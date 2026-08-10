@@ -1,16 +1,11 @@
 import { getStore } from '@netlify/blobs'
 import { randomUUID } from 'node:crypto'
+import { ADMIN_KEY, OWNER_ID, bearer } from './_shared/auth'
+import { findUserByCode, storeNameFor } from './_shared/users'
 
-// One blob store per collection type so records and books never mix.
-const STORE_NAMES = {
-  records: 'runout-collection',
-  books: 'runout-library',
-}
+// Only these collection kinds exist; anything else is rejected.
+const COLLECTIONS = { records: true, books: true }
 const INDEX_KEY = 'index'
-
-function storeNameFor(collection) {
-  return STORE_NAMES[collection] || STORE_NAMES.records
-}
 
 const json = (statusCode, body) => new Response(JSON.stringify(body), {
   status: statusCode,
@@ -26,11 +21,39 @@ async function writeIndex(store, ids) {
   await store.setJSON(INDEX_KEY, ids)
 }
 
+// Every request must carry the caller's access code. The owner uses the admin
+// key; members use the code the admin generated when approving their request.
+async function authorize(req) {
+  const code = bearer(req)
+  if (!code) return { error: json(401, { error: 'Sign in with your access code.' }) }
+
+  let user
+  if (code === ADMIN_KEY) {
+    user = { id: OWNER_ID, role: 'admin', status: 'active', collections: { records: true, books: true } }
+  } else {
+    user = await findUserByCode(code)
+  }
+  if (!user) return { error: json(401, { error: "That access code isn't recognized." }) }
+  if (user.status !== 'active') return { error: json(403, { error: 'This account is disabled.' }) }
+  return { user }
+}
+
 export default async (req) => {
   const url = new URL(req.url)
   const collection = url.searchParams.get('collection') || 'records'
-  const store = getStore(storeNameFor(collection))
   const id = url.searchParams.get('id')
+
+  const { user, error } = await authorize(req)
+  if (error) return error
+
+  if (!COLLECTIONS[collection]) return json(400, { error: 'Unknown collection.' })
+  if (!user.collections?.[collection]) {
+    return json(403, { error: `Your plan doesn't include the ${collection} collection.` })
+  }
+
+  // Owner → legacy stores (existing data preserved); members → their own
+  // isolated store per kind.
+  const store = getStore(storeNameFor(user.id, collection))
 
   try {
     if (req.method === 'GET') {

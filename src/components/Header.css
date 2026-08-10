@@ -37,6 +37,17 @@
 }
 .icon-btn:active { background: var(--vinyl-groove); }
 
+.user-chip {
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+}
+.user-chip-initial {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--runout-gold);
+}
+
 .header-right {
   display: flex;
   align-items: center;

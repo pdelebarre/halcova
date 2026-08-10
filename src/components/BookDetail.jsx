@@ -65,12 +65,14 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
             ) : null}
           </dl>
 
-          <div className="detail-notes">
-            <p className="detail-section-label">About this book</p>
-            {!description && !descError && <p className="detail-loading">Loading…</p>}
-            {descError && <p className="detail-loading">Couldn't load the description.</p>}
-            {description && <p className="book-description">{description}</p>}
-          </div>
+          {(description || item.googleBooksId) && (
+            <div className="detail-notes">
+              <p className="detail-section-label">About this book</p>
+              {item.googleBooksId && !description && !descError && <p className="detail-loading">Loading…</p>}
+              {descError && <p className="detail-loading">Couldn't load the description.</p>}
+              {description && <p className="book-description">{description}</p>}
+            </div>
+          )}
 
           <div className="detail-notes">
             <p className="detail-section-label">Notes</p>

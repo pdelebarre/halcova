@@ -21,7 +21,7 @@ export function useCollection(collection = 'records') {
   useEffect(() => { refresh() }, [refresh])
 
   const add = useCallback(async (item) => {
-    const saved = await api.addItem(collection, item)
+    const saved = await api.addItem(item, collection)
     setItems((prev) => [saved, ...prev])
     return saved
   }, [collection])
@@ -30,7 +30,7 @@ export function useCollection(collection = 'records') {
     const prevItems = items
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)))
     try {
-      await api.updateItem(collection, id, patch)
+      await api.updateItem(id, patch, collection)
     } catch (err) {
       setItems(prevItems)
       throw err
@@ -41,7 +41,7 @@ export function useCollection(collection = 'records') {
     const prevItems = items
     setItems((prev) => prev.filter((it) => it.id !== id))
     try {
-      await api.deleteItem(collection, id)
+      await api.deleteItem(id, collection)
     } catch (err) {
       setItems(prevItems)
       throw err

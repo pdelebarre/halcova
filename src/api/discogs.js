@@ -1,8 +1,16 @@
+import { getUserId } from '../utils/session'
+
 const BASE = 'https://api.discogs.com'
 const USER_AGENT = 'RunoutRecordCollector/1.0'
 
+// Each signed-in user has their own Discogs token (records lookups are
+// personal). Keyed by user id so switching accounts never leaks a token.
+function tokenKey() {
+  return `runout_discogs_token_${getUserId() || 'local'}`
+}
+
 function getToken() {
-  return localStorage.getItem('runout_discogs_token') || ''
+  return localStorage.getItem(tokenKey()) || ''
 }
 
 export function hasToken() {
@@ -10,11 +18,11 @@ export function hasToken() {
 }
 
 export function setToken(token) {
-  localStorage.setItem('runout_discogs_token', token.trim())
+  localStorage.setItem(tokenKey(), token.trim())
 }
 
 export function clearToken() {
-  localStorage.removeItem('runout_discogs_token')
+  localStorage.removeItem(tokenKey())
 }
 
 async function discogsFetch(path, params = {}) {

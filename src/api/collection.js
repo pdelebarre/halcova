@@ -1,7 +1,15 @@
+import { getAccessCode } from '../utils/session'
+
 const FN_BASE = '/.netlify/functions/collection'
 
 // The collection API is shared by records and books — the Netlify function
-// uses this to pick which blob store to read/write.
+// uses this to pick which blob store to read/write. Every call authenticates
+// with the signed-in user's access code.
+function authHeaders() {
+  const code = getAccessCode()
+  return code ? { Authorization: `Bearer ${code}` } : {}
+}
+
 function fnUrl(collection, extra = {}) {
   const url = new URL(FN_BASE, window.location.origin)
   url.searchParams.set('collection', collection || 'records')
@@ -24,30 +32,30 @@ async function handle(res) {
 }
 
 export async function listItems(collection = 'records') {
-  const res = await fetch(fnUrl(collection))
+  const res = await fetch(fnUrl(collection), { headers: authHeaders() })
   const data = await handle(res)
   return data.items || []
 }
 
-export async function addItem(collection = 'records', item) {
+export async function addItem(item, collection = 'records') {
   const res = await fetch(fnUrl(collection), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(item),
   })
   return handle(res)
 }
 
-export async function updateItem(collection = 'records', id, patch) {
+export async function updateItem(id, patch, collection = 'records') {
   const res = await fetch(fnUrl(collection, { id }), {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   })
   return handle(res)
 }
 
-export async function deleteItem(collection = 'records', id) {
-  const res = await fetch(fnUrl(collection, { id }), { method: 'DELETE' })
+export async function deleteItem(id, collection = 'records') {
+  const res = await fetch(fnUrl(collection, { id }), { method: 'DELETE', headers: authHeaders() })
   return handle(res)
 }
