@@ -19,6 +19,7 @@ function normalize(s) {
 export function findRelated(candidate, items) {
   const ownedExact = items.find((it) => {
     if (candidate.discogsId && it.discogsId && it.discogsId === candidate.discogsId) return true
+    if (candidate.googleBooksId && it.googleBooksId && it.googleBooksId === candidate.googleBooksId) return true
     if (candidate.barcode && it.barcode && it.barcode === candidate.barcode) return true
     return false
   }) || null

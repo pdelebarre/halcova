@@ -1,6 +1,11 @@
 import './MatchPicker.css'
 
-export default function MatchPicker({ title, matches, loading, errorMsg, onPick, onRetrySearch, onManual, onClose }) {
+export default function MatchPicker({
+  title, matches, loading, errorMsg,
+  onPick, onRetrySearch, onManual, onClose,
+  loadingLabel = 'Looking it up…',
+  noMatchLabel = 'No matches found.',
+}) {
   return (
     <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={title}>
       <div className="sheet">
@@ -9,19 +14,19 @@ export default function MatchPicker({ title, matches, loading, errorMsg, onPick,
           <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        {loading && <p className="sheet-status">Looking it up on Discogs…</p>}
+        {loading && <p className="sheet-status">{loadingLabel}</p>}
         {errorMsg && !loading && <p className="sheet-status sheet-error">{errorMsg}</p>}
 
         {!loading && !errorMsg && matches?.length === 0 && (
           <div className="sheet-empty">
-            <p>No matches found on Discogs.</p>
+            <p>{noMatchLabel}</p>
           </div>
         )}
 
         {!loading && matches?.length > 0 && (
           <ul className="match-list">
             {matches.map((m) => (
-              <li key={m.discogsId}>
+              <li key={m.discogsId ?? m.googleBooksId ?? m.title}>
                 <button className="match-row" onClick={() => onPick(m)}>
                   <span className="match-cover">
                     {m.coverImage

@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import * as discogs from '../api/discogs'
+import * as books from '../api/books'
 import MatchPicker from './MatchPicker'
 import './ManualAddModal.css'
 
-const FORMATS = ['LP', 'EP', 'CD', '7"', '12"', 'Other']
-const emptyForm = { title: '', artist: '', formatType: 'LP', year: '', label: '', catno: '', genre: '' }
+const emptyForm = { title: '', author: '', year: '', publisher: '', category: '' }
 
-export default function ManualAddModal({ onPick, onClose }) {
+export default function BookManualAddModal({ onPick, onClose }) {
   const [mode, setMode] = useState('search') // search | picking | form
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState(null)
@@ -21,12 +20,10 @@ export default function ManualAddModal({ onPick, onClose }) {
     setLoading(true)
     setErrorMsg('')
     try {
-      const results = await discogs.searchByText(query.trim())
+      const results = await books.searchByText(query.trim())
       setMatches(results)
     } catch (err) {
-      setErrorMsg(err.code === 'NO_TOKEN'
-        ? 'Add a Discogs token in Settings first, or add this record manually below.'
-        : err.message)
+      setErrorMsg(err.message)
       setMatches([])
     } finally {
       setLoading(false)
@@ -37,19 +34,23 @@ export default function ManualAddModal({ onPick, onClose }) {
     e.preventDefault()
     if (!form.title.trim()) return
     onPick({
-      title: form.artist ? `${form.artist} - ${form.title}` : form.title,
+      title: form.author ? `${form.author} - ${form.title}` : form.title,
       year: form.year,
-      label: form.label,
-      catno: form.catno,
-      formatRaw: form.formatType,
-      formatType: form.formatType,
-      genre: form.genre ? [form.genre] : [],
+      label: form.publisher,
+      catno: '',
+      isbn: '',
+      formatRaw: '',
+      formatType: '',
+      genre: form.category ? [form.category] : [],
       style: [],
       country: '',
       coverImage: '',
-      discogsId: null,
+      googleBooksId: null,
+      infoLink: '',
       resourceUrl: '',
       barcode: '',
+      description: '',
+      pageCount: '',
     })
   }
 
@@ -63,15 +64,15 @@ export default function ManualAddModal({ onPick, onClose }) {
         onPick={onPick}
         onManual={() => setMode('form')}
         onClose={onClose}
-        loadingLabel="Looking it up on Discogs…"
-        noMatchLabel="No matches found on Discogs."
+        loadingLabel="Looking it up on Google Books…"
+        noMatchLabel="No matches found on Google Books."
       />
     )
   }
 
   if (mode === 'form') {
     return (
-      <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Add record manually">
+      <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Add book manually">
         <div className="sheet manual-form-sheet">
           <div className="sheet-header">
             <h2>Add by hand</h2>
@@ -79,42 +80,30 @@ export default function ManualAddModal({ onPick, onClose }) {
           </div>
           <form className="manual-form" onSubmit={submitManual}>
             <label>
-              <span>Artist</span>
-              <input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Miles Davis" />
+              <span>Author</span>
+              <input value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} placeholder="Ursula K. Le Guin" />
             </label>
             <label>
               <span>Title *</span>
-              <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kind of Blue" />
+              <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="A Wizard of Earthsea" />
             </label>
             <div className="manual-form-row">
               <label>
-                <span>Format</span>
-                <select value={form.formatType} onChange={(e) => setForm({ ...form, formatType: e.target.value })}>
-                  {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </label>
-              <label>
                 <span>Year</span>
-                <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="1959" inputMode="numeric" />
-              </label>
-            </div>
-            <div className="manual-form-row">
-              <label>
-                <span>Label</span>
-                <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Columbia" />
+                <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="1968" inputMode="numeric" />
               </label>
               <label>
-                <span>Catalog #</span>
-                <input value={form.catno} onChange={(e) => setForm({ ...form, catno: e.target.value })} placeholder="CL 1355" />
+                <span>Publisher</span>
+                <input value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} placeholder="Parnassus Press" />
               </label>
             </div>
             <label>
-              <span>Genre</span>
-              <input value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} placeholder="Jazz" />
+              <span>Category</span>
+              <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Fantasy" />
             </label>
             <div className="sheet-actions">
               <button type="button" className="btn btn-ghost" onClick={() => setMode('search')}>Back to search</button>
-              <button type="submit" className="btn btn-primary">Add to crate</button>
+              <button type="submit" className="btn btn-primary">Add to shelf</button>
             </div>
           </form>
         </div>
@@ -123,7 +112,7 @@ export default function ManualAddModal({ onPick, onClose }) {
   }
 
   return (
-    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Find a record">
+    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Find a book">
       <div className="sheet">
         <div className="sheet-header">
           <h2>Find it another way</h2>
@@ -134,10 +123,10 @@ export default function ManualAddModal({ onPick, onClose }) {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Artist or album title"
+            placeholder="Title or author"
             className="search-input"
           />
-          <button type="submit" className="btn btn-primary btn-block">Search Discogs</button>
+          <button type="submit" className="btn btn-primary btn-block">Search Google Books</button>
         </form>
         <button className="text-link" onClick={() => setMode('form')}>Skip search — add it by hand</button>
       </div>

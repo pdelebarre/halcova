@@ -18,14 +18,14 @@ function RelatedRow({ item, onOpen }) {
   )
 }
 
-export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArtist, onAdd, onOpenItem, onScanNext, onClose }) {
+export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArtist, onAdd, onOpenItem, onScanNext, onClose, copy }) {
   const { artist, album } = splitArtistTitle(candidate.title)
 
-  let banner = { tone: 'good', label: 'Not in your crate yet', sub: "You don't have this one." }
+  let banner = { tone: 'good', ...copy.resultGood }
   if (ownedExact) {
-    banner = { tone: 'owned', label: 'Already in your crate', sub: 'This exact record is already yours.' }
+    banner = { tone: 'owned', ...copy.resultOwned }
   } else if (sameAlbum.length > 0) {
-    banner = { tone: 'caution', label: 'You already own this album', sub: 'Different pressing or format — check before buying.' }
+    banner = { tone: 'caution', ...copy.resultSame }
   }
 
   return (
@@ -56,13 +56,13 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
             <span className="ownership-label">{banner.label}</span>
             <span className="ownership-sub">{banner.sub}</span>
             {ownedExact && (
-              <button className="ownership-view" onClick={() => onOpenItem(ownedExact)}>View in crate →</button>
+              <button className="ownership-view" onClick={() => onOpenItem(ownedExact)}>View in collection →</button>
             )}
           </div>
 
           {sameAlbum.length > 0 && (
             <div className="related-section">
-              <p className="related-heading">Other pressings you own</p>
+              <p className="related-heading">{copy.sameHeading}</p>
               <div className="related-list">
                 {sameAlbum.map((it) => <RelatedRow key={it.id} item={it} onOpen={onOpenItem} />)}
               </div>
@@ -72,8 +72,8 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
           <div className="related-section">
             <p className="related-heading">
               {otherArtist.length > 0
-                ? `More by ${artist} in your crate (${otherArtist.length})`
-                : `Nothing else by ${artist} in your crate`}
+                ? copy.moreBy(artist, otherArtist.length)
+                : copy.nothingElseBy(artist)}
             </p>
             {otherArtist.length > 0 && (
               <div className="related-list">
@@ -84,9 +84,9 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
         </div>
 
         <div className="sheet-actions">
-          <button className="btn btn-ghost" onClick={onScanNext}>Scan next</button>
+          <button className="btn btn-ghost" onClick={onScanNext}>{copy.scanNext}</button>
           <button className="btn btn-primary" onClick={() => onAdd(candidate)}>
-            {ownedExact ? 'Add anyway' : 'Add to crate'}
+            {ownedExact ? copy.addAnyway : copy.add}
           </button>
         </div>
       </div>

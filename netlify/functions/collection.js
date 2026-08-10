@@ -1,8 +1,16 @@
 import { getStore } from '@netlify/blobs'
 import { randomUUID } from 'node:crypto'
 
-const STORE_NAME = 'runout-collection'
+// One blob store per collection type so records and books never mix.
+const STORE_NAMES = {
+  records: 'runout-collection',
+  books: 'runout-library',
+}
 const INDEX_KEY = 'index'
+
+function storeNameFor(collection) {
+  return STORE_NAMES[collection] || STORE_NAMES.records
+}
 
 const json = (statusCode, body) => new Response(JSON.stringify(body), {
   status: statusCode,
@@ -19,8 +27,9 @@ async function writeIndex(store, ids) {
 }
 
 export default async (req) => {
-  const store = getStore(STORE_NAME)
   const url = new URL(req.url)
+  const collection = url.searchParams.get('collection') || 'records'
+  const store = getStore(storeNameFor(collection))
   const id = url.searchParams.get('id')
 
   try {

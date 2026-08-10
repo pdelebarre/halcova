@@ -49,6 +49,10 @@ export default function SettingsModal({ onClose }) {
             Used to look up records by barcode. Get a free token at discogs.com → Settings → Developers →
             Generate new token. It's stored only on this device.
           </p>
+          <div className="settings-help settings-help-books">
+            Books are looked up on Google Books, which needs no token — just switch to the Books tab
+            and scan an ISBN.
+          </div>
           <div className="sheet-actions">
             {discogs.hasToken() && (
               <button type="button" className="btn btn-danger" onClick={clear}>Remove token</button>

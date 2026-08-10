@@ -1,0 +1,80 @@
+.book-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 0;
+}
+
+.book-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--vinyl-groove-2);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.book-card:active .book-cover {
+  transform: translateY(-5px);
+}
+
+/* Subtle spine shadow so covers read as books, not photos. */
+.book-cover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45), transparent 90%);
+}
+
+.book-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.book-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--static-grey);
+}
+
+.book-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 1px;
+}
+
+.book-card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-card-author {
+  font-size: 11px;
+  color: var(--static-grey);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

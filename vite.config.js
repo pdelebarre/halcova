@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Runout — Record Collection',
+        name: 'Runout — Records & Books',
         short_name: 'Runout',
-        description: 'Scan a barcode, catalog the record. Your LP, EP and CD collection in one crate.',
+        description: 'Scan a barcode, catalog the thing. Your record and book collection in one app.',
         theme_color: '#16130F',
         background_color: '#16130F',
         display: 'standalone',
@@ -35,6 +35,16 @@ export default defineConfig({
             urlPattern: ({ url }) => url.hostname.includes('discogs.com') && /\.(jpe?g|png|gif)$/i.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'discogs-images', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } },
+          },
+          {
+            urlPattern: ({ url }) => url.hostname === 'www.googleapis.com',
+            handler: 'NetworkFirst',
+            options: { cacheName: 'google-books-api', expiration: { maxEntries: 200 } },
+          },
+          {
+            urlPattern: ({ url }) => url.hostname === 'books.google.com' && /\.(jpe?g|png|gif|webp)$/i.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'google-books-images', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
         ],
       },

@@ -1,0 +1,16 @@
+/* Book-specific tweaks on top of AlbumDetail.css — covers are portrait, and
+   the description reads as a paragraph rather than a tracklist. */
+
+.detail-cover.book {
+  width: 132px;
+  height: auto;
+  aspect-ratio: 2 / 3;
+}
+
+.book-description {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--jacket-kraft-dim);
+  margin: 0 0 16px;
+  overflow-wrap: break-word;
+}

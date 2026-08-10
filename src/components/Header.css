@@ -36,3 +36,34 @@
   border-radius: 50%;
 }
 .icon-btn:active { background: var(--vinyl-groove); }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+}
+
+.tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--static-grey);
+  transition: all 0.15s ease;
+}
+
+.tab.active {
+  background: var(--vinyl-groove-2);
+  color: var(--jacket-kraft);
+  box-shadow: inset 0 0 0 1px var(--line);
+}

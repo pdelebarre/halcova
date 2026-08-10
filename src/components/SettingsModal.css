@@ -29,3 +29,11 @@
   color: var(--static-grey);
   margin: 2px 0 6px;
 }
+
+.settings-help-books {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft-dim);
+}
