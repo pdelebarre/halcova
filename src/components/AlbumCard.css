@@ -1,0 +1,92 @@
+.album-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 0;
+}
+
+.record-peek {
+  position: absolute;
+  top: -3px;
+  left: 12%;
+  width: 76%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  z-index: 0;
+  transform: translateY(0);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+  background:
+    radial-gradient(circle at 50% 50%, var(--sleeve-black) 0 6%, transparent 6.5%),
+    repeating-radial-gradient(circle at 50% 50%, currentColor 0 1px, transparent 1px 6px);
+}
+.record-peek.fmt-lp { color: var(--label-red-bright); }
+.record-peek.fmt-ep { color: var(--runout-gold); }
+.record-peek.fmt-cd { color: #9FB4C7; }
+.record-peek.fmt-seven { color: var(--success); }
+.record-peek.fmt-other { color: var(--static-grey); }
+
+.album-card:active .record-peek {
+  transform: translateY(-16%);
+}
+
+.sleeve {
+  position: relative;
+  z-index: 1;
+  display: block;
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--vinyl-groove-2);
+  border: 1px solid rgba(0,0,0,0.35);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.album-card:active .sleeve {
+  transform: translateY(-5px);
+}
+
+.sleeve img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sleeve-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--static-grey);
+}
+
+.album-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 1px;
+}
+
+.album-card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-card-artist {
+  font-size: 11px;
+  color: var(--static-grey);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

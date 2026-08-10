@@ -1,0 +1,156 @@
+import { useEffect, useRef, useState } from 'react'
+import { prepareZXingModule, readBarcodes } from 'zxing-wasm/reader'
+import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
+import './ScannerModal.css'
+
+// Serve the WASM decoder from our own bundle instead of a third-party CDN, so
+// scanning keeps working reliably (and gets precached by the service worker)
+// rather than depending on an external host.
+prepareZXingModule({
+  overrides: {
+    locateFile: (path) => (path.endsWith('.wasm') ? zxingReaderWasmUrl : path),
+  },
+})
+
+// 1D retail codes printed on records and sleeves — same set the old
+// html5-qrcode scanner supported, decoded by the zxing-wasm WASM engine which
+// works on iOS Safari where html5-qrcode's decoder is unreliable.
+const READER_OPTIONS = {
+  formats: ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'Code128'],
+  tryHarder: true,
+  maxNumberOfSymbols: 1,
+}
+
+const DECODE_INTERVAL_MS = 180 // ~5 decode attempts per second
+// Frames wider than this are downscaled before decoding — keeps the WASM fast
+// on mid-range phones while staying sharp enough for small barcodes.
+const MAX_DECODE_WIDTH = 640
+
+export default function ScannerModal({ onDetected, onClose }) {
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const [statusMsg, setStatusMsg] = useState('Starting camera…')
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    let mediaStream = null
+    let rafId = 0
+
+    async function decodeFrame(video, canvas, ctx) {
+      const scale = Math.min(1, MAX_DECODE_WIDTH / video.videoWidth)
+      const width = Math.max(1, Math.round(video.videoWidth * scale))
+      const height = Math.max(1, Math.round(video.videoHeight * scale))
+      if (canvas.width !== width) canvas.width = width
+      if (canvas.height !== height) canvas.height = height
+      ctx.drawImage(video, 0, 0, width, height)
+
+      let imageData
+      try {
+        imageData = ctx.getImageData(0, 0, width, height)
+      } catch {
+        return // canvas not ready yet — skip this frame
+      }
+
+      try {
+        const results = await readBarcodes(imageData, READER_OPTIONS)
+        if (!cancelled && results.length > 0 && results[0].text) {
+          cancelled = true
+          navigator.vibrate?.(60)
+          cancelAnimationFrame(rafId)
+          mediaStream?.getTracks().forEach((track) => track.stop())
+          onDetected(results[0].text)
+        }
+      } catch {
+        // A single frame failing to decode is normal — keep scanning.
+      }
+    }
+
+    async function start() {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        })
+        if (cancelled) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          return
+        }
+
+        const video = videoRef.current
+        if (!video) return
+        video.srcObject = mediaStream
+        await video.play()
+        if (cancelled) return
+
+        setStatusMsg('Aim at the barcode')
+
+        const canvas = canvasRef.current
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        let decoding = false
+        let lastDecode = 0
+
+        const loop = async () => {
+          if (cancelled) return
+          const now = performance.now()
+          if (!decoding && video.readyState >= 2 && now - lastDecode >= DECODE_INTERVAL_MS) {
+            lastDecode = now
+            decoding = true
+            await decodeFrame(video, canvas, ctx)
+            decoding = false
+          }
+          rafId = requestAnimationFrame(loop)
+        }
+        rafId = requestAnimationFrame(loop)
+      } catch (err) {
+        if (cancelled) return
+        setErrorMsg(
+          err?.name === 'NotAllowedError'
+            ? 'Camera access was denied. Allow camera access in Settings to scan barcodes.'
+            : 'Could not start the camera on this device.',
+        )
+      }
+    }
+
+    start()
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(rafId)
+      mediaStream?.getTracks().forEach((track) => track.stop())
+    }
+  }, [onDetected])
+
+  return (
+    <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Scan barcode">
+      <div className="scanner-video">
+        <video ref={videoRef} autoPlay muted playsInline />
+        <canvas ref={canvasRef} className="scanner-canvas" />
+      </div>
+
+      <div className="scanner-chrome">
+        <button className="scanner-close" onClick={onClose} aria-label="Cancel scan">
+          ✕
+        </button>
+
+        <div className="scanner-target">
+          <span className="scanner-corner tl" />
+          <span className="scanner-corner tr" />
+          <span className="scanner-corner bl" />
+          <span className="scanner-corner br" />
+          <span className="scanner-line" />
+        </div>
+
+        <p className="scanner-status">{errorMsg || statusMsg}</p>
+
+        <button className="scanner-manual" onClick={() => onClose('manual')}>
+          Enter details manually instead
+        </button>
+      </div>
+    </div>
+  )
+}

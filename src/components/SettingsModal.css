@@ -1,0 +1,31 @@
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--jacket-kraft-dim);
+  font-family: var(--font-mono);
+}
+
+.settings-form input {
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  color: var(--jacket-kraft);
+}
+
+.settings-help {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--static-grey);
+  margin: 2px 0 6px;
+}

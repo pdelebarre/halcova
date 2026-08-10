@@ -1,0 +1,45 @@
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 14vh 32px 40px;
+  gap: 6px;
+}
+
+.empty-disc {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  margin-bottom: 14px;
+  background:
+    radial-gradient(circle at 50% 50%, var(--sleeve-black) 0 8%, transparent 8.5%),
+    radial-gradient(circle at 50% 50%, var(--label-red) 0 22%, transparent 22.5%),
+    repeating-radial-gradient(circle at 50% 50%, var(--vinyl-groove-2) 0 1.5px, var(--vinyl-groove) 1.5px 7px);
+  border: 1px solid var(--line);
+  animation: spin 9s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.empty-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+  margin: 0;
+}
+
+.empty-sub {
+  font-size: 14px;
+  color: var(--jacket-kraft-dim);
+  margin: 0 0 16px;
+  max-width: 280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty-disc { animation: none; }
+}
