@@ -1,0 +1,59 @@
+{
+  "planHash": "eece9ddecd7ebda627147a1c6595c348e7d6c573890e9f737697acab9ec04a36",
+  "phase": "postupgrade",
+  "recordedAtUtc": "2026-08-11T13:30:01.1775310Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 914,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "app-load-auth-screen",
+        "kind": "playwright-route",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\nRunning 1 test using 1 worker\n\n  \u2713  1 .tsupgrader/runtime-validation/playwright-scripts/app-load-auth-screen.spec.ts:6:1 \u203A app-load-auth-screen (342ms)\n\n  1 passed (804ms)\n",
+        "durationMs": 1117
+      },
+      {
+        "name": "dev-server-serves-home",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!doctype html\u003E\n\u003Chtml lang=\u0022en\u0022\u003E\n  \u003Chead\u003E\n    \u003Cscript type=\u0022module\u0022\u003Eimport { injectIntoGlobalHook } from \u0022/@react-refresh\u0022;\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () =\u003E {};\nwindow.$RefreshSig$ = () =\u003E (type) =\u003E type;\u003C/script\u003E\n\n    \u003Cscript type=\u0022module\u0022 src=\u0022/@vite/client\u0022\u003E\u003C/script\u003E\n\n    \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0, viewport-fit=cover\u0022 /\u003E\n    \u003Cmeta name=\u0022theme-color\u0022 content=\u0022#16130F\u0022 /\u003E\n    \u003Cmeta name=\u0022apple-mobile-web-app-capable\u0022 content=\u0022yes\u0022 /\u003E\n    \u003Cmeta name=\u0022apple-mobile-web-app-status-bar-style\u0022 content=\u0022black-translucent\u0022 /\u003E\n    \u003Cmeta name=\u0022apple-mobile-web-app-title\u0022 content=\u0022Runout\u0022 /\u003E\n    \u003Cmeta name=\u0022description\u0022 content=\u0022Scan a barcode, catalog the thing. Your record and book collection in one app.\u0022 /\u003E\n    \u003Clink rel=\u0022icon\u0022 type=\u0022image/png\u0022 href=\u0022/favicon.png\u0022 /\u003E\n    \u003Clink rel=\u0022apple-touch-icon\u0022 href=\u0022/apple-touch-icon.png\u0022 /\u003E\n    \u003Clink rel=\u0022preconnect\u0022 href=\u0022https://fonts.googleapis.com\u0022 /\u003E\n    \u003Clink rel=\u0022preconnect\u0022 href=\u0022https://fonts.gstatic.com\u0022 crossorigin /\u003E\n    \u003Clink href=\u0022https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700\u0026family=Inter:wght@400;500;600;700\u0026family=IBM\u002BPlex\u002BMono:wght@400;500\u0026display=swap\u0022 rel=\u0022stylesheet\u0022 /\u003E\n    \u003Ctitle\u003ERunout \u2014 Records \u0026amp; Books\u003C/title\u003E\n  \u003C/head\u003E\n  \u003Cbody\u003E\n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\n    \u003Cscript type=\u0022module\u0022 src=\u0022/src/main.jsx\u0022\u003E\u003C/script\u003E\n  \u003C/body\u003E\n\u003C/html\u003E\n",
+        "durationMs": 19
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\n\u003E runout@0.1.0 test\n\u003E vitest run\n\n\n\u001B[1m\u001B[30m\u001B[46m RUN \u001B[49m\u001B[39m\u001B[22m \u001B[36mv4.1.10 \u001B[39m\u001B[90m/Users/pdelebarre/dev/vinyl-crate\u001B[39m\n\n(node:32442) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n(node:32445) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n(node:32441) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n(node:32443) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n(node:32446) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n(node:32444) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n(node:32440) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use \u0060node --trace-warnings ...\u0060 to show where the warning was created)\n \u001B[32m\u2713\u001B[39m src/api/books.test.js \u001B[2m(\u001B[22m\u001B[2m8 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 5\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/utils/match.test.js \u001B[2m(\u001B[22m\u001B[2m13 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 4\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/api/collection.test.js \u001B[2m(\u001B[22m\u001B[2m9 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 5\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/api/auth.test.js \u001B[2m(\u001B[22m\u001B[2m9 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 6\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/api/discogs.test.js \u001B[2m(\u001B[22m\u001B[2m20 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 6\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/catalog.test.js \u001B[2m(\u001B[22m\u001B[2m6 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 3\u001B[2mms\u001B[22m\u001B[39m\n \u001B[32m\u2713\u001B[39m src/App.test.jsx \u001B[2m(\u001B[22m\u001B[2m5 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[32m 85\u001B[2mms\u001B[22m\u001B[39m\n\n\u001B[2m Test Files \u001B[22m \u001B[1m\u001B[32m7 passed\u001B[39m\u001B[22m\u001B[90m (7)\u001B[39m\n\u001B[2m      Tests \u001B[22m \u001B[1m\u001B[32m70 passed\u001B[39m\u001B[22m\u001B[90m (70)\u001B[39m\n\u001B[2m   Start at \u001B[22m 15:30:00\n\u001B[2m   Duration \u001B[22m 1.09s\u001B[2m (transform 330ms, setup 836ms, import 349ms, tests 113ms, environment 4.73s)\u001B[22m\n\n",
+        "durationMs": 1404,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 70,
+          "testsPassed": 70,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      }
+    ]
+  }
+}

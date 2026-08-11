@@ -34,7 +34,8 @@ Each `src/api/<kind>.js` exports:
 
 Lookup errors carry a `code` so the flow shows the right message:
 
-- `NO_TOKEN` → "Add a <lookupName> token first…" (opens Settings)
+- `SERVER_NO_TOKEN` → the site hasn't configured a token yet (owner must set
+  it server-side)
 - `BAD_TOKEN` → token rejected (Discogs 401)
 - `RATE_LIMIT` → provider rate limit (429)
 - `HTTP_ERROR` → any other non-OK response

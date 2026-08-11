@@ -2,7 +2,7 @@
 description: "Add or expand Vitest + Testing Library tests for Runout's shared collection flow: splitArtistTitle/findRelated (src/utils/match.js), useCollection (src/hooks/useCollection.js), and lookup API normalization (src/api/*). Triggers: 'add tests', 'write tests', 'test coverage', 'unit test', 'vitest', 'testing library'."
 name: "Add catalog tests"
 argument-hint: "What to test (e.g. 'duplicate detection in match.js')?"
-agent: "Runout Engineer"
+agent: "Tester"
 ---
 Write tests for the shared collection flow in Runout using Vitest + Testing
 Library (already configured: jsdom environment, `@testing-library/react`).

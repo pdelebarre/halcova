@@ -25,6 +25,12 @@ records and books by scanning barcodes.
    - Ergonomics / UX / accessibility review → `Ergonomics Reviewer` agent
      (read-only findings — implement its fixes yourself, following the
      `ergonomics-review` skill)
+   - Security / auth / CVE review → `Security Auditor` agent
+   - Tests / QA / coverage → `Tester` agent
+   - Architecture / design review → `Front End Architect` agent
+   - Whole-stack / cloud / backend design → `Whole Stack Architect` agent
+   - UI/UX design in Figma → `UI UX Expert` agent
+   - Large multi-step work across agents → `Project Manager` agent
 
 ## Constraints
 - DO NOT reimplement `splitArtistTitle` or the item shape — import and reuse.
