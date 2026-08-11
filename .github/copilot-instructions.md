@@ -77,10 +77,16 @@ npm run build      # vite build (PWA precaches the scanner wasm)
 
 ## Workflows
 
-- **Agents** (`.github/agents/`): `Runout Engineer` (general), `Catalog
-  Designer` (new collection kinds), `Scanner Builder` (camera + zxing-wasm),
-  `Netlify Backend` (functions / Blobs / auth / PWA), `Ergonomics Reviewer`
-  (read-only UX/ergonomics/a11y review).
+- **Agents** (`.github/agents/`), two layers:
+  - *Roles*: `Project Manager` (orchestrates the team), `Whole Stack
+    Architect` (cloud/scalability/backend design), `Front End Architect`
+    (front-end design/review), `Front End Developer` (implement), `Tester`
+    (QA), `Security Auditor` (security review), `UI UX Expert` (ergonomics +
+    Figma design via MCP).
+  - *Domain specialists*: `Runout Engineer` (general), `Catalog Designer`
+    (new collection kinds), `Scanner Builder` (camera + zxing-wasm),
+    `Netlify Backend` (functions / Blobs / auth / PWA), `Ergonomics Reviewer`
+    (read-only UX/ergonomics/a11y review).
 - **Skills** (`.github/skills/`):
   - `add-catalog-type` — add a new kind of collectible (records → books pattern)
   - `barcode-scanning` — the zxing-wasm camera scanner
@@ -90,7 +96,9 @@ npm run build      # vite build (PWA precaches the scanner wasm)
   - `pwa-offline` — precaching, runtime caching, offline behavior
   - `testing` — Vitest + Testing Library conventions
   - `ergonomics-review` — read-only UX/ergonomics/a11y audit checklist
+  - `whole-stack-architecture` — cloud/scalability review + backend design
+  - `figma-design` — Figma MCP workflows + design tokens
 - **Prompts** (`.github/prompts/`): `add-catalog-tests`, `deploy-to-netlify`,
   `fix-dark-screen`, `review-changes`, `update-copy`, `review-ergonomics`,
-  `fix-ergonomics`.
+  `fix-ergonomics`, `review-architecture`, `design-in-figma`.
 - Detailed docs: `docs/technical.md`, `docs/functional.md`.

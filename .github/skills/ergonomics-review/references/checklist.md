@@ -63,9 +63,10 @@ fail the probe — the "already handled" items live in `SKILL.md`.
 - **Busy/disabled**: auth buttons disable + relabel ("Signing in…") ✓. Check
   collection add, scan, and admin actions have equivalent busy protection
   (double-submit).
-- **Actionable errors**: are error strings actionable (NO_TOKEN → "add a token
-  in Settings"; camera denied → "allow camera in Settings"; 403 plan → "your
-  plan doesn't include X")? Is the message near the control that caused it?
+- **Actionable errors**: are error strings actionable (SERVER_NO_TOKEN → "the
+  owner needs to add a Discogs token"; camera denied → "allow camera in
+  Settings"; 403 plan → "your plan doesn't include X")? Is the message near
+  the control that caused it?
 - **State coverage**: loading (`.status-line`), empty (`EmptyState`), and
   no-results are distinct and each has a next step (CTA button / manual add).
 

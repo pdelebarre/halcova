@@ -1,6 +1,6 @@
 ---
 name: pwa-offline
-description: "Runout's PWA & offline layer (vite-plugin-pwa in vite.config.js): precaching the shell and the scanner .wasm, runtime caching for the Discogs/Google Books APIs (NetworkFirst) and cover images (CacheFirst), the manifest, service worker auto-update, and offline behavior on iOS Safari. Triggers: 'PWA', 'offline', 'service worker', 'precache', 'cache', 'install app', 'add to home screen', 'workbox', 'runtime caching', 'wasm precache', 'offline mode'."
+description: "Runout's PWA & offline layer (vite-plugin-pwa in vite.config.js): precaching the shell and the scanner .wasm, runtime caching for the Google Books API (NetworkFirst) and cover images (CacheFirst), the manifest, service worker auto-update, and offline behavior on iOS Safari. Record lookups go through the /discogs Netlify function, which caches in Netlify Blobs server-side. Triggers: 'PWA', 'offline', 'service worker', 'precache', 'cache', 'install app', 'add to home screen', 'workbox', 'runtime caching', 'wasm precache', 'offline mode'."
 ---
 # PWA & Offline
 
@@ -24,9 +24,10 @@ are cached at runtime so the app keeps working on a flaky connection.
   `#16130F`, `display: 'standalone'`, `orientation: 'portrait'`, icons
   192 / 512 / maskable.
 - **Runtime caching**:
-  - `api.discogs.com` → **NetworkFirst** (`discogs-api`, 200 entries)
   - discogs images (`*.discogs.com` jpg/png/gif) → **CacheFirst**
-    (`discogs-images`, 500 entries, 30 days)
+    (`discogs-images`, 500 entries, 30 days). Lookup *responses* aren't cached
+    in the browser — records go through the `/discogs` Netlify function, which
+    caches them in Netlify Blobs server-side.
   - `www.googleapis.com` → **NetworkFirst** (`google-books-api`, 200 entries)
   - `books.google.com` images → **CacheFirst** (`google-books-images`, 500
     entries, 30 days)
