@@ -103,8 +103,9 @@ RUNOUT_ADMIN_KEY="$(openssl rand -hex 24)"
 
 Each member's data lives in its own blob store (`collection-<userId>-<kind>`);
 your own collections stay in the original `runout-collection` /
-`runout-library` stores, so nothing needs migrating. The Discogs token is also
-per-user, so each member pastes their own token in Settings.
+`runout-library` stores, so nothing needs migrating. Lookups run through
+server-side proxies, so the Discogs token is owned by the site (a single
+`RUNOUT_DISCOGS_TOKEN`), not by users — nobody pastes a token in Settings.
 
 ## Tech stack
 
@@ -112,7 +113,7 @@ per-user, so each member pastes their own token in Settings.
 | --- | --- |
 | UI | React 19 + Vite 8 |
 | Barcode decoding | `zxing-wasm` (WASM, self-hosted + precached) |
-| Record lookup | Discogs API (personal access token) |
+| Record lookup | Discogs API via server-side proxy (single `RUNOUT_DISCOGS_TOKEN`) |
 | Book lookup | Google Books API (public, no key) |
 | Persistence | Netlify Blobs via Netlify Functions (`collection`, `auth`, `admin`) |
 | Auth | Access codes + admin key (`RUNOUT_ADMIN_KEY`) |
@@ -129,9 +130,9 @@ personal token:
 
 1. Create a Discogs account at discogs.com if you don't have one.
 2. Go to **Settings → Developers → Generate new token**.
-3. Copy the token — you'll paste it into the app's Settings screen once it's
-   deployed (stored only in your phone's browser, never sent anywhere but
-   Discogs).
+3. Copy the token and set it as the site's `RUNOUT_DISCOGS_TOKEN` (see
+   "Deploy to Netlify" below) — the token lives server-side on the lookup
+   proxy, never in anyone's browser.
 
 Books don't need a token — Google Books is a public API.
 
@@ -148,10 +149,12 @@ netlify deploy --build --prod
 Follow the prompts to link or create a site. Netlify Blobs works
 automatically — no database to provision.
 
-Before going live, set the admin key so you can sign in as the owner:
+Before going live, set the admin key so you can sign in as the owner, plus the
+Discogs lookup token the server-side proxy uses:
 
 ```bash
 netlify env:set RUNOUT_ADMIN_KEY "$(openssl rand -hex 24)"
+netlify env:set RUNOUT_DISCOGS_TOKEN "<your Discogs personal access token>"
 ```
 
 **Option B — drag and drop**: run `npm install && npm run build` locally,
@@ -171,7 +174,8 @@ already set in `netlify.toml`, so Netlify should pick them up automatically.
    to be Safari, not Chrome, for the install step).
 2. Tap the Share icon → **Add to Home Screen**.
 3. Open it from the home screen icon — it now runs full-screen.
-4. Tap the settings (gear) icon and paste in your Discogs token.
+4. No token to paste — lookups run through the server-side proxy, which owns
+   the Discogs token.
 5. Tap **Scan** and point the camera at a barcode.
 
 ## Local development

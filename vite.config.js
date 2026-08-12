@@ -27,19 +27,19 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,ico,wasm}'],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.hostname === 'api.discogs.com',
+            // Lookups go through the Netlify function proxies (the server-side
+            // Blob cache is the primary dedup). This is just a modest client
+            // cache so repeat lookups don't re-hit the network.
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/.netlify/functions/discogs') ||
+              url.pathname.startsWith('/.netlify/functions/books'),
             handler: 'NetworkFirst',
-            options: { cacheName: 'discogs-api', expiration: { maxEntries: 200 } },
+            options: { cacheName: 'lookup-api', expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 } },
           },
           {
             urlPattern: ({ url }) => url.hostname.includes('discogs.com') && /\.(jpe?g|png|gif)$/i.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'discogs-images', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } },
-          },
-          {
-            urlPattern: ({ url }) => url.hostname === 'www.googleapis.com',
-            handler: 'NetworkFirst',
-            options: { cacheName: 'google-books-api', expiration: { maxEntries: 200 } },
           },
           {
             urlPattern: ({ url }) => url.hostname === 'books.google.com' && /\.(jpe?g|png|gif|webp)$/i.test(url.pathname),

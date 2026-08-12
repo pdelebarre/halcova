@@ -25,8 +25,8 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
       const results = await discogs.searchByText(query.trim())
       setMatches(results)
     } catch (err) {
-      setErrorMsg(err.code === 'NO_TOKEN'
-        ? 'Add a Discogs token in Settings first, or add this record manually below.'
+      setErrorMsg(err.code === 'SERVER_NO_TOKEN'
+        ? "Record lookups aren't configured yet — ask the owner to set up the shared token, or add this record manually below."
         : err.message)
       setMatches([])
     } finally {
