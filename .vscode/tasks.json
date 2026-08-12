@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Generate icons",
+			"type": "shell",
+			"command": "node scripts/generate-icons.mjs",
+			"group": "none"
+		},
+		{
+			"label": "Install sharp",
+			"type": "shell",
+			"command": "npm install --save-dev sharp",
+			"group": "none"
+		},
+		{
+			"label": "Generate icons",
+			"type": "shell",
+			"command": "node scripts/generate-icons.mjs",
+			"group": "none"
+		},
+		{
+			"label": "Verify build",
+			"type": "shell",
+			"command": "npm run build 2>&1",
+			"group": "none"
+		},
+		{
+			"label": "Lint & test",
+			"type": "shell",
+			"command": "npm run lint && npm test",
+			"group": "none"
+		}
+	]
+}

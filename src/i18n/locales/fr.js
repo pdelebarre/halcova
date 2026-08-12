@@ -19,6 +19,7 @@ const fr = {
   'common.search': 'Rechercher',
   'common.by': 'par',
   'common.copy': 'Copier',
+  'common.credits': 'Crédits',
 
   // §2
   'kind.records': 'Disques',
@@ -234,6 +235,29 @@ const fr = {
   'catalog.listLabel': 'Liste de la collection',
   'catalog.listJumpRail': 'Aller à la lettre',
   'catalog.listJumpTo': 'Aller à',
+
+  // §14 Crédits
+  'credits.aboutName': 'À propos du nom',
+  'credits.aboutNameBody': '« hokan » est un nom propre inventé, intraduisible — un mot chaleureux et douillet qui désigne l\'endroit où vit votre collection, comme « alcôve » dans les langues romanes. Il relie les disques et les livres sans biais pour l\'un ou l\'autre support. Choisi après un processus de nommage international couvrant 7 langues (EN, FR, PT, NL, DE, ES, IT) et l\'esthétique sombre des collectionneurs.',
+  'credits.builtWith': 'Construit avec',
+  'credits.techReact': 'React 19',
+  'credits.techReactDesc': 'Bibliothèque UI',
+  'credits.techVite': 'Vite 8',
+  'credits.techViteDesc': 'Outil de build',
+  'credits.techZxing': 'zxing-wasm',
+  'credits.techZxingDesc': 'Scan de codes-barres (EAN/UPC, ISBN, Code 128)',
+  'credits.techDiscogs': 'API Discogs',
+  'credits.techDiscogsDesc': 'Recherche de disques',
+  'credits.techGoogleBooks': 'API Google Books',
+  'credits.techGoogleBooksDesc': 'Recherche de livres',
+  'credits.techNetlify': 'Netlify',
+  'credits.techNetlifyDesc': 'Fonctions serverless + stockage Blobs',
+  'credits.techPwa': 'vite-plugin-pwa',
+  'credits.techPwaDesc': 'Support hors-ligne / installation',
+  'credits.fonts': 'Polices',
+  'credits.fontsBody': 'Fraunces (mot-symbole, titres) par Undercase Type. Geist Mono (interface, données) par Vercel.',
+  'credits.creator': 'Créateur',
+  'credits.creatorBody': 'Créé par Pierre Delebart pour les autres collectionneurs.',
 }
 
 export default fr

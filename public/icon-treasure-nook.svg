@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="512" height="512"
+     viewBox="0 0 512 512">
+
+  <!-- 1. Background -->
+  <rect width="512" height="512" fill="#16130F" />
+
+  <!-- 2. Warm glow (behind everything) -->
+  <path d="M 156 330 A 100 60 0 0 0 356 330 Z"
+        fill="#C9A227" opacity="0.10" />
+
+  <!-- 3. Gothic pointed arch (stroked outline) -->
+  <path d="M 116 380 A 280 280 0 0 1 256 137.5 A 280 280 0 0 1 396 380"
+        stroke="#C9A227" stroke-width="16" fill="none"
+        stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- 4. Horizontal base line -->
+  <line x1="108" y1="380" x2="404" y2="380"
+        stroke="#C9A227" stroke-width="16" stroke-linecap="round" />
+
+  <!-- 5. Inner card (tilted rounded rectangle) -->
+  <rect x="-50" y="-70" width="100" height="140" rx="12" ry="12"
+        fill="#EFE6D8"
+        transform="translate(256, 302) rotate(10)" />
+
+  <!-- 6. Wordmark (non-maskable only) -->
+  <text x="256" y="460"
+        font-family="Fraunces, Georgia, serif"
+        font-size="72" font-weight="400"
+        fill="#C9A227"
+        text-anchor="middle" letter-spacing="0.05em">
+    hokan
+  </text>
+
+</svg>

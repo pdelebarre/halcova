@@ -19,6 +19,7 @@ const de = {
   'common.search': 'Suchen',
   'common.by': 'von',
   'common.copy': 'Kopieren',
+  'common.credits': 'Credits',
 
   // §2
   'kind.records': 'Platten',
@@ -234,6 +235,29 @@ const de = {
   'catalog.listLabel': 'Sammlungsliste',
   'catalog.listJumpRail': 'Zum Buchstaben springen',
   'catalog.listJumpTo': 'Springen zu',
+
+  // §14 Credits
+  'credits.aboutName': 'Über den Namen',
+  'credits.aboutNameBody': '"hokan" ist ein erfundenes, unübersetzbares Eigenwort — ein warmes, gemütliches Wort, das den Ort benennt, an dem deine Sammlung lebt, wie "Alkoven" in romanischen Sprachen. Es verbindet Platten und Bücher ohne Bevorzugung eines Mediums. Gewählt nach einem internationalen Namensfindungsprozess in 7 Sprachen (EN, FR, PT, NL, DE, ES, IT) und der dunklen Sammler-Ästhetik.',
+  'credits.builtWith': 'Entwickelt mit',
+  'credits.techReact': 'React 19',
+  'credits.techReactDesc': 'UI-Bibliothek',
+  'credits.techVite': 'Vite 8',
+  'credits.techViteDesc': 'Build-Tool',
+  'credits.techZxing': 'zxing-wasm',
+  'credits.techZxingDesc': 'Barcode-Scanning (EAN/UPC, ISBN, Code 128)',
+  'credits.techDiscogs': 'Discogs API',
+  'credits.techDiscogsDesc': 'Platten-Suche',
+  'credits.techGoogleBooks': 'Google Books API',
+  'credits.techGoogleBooksDesc': 'Bücher-Suche',
+  'credits.techNetlify': 'Netlify',
+  'credits.techNetlifyDesc': 'Serverless-Funktionen + Blobs-Speicher',
+  'credits.techPwa': 'vite-plugin-pwa',
+  'credits.techPwaDesc': 'Offline- / Installationsunterstützung',
+  'credits.fonts': 'Schriften',
+  'credits.fontsBody': 'Fraunces (Wortmarke, Überschriften) von Undercase Type. Geist Mono (UI, Daten) von Vercel.',
+  'credits.creator': 'Ersteller',
+  'credits.creatorBody': 'Entwickelt von Pierre Delebart für andere Sammler.',
 }
 
 export default de
