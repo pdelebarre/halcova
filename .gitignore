@@ -5,3 +5,6 @@ dist-ssr
 *.local
 .netlify
 .DS_Store
+.env
+.env.*
+!.env.example

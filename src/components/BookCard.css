@@ -81,3 +81,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* W7: On-loan / Overdue badge (rendered only when lending is enabled). */
+.lending-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--success);
+  background: rgba(18, 15, 11, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.lending-badge.overdue {
+  color: var(--danger-bright);
+  border-color: rgba(224, 105, 91, 0.6);
+}

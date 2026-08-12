@@ -15,17 +15,21 @@ export default function FilterSheet({
   artists = [], activeArtist = '', setActiveArtist,
   artistLabel = 'artist',
   artistPlaceholder = 'All',
+  lendingEnabled = false,
+  activeLending = false,
+  onToggleLending,
   onClear,
   onClose,
 }) {
   const sheet = copy.filterSheet || {}
+  const lending = copy?.lending || {}
   const closeRef = useRef(null)
   const comboWrapRef = useRef(null)
   const [artistQuery, setArtistQuery] = useState('')
   const [artistOpen, setArtistOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
 
-  const hasFilters = activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== ''
+  const hasFilters = activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending
 
   const filteredArtists = useMemo(() => {
     const q = artistQuery.trim().toLowerCase()
@@ -184,6 +188,24 @@ export default function FilterSheet({
                   )}
                 </div>
               </div>
+            </section>
+          )}
+
+          {lendingEnabled && (
+            <section className="filter-section filter-section-lending">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={activeLending}
+                className={`switch${activeLending ? ' on' : ''}`}
+                onClick={() => onToggleLending?.()}
+              >
+                <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>
+                <span className="switch-label">
+                  <span className="switch-label-text">{lending.filter || t('lending.filter')}</span>
+                  <span className="switch-hint">{lending.filterHint || t('lending.filterHint')}</span>
+                </span>
+              </button>
             </section>
           )}
         </div>

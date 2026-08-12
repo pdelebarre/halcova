@@ -170,6 +170,8 @@ const es = {
   'admin.enable': 'Activar',
   'admin.delete': 'Eliminar',
   'admin.deleteConfirm': '¿Eliminar a este miembro y sus colecciones? No se puede deshacer.',
+  'admin.whichFeatures': 'Any extra features for this member?',
+  'admin.features': 'Features',
 
   // §12
   'err.requestFailed': 'Falló la solicitud ({status})',
@@ -257,7 +259,34 @@ const es = {
   'credits.fonts': 'Fuentes',
   'credits.fontsBody': 'Fraunces (marca denominativa, títulos) por Undercase Type. Geist Mono (interfaz, datos) por Vercel.',
   'credits.creator': 'Creador',
-  'credits.creatorBody': 'Creado por Pierre Delebart para otros coleccionistas.',
+  'credits.creatorBody': 'Creado por Philippe Delebarre para otros coleccionistas.',
+
+  // §15 Lending
+  'lending.section': 'Lending',
+  'lending.statusOut': 'On loan to {name} · since {date}',
+  'lending.due': 'Due {date}',
+  'lending.overdue': 'Overdue',
+  'lending.overdueSince': 'Overdue since {date}',
+  'lending.notOnLoan': 'Not on loan',
+  'lending.lend': 'Lend…',
+  'lending.lendTitle': 'Lend this {entity}',
+  'lending.borrower': 'Borrower',
+  'lending.borrowerPlaceholder': "Borrower's name",
+  'lending.contact': 'Contact (optional)',
+  'lending.dueDate': 'Due date (optional)',
+  'lending.confirmLend': 'Lend',
+  'lending.nameRequired': 'Add a name — who are you lending it to?',
+  'lending.return': 'Mark returned',
+  'lending.returnConfirm': 'Confirm returned?',
+  'lending.lentToast': 'Lent to {name}',
+  'lending.returnedToast': 'Marked returned',
+  'lending.badge': 'On loan',
+  'lending.badgeOverdue': 'Overdue',
+  'lending.filter': 'On loan',
+  'lending.filterHint': 'Show items currently on loan',
+  'lending.featureLabel': 'Lending',
+  'lending.featureHint': 'Let this member lend items and track who has them.',
+  'lending.notEnabled': "Lending isn't enabled for your account.",
 }
 
 export default es

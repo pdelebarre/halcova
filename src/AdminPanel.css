@@ -134,6 +134,33 @@
 .switch.on .switch-thumb { transform: translateX(18px); background: var(--jacket-kraft); }
 .switch.on { border-color: var(--label-red); color: var(--jacket-kraft); }
 
+/* Switches with an optional hint line underneath the label (Lending toggle). */
+.switch-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.25;
+}
+.switch-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--static-grey);
+}
+
+/* Optional feature toggles on the approve (grant-access) panel. */
+.admin-features {
+  margin-top: 12px;
+}
+.admin-features-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--static-grey);
+  margin: 0 0 2px;
+}
+
 .admin-approve {
   padding: 14px;
   border: 1px solid var(--runout-gold);

@@ -18,7 +18,7 @@ function fmtDate(iso) {
 
 // Switch-style plan toggle (§4.16): a button with role="switch" so the
 // Records/Books grants read as on/off rather than chips.
-function Switch({ checked, onChange, label }) {
+function Switch({ checked, onChange, label, hint }) {
   return (
     <button
       type="button"
@@ -29,7 +29,10 @@ function Switch({ checked, onChange, label }) {
       onClick={onChange}
     >
       <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>
-      <span className="switch-label">{label}</span>
+      <span className="switch-label">
+        <span className="switch-label-text">{label}</span>
+        {hint && <span className="switch-hint">{hint}</span>}
+      </span>
     </button>
   )
 }
@@ -42,7 +45,7 @@ export default function AdminPanel({ onClose }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [approving, setApproving] = useState(null) // request id being approved
-  const [draft, setDraft] = useState({ records: true, books: true })
+  const [draft, setDraft] = useState({ records: true, books: true, lending: false })
   const [granted, setGranted] = useState(null) // { user, code } just approved
   const [revealed, setRevealed] = useState({}) // userId -> show code?
   const [copied, setCopied] = useState(null) // which code was just copied
@@ -65,10 +68,14 @@ export default function AdminPanel({ onClose }) {
   async function approve() {
     setError('')
     try {
-      const res = await authApi.adminApprove({ requestId: approving, collections: draft })
+      const res = await authApi.adminApprove({
+        requestId: approving,
+        collections: { records: draft.records, books: draft.books },
+        features: { lending: draft.lending },
+      })
       setGranted(res)
       setApproving(null)
-      setDraft({ records: true, books: true })
+      setDraft({ records: true, books: true, lending: false })
       await load()
     } catch (err) {
       setError(err.message)
@@ -92,6 +99,21 @@ export default function AdminPanel({ onClose }) {
     setError('')
     try {
       await authApi.adminUpdateUser({ userId, collections })
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function toggleFeature(userId) {
+    const user = data.users.find((u) => u.id === userId)
+    if (!user) return
+    setError('')
+    try {
+      await authApi.adminUpdateUser({
+        userId,
+        features: { lending: !user.features?.lending },
+      })
       await load()
     } catch (err) {
       setError(err.message)
@@ -196,6 +218,18 @@ export default function AdminPanel({ onClose }) {
                   />
                 ))}
               </div>
+              <div className="admin-features">
+                <h4 className="admin-features-title">{t('admin.features')}</h4>
+                <p className="admin-sub">{t('admin.whichFeatures')}</p>
+                <div className="admin-switches">
+                  <Switch
+                    checked={!!draft.lending}
+                    onChange={() => setDraft((d) => ({ ...d, lending: !d.lending }))}
+                    label={t('lending.featureLabel')}
+                    hint={t('lending.featureHint')}
+                  />
+                </div>
+              </div>
               <div className="sheet-actions">
                 <button
                   className="btn btn-primary"
@@ -246,6 +280,12 @@ export default function AdminPanel({ onClose }) {
                             label={KIND_ACCESS_LABELS[k]?.() || k}
                           />
                         ))}
+                        <Switch
+                          checked={!!u.features?.lending}
+                          onChange={() => toggleFeature(u.id)}
+                          label={t('lending.featureLabel')}
+                          hint={t('lending.featureHint')}
+                        />
                       </div>
                       {revealed[u.id] && (
                         <div className="admin-code-box inline">

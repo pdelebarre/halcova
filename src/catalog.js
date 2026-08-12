@@ -8,6 +8,7 @@
 
 import * as discogs from './api/discogs'
 import * as books from './api/books'
+import { t } from './i18n'
 import AlbumCard from './components/AlbumCard'
 import AlbumGrid from './components/AlbumGrid'
 import AlbumDetail from './components/AlbumDetail'
@@ -73,6 +74,30 @@ export const recordsCatalog = {
       noArtists: 'No matching artists',
       clearArtist: 'Clear artist filter',
     },
+    lending: {
+      section: t('lending.section'),
+      statusOut: (name, date) => t('lending.statusOut', { name, date }),
+      due: (date) => t('lending.due', { date }),
+      overdue: t('lending.overdue'),
+      overdueSince: (date) => t('lending.overdueSince', { date }),
+      notOnLoan: t('lending.notOnLoan'),
+      lend: t('lending.lend'),
+      lendTitle: (entity) => t('lending.lendTitle', { entity }),
+      borrower: t('lending.borrower'),
+      borrowerPlaceholder: t('lending.borrowerPlaceholder'),
+      contact: t('lending.contact'),
+      dueDate: t('lending.dueDate'),
+      confirmLend: t('lending.confirmLend'),
+      nameRequired: t('lending.nameRequired'),
+      return: t('lending.return'),
+      returnConfirm: t('lending.returnConfirm'),
+      lentToast: (name) => t('lending.lentToast', { name }),
+      returnedToast: t('lending.returnedToast'),
+      badge: t('lending.badge'),
+      badgeOverdue: t('lending.badgeOverdue'),
+      filter: t('lending.filter'),
+      filterHint: t('lending.filterHint'),
+    },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,
     },
@@ -110,6 +135,30 @@ export const booksCatalog = {
     emptyIcon: 'empty-book',
     // Kind-specific overrides for the shared collection flow.
     emptyTitle: 'Your shelf is empty',
+    lending: {
+      section: t('lending.section'),
+      statusOut: (name, date) => t('lending.statusOut', { name, date }),
+      due: (date) => t('lending.due', { date }),
+      overdue: t('lending.overdue'),
+      overdueSince: (date) => t('lending.overdueSince', { date }),
+      notOnLoan: t('lending.notOnLoan'),
+      lend: t('lending.lend'),
+      lendTitle: (entity) => t('lending.lendTitle', { entity }),
+      borrower: t('lending.borrower'),
+      borrowerPlaceholder: t('lending.borrowerPlaceholder'),
+      contact: t('lending.contact'),
+      dueDate: t('lending.dueDate'),
+      confirmLend: t('lending.confirmLend'),
+      nameRequired: t('lending.nameRequired'),
+      return: t('lending.return'),
+      returnConfirm: t('lending.returnConfirm'),
+      lentToast: (name) => t('lending.lentToast', { name }),
+      returnedToast: t('lending.returnedToast'),
+      badge: t('lending.badge'),
+      badgeOverdue: t('lending.badgeOverdue'),
+      filter: t('lending.filter'),
+      filterHint: t('lending.filterHint'),
+    },
     emptySub: 'Scan the ISBN on a book to catalog your first title.',
     emptyTagline: 'your shelf, cataloged',
     emptyBtn: 'Scan a book',

@@ -2,10 +2,16 @@
 //
 // Layout inside the single "runout-identity" store:
 //   user:<id>      -> { id, name, email, code, collections:{records,books},
+//                       features:{lending},   // per-account capability flags; off by default
 //                       role:'admin'|'member', status:'active'|'disabled', createdAt }
 //   request:<id>   -> { id, name, email, status:'pending'|'approved'|'rejected', createdAt }
 //   index:users    -> ordered list of user ids
 //   index:requests -> ordered list of request ids
+//
+// `features` is a map of per-account capability flags (currently only
+// `{ lending: boolean }`). New members start without it (absent/false) — the
+// admin grants `features.lending` via approve / updateUser (see admin.js);
+// the owner always has `features: { lending: true }` (see authorize()).
 //
 // Access codes are stored in plaintext so an admin can re-reveal a lost code
 // from the admin panel. The blob store is private to the site; this is an

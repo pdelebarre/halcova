@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import * as discogs from '../api/discogs'
 import { splitArtistTitle } from '../utils/match'
 import { t } from '../i18n'
+import LendingControls from './LendingControls'
 import './AlbumDetail.css'
 
-export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, catalog }) {
+export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, catalog, lendingEnabled, onLend, onReturn, showToast }) {
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
@@ -127,6 +128,15 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
               <p id="detail-notes-error" className="detail-field-error" role="alert">{notesError}</p>
             )}
           </div>
+
+          <LendingControls
+            item={item}
+            catalog={catalog}
+            lendingEnabled={lendingEnabled}
+            onLend={onLend}
+            onReturn={onReturn}
+            showToast={showToast}
+          />
         </div>
 
         <div className="sheet-actions detail-actions">

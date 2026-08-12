@@ -99,4 +99,23 @@ describe('FilterSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear artist filter' }))
     expect(setActiveArtist).toHaveBeenCalledWith('')
   })
+
+  it('shows the On loan switch only when lending is enabled', () => {
+    const { unmount } = renderSheet()
+    expect(screen.queryByRole('switch', { name: /On loan/ })).not.toBeInTheDocument()
+    unmount()
+
+    renderSheet({ lendingEnabled: true })
+    expect(screen.getByRole('switch', { name: /On loan/ })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('reflects activeLending on the On loan switch and toggles it', () => {
+    const onToggleLending = vi.fn()
+    renderSheet({ lendingEnabled: true, activeLending: true, onToggleLending })
+
+    const sw = screen.getByRole('switch', { name: /On loan/ })
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(sw)
+    expect(onToggleLending).toHaveBeenCalledTimes(1)
+  })
 })

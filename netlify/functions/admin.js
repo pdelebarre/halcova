@@ -31,6 +31,20 @@ function sanitizeCollections(collections) {
   }
 }
 
+// Only these per-account feature flags exist. Anything a client sends that
+// isn't in this list is dropped, and every value is coerced to a boolean — a
+// client can never smuggle arbitrary feature payloads onto a user record.
+const KNOWN_FEATURES = ['lending']
+
+// Accepts body.features (e.g. { lending: true }) and returns the complete
+// known-features map, every value coerced to a boolean:
+//   { lending: false }  when missing/empty or all-false.
+function sanitizeFeatures(features) {
+  const result = {}
+  for (const key of KNOWN_FEATURES) result[key] = !!features?.[key]
+  return result
+}
+
 function hasAccess(collections) {
   return !!(collections && (collections.records || collections.books))
 }
@@ -51,6 +65,7 @@ async function handleApprove(body) {
     name: request.name,
     email: request.email,
     collections,
+    features: sanitizeFeatures(body.features),
     code: generateAccessCode(),
     role: 'member',
     status: 'active',
@@ -84,6 +99,7 @@ async function handleUpdateUser(body) {
     }
     user.collections = collections
   }
+  if (body.features) user.features = sanitizeFeatures(body.features)
   if (body.status === 'active' || body.status === 'disabled') user.status = body.status
 
   await saveUser(user)

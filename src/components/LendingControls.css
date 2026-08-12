@@ -1,0 +1,108 @@
+/* Shared lend / return block used by both detail sheets (records + books).
+   Copy comes from catalog.copy.lending; these are layout/style only. */
+
+.lending {
+  margin-bottom: 16px;
+}
+
+/* Not on loan — status + the "Lend…" action. */
+.lending-idle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.lending-not-on-loan {
+  margin: 0;
+  font-size: 14px;
+  color: var(--jacket-kraft-dim);
+}
+
+/* On loan — status line(s) + "Mark returned" (two-step confirm). */
+.lending-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.lending-status p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--jacket-kraft);
+}
+.lending-status p.lending-status-overdue {
+  color: var(--danger-bright);
+  font-weight: 600;
+  font-size: 15px;
+}
+.lending-status .btn {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+/* Armed "Mark returned" confirm step — gold, not red: returning a loan
+   finalizes it, it isn't destructive. Dark text on gold stays well above
+   4.5:1 (--runout-gold #C9A227 vs --sleeve-black #16130F ≈ 7.7:1). */
+.lending-status .btn.btn-confirm {
+  background: var(--runout-gold);
+  color: var(--sleeve-black);
+  border: 1px solid var(--runout-gold);
+}
+.lending-status .btn.btn-confirm:hover { filter: brightness(1.07); }
+.lending-status .btn.btn-confirm:active { filter: brightness(0.93); }
+
+/* The small lend form (borrower / contact / due date). */
+.lending-form {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lending-form-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0;
+  color: var(--jacket-kraft);
+}
+.lending-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lending-field label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--static-grey);
+}
+.lending-field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--jacket-kraft);
+  font-size: 15px;
+}
+.lending-field input::placeholder { color: var(--static-grey); }
+.lending-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.lending-form-actions .btn { flex: 1; }

@@ -39,6 +39,10 @@ export default function App() {
 
   const catalog = CATALOGS[activeTab]
 
+  // Feature flag for the lending MVP (§ W6): the admin grants it per member
+  // (user.features.lending). Gate for the shared LendingControls in details.
+  const lendingEnabled = !!user.features?.lending
+
   if (!catalog) {
     // Signed in but no collections granted — shouldn't normally happen, but
     // be defensive rather than mounting a broken collection view.
@@ -70,7 +74,7 @@ export default function App() {
       />
 
       {/* keyed by kind so each collection remounts fresh when you switch tabs */}
-      <CollectionView key={catalog.kind} catalog={catalog} onRequestSettings={() => setSettingsOpen(true)} />
+      <CollectionView key={catalog.kind} catalog={catalog} onRequestSettings={() => setSettingsOpen(true)} lendingEnabled={lendingEnabled} />
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
