@@ -1,0 +1,46 @@
+/* PWA update banner — a slim, quiet pill that appears when a new version of
+   the app has been installed and is waiting to activate. Fixed bottom-center,
+   on the dark #16130F theme, using the app's design tokens. */
+
+.update-notice {
+  position: fixed;
+  bottom: calc(16px + var(--safe-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 18px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  color: var(--jacket-kraft);
+}
+
+.update-notice-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 44px+ touch target, gold on sleeve-black — the app's primary accent. */
+.update-notice-btn {
+  flex: none;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  background: var(--runout-gold);
+  color: var(--sleeve-black);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.update-notice-btn:active {
+  filter: brightness(1.08);
+}

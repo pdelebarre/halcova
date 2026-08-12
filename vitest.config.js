@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
@@ -5,6 +6,13 @@ import react from '@vitejs/plugin-react'
 // (and the service worker / wasm precaching don't interfere) during tests.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // The real module only exists when vite-plugin-pwa is active. Point it
+      // at a no-op stub in tests (see src/test/mock-pwa-register.js).
+      'virtual:pwa-register': fileURLToPath(new URL('./src/test/mock-pwa-register.js', import.meta.url)),
+    },
+  },
   test: {
     environment: 'jsdom',
     environmentOptions: {

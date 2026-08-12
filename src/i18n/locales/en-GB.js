@@ -288,6 +288,10 @@ const enGB = {
   'lending.featureLabel': 'Lending',
   'lending.featureHint': 'Let this member lend items and track who has them.',
   'lending.notEnabled': "Lending isn't enabled for your account.",
+
+  // §16 Update
+  'update.newVersion': 'New version available',
+  'update.reload': 'Reload',
 }
 
 export default enGB
