@@ -6,7 +6,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Visible update prompt: instead of silently auto-updating, a new build
+      // shows a "New version available" banner (src/components/UpdateNotice.jsx)
+      // with a Reload button. `injectRegister: false` stops the plugin from
+      // injecting <script src="/registerSW.js"> — we register from code via
+      // `virtual:pwa-register` so we can surface the update to the user.
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Hokan — Records & Books',
