@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
+import { t } from '../i18n'
 import './ScanResult.css'
 
 // Cap noisy "other pressings/editions" lists so a big collection can't
@@ -90,11 +91,11 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
   }
 
   return (
-    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={`${album} by ${artist}`}>
+    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={t('detail.albumByArtist', { album, artist })}>
       <div className="sheet result-sheet">
         <div className="sheet-header">
           <span />
-          <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         <div className="result-scroll">
@@ -122,7 +123,7 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
               </span>
             </div>
             {ownedExact && (
-              <button className="ownership-view" onClick={() => onOpenItem(ownedExact)}>View in collection →</button>
+              <button className="ownership-view" onClick={() => onOpenItem(ownedExact)}>{t('detail.viewInCollection')}</button>
             )}
           </div>
 
@@ -151,10 +152,10 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
             {adding ? (
               <>
                 <span className="add-disc" aria-hidden="true" />
-                {copy.addDone}
+                {copy.addDone || t('catalog.addDone')}
               </>
             ) : (
-              <>{ownedExact ? copy.addAnyway : copy.add}</>
+              <>{ownedExact ? (copy.addAnyway || t('catalog.addAnyway')) : (copy.add || t('catalog.add', { collectionLabel: '' }))}</>
             )}
           </button>
         </div>

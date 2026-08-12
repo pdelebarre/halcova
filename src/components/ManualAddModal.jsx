@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as discogs from '../api/discogs'
+import { t } from '../i18n'
 import MatchPicker from './MatchPicker'
 import './ManualAddModal.css'
 
@@ -26,7 +27,7 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
       setMatches(results)
     } catch (err) {
       setErrorMsg(err.code === 'SERVER_NO_TOKEN'
-        ? "Record lookups aren't configured yet — ask the owner to set up the shared token, or add this record manually below."
+        ? t('err.lookupsNotConfiguredToken')
         : err.message)
       setMatches([])
     } finally {
@@ -37,7 +38,7 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
   function submitManual(e) {
     e.preventDefault()
     if (!form.title.trim()) {
-      setTitleError(copy.manualTitleRequired || 'Title is required')
+      setTitleError(copy.manualTitleRequired || t('add.titleRequired'))
       return
     }
     onPick({
@@ -60,35 +61,35 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
   if (mode === 'picking') {
     return (
       <MatchPicker
-        title="Search results"
+        title={t('add.searchResults')}
         matches={matches}
         loading={loading}
         errorMsg={errorMsg}
         onPick={onPick}
         onManual={() => setMode('form')}
         onClose={onClose}
-        loadingLabel="Looking it up on Discogs…"
-        noMatchLabel="No matches found on Discogs."
+        loadingLabel={t('add.lookingUpDiscogs')}
+        noMatchLabel={t('add.noMatchDiscogs')}
       />
     )
   }
 
   if (mode === 'form') {
     return (
-      <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Add record manually">
+      <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={t('add.addRecordManually')}>
         <div className="sheet manual-form-sheet">
           <div className="sheet-header">
-            <h2>Add by hand</h2>
-            <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+            <h2>{t('add.addByHand')}</h2>
+            <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
           </div>
           <form className="manual-form" onSubmit={submitManual} noValidate>
             <div className="manual-form-fields">
               <label>
-                <span>Artist</span>
+                <span>{t('add.artist')}</span>
                 <input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Miles Davis" />
               </label>
               <label>
-                <span>Title *</span>
+                <span>{t('add.titleRequired')}</span>
                 <input
                   value={form.title}
                   onChange={(e) => { setForm({ ...form, title: e.target.value }); if (titleError) setTitleError('') }}
@@ -100,34 +101,34 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
               {titleError && <p id="manual-title-error" className="field-error" role="alert">{titleError}</p>}
               <div className="manual-form-row">
                 <label>
-                  <span>Format</span>
+                  <span>{t('add.format')}</span>
                   <select value={form.formatType} onChange={(e) => setForm({ ...form, formatType: e.target.value })}>
                     {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </label>
                 <label>
-                  <span>Year</span>
+                  <span>{t('add.year')}</span>
                   <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="1959" inputMode="numeric" />
                 </label>
               </div>
               <div className="manual-form-row">
                 <label>
-                  <span>Label</span>
+                  <span>{t('add.label')}</span>
                   <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Columbia" />
                 </label>
                 <label>
-                  <span>Catalog #</span>
+                  <span>{t('add.catalogNumber')}</span>
                   <input value={form.catno} onChange={(e) => setForm({ ...form, catno: e.target.value })} placeholder="CL 1355" />
                 </label>
               </div>
               <label>
-                <span>Genre</span>
+                <span>{t('add.genre')}</span>
                 <input value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} placeholder="Jazz" />
               </label>
             </div>
             <div className="sheet-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setMode('search')}>Back to search</button>
-              <button type="submit" className="btn btn-primary">Add to crate</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setMode('search')}>{t('add.backToSearch')}</button>
+              <button type="submit" className="btn btn-primary">{t('add.addToCrate')}</button>
             </div>
           </form>
         </div>
@@ -136,23 +137,23 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
   }
 
   return (
-    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Find a record">
+    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={t('add.findRecord')}>
       <div className="sheet">
         <div className="sheet-header">
-          <h2>Find it another way</h2>
-          <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <h2>{t('add.findAnotherWay')}</h2>
+          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
         <form onSubmit={runSearch} className="search-form">
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Artist or album title"
+            placeholder={t('add.searchPlaceholderRecord')}
             className="search-input"
           />
-          <button type="submit" className="btn btn-primary btn-block">Search Discogs</button>
+          <button type="submit" className="btn btn-primary btn-block">{t('add.searchDiscogs')}</button>
         </form>
-        <button className="text-link" onClick={() => setMode('form')}>Skip search — add it by hand</button>
+        <button className="text-link" onClick={() => setMode('form')}>{t('add.skipSearchAddByHand')}</button>
       </div>
     </div>
   )

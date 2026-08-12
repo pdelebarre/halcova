@@ -26,7 +26,7 @@ describe('Header (redesign)', () => {
   it('shows the wordmark and Records|Books tabs, without a tagline', () => {
     renderHeader()
 
-    expect(screen.getByText('Alcove')).toBeInTheDocument()
+    expect(screen.getByText('Hokan')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Records' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Books' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByText(/your crate, cataloged/)).not.toBeInTheDocument()

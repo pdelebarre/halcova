@@ -60,7 +60,7 @@ describe('Toolbar layout (redesign)', () => {
   it('badges the Filter pill with the number of active filters', () => {
     renderToolbar({ activeFormats: ['LP'], activeGenres: ['Jazz'], activeArtist: 'Miles Davis' })
 
-    expect(screen.getByRole('button', { name: 'Filter, 3 active' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '3 active' })).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 })

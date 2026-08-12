@@ -1,4 +1,4 @@
-# Localization Plan — Alcove in 7 languages (user-switchable)
+# Localization Plan — Hokan in 8 languages (user-switchable)
 
 **Owner:** Marketing Manager (copy) + Front End Developer (implementation)
 **Status:** Ready to hand off · **Date:** 2026-08-12

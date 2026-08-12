@@ -82,3 +82,55 @@ describe('Grid|List view toggle', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Showing 2 of 2')
   })
 })
+
+describe('letterOf — accented characters', () => {
+  const ACCENTED_ITEMS = [
+    { id: 'a1', title: 'Édith Piaf - La Vie en Rose', year: 1946, formatType: 'LP' },
+    { id: 'a2', title: 'Ástor Piazzolla - Libertango', year: 1974, formatType: 'LP' },
+    { id: 'a3', title: 'Özdemir Erdoğan - Aşk', year: 1970, formatType: 'LP' },
+    { id: 'a4', title: 'Ümit Aksu - Dönüş', year: 1980, formatType: 'LP' },
+    { id: 'a5', title: 'Çiğdem Aslan - Mortissa', year: 2013, formatType: 'LP' },
+    { id: 'a6', title: 'Miles Davis - Kind of Blue', year: 1959, formatType: 'LP' },
+  ]
+
+  it('groups accented first letters under their own headers (É, Á, Ö, Ü, Ç)', () => {
+    // Use fewer items (4) so all headers render within the windowed viewport.
+    const items = [
+      { id: 'a1', title: 'Édith Piaf - La Vie en Rose', year: 1946, formatType: 'LP' },
+      { id: 'a2', title: 'Ástor Piazzolla - Libertango', year: 1974, formatType: 'LP' },
+      { id: 'a3', title: 'Özdemir Erdoğan - Aşk', year: 1970, formatType: 'LP' },
+      { id: 'a4', title: 'Ümit Aksu - Dönüş', year: 1980, formatType: 'LP' },
+    ]
+
+    const { container } = render(
+      <ListView
+        items={items}
+        sortBy="artist"
+        copy={recordsCatalog.copy}
+        onOpen={vi.fn()}
+      />
+    )
+
+    const headers = container.querySelectorAll('.list-group-header')
+    const headerLabels = Array.from(headers).map((h) => h.textContent)
+    expect(headerLabels).toEqual(['É', 'Á', 'Ö', 'Ü'])
+  })
+
+  it('renders jump rail buttons for accented letters', () => {
+    render(
+      <ListView
+        items={ACCENTED_ITEMS}
+        sortBy="artist"
+        copy={recordsCatalog.copy}
+        onOpen={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Jump to É' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to Á' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to Ö' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to Ü' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to Ç' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Jump to M' })).toBeInTheDocument()
+  })
+})

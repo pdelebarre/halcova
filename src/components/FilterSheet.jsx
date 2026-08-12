@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { t } from '../i18n'
 import './FilterSheet.css'
 
 /**
@@ -80,17 +81,17 @@ export default function FilterSheet({
   }
 
   return (
-    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={sheet.title || 'Filters'}>
+    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={sheet.title || t('catalog.filterSheetTitle')}>
       <div className="sheet filter-sheet">
         <div className="sheet-header">
-          <h2>{sheet.title || 'Filters'}</h2>
-          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <h2>{sheet.title || t('catalog.filterSheetTitle')}</h2>
+          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         <div className="filter-body">
           {formats.length > 0 && (
             <section className="filter-section">
-              <h3 className="filter-section-title">{sheet.format || 'Format'}</h3>
+              <h3 className="filter-section-title">{sheet.format || t('catalog.filterSheetFormat')}</h3>
               <div className="filter-chips">
                 {formats.map((f) => (
                   <button
@@ -137,7 +138,7 @@ export default function FilterSheet({
                       type="button"
                       className="artist-chip-remove"
                       onClick={() => selectArtist('')}
-                      aria-label={sheet.clearArtist || 'Clear artist filter'}
+                      aria-label={sheet.clearArtist || t('catalog.filterSheetClearArtist')}
                     >
                       ✕
                     </button>
@@ -156,7 +157,7 @@ export default function FilterSheet({
                     onFocus={() => setArtistOpen(true)}
                     onKeyDown={handleArtistKeys}
                     placeholder={activeArtist ? '' : artistPlaceholder}
-                    aria-label={`Filter by ${artistLabel}`}
+                    aria-label={t('toolbar.filterBy', { artistLabel })}
                   />
                   {artistOpen && filteredArtists.length > 0 && (
                     <ul className="combo-list" id="artist-listbox" role="listbox" aria-label={sheet.artist || artistLabel}>
@@ -179,7 +180,7 @@ export default function FilterSheet({
                     </ul>
                   )}
                   {artistOpen && artistQuery.trim() && filteredArtists.length === 0 && (
-                    <p className="combo-empty">{sheet.noArtists || 'No matching artists'}</p>
+                    <p className="combo-empty">{sheet.noArtists || t('toolbar.noArtists')}</p>
                   )}
                 </div>
               </div>
@@ -190,11 +191,11 @@ export default function FilterSheet({
         <div className="filter-footer sheet-actions">
           {hasFilters && (
             <button type="button" className="btn btn-ghost" onClick={() => onClear?.()}>
-              {sheet.reset || 'Reset'}
+              {sheet.reset || t('toolbar.reset')}
             </button>
           )}
           <button type="button" className="btn btn-primary" onClick={onClose}>
-            {sheet.done || 'Done'}
+            {sheet.done || t('common.done')}
           </button>
         </div>
       </div>

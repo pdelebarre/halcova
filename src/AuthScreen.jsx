@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t } from './i18n'
 import './AuthScreen.css'
 
 // First screen a visitor sees. Two paths:
@@ -45,14 +46,13 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Alcove</h1>
-          <p className="auth-done">Request sent ✉️</p>
+          <h1 className="auth-wordmark">Hokan</h1>
+          <p className="auth-done">{t('auth.requestSent')}</p>
           <p className="auth-copy">
-            The admin will review it and send you an access code. Once you have it,
-            come back and sign in.
+            {t('auth.requestSentBody')}
           </p>
           <button className="btn btn-ghost btn-block" onClick={() => { setMode('welcome'); setError('') }}>
-            Back
+            {t('common.back')}
           </button>
         </div>
       </div>
@@ -63,8 +63,8 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Alcove</h1>
-          <p className="auth-copy">Enter the access code the admin gave you.</p>
+          <h1 className="auth-wordmark">Hokan</h1>
+          <p className="auth-copy">{t('auth.enterCode')}</p>
           <form onSubmit={handleLogin} className="auth-form" noValidate>
             <input
               className={`auth-input auth-code${error ? ' invalid' : ''}`}
@@ -80,13 +80,13 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
               aria-invalid={!!error}
               aria-describedby={error ? 'auth-login-error' : undefined}
             />
-            <p className="auth-paste-hint">Tip: paste your access code — it's case-sensitive</p>
+            <p className="auth-paste-hint">{t('auth.pasteTip')}</p>
             {error && <p id="auth-login-error" className="auth-error" role="alert">{error}</p>}
             <button className="btn btn-primary btn-block" type="submit" disabled={busy || !code.trim()}>
-              {busy ? 'Signing in…' : 'Sign in'}
+              {busy ? t('auth.signingIn') : t('auth.signIn')}
             </button>
           </form>
-          <button className="auth-back" onClick={() => { setMode('welcome'); setError('') }}>← Back</button>
+          <button className="auth-back" onClick={() => { setMode('welcome'); setError('') }}>← {t('common.back')}</button>
         </div>
       </div>
     )
@@ -96,10 +96,9 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Alcove</h1>
+          <h1 className="auth-wordmark">Hokan</h1>
           <p className="auth-copy">
-            Request access to start cataloging. The admin will approve your account
-            and send you an access code.
+            {t('auth.requestToStart')}
           </p>
           <form onSubmit={handleRequest} className="auth-form">
             <input
@@ -107,7 +106,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
+              placeholder={t('auth.yourName')}
               autoCapitalize="words"
               autoCorrect="off"
             />
@@ -122,10 +121,10 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
             />
             {error && <p className="auth-error" role="alert">{error}</p>}
             <button className="btn btn-primary btn-block" type="submit" disabled={busy || !name.trim() || !email.trim()}>
-              {busy ? 'Requesting…' : 'Request access'}
+              {busy ? t('auth.requesting') : t('auth.requestAccess')}
             </button>
           </form>
-          <button className="auth-back" onClick={() => { setMode('welcome'); setError('') }}>← Back</button>
+          <button className="auth-back" onClick={() => { setMode('welcome'); setError('') }}>← {t('common.back')}</button>
         </div>
       </div>
     )
@@ -135,14 +134,14 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-disc" aria-hidden="true" />
-        <h1 className="auth-wordmark">Alcove</h1>
-        <p className="auth-tagline">your crate &amp; shelf, cataloged</p>
+        <h1 className="auth-wordmark">Hokan</h1>
+        <p className="auth-tagline">{t('auth.tagline')}</p>
         <div className="auth-actions">
           <button className="btn btn-primary btn-block" onClick={() => setMode('login')}>
-            I have an access code
+            {t('auth.haveCode')}
           </button>
           <button className="btn btn-ghost btn-block" onClick={() => setMode('request')}>
-            Request access
+            {t('auth.requestAccess')}
           </button>
         </div>
       </div>

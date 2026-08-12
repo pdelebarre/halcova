@@ -1,18 +1,18 @@
-# Alcove — your crate and shelf, cataloged
+# Hokan — your crate and shelf, cataloged
 
-**Scan a barcode, catalog the thing.** Alcove is a progressive web app (PWA) for
+**Scan a barcode, catalog the thing.** Hokan is a progressive web app (PWA) for
 cataloging your record and book collections. Point your phone's camera at a
-barcode, Alcove looks the release up on **Discogs** (records) or **Google Books**
+barcode, Hokan looks the release up on **Discogs** (records) or **Google Books**
 (books), you confirm the match, and it's saved. Install it to your home screen
 and it runs full-screen, like a native app — no app store, no account.
 
-Alcove supports **multiple users**: you (the site owner) approve who gets in,
+Hokan supports **multiple users**: you (the site owner) approve who gets in,
 and each member's collections are stored separately and protected by an access
 code. See [Multi-user access](#multi-user-access--admin) below.
 
 ```
 ┌─────────────────────────────────────┐
-│  Alcove — your crate, cataloged     │
+│  Hokan — your crate, cataloged      │
 │  [Records] [Books]            ⚙     │
 │  ┌─────────────────────────────────┐│
 │  │  ⌕ Search your crate…     ( 42 )││
@@ -37,7 +37,7 @@ code. See [Multi-user access](#multi-user-access--admin) below.
 - **Books via Google Books** — scan an ISBN (or ISBN-10) and get the edition
   back, with publisher, page count, categories, description and a Google Books
   link. No token needed.
-- **Duplicate detection** — before anything is added, Alcove tells you whether
+- **Duplicate detection** — before anything is added, Hokan tells you whether
   you already own the exact release, a different pressing of the same album, or
   other albums by the same artist.
 - **Two catalogs, one flow** — Records and Books tabs share a single collection
@@ -64,7 +64,7 @@ code. See [Multi-user access](#multi-user-access--admin) below.
    needed) to read the barcode, then queries Discogs (records) or Google Books
    (books) for a match.
 2. **Confirm**: if there's a single match you land straight on the result; if
-   several pressings/editions match, pick the right one. Alcove flags anything
+   several pressings/editions match, pick the right one. Hokan flags anything
    you already own before you add.
 3. **Storage**: your collection lives server-side via Netlify Blobs, isolated
    per user, so it's not tied to one browser or device.
@@ -74,14 +74,14 @@ code. See [Multi-user access](#multi-user-access--admin) below.
 
 ## Multi-user access & admin
 
-Alcove has no passwords — access is granted by you. The flow is:
+Hokan has no passwords — access is granted by you. The flow is:
 
 1. **Visitor requests access** — the sign-in screen offers "Request access"
    (name + email), which creates a pending request.
 2. **You approve from the admin panel** — signed in with your admin key, tap the
    shield in the header. Pending requests appear with **Approve / Reject**.
    On approve, choose which collections the member gets (**Records** and/or
-   **Books**) and Alcove generates an `RU-XXXX-XXXX-XXXX` access code for you to
+   **Books**) and Hokan generates an `RU-XXXX-XXXX-XXXX` access code for you to
    share.
 3. **The member signs in** with that code. The app only shows the tabs they were
    granted, and every collection read/write is authenticated with the code.

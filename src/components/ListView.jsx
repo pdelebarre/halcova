@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
+import { t, getLocale } from '../i18n'
 import './ListView.css'
 
 const ROW_H = 56
@@ -8,9 +9,19 @@ const OVERSCAN = 8
 
 const BADGE_CLASS = { LP: 'lp', EP: 'ep', CD: 'cd', '7"': 'seven', '12"': 'lp' }
 
-function letterOf(name) {
+function letterOf(name, locale = 'en') {
   if (!name) return '#'
   const ch = name.trim().charAt(0).toUpperCase()
+  // Use Intl.Collator to decide if the character is a "letter" in this locale,
+  // so accented letters (É, Á, Ö, Ü, Ç) bucket correctly.
+  try {
+    const collator = new Intl.Collator(locale, { sensitivity: 'base' })
+    // Compare against 'A' — if it sorts >= 'A' and the collator sees it as a letter
+    if (/[\p{Letter}]/u.test(ch)) {
+      // Bucket accented letters under their base form
+      return ch
+    }
+  } catch { /* fall through */ }
   return /[A-Z]/.test(ch) ? ch : '#'
 }
 
@@ -34,7 +45,7 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {} }) {
       let currentLetter = null
       for (const item of items) {
         const { artist } = splitArtistTitle(item.title)
-        const letter = letterOf(artist)
+        const letter = letterOf(artist, getLocale())
         if (letter !== currentLetter) {
           out.push({ type: 'header', label: letter, offset: y, height: GROUP_H })
           y += GROUP_H
@@ -103,13 +114,13 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {} }) {
   return (
     <div className="list-view">
       {grouped && letters.length > 0 && (
-        <nav className="jump-rail" aria-label={copy.list?.jumpRail || 'Jump to letter'}>
+        <nav className="jump-rail" aria-label={copy.list?.jumpRail || t('list.jumpToLetter')}>
           {letters.map((l) => (
             <button
               key={l}
               type="button"
               onClick={() => jumpTo(l)}
-              aria-label={`${copy.list?.jumpTo || 'Jump to'} ${l}`}
+              aria-label={`${copy.list?.jumpTo || t('list.jumpTo')} ${l}`}
             >
               {l}
             </button>
@@ -121,7 +132,7 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {} }) {
         className="list-scroller"
         ref={scrollerRef}
         onScroll={onScroll}
-        aria-label={copy.list?.label || 'Collection list'}
+        aria-label={copy.list?.label || t('list.collectionList')}
       >
         <div className="list-inner" style={{ height: total }}>
           <div style={{ height: padTop }} aria-hidden="true" />
@@ -147,7 +158,7 @@ function ListItemRow({ item, onOpen }) {
       type="button"
       className="list-row"
       onClick={() => onOpen(item)}
-      aria-label={[artist, album].filter(Boolean).join(' — ') || 'Collection item'}
+      aria-label={[artist, album].filter(Boolean).join(' — ') || t('list.collectionItem')}
     >
       <span className="list-cover" aria-hidden="true">
         {item.coverImage

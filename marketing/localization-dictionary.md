@@ -2,7 +2,7 @@
 
 **Owner:** Marketing Manager · **Status:** v1 draft — EN is the shipped
 baseline; FR/NL/PT-BR/DE/ES/IT must be confirmed by the native testers before
-shipping. Proper nouns stay as-is in all languages: `Alcove`, `Discogs`,
+shipping. Proper nouns stay as-is in all languages: `Hokan`, `Discogs`,
 `Google Books`, `ISBN`, the `RU-…` code format. The `{name}`/`{n}`/`{date}`
 markers are interpolation placeholders.
 **Branch:** `feat/localization` · **Plan:** `localization-plan.md`

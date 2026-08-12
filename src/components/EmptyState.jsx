@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 import './EmptyState.css'
 
 export default function EmptyState({ kind = 'empty', copy = {}, onScan, onManualAdd, onClear }) {
@@ -7,11 +8,11 @@ export default function EmptyState({ kind = 'empty', copy = {}, onScan, onManual
     return (
       <div className="empty-state">
         <div className={iconClass} aria-hidden="true" />
-        <p className="empty-title">Nothing matches</p>
-        <p className="empty-sub">Try a different search or clear the filters.</p>
+        <p className="empty-title">{t('list.nothingMatches')}</p>
+        <p className="empty-sub">{t('list.tryDifferentSearch')}</p>
         {onClear && (
           <button type="button" className="btn btn-ghost" onClick={onClear} style={{ marginTop: 8 }}>
-            {copy.clearFilters || 'Clear filters'}
+            {copy.clearFilters || t('catalog.clearFilters')}
           </button>
         )}
       </div>
@@ -21,13 +22,13 @@ export default function EmptyState({ kind = 'empty', copy = {}, onScan, onManual
   return (
     <div className="empty-state">
       <div className={iconClass} aria-hidden="true" />
-      <p className="empty-title">{copy.emptyTitle || 'Your collection is empty'}</p>
-      <p className="empty-sub">{copy.emptySub || 'Scan a barcode to catalog your first item.'}</p>
+      <p className="empty-title">{copy.emptyTitle || t('catalog.emptyTitle')}</p>
+      <p className="empty-sub">{copy.emptySub || t('catalog.emptySub')}</p>
       {copy.emptyTagline && <p className="empty-tagline">{copy.emptyTagline}</p>}
-      {onScan && <button type="button" className="btn btn-primary" onClick={onScan}>{copy.emptyBtn || 'Scan an item'}</button>}
+      {onScan && <button type="button" className="btn btn-primary" onClick={onScan}>{copy.emptyBtn || t('catalog.emptyBtn')}</button>}
       {onManualAdd && (
         <button type="button" className="btn btn-ghost" onClick={onManualAdd} style={{ marginTop: 8 }}>
-          {copy.emptyManualBtn || 'Add by title'}
+          {copy.emptyManualBtn || t('catalog.emptyManualBtn')}
         </button>
       )}
     </div>

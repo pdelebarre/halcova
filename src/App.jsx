@@ -6,10 +6,10 @@ import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
 import { recordsCatalog, booksCatalog } from './catalog'
 import { useAuth } from './hooks/useAuth'
+import { t } from './i18n'
 import './App.css'
 
 const CATALOGS = { records: recordsCatalog, books: booksCatalog }
-const KIND_LABELS = { records: 'Records', books: 'Books' }
 
 export default function App() {
   const { session, ready, login, logout, requestAccess } = useAuth()
@@ -23,7 +23,7 @@ export default function App() {
   }, [session?.user?.id])
 
   if (!ready) {
-    return <div className="status-line">Loading…</div>
+    return <div className="status-line">{t('common.loading')}</div>
   }
 
   if (!session) {
@@ -43,12 +43,11 @@ export default function App() {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Alcove</h1>
+          <h1 className="auth-wordmark">Hokan</h1>
           <p className="auth-copy">
-            Hi {user.name} — your account doesn't include any collections yet.
-            Ask the admin to grant you Records and/or Books.
+            {t('auth.noCollections', { name: user.name })}
           </p>
-          <button type="button" className="btn btn-ghost btn-block" onClick={logout}>Sign out</button>
+          <button type="button" className="btn btn-ghost btn-block" onClick={logout}>{t('common.signOut')}</button>
         </div>
       </div>
     )
@@ -57,7 +56,7 @@ export default function App() {
   return (
     <>
       <Header
-        tabs={available.map((kind) => ({ id: kind, label: KIND_LABELS[kind] }))}
+        tabs={available.map((kind) => ({ id: kind, label: t(`kind.${kind}`) }))}
         activeTab={activeTab}
         onTabChange={setTab}
         onOpenSettings={() => setSettingsOpen(true)}

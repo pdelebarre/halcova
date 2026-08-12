@@ -1,6 +1,6 @@
-# Alcove — Technical Documentation
+# Hokan — Technical Documentation
 
-This document describes **how Alcove is built**: architecture, data model, APIs,
+This document describes **how Hokan is built**: architecture, data model, APIs,
 offline/PWA strategy, and the deployment pipeline. For *what the app does*, see
 [`functional.md`](functional.md).
 
@@ -23,7 +23,7 @@ offline/PWA strategy, and the deployment pipeline. For *what the app does*, see
 
 ## 1. Architecture overview
 
-Alcove is a **React 19 SPA** built with Vite, deployed as a **static site + a
+Hokan is a **React 19 SPA** built with Vite, deployed as a **static site + a
 small set of Netlify Functions** on Netlify.
 
 ```mermaid
@@ -449,7 +449,7 @@ barcode already in your collection short-circuits the network lookup entirely.
 
 Configured in `vite.config.js` via `vite-plugin-pwa`:
 
-- **Manifest** — name "Alcove — Records & Books", standalone, portrait,
+- **Manifest** — name "Hokan — Records & Books", standalone, portrait,
   `#16130F` theme/background, three icon sizes including a maskable icon.
 - **Registration** — `registerType: 'autoUpdate'` (users get new versions
   silently).
@@ -472,7 +472,7 @@ Netlify Blobs. Offline, the shell and lookup caches still let the app open, and
 already-owned barcodes still match from local state.
 
 `index.html` carries the iOS web-app meta tags (`apple-mobile-web-app-capable`,
-`black-translucent` status bar, `Alcove` title) and `theme-color`.
+`black-translucent` status bar, `Hokan` title) and `theme-color`.
 
 ---
 

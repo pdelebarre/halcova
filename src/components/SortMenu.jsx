@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { t } from '../i18n'
 import './SortMenu.css'
 
 function useMedia(query) {
@@ -75,7 +76,7 @@ export default function SortMenu({ options = [], value, onSelect, onClose, ancho
         ref={menuRef}
         className={isDesktop ? 'sort-menu' : 'sort-menu sort-menu--sheet'}
         role="menu"
-        aria-label={copy.sortMenu?.label || 'Sort by'}
+        aria-label={copy.sortMenu?.label || t('toolbar.sortBy')}
         style={isDesktop ? pos : undefined}
         onKeyDown={handleKeys}
       >

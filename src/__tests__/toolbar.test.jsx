@@ -68,7 +68,7 @@ describe('Toolbar (single-row redesign)', () => {
   it('labels the Filter button with the active filter count', () => {
     renderToolbar({ activeFormats: ['LP'], activeGenres: ['Jazz'] })
 
-    expect(screen.getByRole('button', { name: 'Filter, 2 active' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '2 active' })).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 

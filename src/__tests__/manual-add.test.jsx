@@ -16,7 +16,7 @@ describe('ManualAddModal (records)', () => {
     // Skip the Discogs search — go straight to the manual form.
     fireEvent.click(screen.getByText('Skip search — add it by hand'))
 
-    const title = screen.getByLabelText('Title *')
+    const title = screen.getByLabelText('Title is required')
     fireEvent.click(screen.getByRole('button', { name: 'Add to crate' }))
 
     const error = screen.getByText('Add a title — give this record a name first.')
@@ -31,7 +31,7 @@ describe('ManualAddModal (records)', () => {
     renderManual()
     fireEvent.click(screen.getByText('Skip search — add it by hand'))
 
-    const title = screen.getByLabelText('Title *')
+    const title = screen.getByLabelText('Title is required')
     fireEvent.click(screen.getByRole('button', { name: 'Add to crate' }))
     expect(screen.getByText(/Add a title/)).toBeInTheDocument()
 
@@ -48,7 +48,7 @@ describe('BookManualAddModal (books)', () => {
 
     fireEvent.click(screen.getByText('Skip search — add it by hand'))
 
-    const title = screen.getByLabelText('Title *')
+    const title = screen.getByLabelText('Title is required')
     fireEvent.click(screen.getByRole('button', { name: 'Add to shelf' }))
 
     const error = screen.getByText('Add a title — give this book a name first.')
