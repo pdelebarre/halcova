@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
+import { t } from '../i18n'
 import './AlbumDetail.css'
 import './BookDetail.css'
 
@@ -46,7 +47,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
       setNotesSaved(true)
       window.setTimeout(() => setNotesSaved(false), 1200)
     } catch (err) {
-      setNotesError(err?.message || 'Could not save notes')
+      setNotesError(err?.message || t('detail.couldNotSaveNotes'))
     }
   }
 
@@ -69,7 +70,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
         <div className="sheet-header">
           <h2 className="visually-hidden">{bookTitle}</h2>
           <span />
-          <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         <div className="detail-scroll">
@@ -85,38 +86,38 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
           </div>
 
           <dl className="detail-meta">
-            {item.formatRaw && <div><dt>Format</dt><dd>{item.formatRaw}</dd></div>}
-            {item.year && <div><dt>Year</dt><dd>{item.year}</dd></div>}
-            {item.label && <div><dt>Publisher</dt><dd>{item.label}</dd></div>}
-            {pageCount && <div><dt>Pages</dt><dd>{pageCount}</dd></div>}
-            {item.isbn && <div><dt>ISBN</dt><dd className="mono">{item.isbn}</dd></div>}
+            {item.formatRaw && <div><dt>{t('add.format')}</dt><dd>{item.formatRaw}</dd></div>}
+            {item.year && <div><dt>{t('add.year')}</dt><dd>{item.year}</dd></div>}
+            {item.label && <div><dt>{t('add.publisher')}</dt><dd>{item.label}</dd></div>}
+            {pageCount && <div><dt>{t('detail.pages')}</dt><dd>{pageCount}</dd></div>}
+            {item.isbn && <div><dt>{t('detail.isbn')}</dt><dd className="mono">{item.isbn}</dd></div>}
             {item.genre?.length ? (
-              <div><dt>Categories</dt><dd>{item.genre.join(', ')}</dd></div>
+              <div><dt>{t('detail.categories')}</dt><dd>{item.genre.join(', ')}</dd></div>
             ) : null}
           </dl>
 
           {(description || item.googleBooksId) && (
             <div className="detail-notes">
-              <p className="detail-section-label">About this book</p>
-              {item.googleBooksId && !description && !descError && <p className="detail-loading">Loading…</p>}
-              {descError && <p className="detail-loading">Couldn't load the description.</p>}
+              <p className="detail-section-label">{t('detail.aboutThisBook')}</p>
+              {item.googleBooksId && !description && !descError && <p className="detail-loading">{t('common.loading')}</p>}
+              {descError && <p className="detail-loading">{t('detail.descriptionError')}</p>}
               {description && <p className="book-description">{description}</p>}
             </div>
           )}
 
           <div className="detail-notes">
-            <p className="detail-section-label">Notes</p>
+            <p className="detail-section-label">{t('detail.notes')}</p>
             <textarea
               value={notes}
               onChange={(e) => { setNotes(e.target.value); if (notesError) setNotesError('') }}
-              placeholder="Condition, where you got it, whether it's signed…"
+              placeholder={t('detail.notesPlaceholderBook')}
               rows={3}
               aria-invalid={!!notesError}
               aria-describedby={notesError ? 'detail-notes-error' : undefined}
             />
             <div className="detail-notes-actions">
               <button type="button" className="btn btn-ghost" onClick={saveNotes} disabled={!notesDirty}>
-                {notesSaved ? copy.notesSaved : copy.notesSave}
+                {notesSaved ? (copy.notesSaved || t('catalog.notesSaved')) : (copy.notesSave || t('catalog.notesSave'))}
               </button>
             </div>
             {notesError && (
@@ -141,7 +142,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
             className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
             onClick={handleRemove}
           >
-            {confirmDelete ? copy.removeConfirm : copy.removeLabel}
+            {confirmDelete ? (copy.removeConfirm || t('catalog.removeConfirm')) : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))}
           </button>
         </div>
       </div>

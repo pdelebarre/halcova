@@ -82,3 +82,32 @@
   background: var(--vinyl-groove);
   color: var(--jacket-kraft-dim);
 }
+
+/* Language switcher row (§5 settings) */
+.settings-language-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.settings-language-select {
+  flex-shrink: 0;
+  background: var(--vinyl-groove-2, #1e1c18);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--jacket-kraft);
+  font-size: 14px;
+  padding: 8px 10px;
+  min-width: 180px;
+  height: 40px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.settings-language-select:focus-visible {
+  outline: 2px solid var(--jacket-kraft);
+  outline-offset: 1px;
+}

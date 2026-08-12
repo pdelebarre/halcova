@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as discogs from '../api/discogs'
 import { splitArtistTitle } from '../utils/match'
+import { t } from '../i18n'
 import './AlbumDetail.css'
 
 export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, catalog }) {
@@ -39,7 +40,7 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
       setNotesSaved(true)
       window.setTimeout(() => setNotesSaved(false), 1200)
     } catch (err) {
-      setNotesError(err?.message || 'Could not save notes')
+      setNotesError(err?.message || t('detail.couldNotSaveNotes'))
     }
   }
 
@@ -60,7 +61,7 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
         <div className="sheet-header">
           <h2 className="visually-hidden">{albumTitle}</h2>
           <span />
-          <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         <div className="detail-scroll">
@@ -76,23 +77,23 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
           </div>
 
           <dl className="detail-meta">
-            {item.formatType && <div><dt>Format</dt><dd>{item.formatRaw || item.formatType}</dd></div>}
-            {item.year && <div><dt>Year</dt><dd>{item.year}</dd></div>}
-            {item.label && <div><dt>Label</dt><dd>{item.label}</dd></div>}
-            {item.catno && <div><dt>Catalog #</dt><dd>{item.catno}</dd></div>}
-            {item.country && <div><dt>Country</dt><dd>{item.country}</dd></div>}
+            {item.formatType && <div><dt>{t('add.format')}</dt><dd>{item.formatRaw || item.formatType}</dd></div>}
+            {item.year && <div><dt>{t('add.year')}</dt><dd>{item.year}</dd></div>}
+            {item.label && <div><dt>{t('add.label')}</dt><dd>{item.label}</dd></div>}
+            {item.catno && <div><dt>{t('add.catalogNumber')}</dt><dd>{item.catno}</dd></div>}
+            {item.country && <div><dt>{t('detail.country')}</dt><dd>{item.country}</dd></div>}
             {(item.genre?.length || item.style?.length) ? (
-              <div><dt>Genre</dt><dd>{[...(item.genre || []), ...(item.style || [])].join(', ')}</dd></div>
+              <div><dt>{t('add.genre')}</dt><dd>{[...(item.genre || []), ...(item.style || [])].join(', ')}</dd></div>
             ) : null}
-            {item.barcode && <div><dt>Barcode</dt><dd className="mono">{item.barcode}</dd></div>}
+            {item.barcode && <div><dt>{t('detail.barcode')}</dt><dd className="mono">{item.barcode}</dd></div>}
           </dl>
 
           {item.discogsId && (
             <div className="detail-tracklist">
-              <p className="detail-section-label">Tracklist</p>
-              {!tracklist && !trackError && <p className="detail-loading">Loading…</p>}
-              {trackError && <p className="detail-loading">Couldn't load tracklist.</p>}
-              {tracklist && tracklist.length === 0 && <p className="detail-loading">No tracklist on file.</p>}
+              <p className="detail-section-label">{t('detail.tracklist')}</p>
+              {!tracklist && !trackError && <p className="detail-loading">{t('common.loading')}</p>}
+              {trackError && <p className="detail-loading">{t('detail.tracklistError')}</p>}
+              {tracklist && tracklist.length === 0 && <p className="detail-loading">{t('detail.noTracklist')}</p>}
               {tracklist && tracklist.length > 0 && (
                 <ol className="track-list">
                   {tracklist.map((t, i) => (
@@ -108,18 +109,18 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
           )}
 
           <div className="detail-notes">
-            <p className="detail-section-label">Notes</p>
+            <p className="detail-section-label">{t('detail.notes')}</p>
             <textarea
               value={notes}
               onChange={(e) => { setNotes(e.target.value); if (notesError) setNotesError('') }}
-              placeholder="Condition, pressing details, where you found it…"
+              placeholder={t('detail.notesPlaceholderRecord')}
               rows={3}
               aria-invalid={!!notesError}
               aria-describedby={notesError ? 'detail-notes-error' : undefined}
             />
             <div className="detail-notes-actions">
               <button type="button" className="btn btn-ghost" onClick={saveNotes} disabled={!notesDirty}>
-                {notesSaved ? copy.notesSaved : copy.notesSave}
+                {notesSaved ? (copy.notesSaved || t('catalog.notesSaved')) : (copy.notesSave || t('catalog.notesSave'))}
               </button>
             </div>
             {notesError && (
@@ -144,7 +145,7 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
             className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
             onClick={handleRemove}
           >
-            {confirmDelete ? copy.removeConfirm : copy.removeLabel}
+            {confirmDelete ? (copy.removeConfirm || t('catalog.removeConfirm')) : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))}
           </button>
         </div>
       </div>

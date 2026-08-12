@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as authApi from './api/auth'
+import { t, getLocale } from './i18n'
 import './AdminPanel.css'
 
-const KIND_LABELS = { records: 'Records', books: 'Books' }
+const KIND_LABELS = { records: () => t('kind.records'), books: () => t('kind.books') }
+const KIND_ACCESS_LABELS = { records: () => t('kind.recordsAccess'), books: () => t('kind.booksAccess') }
 const KINDS = ['records', 'books']
 
 function fmtDate(iso) {
   if (!iso) return ''
   try {
-    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    return new Date(iso).toLocaleDateString(getLocale(), { month: 'short', day: 'numeric', year: 'numeric' })
   } catch {
     return ''
   }
@@ -112,7 +114,7 @@ export default function AdminPanel({ onClose }) {
   }
 
   async function removeUser(userId) {
-    if (!window.confirm('Delete this member and their collections? This cannot be undone.')) return
+    if (!window.confirm(t('admin.deleteConfirm'))) return
     setError('')
     try {
       await authApi.adminDeleteUser({ userId })
@@ -146,33 +148,33 @@ export default function AdminPanel({ onClose }) {
   const members = data.users.filter((u) => u.role !== 'admin')
 
   return (
-    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label="Admin">
+    <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={t('common.adminPanel')}>
       <div className="sheet admin-sheet">
         <div className="sheet-header">
-          <h2>Admin</h2>
-          <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <h2>{t('common.adminPanel')}</h2>
+          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         {error && <p className="sheet-error admin-error">{error}</p>}
 
         <div className="admin-scroll">
           <section>
-            <h3 className="admin-h3">Pending requests{pending.length ? ` (${pending.length})` : ''}</h3>
+            <h3 className="admin-h3">{t('admin.pendingRequests')}{pending.length ? ` (${pending.length})` : ''}</h3>
             {loading ? (
-              <p className="sheet-status">Loading…</p>
+              <p className="sheet-status">{t('common.loading')}</p>
             ) : pending.length === 0 ? (
-              <p className="sheet-empty">No pending requests right now.</p>
+              <p className="sheet-empty">{t('admin.noPending')}</p>
             ) : (
               <ul className="admin-list">
                 {pending.map((r) => (
                   <li key={r.id} className="admin-row">
                     <div className="admin-row-main">
                       <span className="admin-name">{r.name}</span>
-                      <span className="admin-sub">{r.email} · requested {fmtDate(r.createdAt)}</span>
+                      <span className="admin-sub">{r.email} · {t('admin.requestedOn', { date: fmtDate(r.createdAt) })}</span>
                     </div>
                     <div className="admin-row-actions">
-                      <button className="btn btn-ghost btn-sm" onClick={() => setApproving(r.id)}>Approve</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => reject(r.id)}>Reject</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setApproving(r.id)}>{t('admin.approve')}</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => reject(r.id)}>{t('admin.reject')}</button>
                     </div>
                   </li>
                 ))}
@@ -182,15 +184,15 @@ export default function AdminPanel({ onClose }) {
 
           {approving && (
             <section className="admin-approve">
-              <h3 className="admin-h3">Grant access</h3>
-              <p className="admin-sub">Which collections should this member get?</p>
+              <h3 className="admin-h3">{t('admin.grantAccess')}</h3>
+              <p className="admin-sub">{t('admin.whichCollections')}</p>
               <div className="admin-switches">
                 {KINDS.map((k) => (
                   <Switch
                     key={k}
                     checked={!!draft[k]}
                     onChange={() => setDraft((d) => ({ ...d, [k]: !d[k] }))}
-                    label={KIND_LABELS[k]}
+                    label={KIND_LABELS[k]?.() || k}
                   />
                 ))}
               </div>
@@ -200,31 +202,31 @@ export default function AdminPanel({ onClose }) {
                   onClick={approve}
                   disabled={!draft.records && !draft.books}
                 >
-                  Generate access code
+                  {t('admin.generateCode')}
                 </button>
-                <button className="btn btn-ghost" onClick={() => setApproving(null)}>Cancel</button>
+                <button className="btn btn-ghost" onClick={() => setApproving(null)}>{t('common.cancel')}</button>
               </div>
             </section>
           )}
 
           {granted && (
             <section className="admin-code">
-              <h3 className="admin-h3">Access code for {granted.user.name}</h3>
-              <p className="admin-sub">Share this code out of band — it's how they sign in.</p>
+              <h3 className="admin-h3">{t('admin.accessCodeFor', { name: granted.user.name })}</h3>
+              <p className="admin-sub">{t('admin.shareCodeHint')}</p>
               <div className="admin-code-box">
                 <code className="admin-code-text">{granted.code}</code>
                 <button className="btn btn-ghost btn-sm" onClick={() => copyText(granted.code, `grant-${granted.code}`)}>
-                  {copied === `grant-${granted.code}` ? 'Copied ✓' : 'Copy'}
+                  {copied === `grant-${granted.code}` ? t('admin.copied') : t('common.copy')}
                 </button>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setGranted(null)}>Done</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setGranted(null)}>{t('common.done')}</button>
             </section>
           )}
 
           <section>
-            <h3 className="admin-h3">Members{members.length ? ` (${members.length})` : ''}</h3>
+            <h3 className="admin-h3">{t('admin.members')}{members.length ? ` (${members.length})` : ''}</h3>
             {members.length === 0 ? (
-              <p className="sheet-empty">No members yet.</p>
+              <p className="sheet-empty">{t('admin.noMembers')}</p>
             ) : (
               <ul className="admin-list">
                 {members.map((u) => (
@@ -232,7 +234,7 @@ export default function AdminPanel({ onClose }) {
                     <div className="admin-row-main">
                       <span className="admin-name">
                         {u.name}
-                        {u.status === 'disabled' && <span className="admin-status-tag">Disabled</span>}
+                        {u.status === 'disabled' && <span className="admin-status-tag">{t('admin.disabled')}</span>}
                       </span>
                       <span className="admin-sub">{u.email}</span>
                       <div className="admin-switches">
@@ -241,7 +243,7 @@ export default function AdminPanel({ onClose }) {
                             key={k}
                             checked={!!u.collections?.[k]}
                             onChange={() => toggleAccess(u.id, k)}
-                            label={`${KIND_LABELS[k]} access`}
+                            label={KIND_ACCESS_LABELS[k]?.() || k}
                           />
                         ))}
                       </div>
@@ -249,19 +251,19 @@ export default function AdminPanel({ onClose }) {
                         <div className="admin-code-box inline">
                           <code className="admin-code-text">{u.code}</code>
                           <button className="btn btn-ghost btn-sm" onClick={() => copyText(u.code, `member-${u.id}`)}>
-                            {copied === `member-${u.id}` ? 'Copied ✓' : 'Copy'}
+                            {copied === `member-${u.id}` ? t('admin.copied') : t('common.copy')}
                           </button>
                         </div>
                       )}
                     </div>
                     <div className="admin-row-actions">
                       <button className="btn btn-ghost btn-sm" onClick={() => setRevealed((prev) => ({ ...prev, [u.id]: !prev[u.id] }))}>
-                        {revealed[u.id] ? 'Hide code' : 'Show code'}
+                        {revealed[u.id] ? t('admin.hideCode') : t('admin.showCode')}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(u.id)}>
-                        {u.status === 'active' ? 'Disable' : 'Enable'}
+                        {u.status === 'active' ? t('admin.disable') : t('admin.enable')}
                       </button>
-                      <button className="btn btn-danger btn-sm" onClick={() => removeUser(u.id)}>Delete</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => removeUser(u.id)}>{t('admin.delete')}</button>
                     </div>
                   </li>
                 ))}

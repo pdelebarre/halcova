@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { prepareZXingModule, readBarcodes } from 'zxing-wasm/reader'
 import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
+import { t } from '../i18n'
 import './ScannerModal.css'
 
 // Serve the WASM decoder from our own bundle instead of a third-party CDN, so
@@ -30,7 +31,7 @@ export default function ScannerModal({ onDetected, onClose }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const torchTrackRef = useRef(null)
-  const [statusMsg, setStatusMsg] = useState('Starting camera…')
+  const [statusMsg, setStatusMsg] = useState(t('scan.startingCamera'))
   const [errorMsg, setErrorMsg] = useState('')
   const [retryKey, setRetryKey] = useState(0)
   const [torchAvailable, setTorchAvailable] = useState(false)
@@ -99,7 +100,7 @@ export default function ScannerModal({ onDetected, onClose }) {
         await video.play()
         if (cancelled) return
 
-        setStatusMsg('Aim at the barcode')
+        setStatusMsg(t('scan.aimAtBarcode'))
 
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -132,8 +133,8 @@ export default function ScannerModal({ onDetected, onClose }) {
         if (cancelled) return
         setErrorMsg(
           err?.name === 'NotAllowedError'
-            ? 'Camera access was denied. Allow camera access in Settings to scan barcodes.'
-            : 'Could not start the camera on this device.',
+            ? t('scan.cameraDenied')
+            : t('scan.cameraFail'),
         )
       }
     }
@@ -171,19 +172,19 @@ export default function ScannerModal({ onDetected, onClose }) {
 
   const handleRetry = () => {
     setErrorMsg('')
-    setStatusMsg('Restarting camera…')
+    setStatusMsg(t('scan.restartingCamera'))
     setRetryKey((k) => k + 1)
   }
 
   return (
-    <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Scan barcode">
+    <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label={t('scan.scanBarcode')}>
       <div className="scanner-video">
         <video ref={videoRef} autoPlay muted playsInline />
         <canvas ref={canvasRef} className="scanner-canvas" />
       </div>
 
       <div className="scanner-chrome">
-        <button className="scanner-close" onClick={onClose} aria-label="Cancel scan">
+        <button className="scanner-close" onClick={onClose} aria-label={t('scan.cancelScan')}>
           ✕
         </button>
 
@@ -192,7 +193,7 @@ export default function ScannerModal({ onDetected, onClose }) {
             className={`scanner-torch ${torchOn ? 'on' : ''}`}
             onClick={toggleTorch}
             aria-pressed={torchOn}
-            aria-label={torchOn ? 'Turn off torch' : 'Turn on torch'}
+            aria-label={torchOn ? t('scan.torchOff') : t('scan.torchOn')}
           >
             {torchOn ? '🔦' : '💡'}
           </button>
@@ -211,14 +212,14 @@ export default function ScannerModal({ onDetected, onClose }) {
 
         {errorMsg && (
           <div style={{ marginTop: 8 }}>
-            <button className="scanner-retry" onClick={handleRetry} aria-label="Retry camera">
-              Retry
+            <button className="scanner-retry" onClick={handleRetry} aria-label={t('scan.retryCamera')}>
+              {t('common.retry')}
             </button>
           </div>
         )}
 
         <button className="scanner-manual" onClick={() => onClose('manual')}>
-          Enter details manually instead
+          {t('scan.enterManually')}
         </button>
       </div>
     </div>

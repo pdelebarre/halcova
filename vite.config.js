@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Alcove — Records & Books',
-        short_name: 'Alcove',
-        description: 'Alcove — scan a barcode, catalog the thing. Your records and books in one app. Never double-buy: it knows what you already own.',
+        name: 'Hokan — Records & Books',
+        short_name: 'Hokan',
+        description: 'Hokan — scan a barcode, catalog the thing. Your records and books in one app. Never double-buy: it knows what you already own.',
         theme_color: '#16130F',
         background_color: '#16130F',
         display: 'standalone',

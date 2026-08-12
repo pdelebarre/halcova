@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useScrolled } from '../hooks/useScrolled'
+import { t, getLocale } from '../i18n'
 import FilterSheet from './FilterSheet'
 import SortMenu from './SortMenu'
 import './Toolbar.css'
@@ -40,8 +41,10 @@ export default function Toolbar({
     () => sortOptions.find((o) => o.value === sortBy)?.label || sortBy,
     [sortOptions, sortBy],
   )
-  const filterLabel = copy.filterLabel || 'Filter'
-  const filterAriaLabel = activeFilterCount > 0 ? `${filterLabel}, ${activeFilterCount} active` : filterLabel
+  const filterLabel = copy.filterLabel || t('toolbar.filter')
+  const filterAriaLabel = activeFilterCount > 0
+    ? t('toolbar.filtersActive', { n: activeFilterCount })
+    : filterLabel
 
   function closeSheet() {
     setSheetOpen(false)
@@ -64,19 +67,19 @@ export default function Toolbar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          aria-label="Search collection"
+          aria-label={t('toolbar.searchCollection')}
         />
         {query && (
           <button
             type="button"
             className="search-clear"
             onClick={() => setQuery('')}
-            aria-label={copy.searchClear || 'Clear search'}
+            aria-label={copy.searchClear || t('toolbar.clearSearch')}
           >
             ✕
           </button>
         )}
-        <span className="toolbar-count" aria-hidden="true">{Number(count || 0).toLocaleString()}</span>
+        <span className="toolbar-count" aria-hidden="true">{Number(count || 0).toLocaleString(getLocale())}</span>
       </div>
 
       <button
@@ -102,7 +105,7 @@ export default function Toolbar({
         onClick={() => setSortOpen(true)}
         aria-haspopup="menu"
         aria-expanded={sortOpen}
-        aria-label={`${copy.sortMenu?.label || 'Sort by'}: ${currentSortLabel}`}
+        aria-label={`${copy.sortMenu?.label || t('toolbar.sortBy')}: ${currentSortLabel}`}
       >
         <span className="sort-label">{currentSortLabel}</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -116,7 +119,7 @@ export default function Toolbar({
           className={`view-toggle-btn${view === 'grid' ? ' active' : ''}`}
           onClick={() => setView('grid')}
           aria-pressed={view === 'grid'}
-          aria-label={copy.view?.grid || 'Grid view'}
+          aria-label={copy.view?.grid || t('toolbar.gridView')}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -130,7 +133,7 @@ export default function Toolbar({
           className={`view-toggle-btn${view === 'list' ? ' active' : ''}`}
           onClick={() => setView('list')}
           aria-pressed={view === 'list'}
-          aria-label={copy.view?.list || 'List view'}
+          aria-label={copy.view?.list || t('toolbar.listView')}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M8 6h13M8 12h13M8 18h13" />
@@ -140,7 +143,7 @@ export default function Toolbar({
       </div>
 
       <span className="visually-hidden" aria-live="polite">
-        {activeFilterCount > 0 ? copy.filtersActive?.(activeFilterCount) : ''}
+        {activeFilterCount > 0 ? (copy.filtersActive?.(activeFilterCount) ?? t('toolbar.filtersActive', { n: activeFilterCount })) : ''}
       </span>
 
       {sheetOpen && (

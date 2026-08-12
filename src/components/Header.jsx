@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useScrolled } from '../hooks/useScrolled'
+import { t } from '../i18n'
 import './Header.css'
 
-const DEFAULT_TABS = [
-  { id: 'records', label: 'Records' },
-  { id: 'books', label: 'Books' },
-]
-
 export default function Header({
-  tabs = DEFAULT_TABS,
+  tabs,
   activeTab,
   onTabChange,
   onOpenSettings,
@@ -49,10 +45,10 @@ export default function Header({
   return (
     <header className={scrolled ? 'app-header scrolled' : 'app-header'}>
       <div className="app-header-title">
-        <span className="wordmark">Alcove</span>
+        <span className="wordmark">Hokan</span>
       </div>
       <div className="header-right">
-        <nav className="tab-bar" aria-label="Collection type">
+        <nav className="tab-bar" aria-label={t('header.collectionType')}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -71,20 +67,20 @@ export default function Header({
             <div
               className="avatar-menu"
               role="menu"
-              aria-label="Account"
+              aria-label={t('header.account')}
               ref={menuRef}
               hidden={!menuOpen}
             >
               <button type="button" role="menuitem" onClick={() => run(onOpenSettings)}>
-                Settings
+                {t('common.settings')}
               </button>
               {showAdmin && (
                 <button type="button" role="menuitem" onClick={() => run(onOpenAdmin)}>
-                  Admin panel
+                  {t('common.adminPanel')}
                 </button>
               )}
               <button type="button" role="menuitem" className="avatar-signout" onClick={() => run(onLogout)}>
-                Sign out
+                {t('common.signOut')}
               </button>
             </div>
             <button
@@ -94,7 +90,7 @@ export default function Header({
               onClick={() => setMenuOpen((s) => !s)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              aria-label={`Account: ${user.name}`}
+              aria-label={t('header.accountLabel', { name: user.name })}
             >
               <span className="user-chip-initial">{String(user.name || '?').charAt(0).toUpperCase()}</span>
             </button>

@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 import './MatchPicker.css'
 
 export default function MatchPicker({
@@ -11,7 +12,7 @@ export default function MatchPicker({
       <div className="sheet">
         <div className="sheet-header">
           <h2>{title}</h2>
-          <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
         </div>
 
         {loading && <p className="sheet-status">{loadingLabel}</p>}
@@ -48,9 +49,9 @@ export default function MatchPicker({
 
         <div className="sheet-actions">
           {onRetrySearch && (
-            <button className="btn btn-ghost" onClick={onRetrySearch}>Search by title instead</button>
+            <button className="btn btn-ghost" onClick={onRetrySearch}>{t('add.searchByTitleInstead')}</button>
           )}
-          <button className="btn btn-ghost" onClick={onManual}>Add manually</button>
+          <button className="btn btn-ghost" onClick={onManual}>{t('add.addManually')}</button>
         </div>
       </div>
     </div>

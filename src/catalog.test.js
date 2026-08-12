@@ -24,7 +24,6 @@ describe('recordsCatalog', () => {
   it('has the copy strings and helpers used by the UI', () => {
     expect(recordsCatalog.copy.emptyTitle).toBe('Your crate is empty')
     expect(recordsCatalog.copy.addToast).toBe('Added to your crate')
-    expect(recordsCatalog.copy.removedToast).toBe('Removed')
     expect(recordsCatalog.copy.moreBy('Miles Davis', 3)).toBe('More by Miles Davis in your crate (3)')
     expect(recordsCatalog.copy.nothingElseBy('Miles Davis')).toBe('Nothing else by Miles Davis in your crate')
     expect(recordsCatalog.copy.resultGood.label).toBe('Not in your crate yet')

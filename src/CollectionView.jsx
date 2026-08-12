@@ -6,6 +6,7 @@ import MatchPicker from './components/MatchPicker'
 import ScanResult from './components/ScanResult'
 import { useCollection } from './hooks/useCollection'
 import { findRelated, splitArtistTitle } from './utils/match'
+import { t, getLocale } from './i18n'
 import './App.css'
 
 // The WASM barcode decoder is heavy — only worth loading once the person
@@ -159,7 +160,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
         onRequestSettings()
-        showToast(`${catalog.lookupName} lookups aren't configured yet — ask the owner to set up the shared token`, 'error')
+        showToast(`${catalog.lookupName} ${t('view.lookupsNotConfigured', { lookupName: catalog.lookupName })}`, 'error')
         return
       }
       setPickerState({ matches: [], loading: false, errorMsg: err.message })
@@ -184,7 +185,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
       setScanCandidate(null)
       showToast(copy.addToast, 'add')
     } catch {
-      showToast('Could not save — check your connection', 'error')
+      showToast(t('view.couldNotSave'), 'error')
     }
   }
 
@@ -203,7 +204,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     await remove(id)
     setModal(null)
     setSelectedItem(null)
-    showToast(copy.removedToast, 'remove')
+    showToast(copy.removedToast || t('catalog.removedToast'), 'remove')
   }
 
   async function handleSaveNotes(notes) {
@@ -245,16 +246,19 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     }
     const sorted = [...list]
     if (sortBy === 'artist') {
+      const locale = getLocale()
       sorted.sort((a, b) => {
-        const artistCmp = splitArtistTitle(a.title).artist.localeCompare(splitArtistTitle(b.title).artist)
-        return artistCmp !== 0 ? artistCmp : (a.title || '').localeCompare(b.title || '')
+        const artistCmp = splitArtistTitle(a.title).artist.localeCompare(splitArtistTitle(b.title).artist, locale)
+        return artistCmp !== 0 ? artistCmp : (a.title || '').localeCompare(b.title || '', locale)
       })
     } else if (sortBy === 'year') {
       sorted.sort((a, b) => (b.year || 0) - (a.year || 0))
     } else if (sortBy === 'format') {
-      sorted.sort((a, b) => (a.formatType || '').localeCompare(b.formatType || ''))
+      const locale = getLocale()
+      sorted.sort((a, b) => (a.formatType || '').localeCompare(b.formatType || '', locale))
     } else if (sortBy === 'title') {
-      sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+      const locale = getLocale()
+      sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', locale))
     } else {
       sorted.sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
     }
@@ -288,8 +292,8 @@ export default function CollectionView({ catalog, onRequestSettings }) {
 
         {status === 'error' && (
           <div className="status-line status-error">
-            <p>Couldn't reach your collection. {error}</p>
-            <button type="button" className="btn btn-ghost" onClick={refresh}>Try again</button>
+            <p>{t('view.couldNotReach', { error })}</p>
+            <button type="button" className="btn btn-ghost" onClick={refresh}>{t('common.tryAgain')}</button>
           </div>
         )}
 
@@ -360,13 +364,13 @@ export default function CollectionView({ catalog, onRequestSettings }) {
             aria-haspopup="menu"
             aria-expanded={fabOpen}
             onClick={() => setFabOpen((s) => !s)}
-            aria-label="Scan"
+            aria-label={t('common.scan')}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3" />
               <path d="M7 12h10" />
             </svg>
-            <span>Scan</span>
+            <span>{t('common.scan')}</span>
           </button>
         </>
       )}
