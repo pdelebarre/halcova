@@ -4,6 +4,12 @@
 **Decision:** rename public brand `Runout` → `Alcove` (locked).
 **Branch for all code:** `chore/rename-alcove` (off `main`) → PR. **Never `main`.**
 
+> **Scope updated (2026-08-12): private-first.** Alcove launches as a **private
+> friends & family test** with FR · NL · BR · DE testers (they double as the
+> native-speaker name check for those markets). See
+> `private-test-plan.md` + `private-test-invite.md`. "Name day" below = the
+> **soft-open** to that circle; a wider launch is a later go/no-go.
+
 ---
 
 ## 1. Assignments
