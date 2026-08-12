@@ -21,6 +21,8 @@ export function bearer(req) {
 }
 
 // Strip sensitive fields (the access code) before sending a user to the client.
+// Everything else — including the per-account `features` flag map — passes
+// through untouched, so the client can read session.user.features.lending.
 export function publicUser(user) {
   if (!user) return null
   const { code: _code, ...rest } = user

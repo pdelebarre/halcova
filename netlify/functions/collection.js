@@ -1,42 +1,7 @@
 import { getStore } from '@netlify/blobs'
 import { randomUUID } from 'node:crypto'
-import { ADMIN_KEY, OWNER_ID, bearer } from './_shared/auth'
-import { findUserByCode, storeNameFor } from './_shared/users'
-
-// Only these collection kinds exist; anything else is rejected.
-const COLLECTIONS = { records: true, books: true }
-const INDEX_KEY = 'index'
-
-const json = (statusCode, body) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
-})
-
-async function readIndex(store) {
-  const data = await store.get(INDEX_KEY, { type: 'json' })
-  return data || []
-}
-
-async function writeIndex(store, ids) {
-  await store.setJSON(INDEX_KEY, ids)
-}
-
-// Every request must carry the caller's access code. The owner uses the admin
-// key; members use the code the admin generated when approving their request.
-async function authorize(req) {
-  const code = bearer(req)
-  if (!code) return { error: json(401, { error: 'Sign in with your access code.' }) }
-
-  let user
-  if (code === ADMIN_KEY) {
-    user = { id: OWNER_ID, role: 'admin', status: 'active', collections: { records: true, books: true } }
-  } else {
-    user = await findUserByCode(code)
-  }
-  if (!user) return { error: json(401, { error: "That access code isn't recognized." }) }
-  if (user.status !== 'active') return { error: json(403, { error: 'This account is disabled.' }) }
-  return { user }
-}
+import { COLLECTIONS, authorize, json, readIndex, writeIndex } from './_shared/collection-store'
+import { storeNameFor } from './_shared/users'
 
 export default async (req) => {
   const url = new URL(req.url)
