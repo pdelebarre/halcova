@@ -51,6 +51,22 @@ Blobs.
   `code` field before sending users to the client (`publicUser` in
   `netlify/functions/_shared/auth.js`).
 
+## Branching & Version Control
+
+- **Never commit new feature work directly to `main`.** Before starting any
+  new feature, create a feature branch from `main`:
+  `git switch -c feat/<kebab-slug>`.
+- Use intent prefixes, kebab-case, short names: `feat/` (features), `fix/`
+  (bug fixes), `docs/` (documentation), `chore/` (tooling/refactors).
+- The Project Manager (or the implementing agent) creates the branch before
+  work starts; implementation, tests, and docs for that feature live on it.
+- Sync with `main` regularly (`git fetch origin && git merge origin/main`),
+  and finish with a pull request — don't push straight to `main`.
+- Exceptions (e.g. a one-line hotfix to a deployed site) are allowed only when
+  the user explicitly says to work on `main`.
+- `git status` before and after: confirm you're on the intended branch and
+  that only your feature's files changed. See the `feature-branching` skill.
+
 ## Build & Test
 
 ```bash
@@ -82,7 +98,8 @@ npm run build      # vite build (PWA precaches the scanner wasm)
     Architect` (cloud/scalability/backend design), `Front End Architect`
     (front-end design/review), `Front End Developer` (implement), `Tester`
     (QA), `Security Auditor` (security review), `UI UX Expert` (ergonomics +
-    Figma design via MCP).
+    Figma design via MCP), `Marketing Manager` (online/international
+    marketing, launches, content).
   - *Domain specialists*: `Runout Engineer` (general), `Catalog Designer`
     (new collection kinds), `Scanner Builder` (camera + zxing-wasm),
     `Netlify Backend` (functions / Blobs / auth / PWA), `Ergonomics Reviewer`
@@ -98,7 +115,9 @@ npm run build      # vite build (PWA precaches the scanner wasm)
   - `ergonomics-review` — read-only UX/ergonomics/a11y audit checklist
   - `whole-stack-architecture` — cloud/scalability review + backend design
   - `figma-design` — Figma MCP workflows + design tokens
+  - `feature-branching` — never commit new features to `main`
 - **Prompts** (`.github/prompts/`): `add-catalog-tests`, `deploy-to-netlify`,
   `fix-dark-screen`, `review-changes`, `update-copy`, `review-ergonomics`,
-  `fix-ergonomics`, `review-architecture`, `design-in-figma`.
+  `fix-ergonomics`, `review-architecture`, `design-in-figma`,
+  `new-feature-branch`.
 - Detailed docs: `docs/technical.md`, `docs/functional.md`.

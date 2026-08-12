@@ -29,8 +29,13 @@ const MAX_DECODE_WIDTH = 640
 export default function ScannerModal({ onDetected, onClose }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+  const torchTrackRef = useRef(null)
   const [statusMsg, setStatusMsg] = useState('Starting camera…')
   const [errorMsg, setErrorMsg] = useState('')
+  const [retryKey, setRetryKey] = useState(0)
+  const [torchAvailable, setTorchAvailable] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+  const [justDecoded, setJustDecoded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -55,11 +60,18 @@ export default function ScannerModal({ onDetected, onClose }) {
       try {
         const results = await readBarcodes(imageData, READER_OPTIONS)
         if (!cancelled && results.length > 0 && results[0].text) {
+          // Prevent further decode attempts while we play the UI pulse.
           cancelled = true
+          setJustDecoded(true)
           navigator.vibrate?.(60)
-          cancelAnimationFrame(rafId)
-          mediaStream?.getTracks().forEach((track) => track.stop())
-          onDetected(results[0].text)
+          // Keep camera running briefly so the user sees the pulse animation,
+          // then stop tracks and notify the caller.
+          const text = results[0].text
+          setTimeout(() => {
+            cancelAnimationFrame(rafId)
+            mediaStream?.getTracks().forEach((track) => track.stop())
+            onDetected(text)
+          }, 320)
         }
       } catch {
         // A single frame failing to decode is normal — keep scanning.
@@ -94,6 +106,16 @@ export default function ScannerModal({ onDetected, onClose }) {
         let decoding = false
         let lastDecode = 0
 
+        // Detect torch capability on the first video track and cache the track.
+        try {
+          const [vt] = mediaStream.getVideoTracks()
+          torchTrackRef.current = vt
+          const caps = vt.getCapabilities?.() || {}
+          if (caps.torch) setTorchAvailable(true)
+        } catch (e) {
+          // ignore — just means torch not available
+        }
+
         const loop = async () => {
           if (cancelled) return
           const now = performance.now()
@@ -123,7 +145,35 @@ export default function ScannerModal({ onDetected, onClose }) {
       cancelAnimationFrame(rafId)
       mediaStream?.getTracks().forEach((track) => track.stop())
     }
-  }, [onDetected])
+  }, [onDetected, retryKey])
+
+  // Toggle torch if supported. Try applyConstraints first, fall back to ImageCapture.
+  const toggleTorch = async () => {
+    const vt = torchTrackRef.current
+    if (!vt) return
+    try {
+      const newState = !torchOn
+      await vt.applyConstraints?.(newState ? { advanced: [{ torch: true }] } : { advanced: [{ torch: false }] })
+      setTorchOn(newState)
+    } catch (e) {
+      try {
+        const ImageCaptureCtor = window.ImageCapture
+        if (ImageCaptureCtor) {
+          const ic = new ImageCaptureCtor(vt)
+          await ic.setOptions?.({ torch: !torchOn })
+          setTorchOn((s) => !s)
+        }
+      } catch (e2) {
+        setTorchAvailable(false)
+      }
+    }
+  }
+
+  const handleRetry = () => {
+    setErrorMsg('')
+    setStatusMsg('Restarting camera…')
+    setRetryKey((k) => k + 1)
+  }
 
   return (
     <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Scan barcode">
@@ -137,15 +187,35 @@ export default function ScannerModal({ onDetected, onClose }) {
           ✕
         </button>
 
-        <div className="scanner-target">
+        {torchAvailable && (
+          <button
+            className={`scanner-torch ${torchOn ? 'on' : ''}`}
+            onClick={toggleTorch}
+            aria-pressed={torchOn}
+            aria-label={torchOn ? 'Turn off torch' : 'Turn on torch'}
+          >
+            {torchOn ? '🔦' : '💡'}
+          </button>
+        )}
+
+        <div className={`scanner-target ${justDecoded ? 'pulse' : ''}`}>
           <span className="scanner-corner tl" />
           <span className="scanner-corner tr" />
           <span className="scanner-corner bl" />
           <span className="scanner-corner br" />
           <span className="scanner-line" />
+          <span className="scanner-pulse" aria-hidden="true" />
         </div>
 
         <p className="scanner-status">{errorMsg || statusMsg}</p>
+
+        {errorMsg && (
+          <div style={{ marginTop: 8 }}>
+            <button className="scanner-retry" onClick={handleRetry} aria-label="Retry camera">
+              Retry
+            </button>
+          </div>
+        )}
 
         <button className="scanner-manual" onClick={() => onClose('manual')}>
           Enter details manually instead

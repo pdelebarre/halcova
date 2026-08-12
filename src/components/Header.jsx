@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react'
+import { useScrolled } from '../hooks/useScrolled'
 import './Header.css'
 
 const DEFAULT_TABS = [
@@ -15,19 +17,46 @@ export default function Header({
   user,
   onLogout,
 }) {
+  const scrolled = useScrolled()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const avatarRef = useRef(null)
+  const menuRef = useRef(null)
+
+  // Esc closes the avatar menu; focus returns to the avatar chip.
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    menuRef.current?.querySelector('button')?.focus()
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        setMenuOpen(false)
+        avatarRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
+  function closeMenu() {
+    setMenuOpen(false)
+    avatarRef.current?.focus()
+  }
+
+  function run(action) {
+    setMenuOpen(false)
+    action()
+  }
+
   return (
-    <header className="app-header">
+    <header className={scrolled ? 'app-header scrolled' : 'app-header'}>
       <div className="app-header-title">
         <span className="wordmark">Runout</span>
-        <span className="tagline">
-          {activeTab === 'books' ? 'your shelf, cataloged' : 'your crate, cataloged'}
-        </span>
       </div>
       <div className="header-right">
         <nav className="tab-bar" aria-label="Collection type">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               className={`tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => onTabChange(tab.id)}
               aria-pressed={activeTab === tab.id}
@@ -36,29 +65,40 @@ export default function Header({
             </button>
           ))}
         </nav>
-        {showAdmin && (
-          <button className="icon-btn" onClick={onOpenAdmin} aria-label="Admin panel">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-          </button>
-        )}
-        <button className="icon-btn" onClick={onOpenSettings} aria-label="Settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
         {user && (
-          <button
-            className="icon-btn user-chip"
-            onClick={onLogout}
-            aria-label={`Sign out ${user.name}`}
-            title={`Signed in as ${user.name} — tap to sign out`}
-          >
-            <span className="user-chip-initial">{String(user.name || '?').charAt(0).toUpperCase()}</span>
-          </button>
+          <div className="avatar-wrap">
+            {menuOpen && <div className="avatar-overlay" onClick={closeMenu} aria-hidden="true" />}
+            <div
+              className="avatar-menu"
+              role="menu"
+              aria-label="Account"
+              ref={menuRef}
+              hidden={!menuOpen}
+            >
+              <button type="button" role="menuitem" onClick={() => run(onOpenSettings)}>
+                Settings
+              </button>
+              {showAdmin && (
+                <button type="button" role="menuitem" onClick={() => run(onOpenAdmin)}>
+                  Admin panel
+                </button>
+              )}
+              <button type="button" role="menuitem" className="avatar-signout" onClick={() => run(onLogout)}>
+                Sign out
+              </button>
+            </div>
+            <button
+              ref={avatarRef}
+              type="button"
+              className="icon-btn user-chip"
+              onClick={() => setMenuOpen((s) => !s)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label={`Account: ${user.name}`}
+            >
+              <span className="user-chip-initial">{String(user.name || '?').charAt(0).toUpperCase()}</span>
+            </button>
+          </div>
         )}
       </div>
     </header>

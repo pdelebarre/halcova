@@ -1,6 +1,9 @@
 .app-main {
-  flex: 1;
-  padding-bottom: calc(var(--safe-bottom) + 90px);
+  /* Constrain the app shell to a comfortable reading width and center it.
+     Preserve the safe-area padding on the bottom for iOS-like devices. */
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px calc(var(--safe-bottom) + 90px);
 }
 
 .status-line {
@@ -45,12 +48,62 @@
 }
 .fab:active { transform: scale(0.95); background: var(--label-red-bright); }
 
+/* Transparent scrim behind the FAB menu — closes on tap outside. */
+.fab-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: transparent;
+}
+
+/* Expanded FAB menu (3 add actions above the main FAB, §4.8) */
+.fab-menu {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--safe-bottom) + 88px);
+  z-index: 46;
+  min-width: 216px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  animation: fab-menu-in 0.15s ease;
+}
+.fab-menu[hidden] { display: none; }
+
+.fab-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--jacket-kraft);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+}
+.fab-option svg { flex-shrink: 0; color: var(--runout-gold); }
+.fab-option:active { background: var(--vinyl-groove); }
+
+@keyframes fab-menu-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--safe-bottom) + 24px);
+  bottom: calc(var(--safe-bottom) + 84px);
   transform: translateX(-50%);
   z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: var(--jacket-kraft);
   color: var(--sleeve-black);
   font-size: 13.5px;
@@ -60,6 +113,24 @@
   box-shadow: 0 8px 20px rgba(0,0,0,0.35);
   animation: toast-in 0.2s ease;
 }
+
+/* Leading status icon (✓ add / – remove) + danger tint for errors (§4.17). */
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--success);
+  color: var(--sleeve-black);
+}
+.toast-remove .toast-icon { background: var(--static-grey); color: var(--sleeve-black); }
+.toast-error { border: 1px solid rgba(194, 75, 63, 0.65); }
+.toast-error .toast-icon { background: var(--danger); color: var(--jacket-kraft); }
 
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 8px); }

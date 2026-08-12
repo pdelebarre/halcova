@@ -65,19 +65,23 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
         <div className="auth-card">
           <h1 className="auth-wordmark">Runout</h1>
           <p className="auth-copy">Enter the access code the admin gave you.</p>
-          <form onSubmit={handleLogin} className="auth-form">
+          <form onSubmit={handleLogin} className="auth-form" noValidate>
             <input
-              className="auth-input auth-code"
+              className={`auth-input auth-code${error ? ' invalid' : ''}`}
               type="text"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => { setCode(e.target.value); if (error) setError('') }}
               placeholder="RU-XXXX-XXXX-XXXX"
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
+              autoComplete="off"
               autoFocus
+              aria-invalid={!!error}
+              aria-describedby={error ? 'auth-login-error' : undefined}
             />
-            {error && <p className="auth-error">{error}</p>}
+            <p className="auth-paste-hint">Tip: paste your access code — it's case-sensitive</p>
+            {error && <p id="auth-login-error" className="auth-error" role="alert">{error}</p>}
             <button className="btn btn-primary btn-block" type="submit" disabled={busy || !code.trim()}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
@@ -116,9 +120,9 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
               autoCapitalize="off"
               autoCorrect="off"
             />
-            {error && <p className="auth-error">{error}</p>}
+            {error && <p className="auth-error" role="alert">{error}</p>}
             <button className="btn btn-primary btn-block" type="submit" disabled={busy || !name.trim() || !email.trim()}>
-              {busy ? 'Sending…' : 'Request access'}
+              {busy ? 'Requesting…' : 'Request access'}
             </button>
           </form>
           <button className="auth-back" onClick={() => { setMode('welcome'); setError('') }}>← Back</button>
@@ -130,6 +134,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
   return (
     <div className="auth-screen">
       <div className="auth-card">
+        <div className="auth-disc" aria-hidden="true" />
         <h1 className="auth-wordmark">Runout</h1>
         <p className="auth-tagline">your crate &amp; shelf, cataloged</p>
         <div className="auth-actions">

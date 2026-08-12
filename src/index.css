@@ -7,7 +7,10 @@
   --label-red: #B23A2E;
   --label-red-bright: #CE4B3D;
   --runout-gold: #C9A227;
-  --static-grey: #8A8377;
+  --static-grey: #A49C8E;
+  --glass: rgba(33, 29, 24, 0.72);
+  --shadow-card: 0 6px 14px rgba(0,0,0,0.35);
+  --shadow-float: 0 10px 24px rgba(0,0,0,0.45);
   --line: #35302A;
   --danger: #C24B3F;
   --success: #7A9A6B;
@@ -22,6 +25,10 @@
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Sticky header height (incl. safe-area) — toolbar sticks right below it. */
+  --header-h: calc(var(--safe-top) + 64px);
+  --toolbar-h: 60px;
 
   color-scheme: dark;
 }
