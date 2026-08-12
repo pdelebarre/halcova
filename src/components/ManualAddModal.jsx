@@ -6,13 +6,14 @@ import './ManualAddModal.css'
 const FORMATS = ['LP', 'EP', 'CD', '7"', '12"', 'Other']
 const emptyForm = { title: '', artist: '', formatType: 'LP', year: '', label: '', catno: '', genre: '' }
 
-export default function ManualAddModal({ onPick, onClose }) {
+export default function ManualAddModal({ onPick, onClose, copy = {} }) {
   const [mode, setMode] = useState('search') // search | picking | form
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState(null)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState(emptyForm)
+  const [titleError, setTitleError] = useState('')
 
   async function runSearch(e) {
     e?.preventDefault()
@@ -35,7 +36,10 @@ export default function ManualAddModal({ onPick, onClose }) {
 
   function submitManual(e) {
     e.preventDefault()
-    if (!form.title.trim()) return
+    if (!form.title.trim()) {
+      setTitleError(copy.manualTitleRequired || 'Title is required')
+      return
+    }
     onPick({
       title: form.artist ? `${form.artist} - ${form.title}` : form.title,
       year: form.year,
@@ -77,41 +81,50 @@ export default function ManualAddModal({ onPick, onClose }) {
             <h2>Add by hand</h2>
             <button className="sheet-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
-          <form className="manual-form" onSubmit={submitManual}>
-            <label>
-              <span>Artist</span>
-              <input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Miles Davis" />
-            </label>
-            <label>
-              <span>Title *</span>
-              <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kind of Blue" />
-            </label>
-            <div className="manual-form-row">
+          <form className="manual-form" onSubmit={submitManual} noValidate>
+            <div className="manual-form-fields">
               <label>
-                <span>Format</span>
-                <select value={form.formatType} onChange={(e) => setForm({ ...form, formatType: e.target.value })}>
-                  {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <span>Artist</span>
+                <input value={form.artist} onChange={(e) => setForm({ ...form, artist: e.target.value })} placeholder="Miles Davis" />
               </label>
               <label>
-                <span>Year</span>
-                <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="1959" inputMode="numeric" />
+                <span>Title *</span>
+                <input
+                  value={form.title}
+                  onChange={(e) => { setForm({ ...form, title: e.target.value }); if (titleError) setTitleError('') }}
+                  placeholder="Kind of Blue"
+                  aria-invalid={!!titleError}
+                  aria-describedby={titleError ? 'manual-title-error' : undefined}
+                />
+              </label>
+              {titleError && <p id="manual-title-error" className="field-error" role="alert">{titleError}</p>}
+              <div className="manual-form-row">
+                <label>
+                  <span>Format</span>
+                  <select value={form.formatType} onChange={(e) => setForm({ ...form, formatType: e.target.value })}>
+                    {FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Year</span>
+                  <input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} placeholder="1959" inputMode="numeric" />
+                </label>
+              </div>
+              <div className="manual-form-row">
+                <label>
+                  <span>Label</span>
+                  <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Columbia" />
+                </label>
+                <label>
+                  <span>Catalog #</span>
+                  <input value={form.catno} onChange={(e) => setForm({ ...form, catno: e.target.value })} placeholder="CL 1355" />
+                </label>
+              </div>
+              <label>
+                <span>Genre</span>
+                <input value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} placeholder="Jazz" />
               </label>
             </div>
-            <div className="manual-form-row">
-              <label>
-                <span>Label</span>
-                <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Columbia" />
-              </label>
-              <label>
-                <span>Catalog #</span>
-                <input value={form.catno} onChange={(e) => setForm({ ...form, catno: e.target.value })} placeholder="CL 1355" />
-              </label>
-            </div>
-            <label>
-              <span>Genre</span>
-              <input value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })} placeholder="Jazz" />
-            </label>
             <div className="sheet-actions">
               <button type="button" className="btn btn-ghost" onClick={() => setMode('search')}>Back to search</button>
               <button type="submit" className="btn btn-primary">Add to crate</button>

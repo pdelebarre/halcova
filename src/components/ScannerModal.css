@@ -40,8 +40,8 @@
   position: absolute;
   top: calc(var(--safe-top) + 16px);
   right: 16px;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: rgba(22, 19, 15, 0.65);
   color: var(--jacket-kraft);
@@ -55,10 +55,11 @@
 
 .scanner-target {
   position: relative;
-  width: min(78vw, 340px);
-  height: 190px;
+  width: min(78vw, 60dvh, 340px);
+  height: max(140px, min(48vw, 40dvh, 220px));
   margin-top: auto;
   margin-bottom: auto;
+  transition: transform 260ms ease;
 }
 
 .scanner-corner {
@@ -85,6 +86,29 @@
   animation: scan-sweep 2.2s ease-in-out infinite;
 }
 
+.scanner-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.12), rgba(206,75,61,0.06) 45%, transparent 60%);
+}
+
+.scanner-target.pulse {
+  transform: scale(0.998);
+}
+
+.scanner-target.pulse .scanner-pulse {
+  animation: decode-pulse 360ms ease-out forwards;
+}
+
+@keyframes decode-pulse {
+  0% { opacity: 0.0; transform: scale(0.98); }
+  40% { opacity: 0.95; transform: scale(1.02); }
+  100% { opacity: 0.0; transform: scale(1.04); }
+}
+
 @keyframes scan-sweep {
   0%, 100% { top: 8px; opacity: 0.9; }
   50% { top: calc(100% - 10px); opacity: 0.9; }
@@ -101,6 +125,33 @@
   border-radius: 999px;
   text-align: center;
   max-width: 88vw;
+}
+
+.scanner-torch {
+  position: absolute;
+  top: calc(var(--safe-top) + 16px);
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(22,19,15,0.65);
+  color: var(--jacket-kraft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  backdrop-filter: blur(4px);
+  font-size: 16px;
+}
+.scanner-torch.on { box-shadow: 0 0 0 3px rgba(255,230,180,0.12); }
+
+.scanner-retry {
+  background: rgba(255,255,255,0.06);
+  color: var(--jacket-kraft);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 8px 12px;
+  border-radius: 8px;
+  pointer-events: auto;
 }
 
 .scanner-manual {

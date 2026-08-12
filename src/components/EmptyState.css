@@ -3,7 +3,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 14vh 32px 40px;
+  padding: clamp(24px, 14vh, 120px) 32px 40px;
   gap: 6px;
 }
 
@@ -61,7 +61,7 @@
 
 .empty-title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--jacket-kraft);
   margin: 0;
@@ -72,6 +72,15 @@
   color: var(--jacket-kraft-dim);
   margin: 0 0 16px;
   max-width: 280px;
+}
+
+/* Tagline migrated out of the header chrome (§4.2) — sits under the title. */
+.empty-tagline {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--static-grey);
+  margin: -6px 0 18px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
    the description reads as a paragraph rather than a tracklist. */
 
 .detail-cover.book {
-  width: 132px;
+  width: clamp(96px, 24vw, 200px);
   height: auto;
   aspect-ratio: 2 / 3;
 }

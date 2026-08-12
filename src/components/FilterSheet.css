@@ -1,0 +1,142 @@
+.filter-sheet {
+  max-height: min(84dvh, 720px);
+}
+
+.filter-body {
+  overflow-y: auto;
+  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.filter-section-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--static-grey);
+  margin: 0 0 10px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chips .chip {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--jacket-kraft-dim);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.filter-chips .chip:active { background: var(--vinyl-groove-2); }
+.filter-chips .chip.active {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+/* --- Artist / Author searchable combobox (§5.2) --- */
+.filter-combobox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.artist-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 6px 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--runout-gold);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.1);
+  font-size: 13px;
+  font-weight: 600;
+}
+.artist-chip-remove {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--runout-gold);
+  font-size: 13px;
+}
+.artist-chip-remove:active { background: rgba(201, 162, 39, 0.18); }
+
+.combo-field {
+  position: relative;
+}
+.combo-field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--jacket-kraft);
+  font-size: 15px;
+}
+.combo-field input::placeholder { color: var(--static-grey); }
+
+.combo-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+}
+.combo-list li {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--jacket-kraft-dim);
+  cursor: pointer;
+}
+.combo-list li.highlighted {
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft);
+}
+.combo-list li[aria-selected='true'] {
+  color: var(--runout-gold);
+}
+
+.combo-empty {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--static-grey);
+}
+
+.filter-footer {
+  margin-top: 18px;
+}

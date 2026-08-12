@@ -23,6 +23,22 @@ if (typeof window.localStorage?.getItem !== 'function') {
   })
 }
 
+// Minimal window.matchMedia polyfill so components using media queries
+// via JS (SortMenu's useMedia, ListView) do not throw in jsdom.
+if (!window.matchMedia) {
+  window.matchMedia = (query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })
+}
+
+// Basic cleanup and mock restore between tests.
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()

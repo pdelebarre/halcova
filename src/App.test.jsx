@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import App from './App'
 import { saveSession } from './utils/session'
 
@@ -35,7 +35,7 @@ describe('App auth gating', () => {
     render(<App />)
     expect(await screen.findByRole('button', { name: 'Records' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Books' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Admin panel')).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Admin panel' })).not.toBeInTheDocument()
   })
 
   it('hides collections the member is not entitled to', async () => {
@@ -45,11 +45,14 @@ describe('App auth gating', () => {
     expect(screen.queryByRole('button', { name: 'Records' })).not.toBeInTheDocument()
   })
 
-  it('shows the admin panel button only for the admin', async () => {
+  it('shows the admin panel entry only for the admin', async () => {
     mockSignedIn({ id: 'owner', name: 'Admin', role: 'admin', collections: { records: true, books: true } })
     render(<App />)
-    expect(await screen.findByLabelText('Admin panel')).toBeInTheDocument()
-    expect(screen.getByLabelText(/Sign out Admin/)).toBeInTheDocument()
+
+    const avatar = await screen.findByRole('button', { name: 'Account: Admin' })
+    fireEvent.click(avatar)
+    expect(screen.getByRole('menuitem', { name: 'Admin panel' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 
   it('shows a friendly message when a signed-in user has no collections', async () => {

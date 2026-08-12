@@ -4,24 +4,69 @@
   gap: 10px;
 }
 
-.settings-form label {
+.settings-section-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--static-grey);
+  margin: 6px 0 0;
+}
+
+/* Rows as cards (≥48px) in the sheet language (§4.15). */
+.settings-card {
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.settings-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  min-height: 48px;
+  justify-content: center;
+}
+
+.settings-row-label {
   font-size: 12px;
   color: var(--jacket-kraft-dim);
   font-family: var(--font-mono);
 }
 
-.settings-form input {
-  background: var(--vinyl-groove-2);
+.settings-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-input-wrap input {
+  flex: 1;
+  min-width: 0;
+  background: var(--vinyl-groove);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: 11px 12px;
+  padding: 12px;
   font-size: 15px;
   font-family: var(--font-mono);
   color: var(--jacket-kraft);
+  height: 44px;
 }
+
+.settings-eye {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--static-grey);
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+}
+.settings-eye:active { color: var(--jacket-kraft); }
 
 .settings-help {
   font-size: 12.5px;
@@ -31,9 +76,9 @@
 }
 
 .settings-help-books {
-  padding: 10px 12px;
+  padding: 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--vinyl-groove);
   color: var(--jacket-kraft-dim);
 }

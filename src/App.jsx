@@ -48,7 +48,7 @@ export default function App() {
             Hi {user.name} — your account doesn't include any collections yet.
             Ask the admin to grant you Records and/or Books.
           </p>
-          <button className="btn btn-ghost btn-block" onClick={logout}>Sign out</button>
+          <button type="button" className="btn btn-ghost btn-block" onClick={logout}>Sign out</button>
         </div>
       </div>
     )

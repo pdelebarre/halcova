@@ -15,12 +15,15 @@ catalogs records and books by scanning barcodes.
 ## Approach
 1. Load `.github/copilot-instructions.md` and check `.github/skills/` for a
    matching workflow.
-2. Implement with the conventions: import `splitArtistTitle` (never
+2. Ensure you're on a feature branch before editing — `git branch
+   --show-current`; if you're on `main`, create `git switch -c feat/<slug>`
+   (see the `feature-branching` skill).
+3. Implement with the conventions: import `splitArtistTitle` (never
    reimplement), guard render paths (no error boundary → dark screen), put
    copy in the catalog's `.copy`, normalize in `src/api/*`.
-3. Verify locally before calling work done: `npm run lint`, `npm test`,
+4. Verify locally before calling work done: `npm run lint`, `npm test`,
    `npm run build`.
-4. Delegate deeply specialist work to the domain agents and integrate their
+5. Delegate deeply specialist work to the domain agents and integrate their
    output:
    - New collection kind → `Catalog Designer`
    - Camera / zxing-wasm scanner → `Scanner Builder`
@@ -31,6 +34,7 @@ catalogs records and books by scanning barcodes.
 - DO NOT add an unguarded render path (dark-screen failure mode).
 - DO NOT hardcode user-facing copy — use the catalog `.copy`.
 - DO NOT log or expose access codes or the admin key.
+- DO NOT implement feature work on `main` — always work on a feature branch.
 
 ## Output Format
 Report what changed, the files touched, tests added, and the verification

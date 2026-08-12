@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as discogs from '../api/discogs'
 import { splitArtistTitle } from '../utils/match'
 import './AlbumDetail.css'
 
-export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes }) {
+export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, catalog }) {
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
+  const copy = catalog?.copy || {}
 
   const [tracklist, setTracklist] = useState(null)
   const [trackError, setTrackError] = useState('')
   const [notes, setNotes] = useState(item.notes || '')
+  const [notesError, setNotesError] = useState('')
+  const [notesSaved, setNotesSaved] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirmTimer = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -21,8 +25,33 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes }) {
     return () => { cancelled = true }
   }, [item.discogsId])
 
-  function saveNotes() {
-    if (notes !== (item.notes || '')) onSaveNotes(notes)
+  useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
+
+  const notesDirty = notes !== (item.notes || '')
+
+  // Explicit Save button — no silent save-on-blur (§4.13). Persists via the
+  // existing onSaveNotes prop and shows a brief confirm state.
+  async function saveNotes() {
+    if (!notesDirty) return
+    setNotesError('')
+    try {
+      await onSaveNotes(notes)
+      setNotesSaved(true)
+      window.setTimeout(() => setNotesSaved(false), 1200)
+    } catch (err) {
+      setNotesError(err?.message || 'Could not save notes')
+    }
+  }
+
+  // Remove → inline confirm step on the button (auto-reverts after ~3s).
+  function handleRemove() {
+    if (confirmDelete) {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current)
+      onDelete(item.id)
+      return
+    }
+    setConfirmDelete(true)
+    confirmTimer.current = window.setTimeout(() => setConfirmDelete(false), 3000)
   }
 
   return (
@@ -82,36 +111,41 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes }) {
             <p className="detail-section-label">Notes</p>
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={saveNotes}
+              onChange={(e) => { setNotes(e.target.value); if (notesError) setNotesError('') }}
               placeholder="Condition, pressing details, where you found it…"
               rows={3}
+              aria-invalid={!!notesError}
+              aria-describedby={notesError ? 'detail-notes-error' : undefined}
             />
+            <div className="detail-notes-actions">
+              <button type="button" className="btn btn-ghost" onClick={saveNotes} disabled={!notesDirty}>
+                {notesSaved ? copy.notesSaved : copy.notesSave}
+              </button>
+            </div>
+            {notesError && (
+              <p id="detail-notes-error" className="detail-field-error" role="alert">{notesError}</p>
+            )}
           </div>
+        </div>
 
+        <div className="sheet-actions detail-actions">
           {item.discogsId && (
             <a
-              className="detail-discogs-link"
-              href={`https://www.discogs.com/release/${item.discogsId}`}
+              className="btn btn-ghost"
+              href={catalog.detailLink(item)}
               target="_blank"
               rel="noreferrer"
             >
-              View on Discogs ↗
+              {catalog.detailLinkLabel}
             </a>
           )}
-        </div>
-
-        <div className="sheet-actions">
-          {!confirmDelete ? (
-            <button className="btn btn-danger btn-block" onClick={() => setConfirmDelete(true)}>
-              Remove from crate
-            </button>
-          ) : (
-            <>
-              <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => onDelete(item.id)}>Confirm remove</button>
-            </>
-          )}
+          <button
+            type="button"
+            className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
+            onClick={handleRemove}
+          >
+            {confirmDelete ? copy.removeConfirm : copy.removeLabel}
+          </button>
         </div>
       </div>
     </div>

@@ -16,9 +16,12 @@ records and books by scanning barcodes.
 1. Load `.github/copilot-instructions.md` for conventions and gotchas.
 2. Check `.github/skills/` for a matching workflow and follow it when one
    applies (see the list in the instructions' Workflows section).
-3. Verify locally before calling work done: `npm run lint`, `npm test`, and
+3. Ensure you're on a feature branch before editing — `git branch
+   --show-current`; if you're on `main`, create `git switch -c feat/<slug>`
+   (see the `feature-branching` skill).
+4. Verify locally before calling work done: `npm run lint`, `npm test`, and
    `npm run build`.
-4. Delegate specialist work:
+5. Delegate specialist work:
    - New collection kind → `Catalog Designer` agent
    - Camera / zxing-wasm scanner → `Scanner Builder` agent
    - Netlify functions, Blobs, auth/admin, or PWA → `Netlify Backend` agent
@@ -38,6 +41,7 @@ records and books by scanning barcodes.
   (no error boundary) failure mode.
 - DO NOT hardcode user-facing copy; put it in the catalog's `.copy`.
 - DO NOT log or expose access codes or the admin key (`RUNOUT_ADMIN_KEY`).
+- DO NOT commit feature work to `main` — work on a feature branch.
 
 ## Output Format
 Report what changed, the files touched, and the commands you ran to verify.

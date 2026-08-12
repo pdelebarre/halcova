@@ -4,7 +4,7 @@ import './AlbumGrid.css'
 
 export default function BookGrid({ items, onOpen }) {
   return (
-    <div className="album-grid">
+    <div className="album-grid album-grid--books">
       {items.map((item) => (
         <BookCard key={item.id} item={item} onOpen={onOpen} />
       ))}

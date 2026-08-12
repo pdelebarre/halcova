@@ -14,6 +14,24 @@ function fmtDate(iso) {
   }
 }
 
+// Switch-style plan toggle (§4.16): a button with role="switch" so the
+// Records/Books grants read as on/off rather than chips.
+function Switch({ checked, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={`switch${checked ? ' on' : ''}`}
+      onClick={onChange}
+    >
+      <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>
+      <span className="switch-label">{label}</span>
+    </button>
+  )
+}
+
 // The admin screen: accept pending signup requests (granting Records and/or
 // Books), manage members' access, disable/delete accounts. Reachable only by
 // the owner (the admin key session).
@@ -25,6 +43,7 @@ export default function AdminPanel({ onClose }) {
   const [draft, setDraft] = useState({ records: true, books: true })
   const [granted, setGranted] = useState(null) // { user, code } just approved
   const [revealed, setRevealed] = useState({}) // userId -> show code?
+  const [copied, setCopied] = useState(null) // which code was just copied
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -103,10 +122,24 @@ export default function AdminPanel({ onClose }) {
     }
   }
 
-  async function copyText(text) {
+  async function copyText(text, key) {
     try {
       await navigator.clipboard.writeText(text)
-    } catch { /* clipboard unavailable — the code stays selectable */ }
+    } catch {
+      // Fallback for older / non-secure contexts: select + execCommand.
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.left = '-9999px'
+      document.body.appendChild(ta)
+      ta.select()
+      // execCommand is legacy but is the only portable fallback for copy.
+      try { document.execCommand('copy') } catch { /* still unavailable */ }
+      ta.remove()
+    }
+    setCopied(key)
+    window.setTimeout(() => setCopied(null), 1500)
   }
 
   const pending = data.requests.filter((r) => r.status === 'pending')
@@ -151,16 +184,14 @@ export default function AdminPanel({ onClose }) {
             <section className="admin-approve">
               <h3 className="admin-h3">Grant access</h3>
               <p className="admin-sub">Which collections should this member get?</p>
-              <div className="admin-kinds">
+              <div className="admin-switches">
                 {KINDS.map((k) => (
-                  <label key={k} className={`kind-chip ${draft[k] ? 'on' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={!!draft[k]}
-                      onChange={() => setDraft((d) => ({ ...d, [k]: !d[k] }))}
-                    />
-                    {KIND_LABELS[k]}
-                  </label>
+                  <Switch
+                    key={k}
+                    checked={!!draft[k]}
+                    onChange={() => setDraft((d) => ({ ...d, [k]: !d[k] }))}
+                    label={KIND_LABELS[k]}
+                  />
                 ))}
               </div>
               <div className="sheet-actions">
@@ -182,7 +213,9 @@ export default function AdminPanel({ onClose }) {
               <p className="admin-sub">Share this code out of band — it's how they sign in.</p>
               <div className="admin-code-box">
                 <code className="admin-code-text">{granted.code}</code>
-                <button className="btn btn-ghost btn-sm" onClick={() => copyText(granted.code)}>Copy</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => copyText(granted.code, `grant-${granted.code}`)}>
+                  {copied === `grant-${granted.code}` ? 'Copied ✓' : 'Copy'}
+                </button>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setGranted(null)}>Done</button>
             </section>
@@ -197,24 +230,27 @@ export default function AdminPanel({ onClose }) {
                 {members.map((u) => (
                   <li key={u.id} className={`admin-row ${u.status === 'disabled' ? 'is-disabled' : ''}`}>
                     <div className="admin-row-main">
-                      <span className="admin-name">{u.name}</span>
+                      <span className="admin-name">
+                        {u.name}
+                        {u.status === 'disabled' && <span className="admin-status-tag">Disabled</span>}
+                      </span>
                       <span className="admin-sub">{u.email}</span>
-                      <div className="admin-kinds static">
+                      <div className="admin-switches">
                         {KINDS.map((k) => (
-                          <button
+                          <Switch
                             key={k}
-                            type="button"
-                            className={`kind-chip mini ${u.collections?.[k] ? 'on' : ''}`}
-                            onClick={() => toggleAccess(u.id, k)}
-                            aria-pressed={!!u.collections?.[k]}
-                          >
-                            {KIND_LABELS[k]}
-                          </button>
+                            checked={!!u.collections?.[k]}
+                            onChange={() => toggleAccess(u.id, k)}
+                            label={`${KIND_LABELS[k]} access`}
+                          />
                         ))}
                       </div>
                       {revealed[u.id] && (
                         <div className="admin-code-box inline">
                           <code className="admin-code-text">{u.code}</code>
+                          <button className="btn btn-ghost btn-sm" onClick={() => copyText(u.code, `member-${u.id}`)}>
+                            {copied === `member-${u.id}` ? 'Copied ✓' : 'Copy'}
+                          </button>
                         </div>
                       )}
                     </div>

@@ -3,19 +3,21 @@
 }
 
 .detail-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
 }
 
 .detail-cover {
-  width: 132px;
-  height: 132px;
+  width: clamp(120px, 30vw, 240px);
+  aspect-ratio: 1;
   margin: 0 auto 14px;
   border-radius: 6px;
   overflow: hidden;
   background: var(--vinyl-groove-2);
   border: 1px solid var(--line);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-float);
 }
 .detail-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .detail-cover-placeholder {
@@ -31,7 +33,7 @@
 .detail-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 20px;
+  font-size: 22px;
   color: var(--jacket-kraft);
   margin: 0 0 3px;
   line-height: 1.25;
@@ -54,14 +56,14 @@
 .detail-meta div { display: flex; flex-direction: column; gap: 2px; }
 .detail-meta dt {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--static-grey);
 }
 .detail-meta dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--jacket-kraft);
 }
 .detail-meta dd.mono { font-family: var(--font-mono); }
@@ -96,16 +98,17 @@
 .track-pos {
   font-family: var(--font-mono);
   color: var(--runout-gold);
-  font-size: 11px;
+  font-size: 12px;
   flex-shrink: 0;
   width: 22px;
 }
 .track-title { flex: 1; color: var(--jacket-kraft); }
-.track-duration { font-family: var(--font-mono); font-size: 11px; color: var(--static-grey); }
+.track-duration { font-family: var(--font-mono); font-size: 12px; color: var(--static-grey); }
 
 .detail-notes { margin-bottom: 16px; }
 .detail-notes textarea {
   width: 100%;
+  min-height: 44px;
   background: var(--vinyl-groove-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -116,10 +119,19 @@
   resize: vertical;
 }
 
-.detail-discogs-link {
-  display: inline-block;
+.detail-notes-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.detail-notes-actions .btn {
+  min-height: 44px;
+  padding: 10px 20px;
+}
+
+.detail-field-error {
+  font-family: var(--font-mono);
   font-size: 12.5px;
-  color: var(--runout-gold);
-  margin-bottom: 4px;
-  text-decoration: none;
+  color: var(--danger);
+  margin: 8px 0 0;
 }

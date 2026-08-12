@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
 import './AlbumDetail.css'
 import './BookDetail.css'
 
 export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catalog }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
+  const copy = catalog?.copy || {}
 
   const [description, setDescription] = useState(item.description || '')
   const [pageCount, setPageCount] = useState(item.pageCount || '')
   const [descError, setDescError] = useState('')
   const [notes, setNotes] = useState(item.notes || '')
+  const [notesError, setNotesError] = useState('')
+  const [notesSaved, setNotesSaved] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const confirmTimer = useRef(null)
 
   // Search results come with a short description; pull the full one (and page
   // count) from the volume detail when it wasn't included up front.
@@ -29,9 +33,35 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
     return () => { cancelled = true }
   }, [item.googleBooksId, item.description, catalog])
 
-  function saveNotes() {
-    if (notes !== (item.notes || '')) onSaveNotes(notes)
+  useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
+
+  const notesDirty = notes !== (item.notes || '')
+
+  // Explicit Save button — no silent save-on-blur (§4.13).
+  async function saveNotes() {
+    if (!notesDirty) return
+    setNotesError('')
+    try {
+      await onSaveNotes(notes)
+      setNotesSaved(true)
+      window.setTimeout(() => setNotesSaved(false), 1200)
+    } catch (err) {
+      setNotesError(err?.message || 'Could not save notes')
+    }
   }
+
+  // Remove → inline confirm step on the button (auto-reverts after ~3s).
+  function handleRemove() {
+    if (confirmDelete) {
+      if (confirmTimer.current) clearTimeout(confirmTimer.current)
+      onDelete(item.id)
+      return
+    }
+    setConfirmDelete(true)
+    confirmTimer.current = window.setTimeout(() => setConfirmDelete(false), 3000)
+  }
+
+  const hasExternalLink = !!(item.googleBooksId || item.infoLink)
 
   return (
     <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={bookTitle}>
@@ -78,36 +108,41 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
             <p className="detail-section-label">Notes</p>
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={saveNotes}
+              onChange={(e) => { setNotes(e.target.value); if (notesError) setNotesError('') }}
               placeholder="Condition, where you got it, whether it's signed…"
               rows={3}
+              aria-invalid={!!notesError}
+              aria-describedby={notesError ? 'detail-notes-error' : undefined}
             />
+            <div className="detail-notes-actions">
+              <button type="button" className="btn btn-ghost" onClick={saveNotes} disabled={!notesDirty}>
+                {notesSaved ? copy.notesSaved : copy.notesSave}
+              </button>
+            </div>
+            {notesError && (
+              <p id="detail-notes-error" className="detail-field-error" role="alert">{notesError}</p>
+            )}
           </div>
+        </div>
 
-          {item.infoLink && (
+        <div className="sheet-actions detail-actions">
+          {hasExternalLink && (
             <a
-              className="detail-discogs-link"
-              href={item.infoLink}
+              className="btn btn-ghost"
+              href={catalog.detailLink(item)}
               target="_blank"
               rel="noreferrer"
             >
-              View on Google Books ↗
+              {catalog.detailLinkLabel}
             </a>
           )}
-        </div>
-
-        <div className="sheet-actions">
-          {!confirmDelete ? (
-            <button className="btn btn-danger btn-block" onClick={() => setConfirmDelete(true)}>
-              Remove from shelf
-            </button>
-          ) : (
-            <>
-              <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => onDelete(item.id)}>Confirm remove</button>
-            </>
-          )}
+          <button
+            type="button"
+            className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
+            onClick={handleRemove}
+          >
+            {confirmDelete ? copy.removeConfirm : copy.removeLabel}
+          </button>
         </div>
       </div>
     </div>

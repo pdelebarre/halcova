@@ -39,7 +39,18 @@
   border: 1px solid var(--line);
 }
 
-.admin-row.is-disabled { opacity: 0.55; }
+.admin-row.is-disabled { opacity: 0.6; }
+
+/* Disabled members keep a legible label so the row isn't opacity-only (§4.16). */
+.admin-status-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--static-grey);
+  border: 1px solid var(--static-grey);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
 
 .admin-row-main {
   display: flex;
@@ -49,6 +60,10 @@
 }
 
 .admin-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   font-weight: 600;
   font-size: 14.5px;
   color: var(--jacket-kraft);
@@ -74,33 +89,50 @@
   font-family: var(--font-mono);
 }
 
-.admin-kinds { display: flex; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
-.admin-kinds.static { margin: 6px 0 0; }
+/* Switch-style plan toggles (§4.16). */
+.admin-switches {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 0;
+  flex-wrap: wrap;
+}
 
-.kind-chip {
+.switch {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 999px;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: transparent;
-  color: var(--static-grey);
-  font-size: 12.5px;
-  cursor: pointer;
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft-dim);
+  font-size: 13px;
+  font-weight: 600;
 }
-.kind-chip input { accent-color: var(--label-red); }
-.kind-chip.on {
-  background: var(--label-red);
-  color: var(--jacket-kraft);
-  border-color: var(--label-red);
+.switch-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.kind-chip.mini {
-  padding: 4px 9px;
-  font-size: 11px;
-  font-family: var(--font-mono);
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--static-grey);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
-.kind-chip.mini.on { background: var(--vinyl-groove-2); color: var(--runout-gold); border-color: var(--runout-gold); }
+.switch.on .switch-track { background: var(--label-red); border-color: var(--label-red); }
+.switch.on .switch-thumb { transform: translateX(18px); background: var(--jacket-kraft); }
+.switch.on { border-color: var(--label-red); color: var(--jacket-kraft); }
 
 .admin-approve {
   padding: 14px;

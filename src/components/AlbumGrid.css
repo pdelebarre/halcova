@@ -1,14 +1,19 @@
 .album-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px 14px;
-  padding: 4px 16px 24px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 20px 16px;
+  padding: 0 16px 24px;
+}
+
+/* Variant for book cards which are slimmer */
+.album-grid--books {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
 }
 
 @media (min-width: 480px) {
-  .album-grid { grid-template-columns: repeat(4, 1fr); }
+  .album-grid { gap: 20px 16px; }
 }
 
 @media (min-width: 720px) {
-  .album-grid { grid-template-columns: repeat(6, 1fr); gap: 24px 18px; padding: 4px 24px 32px; }
+  .album-grid { gap: 24px 18px; padding: 4px 24px 32px; }
 }

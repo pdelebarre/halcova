@@ -1,27 +1,50 @@
 .toolbar {
-  padding: 10px 16px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   position: sticky;
-  top: 0;
-  z-index: 10;
+  top: var(--header-h);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--toolbar-h);
+  min-height: var(--toolbar-h);
+  padding: 8px 16px;
   background: linear-gradient(var(--sleeve-black) 82%, transparent);
 }
 
+/* Scroll elevation: subtle border + frosted backdrop (§4.1). */
+.toolbar.scrolled {
+  border-bottom: 1px solid var(--line);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* --- Search pill --- */
 .toolbar-search {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--static-grey);
+  pointer-events: none;
 }
 
 .toolbar-search input {
   width: 100%;
+  height: 44px;
   background: var(--vinyl-groove);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 10px 40px 10px 16px;
-  font-size: 14.5px;
+  padding: 0 44px 0 42px;
+  font-size: 15px;
   color: var(--jacket-kraft);
 }
 .toolbar-search input::placeholder { color: var(--static-grey); }
@@ -29,85 +52,110 @@
 .toolbar-count {
   position: absolute;
   right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--static-grey);
   pointer-events: none;
 }
 
-.toolbar-row {
+.search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--jacket-kraft-dim);
+  font-size: 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  overflow-x: auto;
+  justify-content: center;
+  background: var(--vinyl-groove-2);
+}
+.search-clear:active { color: var(--jacket-kraft); }
+
+/* When there's text, the count slides left of the clear button; on very
+   narrow screens the count hides so the ✕ never clips (§4.3). */
+.toolbar-search.has-text .toolbar-count { right: 44px; }
+@media (max-width: 479px) {
+  .toolbar-search.has-text .toolbar-count { display: none; }
 }
 
-.format-chips {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.format-chips::-webkit-scrollbar { display: none; }
-
-.chip {
+/* --- Generic toolbar buttons (Filter / Sort) --- */
+.toolbar-btn {
   flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  padding: 6px 11px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid var(--line);
+  background: var(--vinyl-groove);
   color: var(--jacket-kraft-dim);
-  transition: all 0.15s ease;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
-.chip.active {
+.toolbar-btn:active { background: var(--vinyl-groove-2); }
+
+.filter-btn.active {
   border-color: var(--runout-gold);
   color: var(--runout-gold);
   background: rgba(201, 162, 39, 0.1);
 }
 
-.sort-select {
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--runout-gold);
+  color: var(--sleeve-black);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Sort: label hidden on very narrow screens — just the chevron */
+.sort-label {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 479px) {
+  .sort-label { display: none; }
+}
+
+/* --- Grid | List view toggle --- */
+.view-toggle {
   flex-shrink: 0;
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
   background: var(--vinyl-groove);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  font-size: 12px;
-  color: var(--jacket-kraft-dim);
 }
-
-/* Classification row: genre chips + artist filter */
-.toolbar-classify {
-  padding-top: 2px;
-}
-
-.row-label {
-  flex-shrink: 0;
-  align-self: center;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--static-grey);
-  margin-right: 2px;
-}
-
-.toolbar-actions {
-  display: flex;
+.view-toggle-btn {
+  width: 44px;
+  height: 38px;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--static-grey);
+}
+.view-toggle-btn.active {
+  background: var(--vinyl-groove-2);
+  color: var(--runout-gold);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.artist-select {
-  max-width: 150px;
-}
-
-.clear-chip {
-  border-color: var(--label-red-bright);
-  color: var(--label-red-bright);
-}
-.clear-chip:hover {
-  background: rgba(206, 75, 61, 0.12);
-}

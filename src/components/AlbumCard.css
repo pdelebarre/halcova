@@ -5,6 +5,9 @@
   gap: 6px;
   text-align: left;
   padding: 0;
+  /* Skip layout/paint off-screen cards so 1000+ covers stay smooth (§4.6). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 250px;
 }
 
 .record-peek {
@@ -75,7 +78,7 @@
 }
 
 .album-card-title {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--jacket-kraft);
   overflow: hidden;
@@ -84,7 +87,7 @@
 }
 
 .album-card-artist {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--static-grey);
   overflow: hidden;
   text-overflow: ellipsis;
