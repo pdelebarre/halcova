@@ -19,6 +19,7 @@ const ptBR = {
   'common.search': 'Pesquisar',
   'common.by': 'por',
   'common.copy': 'Copiar',
+  'common.credits': 'Créditos',
 
   // §2
   'kind.records': 'Discos',
@@ -234,6 +235,29 @@ const ptBR = {
   'catalog.listLabel': 'Lista da coleção',
   'catalog.listJumpRail': 'Ir para a letra',
   'catalog.listJumpTo': 'Ir para',
+
+  // §14 Créditos
+  'credits.aboutName': 'Sobre o nome',
+  'credits.aboutNameBody': '"hokan" é um substantivo próprio inventado e intraduzível — uma palavra calorosa e aconchegante que nomeia o lugar onde sua coleção vive, como "alcova" nas línguas românicas. Ela conecta discos e livros sem viés para nenhum dos formatos. Escolhida após um processo internacional de nomeação abrangendo 7 idiomas (EN, FR, PT, NL, DE, ES, IT) e a estética escura de colecionador.',
+  'credits.builtWith': 'Construído com',
+  'credits.techReact': 'React 19',
+  'credits.techReactDesc': 'Biblioteca de UI',
+  'credits.techVite': 'Vite 8',
+  'credits.techViteDesc': 'Ferramenta de build',
+  'credits.techZxing': 'zxing-wasm',
+  'credits.techZxingDesc': 'Escaneamento de código de barras (EAN/UPC, ISBN, Code 128)',
+  'credits.techDiscogs': 'API do Discogs',
+  'credits.techDiscogsDesc': 'Busca de discos',
+  'credits.techGoogleBooks': 'API do Google Books',
+  'credits.techGoogleBooksDesc': 'Busca de livros',
+  'credits.techNetlify': 'Netlify',
+  'credits.techNetlifyDesc': 'Funções serverless + armazenamento Blobs',
+  'credits.techPwa': 'vite-plugin-pwa',
+  'credits.techPwaDesc': 'Suporte offline / instalação',
+  'credits.fonts': 'Fontes',
+  'credits.fontsBody': 'Fraunces (marca nominativa, títulos) por Undercase Type. Geist Mono (interface, dados) por Vercel.',
+  'credits.creator': 'Criador',
+  'credits.creatorBody': 'Criado por Pierre Delebart para outros colecionadores.',
 }
 
 export default ptBR

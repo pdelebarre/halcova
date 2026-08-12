@@ -19,6 +19,7 @@ const it = {
   'common.search': 'Cerca',
   'common.by': 'di',
   'common.copy': 'Copia',
+  'common.credits': 'Crediti',
 
   // §2
   'kind.records': 'Dischi',
@@ -234,6 +235,29 @@ const it = {
   'catalog.listLabel': 'Elenco della collezione',
   'catalog.listJumpRail': 'Vai alla lettera',
   'catalog.listJumpTo': 'Vai a',
+
+  // §14 Crediti
+  'credits.aboutName': 'Sul nome',
+  'credits.aboutNameBody': '"hokan" è un nome proprio inventato e intraducibile — una parola calda e accogliente che dà un nome al luogo in cui vive la tua collezione, come "alcova" nelle lingue romanze. Collega dischi e libri senza pregiudizi per nessuno dei due supporti. Scelto dopo un processo di denominazione internazionale che ha coinvolto 7 lingue (EN, FR, PT, NL, DE, ES, IT) e l\'estetica scura da collezionista.',
+  'credits.builtWith': 'Realizzato con',
+  'credits.techReact': 'React 19',
+  'credits.techReactDesc': 'Libreria UI',
+  'credits.techVite': 'Vite 8',
+  'credits.techViteDesc': 'Strumento di build',
+  'credits.techZxing': 'zxing-wasm',
+  'credits.techZxingDesc': 'Scansione codici a barre (EAN/UPC, ISBN, Code 128)',
+  'credits.techDiscogs': 'API Discogs',
+  'credits.techDiscogsDesc': 'Ricerca dischi',
+  'credits.techGoogleBooks': 'API Google Books',
+  'credits.techGoogleBooksDesc': 'Ricerca libri',
+  'credits.techNetlify': 'Netlify',
+  'credits.techNetlifyDesc': 'Funzioni serverless + archiviazione Blobs',
+  'credits.techPwa': 'vite-plugin-pwa',
+  'credits.techPwaDesc': 'Supporto offline / installazione',
+  'credits.fonts': 'Font',
+  'credits.fontsBody': 'Fraunces (marchio denominativo, titoli) di Undercase Type. Geist Mono (interfaccia, dati) di Vercel.',
+  'credits.creator': 'Creatore',
+  'credits.creatorBody': 'Creato da Pierre Delebart per altri collezionisti.',
 }
 
 export default it

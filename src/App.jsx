@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
+import CreditModal from './components/CreditModal'
 import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
@@ -16,6 +17,7 @@ export default function App() {
   const [tab, setTab] = useState('records')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [creditOpen, setCreditOpen] = useState(false)
 
   // Reset to the first collection when a different user signs in.
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function App() {
         onTabChange={setTab}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenAdmin={() => setAdminOpen(true)}
+        onOpenCredits={() => setCreditOpen(true)}
         showAdmin={user.role === 'admin'}
         user={user}
         onLogout={logout}
@@ -71,6 +74,7 @@ export default function App() {
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
+      {creditOpen && <CreditModal onClose={() => setCreditOpen(false)} />}
     </>
   )
 }

@@ -19,6 +19,7 @@ const nl = {
   'common.search': 'Zoeken',
   'common.by': 'door',
   'common.copy': 'Kopiëren',
+  'common.credits': 'Credits',
 
   // §2
   'kind.records': 'Platen',
@@ -234,6 +235,29 @@ const nl = {
   'catalog.listLabel': 'Collectielijst',
   'catalog.listJumpRail': 'Spring naar letter',
   'catalog.listJumpTo': 'Spring naar',
+
+  // §14 Credits
+  'credits.aboutName': 'Over de naam',
+  'credits.aboutNameBody': '"hokan" is een verzonnen, onvertaalbaar eigennaam — een warm, knus woord dat de plek benoemt waar je collectie leeft, zoals "alkoof" in Romaanse talen. Het verbindt platen en boeken zonder voorkeur voor één medium. Gekozen na een internationaal naamgevingsproces in 7 talen (EN, FR, PT, NL, DE, ES, IT) en de donkere verzamelaarsesthetiek.',
+  'credits.builtWith': 'Gebouwd met',
+  'credits.techReact': 'React 19',
+  'credits.techReactDesc': 'UI-bibliotheek',
+  'credits.techVite': 'Vite 8',
+  'credits.techViteDesc': 'Build-tool',
+  'credits.techZxing': 'zxing-wasm',
+  'credits.techZxingDesc': 'Streepjescodes scannen (EAN/UPC, ISBN, Code 128)',
+  'credits.techDiscogs': 'Discogs API',
+  'credits.techDiscogsDesc': 'Platen opzoeken',
+  'credits.techGoogleBooks': 'Google Books API',
+  'credits.techGoogleBooksDesc': 'Boeken opzoeken',
+  'credits.techNetlify': 'Netlify',
+  'credits.techNetlifyDesc': 'Serverloze functies + Blobs-opslag',
+  'credits.techPwa': 'vite-plugin-pwa',
+  'credits.techPwaDesc': 'Offline / installatie-ondersteuning',
+  'credits.fonts': 'Lettertypen',
+  'credits.fontsBody': 'Fraunces (woordmerk, koppen) door Undercase Type. Geist Mono (UI, gegevens) door Vercel.',
+  'credits.creator': 'Maker',
+  'credits.creatorBody': 'Gebouwd door Pierre Delebart voor medeverzamelaars.',
 }
 
 export default nl

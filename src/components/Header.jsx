@@ -9,6 +9,7 @@ export default function Header({
   onTabChange,
   onOpenSettings,
   onOpenAdmin,
+  onOpenCredits,
   showAdmin = false,
   user,
   onLogout,
@@ -79,6 +80,9 @@ export default function Header({
                   {t('common.adminPanel')}
                 </button>
               )}
+              <button type="button" role="menuitem" onClick={() => run(onOpenCredits)}>
+                {t('common.credits')}
+              </button>
               <button type="button" role="menuitem" className="avatar-signout" onClick={() => run(onLogout)}>
                 {t('common.signOut')}
               </button>

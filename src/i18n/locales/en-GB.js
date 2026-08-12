@@ -20,6 +20,7 @@ const enGB = {
   'common.search': 'Search',
   'common.by': 'by',
   'common.copy': 'Copy',
+  'common.credits': 'Credits',
 
   // §2 Kinds & tags
   'kind.records': 'Records',
@@ -235,6 +236,29 @@ const enGB = {
   'catalog.listLabel': 'Collection list',
   'catalog.listJumpRail': 'Jump to letter',
   'catalog.listJumpTo': 'Jump to',
+
+  // §14 Credits
+  'credits.aboutName': 'About the name',
+  'credits.aboutNameBody': '"hokan" is a coined, untranslatable proper noun — a warm, cozy word that names the place your collection lives, like "alcove" in Romance languages. It bridges records and books without bias toward either medium. Chosen after an international naming process spanning 7 languages (EN, FR, PT, NL, DE, ES, IT) and the dark collector aesthetic.',
+  'credits.builtWith': 'Built with',
+  'credits.techReact': 'React 19',
+  'credits.techReactDesc': 'UI library',
+  'credits.techVite': 'Vite 8',
+  'credits.techViteDesc': 'Build tool',
+  'credits.techZxing': 'zxing-wasm',
+  'credits.techZxingDesc': 'Barcode scanning (EAN/UPC, ISBN, Code 128)',
+  'credits.techDiscogs': 'Discogs API',
+  'credits.techDiscogsDesc': 'Record lookups',
+  'credits.techGoogleBooks': 'Google Books API',
+  'credits.techGoogleBooksDesc': 'Book lookups',
+  'credits.techNetlify': 'Netlify',
+  'credits.techNetlifyDesc': 'Serverless functions + Blobs storage',
+  'credits.techPwa': 'vite-plugin-pwa',
+  'credits.techPwaDesc': 'Offline / install support',
+  'credits.fonts': 'Fonts',
+  'credits.fontsBody': 'Fraunces (wordmark, headings) by Undercase Type. Geist Mono (UI, data) by Vercel.',
+  'credits.creator': 'Creator',
+  'credits.creatorBody': 'Built by Pierre Delebart for fellow collectors.',
 }
 
 export default enGB
