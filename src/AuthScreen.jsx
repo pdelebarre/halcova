@@ -45,7 +45,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Runout</h1>
+          <h1 className="auth-wordmark">Alcove</h1>
           <p className="auth-done">Request sent ✉️</p>
           <p className="auth-copy">
             The admin will review it and send you an access code. Once you have it,
@@ -63,7 +63,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Runout</h1>
+          <h1 className="auth-wordmark">Alcove</h1>
           <p className="auth-copy">Enter the access code the admin gave you.</p>
           <form onSubmit={handleLogin} className="auth-form" noValidate>
             <input
@@ -96,7 +96,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Runout</h1>
+          <h1 className="auth-wordmark">Alcove</h1>
           <p className="auth-copy">
             Request access to start cataloging. The admin will approve your account
             and send you an access code.
@@ -135,7 +135,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-disc" aria-hidden="true" />
-        <h1 className="auth-wordmark">Runout</h1>
+        <h1 className="auth-wordmark">Alcove</h1>
         <p className="auth-tagline">your crate &amp; shelf, cataloged</p>
         <div className="auth-actions">
           <button className="btn btn-primary btn-block" onClick={() => setMode('login')}>

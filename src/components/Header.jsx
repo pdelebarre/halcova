@@ -49,7 +49,7 @@ export default function Header({
   return (
     <header className={scrolled ? 'app-header scrolled' : 'app-header'}>
       <div className="app-header-title">
-        <span className="wordmark">Runout</span>
+        <span className="wordmark">Alcove</span>
       </div>
       <div className="header-right">
         <nav className="tab-bar" aria-label="Collection type">

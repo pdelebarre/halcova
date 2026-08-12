@@ -12,6 +12,11 @@
 | `name-check-alcove-7-languages.md` | **Native-speaker check sheet** — 7-language pronunciation/meaning/vibe validation to run before launch |
 | `brief-alcove-icon.md` | **Icon design brief** — for the UI/UX Expert (Figma), with real dark/gold tokens and maskable constraints |
 | `handoff-rename-alcove.md` | **Coordination handoff** — who does what, dependency map, "name day" checklist |
+| `private-test-plan.md` | **Private-test plan** — friends & family circle (FR/NL/PT-BR/DE/ES/IT), setup, feedback form, go/no-go |
+| `private-test-invite.md` | **Invite copy** — EN master + FR/NL/PT-BR/DE/ES/IT drafts, with personal-code placeholders |
+| `localization-plan.md` | **Localization plan** — 7 languages, per-user preference + switcher, architecture, rollout |
+| `localization-dictionary.md` | **Translation dictionary (v1)** — EN/FR/NL/PT-BR/DE/ES/IT content for every key, `[VALIDATE]` |
+| `ticket-localization.md` | **Dev implementation ticket** — exact file/string scope for `feat/localization`, non-string fixes, tests, DoD |
 
 ## Iteration history (drafts — superseded, kept for reference)
 
@@ -28,3 +33,4 @@
 2. Trademark + domain + app-store + social-handle check for "Alcove".
 3. New app icon mark on the dark `#16130F` theme.
 4. Implement rollout items in `rename-alcove.md` §6 on a `chore/rename-alcove` branch.
+5. Localization dictionaries validated by native testers (FR/NL/PT-BR/DE/ES/IT) before the `feat/localization` branch ships.

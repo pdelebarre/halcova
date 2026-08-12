@@ -1,6 +1,6 @@
-# Runout — Design Redesign Spec
+# Alcove — Design Redesign Spec
 
-A design-forward, implementation-ready spec for modernizing Runout's UI/UX
+A design-forward, implementation-ready spec for modernizing Alcove's UI/UX
 while keeping its record-shop identity. This is the **target design** — the
 current app has been reviewed and this document describes the desired end
 state. It is a handoff for the Runout Engineer; nothing here is implemented yet.
@@ -176,7 +176,7 @@ requirements. Files referenced are the current ones to be updated.
 
 ### 4.2 Header (`src/components/Header.jsx` / `Header.css`)
 
-- **Left:** wordmark "Runout" (Fraunces 24, weight 700). The tagline moves out of the header — it belongs in the empty state, not the chrome.
+- **Left:** wordmark "Alcove" (Fraunces 24, weight 700). The tagline moves out of the header — it belongs in the empty state, not the chrome.
 - **Center:** segmented **Records | Books** pill control, 44px tall, `aria-pressed` per tab; active = `--vinyl-groove-2` + gold underline dot.
 - **Right:** one compact cluster: avatar chip (44px, shows initial) → opens a small menu (Settings / Admin if `showAdmin` / Sign out). All icon-btns grow from 38px to **44px**.
 - Sticky; blur + border on scroll (see §4.1).
