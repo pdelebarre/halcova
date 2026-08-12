@@ -4,11 +4,14 @@ description: 'Add or change a lookup API in Runout (Discogs for records, Google 
 ---
 # Lookup API Integration
 
-Runout looks up scanned codes and text against external APIs. Records go
-through a **server-side Discogs proxy** (`netlify/functions/discogs.js`) that
-owns one token and caches responses; books are looked up straight from the
-browser (`src/api/books.js`). This skill covers extending them or adding a new
-provider.
+Runout looks up scanned codes and text against external APIs. **Both providers
+are proxied server-side**: records go through the Discogs proxy
+(`netlify/functions/discogs.js`, which owns the single token) and books through
+the Google Books proxy (`netlify/functions/books.js`, no token). Both functions
+authorize with the caller's access code and cache responses in shared blob
+stores; the frontend `src/api/*` modules send the access code as `Bearer` and
+never store a token for either provider. This skill covers extending them or
+adding a new provider.
 
 ## When to Use
 - Fix a lookup bug, handle a new error code, or adjust normalization.
@@ -37,9 +40,13 @@ Errors carry a `code` so the flow shows the right message:
   `discogs-cache` blob store (barcode/release: 30 days, text search: 1 day).
   Errors: 401 → `BAD_TOKEN`, 429 → `RATE_LIMIT`, missing env →
   `SERVER_NO_TOKEN`. No token is ever stored in the browser.
-- **Google Books**: no token; add `country=US`; upshift `http://` cover URLs to
-  `https://` to avoid mixed-content blanks; slice the year from ISO dates
-  (`"2012-03-01"` → `"2012"`).
+- **Google Books**: `src/api/books.js` calls the
+  `netlify/functions/books.js` proxy with the access code as `Bearer`; the
+  proxy hits the public Google Books `v1` endpoints (no token) and caches in
+  the shared `books-cache` blob store (ISBN/detail: 30 days, text search:
+  1 day). Normalization stays client-side; add `country=US`; upshift `http://`
+  cover URLs to `https://` to avoid mixed-content blanks; slice the year from
+  ISO dates (`"2012-03-01"` → `"2012"`).
 - Titles are saved as `"Artist - Author - Title"` so `splitArtistTitle` works.
 
 ## Procedure — New Provider

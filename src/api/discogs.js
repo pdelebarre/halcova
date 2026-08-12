@@ -1,58 +1,38 @@
-import { getUserId } from '../utils/session'
+import { getAccessCode } from '../utils/session'
 
-const BASE = 'https://api.discogs.com'
-const USER_AGENT = 'RunoutRecordCollector/1.0'
+// Record lookups go through the server-side Discogs proxy, which owns the
+// single Discogs token, sends the User-Agent, and caches responses in Blobs.
+// The browser never stores or sends a token — requests authenticate with the
+// signed-in user's access code.
+const FN_BASE = '/.netlify/functions/discogs'
 
-// Each signed-in user has their own Discogs token (records lookups are
-// personal). Keyed by user id so switching accounts never leaks a token.
-function tokenKey() {
-  return `runout_discogs_token_${getUserId() || 'local'}`
+const ERROR_MESSAGES = {
+  SERVER_NO_TOKEN: "Lookups aren't configured yet — tell the owner to set the Discogs token.",
+  BAD_TOKEN: 'Discogs token rejected.',
+  RATE_LIMIT: 'Discogs rate limit hit — wait a moment and try again.',
+  HTTP_ERROR: 'Discogs request failed.',
 }
 
-function getToken() {
-  return localStorage.getItem(tokenKey()) || ''
+function authHeaders() {
+  const code = getAccessCode()
+  return code ? { Authorization: `Bearer ${code}` } : {}
 }
 
-export function hasToken() {
-  return !!getToken()
-}
-
-export function setToken(token) {
-  localStorage.setItem(tokenKey(), token.trim())
-}
-
-export function clearToken() {
-  localStorage.removeItem(tokenKey())
-}
-
-async function discogsFetch(path, params = {}) {
-  const token = getToken()
-  if (!token) {
-    const err = new Error('No Discogs token set')
-    err.code = 'NO_TOKEN'
-    throw err
-  }
-  const url = new URL(BASE + path)
+async function discogsFetch(action, params = {}) {
+  const url = new URL(FN_BASE, window.location.origin)
+  url.searchParams.set('action', action)
   Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') url.searchParams.set(k, v) })
-  url.searchParams.set('token', token)
 
-  const res = await fetch(url.toString(), {
-    headers: { 'User-Agent': USER_AGENT },
-  })
+  const res = await fetch(url.pathname + url.search, { headers: authHeaders() })
 
-  if (res.status === 401) {
-    const err = new Error('Discogs token was rejected. Check it in Settings.')
-    err.code = 'BAD_TOKEN'
-    throw err
-  }
-  if (res.status === 429) {
-    const err = new Error('Discogs rate limit hit — wait a moment and try again.')
-    err.code = 'RATE_LIMIT'
-    throw err
-  }
   if (!res.ok) {
-    const err = new Error(`Discogs request failed (${res.status})`)
-    err.code = 'HTTP_ERROR'
+    let code = 'HTTP_ERROR'
+    try {
+      const body = await res.json()
+      if (body?.code) code = body.code
+    } catch { /* non-JSON error body — fall back to HTTP_ERROR */ }
+    const err = new Error(ERROR_MESSAGES[code] || `Discogs request failed (${res.status})`)
+    err.code = code
     throw err
   }
   return res.json()
@@ -77,7 +57,7 @@ function parseFormatType(formatArray) {
 
 export async function searchByBarcode(barcode) {
   const clean = cleanBarcode(barcode)
-  const data = await discogsFetch('/database/search', { barcode: clean, type: 'release' })
+  const data = await discogsFetch('searchBarcode', { barcode: clean })
   const results = data.results || []
   return results.map((r) => ({
     discogsId: r.id,
@@ -98,7 +78,7 @@ export async function searchByBarcode(barcode) {
 }
 
 export async function searchByText(query) {
-  const data = await discogsFetch('/database/search', { q: query, type: 'release' })
+  const data = await discogsFetch('searchText', { q: query })
   const results = data.results || []
   return results.slice(0, 20).map((r) => ({
     discogsId: r.id,
@@ -119,7 +99,7 @@ export async function searchByText(query) {
 }
 
 export async function getReleaseDetail(discogsId) {
-  const data = await discogsFetch(`/releases/${discogsId}`)
+  const data = await discogsFetch('release', { id: discogsId })
   return {
     tracklist: (data.tracklist || []).map((t) => ({
       position: t.position,

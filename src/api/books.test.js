@@ -1,16 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as books from './books'
+import { saveSession } from '../utils/session'
+
+const CODE = 'RU-XXXX-XXXX-XXXX'
 
 function okJson(data) {
   return { ok: true, status: 200, json: async () => data }
 }
 
-describe('searchByBarcode', () => {
-  beforeEach(() => {
-    global.fetch = vi.fn()
-  })
+function errorJson(status, body = {}) {
+  return { ok: false, status, json: async () => body }
+}
 
-  it('cleans the ISBN, queries by isbn: and normalizes volumes', async () => {
+beforeEach(() => {
+  localStorage.clear()
+  saveSession({ user: { id: 'u42' }, code: CODE })
+  global.fetch = vi.fn()
+})
+
+describe('searchByBarcode', () => {
+  it('cleans the ISBN, asks the proxy by isbn and normalizes volumes', async () => {
     global.fetch.mockResolvedValue(okJson({
       items: [{
         id: 'vol1',
@@ -32,10 +41,11 @@ describe('searchByBarcode', () => {
 
     const results = await books.searchByBarcode('978-0-14-034943-4')
     expect(global.fetch).toHaveBeenCalledTimes(1)
-    const url = new URL(global.fetch.mock.calls[0][0])
-    expect(url.pathname).toBe('/books/v1/volumes')
-    expect(url.searchParams.get('q')).toBe('isbn:9780140349434')
-    expect(url.searchParams.get('country')).toBe('US')
+    const url = new URL(global.fetch.mock.calls[0][0], 'http://localhost')
+    expect(url.pathname).toBe('/.netlify/functions/books')
+    expect(url.searchParams.get('action')).toBe('searchBarcode')
+    expect(url.searchParams.get('isbn')).toBe('9780140349434')
+    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${CODE}` })
 
     expect(results).toHaveLength(1)
     expect(results[0]).toMatchObject({
@@ -90,34 +100,32 @@ describe('searchByBarcode', () => {
 })
 
 describe('searchByText', () => {
-  beforeEach(() => {
-    global.fetch = vi.fn()
-  })
-
-  it('searches with maxResults and maps results', async () => {
+  it('searches through the proxy and maps results', async () => {
     global.fetch.mockResolvedValue(okJson({
       items: [{ id: 'v', volumeInfo: { title: 'Earthsea', authors: ['Le Guin'] } }],
     }))
     const results = await books.searchByText('earthsea')
-    const url = new URL(global.fetch.mock.calls[0][0])
+    const url = new URL(global.fetch.mock.calls[0][0], 'http://localhost')
+    expect(url.pathname).toBe('/.netlify/functions/books')
+    expect(url.searchParams.get('action')).toBe('searchText')
     expect(url.searchParams.get('q')).toBe('earthsea')
-    expect(url.searchParams.get('maxResults')).toBe('20')
+    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${CODE}` })
     expect(results[0].title).toBe('Le Guin - Earthsea')
   })
 })
 
 describe('getBookDetail', () => {
-  beforeEach(() => {
-    global.fetch = vi.fn()
-  })
-
   it('returns description and pageCount', async () => {
     global.fetch.mockResolvedValue(okJson({
       volumeInfo: { description: 'Full desc', pageCount: 300 },
     }))
     const detail = await books.getBookDetail('vol1')
+    const url = new URL(global.fetch.mock.calls[0][0], 'http://localhost')
+    expect(url.pathname).toBe('/.netlify/functions/books')
+    expect(url.searchParams.get('action')).toBe('detail')
+    expect(url.searchParams.get('id')).toBe('vol1')
+    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${CODE}` })
     expect(detail).toEqual({ description: 'Full desc', pageCount: 300 })
-    expect(global.fetch.mock.calls[0][0]).toContain('/volumes/vol1')
   })
 
   it('defaults when volumeInfo is missing', async () => {
@@ -128,11 +136,17 @@ describe('getBookDetail', () => {
 })
 
 describe('error handling', () => {
-  beforeEach(() => {
-    global.fetch = vi.fn()
+  it('surfaces the proxy RATE_LIMIT code as err.code', async () => {
+    global.fetch.mockResolvedValue(errorJson(429, { error: 'rate limited', code: 'RATE_LIMIT' }))
+    await expect(books.searchByText('x')).rejects.toMatchObject({ code: 'RATE_LIMIT' })
   })
 
-  it('throws HTTP_ERROR on a non-ok response', async () => {
+  it('surfaces the proxy HTTP_ERROR code as err.code', async () => {
+    global.fetch.mockResolvedValue(errorJson(500, { error: 'nope', code: 'HTTP_ERROR' }))
+    await expect(books.searchByText('x')).rejects.toMatchObject({ code: 'HTTP_ERROR' })
+  })
+
+  it('falls back to HTTP_ERROR when the error body has no code', async () => {
     global.fetch.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) })
     await expect(books.searchByText('x')).rejects.toMatchObject({ code: 'HTTP_ERROR' })
   })

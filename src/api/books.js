@@ -1,19 +1,39 @@
-// Books are looked up through the Google Books API. It needs no token — a
-// public endpoint that returns JSON, good for ISBN scans and title/author
-// searches. Items are normalized into the same shape the app uses for records
-// ("Author - Title", year, label=publisher, barcode=ISBN, etc.) so the shared
-// grid/detail/duplicate-detection code works for both.
+import { getAccessCode } from '../utils/session'
 
-const BASE = 'https://www.googleapis.com/books/v1'
+// Books are looked up through the server-side Google Books proxy, which owns
+// request building (country, etc.) and caches responses in Blobs. The browser
+// just calls the function with the signed-in user's access code. Items are
+// normalized into the same shape the app uses for records ("Author - Title",
+// year, label=publisher, barcode=ISBN, etc.) so the shared grid/detail/
+// duplicate-detection code works for both.
 
-async function booksFetch(path, params = {}) {
-  const url = new URL(BASE + path)
+const FN_BASE = '/.netlify/functions/books'
+
+const ERROR_MESSAGES = {
+  RATE_LIMIT: 'Google Books rate limit hit — wait a moment and try again.',
+  HTTP_ERROR: 'Google Books request failed.',
+}
+
+function authHeaders() {
+  const code = getAccessCode()
+  return code ? { Authorization: `Bearer ${code}` } : {}
+}
+
+async function booksFetch(action, params = {}) {
+  const url = new URL(FN_BASE, window.location.origin)
+  url.searchParams.set('action', action)
   Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') url.searchParams.set(k, v) })
-  url.searchParams.set('country', 'US')
-  const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
+
+  const res = await fetch(url.pathname + url.search, { headers: authHeaders() })
+
   if (!res.ok) {
-    const err = new Error(`Google Books request failed (${res.status})`)
-    err.code = 'HTTP_ERROR'
+    let code = 'HTTP_ERROR'
+    try {
+      const body = await res.json()
+      if (body?.code) code = body.code
+    } catch { /* non-JSON error body — fall back to HTTP_ERROR */ }
+    const err = new Error(ERROR_MESSAGES[code] || `Google Books request failed (${res.status})`)
+    err.code = code
     throw err
   }
   return res.json()
@@ -73,17 +93,17 @@ function toBookItem(volume, scannedIsbn) {
 
 export async function searchByBarcode(isbn) {
   const clean = cleanIsbn(isbn)
-  const data = await booksFetch('/volumes', { q: `isbn:${clean}` })
+  const data = await booksFetch('searchBarcode', { isbn: clean })
   return (data.items || []).slice(0, 10).map((vol) => toBookItem(vol, clean))
 }
 
 export async function searchByText(query) {
-  const data = await booksFetch('/volumes', { q: query, maxResults: 20 })
+  const data = await booksFetch('searchText', { q: query })
   return (data.items || []).map((vol) => toBookItem(vol, ''))
 }
 
 export async function getBookDetail(googleBooksId) {
-  const data = await booksFetch(`/volumes/${encodeURIComponent(googleBooksId)}`)
+  const data = await booksFetch('detail', { id: googleBooksId })
   return {
     description: data.volumeInfo?.description || '',
     pageCount: data.volumeInfo?.pageCount || '',

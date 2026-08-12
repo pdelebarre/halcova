@@ -157,9 +157,9 @@ export default function CollectionView({ catalog, onRequestSettings }) {
         setPickerState({ matches: results, loading: false, errorMsg: '' })
       }
     } catch (err) {
-      if (err.code === 'NO_TOKEN') {
+      if (err.code === 'SERVER_NO_TOKEN') {
         onRequestSettings()
-        showToast(`Add a ${catalog.lookupName} token first to look up barcodes`, 'error')
+        showToast(`${catalog.lookupName} lookups aren't configured yet — ask the owner to set up the shared token`, 'error')
         return
       }
       setPickerState({ matches: [], loading: false, errorMsg: err.message })
