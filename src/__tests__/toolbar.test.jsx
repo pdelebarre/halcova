@@ -95,4 +95,22 @@ describe('Toolbar (single-row redesign)', () => {
     fireEvent.click(list)
     expect(setView).toHaveBeenCalledWith('list')
   })
+
+  it('counts the on-loan filter toward the active filter badge', () => {
+    renderToolbar({ activeLending: true })
+
+    expect(screen.getByRole('button', { name: '1 active' })).toBeInTheDocument()
+    expect(screen.getByText('1')).toBeInTheDocument()
+  })
+
+  it('renders the On loan switch inside the filter sheet when lending is enabled', () => {
+    const onToggleLending = vi.fn()
+    renderToolbar({ lendingEnabled: true, activeLending: false, onToggleLending })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const sw = screen.getByRole('switch', { name: /On loan/ })
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(sw)
+    expect(onToggleLending).toHaveBeenCalledTimes(1)
+  })
 })

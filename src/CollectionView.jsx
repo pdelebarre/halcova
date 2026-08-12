@@ -25,8 +25,8 @@ const TOAST_ICONS = { add: '✓', remove: '–', error: '✕' }
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings }) {
-  const { items, status, error, add, update, remove, refresh } = useCollection(catalog.storage)
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled }) {
+  const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   const [modal, setModal] = useState(null) // 'scan' | 'pick' | 'manual' | 'result' | 'detail'
   const [pickerState, setPickerState] = useState({ matches: null, loading: false, errorMsg: '' })
@@ -40,6 +40,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
   const [activeFormats, setActiveFormats] = useState([])
   const [activeGenres, setActiveGenres] = useState([])
   const [activeArtist, setActiveArtist] = useState('')
+  const [activeLending, setActiveLending] = useState(false) // W7: only on-loan items
   const [sortBy, setSortBy] = useState('added')
 
   // Grid vs List, remembered per kind (§4.6).
@@ -92,19 +93,25 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     setActiveGenres((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
   }
 
+  function toggleLending() {
+    setActiveLending((v) => !v)
+  }
+
   function clearFilters() {
     setQuery('')
     setActiveFormats([])
     setActiveGenres([])
     setActiveArtist('')
+    setActiveLending(false)
   }
 
-  // Reset only the format/genre/artist filters (search stays) — used by the
-  // filter sheet's Reset action (§5.2).
+  // Reset only the format/genre/artist/lending filters (search stays) — used
+  // by the filter sheet's Reset action (§5.2).
   function resetFilters() {
     setActiveFormats([])
     setActiveGenres([])
     setActiveArtist('')
+    setActiveLending(false)
   }
 
   // Distinct genres and artists present in the collection — drives the classification filters.
@@ -126,7 +133,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     }
   }, [items])
 
-  const hasActiveFilters = debouncedQuery.trim() !== '' || activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== ''
+  const hasActiveFilters = debouncedQuery.trim() !== '' || activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending
 
   // The core "am I looking at a duplicate" step — every path into the app
   // (barcode auto-match, picking from multiple pressings/editions, text
@@ -213,6 +220,41 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     setSelectedItem((prev) => (prev ? { ...prev, notes } : prev))
   }
 
+  // Lending (W6): optimistic lend/return go through the hook (which keeps
+  // `items` in sync and rolls back on failure). We mirror the same item patch
+  // onto the OPEN sheet's `selectedItem` so the detail reflects the change
+  // live — the shape matches what useCollection / the lending function store.
+  async function handleLend(payload) {
+    if (!selectedItem) return
+    await lend(selectedItem.id, payload)
+    setSelectedItem((prev) => (prev ? {
+      ...prev,
+      lending: {
+        borrower: {
+          name: payload.borrower.name,
+          ...(payload.borrower.contact ? { contact: payload.borrower.contact } : {}),
+        },
+        lentOn: new Date().toISOString(),
+        ...(payload.dueOn ? { dueOn: payload.dueOn } : {}),
+      },
+    } : prev))
+  }
+
+  async function handleReturn() {
+    if (!selectedItem) return
+    await returnItem(selectedItem.id)
+    setSelectedItem((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev }
+      if (prev.lending) {
+        const record = { ...prev.lending, returnedOn: new Date().toISOString() }
+        updated.lendingHistory = [record, ...(prev.lendingHistory || [])].slice(0, 10)
+      }
+      delete updated.lending
+      return updated
+    })
+  }
+
   // FAB menu: tapping the scrim / Esc closes and restores focus to the FAB;
   // choosing an action opens the matching flow.
   function closeFab() {
@@ -235,6 +277,10 @@ export default function CollectionView({ catalog, onRequestSettings }) {
     }
     if (activeArtist) {
       list = list.filter((it) => splitArtistTitle(it.title).artist === activeArtist)
+    }
+    // W7: "On loan" — an item passes when item.lending is present.
+    if (activeLending) {
+      list = list.filter((it) => !!it.lending)
     }
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.trim().toLowerCase()
@@ -263,7 +309,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
       sorted.sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
     }
     return sorted
-  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, sortBy])
+  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, sortBy])
 
   return (
     <>
@@ -284,6 +330,9 @@ export default function CollectionView({ catalog, onRequestSettings }) {
           onResetFilters={resetFilters}
           view={view} setView={setView}
           copy={copy}
+          lendingEnabled={lendingEnabled}
+          activeLending={activeLending}
+          onToggleLending={toggleLending}
         />
       )}
 
@@ -314,7 +363,7 @@ export default function CollectionView({ catalog, onRequestSettings }) {
               onOpen={(item) => { setSelectedItem(item); setModal('detail') }}
             />
           ) : (
-            <Grid items={visibleItems} onOpen={(item) => { setSelectedItem(item); setModal('detail') }} />
+            <Grid items={visibleItems} onOpen={(item) => { setSelectedItem(item); setModal('detail') }} lendingEnabled={lendingEnabled} copy={copy} />
           )
         )}
 
@@ -428,6 +477,10 @@ export default function CollectionView({ catalog, onRequestSettings }) {
           onClose={() => { setModal(null); setSelectedItem(null) }}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
+          lendingEnabled={lendingEnabled}
+          onLend={handleLend}
+          onReturn={handleReturn}
+          showToast={showToast}
         />
       )}
     </>

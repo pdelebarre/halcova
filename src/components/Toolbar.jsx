@@ -29,6 +29,9 @@ export default function Toolbar({
   count, onClearFilters, onResetFilters,
   view = 'grid', setView,
   copy = {},
+  lendingEnabled = false,
+  activeLending = false,
+  onToggleLending,
 }) {
   const scrolled = useScrolled()
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -36,7 +39,7 @@ export default function Toolbar({
   const filterBtnRef = useRef(null)
   const sortBtnRef = useRef(null)
 
-  const activeFilterCount = activeFormats.length + activeGenres.length + (activeArtist ? 1 : 0)
+  const activeFilterCount = activeFormats.length + activeGenres.length + (activeArtist ? 1 : 0) + (activeLending ? 1 : 0)
   const currentSortLabel = useMemo(
     () => sortOptions.find((o) => o.value === sortBy)?.label || sortBy,
     [sortOptions, sortBy],
@@ -161,6 +164,9 @@ export default function Toolbar({
           setActiveArtist={setActiveArtist}
           artistLabel={artistLabel}
           artistPlaceholder={artistPlaceholder}
+          lendingEnabled={lendingEnabled}
+          activeLending={activeLending}
+          onToggleLending={onToggleLending}
           onClear={onResetFilters || onClearFilters}
           onClose={closeSheet}
         />

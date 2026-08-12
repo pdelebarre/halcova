@@ -13,6 +13,7 @@
   --shadow-float: 0 10px 24px rgba(0,0,0,0.45);
   --line: #35302A;
   --danger: #C24B3F;
+  --danger-bright: #E0695B; /* lighter danger for small text/badges: >= 4.5:1 on --vinyl-groove-2 and the grid chip */
   --success: #7A9A6B;
 
   --font-display: 'Fraunces', Georgia, serif;
