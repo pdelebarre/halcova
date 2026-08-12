@@ -43,7 +43,7 @@ export default function App() {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Runout</h1>
+          <h1 className="auth-wordmark">Alcove</h1>
           <p className="auth-copy">
             Hi {user.name} — your account doesn't include any collections yet.
             Ask the admin to grant you Records and/or Books.

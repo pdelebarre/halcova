@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Runout — Records & Books',
-        short_name: 'Runout',
-        description: 'Scan a barcode, catalog the thing. Your record and book collection in one app.',
+        name: 'Alcove — Records & Books',
+        short_name: 'Alcove',
+        description: 'Alcove — scan a barcode, catalog the thing. Your records and books in one app. Never double-buy: it knows what you already own.',
         theme_color: '#16130F',
         background_color: '#16130F',
         display: 'standalone',
