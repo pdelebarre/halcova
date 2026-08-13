@@ -1,0 +1,24 @@
+/* Horizontal shelf (§ Phase 1): a swipeable row of covers like a shop-front
+   display. Cards get a fixed width so they don't stretch in the flex row
+   (the grid normally sizes them with minmax). */
+
+.cover-shelf {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 2px 16px 10px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.cover-shelf > .album-card,
+.cover-shelf > .book-card {
+  flex: 0 0 140px;
+  width: 140px;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 720px) {
+  .cover-shelf { gap: 16px; padding: 4px 24px 14px; }
+}

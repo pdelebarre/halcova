@@ -5,7 +5,7 @@ import LendingControls from './LendingControls'
 import './AlbumDetail.css'
 import './BookDetail.css'
 
-export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catalog, lendingEnabled, onLend, onReturn, showToast, isDemo = false }) {
+export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, onLend, onReturn, showToast, isDemo = false }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
@@ -71,7 +71,22 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, catal
         <div className="sheet-header">
           <h2 className="visually-hidden">{bookTitle}</h2>
           <span />
-          <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
+          <div className="detail-header-actions">
+            {!isDemo && onTogglePinned && (
+              <button
+                type="button"
+                className={`icon-btn detail-pin${item.pinned ? ' pinned' : ''}`}
+                onClick={onTogglePinned}
+                aria-pressed={!!item.pinned}
+                aria-label={item.pinned ? (copy.floor?.unpin || 'Unpin') : (copy.floor?.pin || 'Pin to top')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={item.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M9 3h6M12 3v5l-3 3v2h6v-2l-3-3V3M12 13v8" />
+                </svg>
+              </button>
+            )}
+            <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
+          </div>
         </div>
 
         <div className="detail-scroll">

@@ -1,6 +1,12 @@
 .app-main {
   /* Constrain the app shell to a comfortable reading width and center it.
-     Preserve the safe-area padding on the bottom for iOS-like devices. */
+     Preserve the safe-area padding on the bottom for iOS-like devices.
+     `width: 100%` is required: #root is a column flexbox and the auto
+     horizontal margins make this a shrink-to-fit item, so without it the
+     wide CoverShelf shelf (fixed-width cards) blows the shell out to
+     max-width on narrow phones. Pin it to the container width and let the
+     shelf scroll inside instead. */
+  width: 100%;
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 16px calc(var(--safe-bottom) + 90px);
@@ -19,6 +25,7 @@
 /* Free-tier plan banner (T4): total-item counter + at-cap hint. Rendered by
    CollectionView for free-plan members only. */
 .plan-banner {
+  width: 100%;
   max-width: 1280px;
   margin: 10px auto 0;
   padding: 0 16px;

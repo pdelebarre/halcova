@@ -74,6 +74,20 @@ export const recordsCatalog = {
       noArtists: 'No matching artists',
       clearArtist: 'Clear artist filter',
     },
+    // The Floor (§ Phase 1): sectioned home — New arrivals / On loan / Pinned
+    // shelves, then "Browse all". `dive` opens a random item.
+    floor: {
+      newArrivals: { title: 'New arrivals', kicker: 'Fresh in' },
+      onLoan: { title: 'On loan', kicker: 'Out in the world' },
+      pinned: { title: 'Pinned', kicker: 'Your picks' },
+      browseAll: { title: 'Browse all', kicker: 'Everything' },
+      dive: 'Crate dive',
+      diveAria: 'Open a random record from your crate',
+      pin: 'Pin to top',
+      unpin: 'Unpin',
+      pinnedToast: 'Pinned to your picks',
+      unpinnedToast: 'Removed from your picks',
+    },
     lending: {
       section: t('lending.section'),
       statusOut: (name, date) => t('lending.statusOut', { name, date }),
@@ -188,6 +202,20 @@ export const booksCatalog = {
       artist: 'Author',
       noArtists: 'No matching authors',
       clearArtist: 'Clear author filter',
+    },
+    // The Floor (§ Phase 1): sectioned home — New arrivals / On loan / Pinned
+    // shelves, then "Browse all". `dive` opens a random item.
+    floor: {
+      newArrivals: { title: 'New arrivals', kicker: 'Fresh in' },
+      onLoan: { title: 'On loan', kicker: 'Out in the world' },
+      pinned: { title: 'Pinned', kicker: 'Your picks' },
+      browseAll: { title: 'Browse all', kicker: 'Everything' },
+      dive: 'Shelf dive',
+      diveAria: 'Open a random book from your shelf',
+      pin: 'Pin to top',
+      unpin: 'Unpin',
+      pinnedToast: 'Pinned to your picks',
+      unpinnedToast: 'Removed from your picks',
     },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,

@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Toolbar from './components/Toolbar'
 import ListView from './components/ListView'
 import EmptyState from './components/EmptyState'
+import SectionHeader from './components/SectionHeader'
+import CoverShelf from './components/CoverShelf'
 import MatchPicker from './components/MatchPicker'
 import ScanResult from './components/ScanResult'
 import { useCollection } from './hooks/useCollection'
@@ -24,6 +26,10 @@ const TOAST_ICONS = { add: '✓', remove: '–', error: '✕' }
 // The server is authoritative — this only drives the counter and disabling the
 // add UI so users aren't sent on a doomed add.
 const FREE_PLAN_CAP = 10
+
+// How many of the most recently added items get their own shelf on the Floor.
+// The Floor activates once the collection grows past this many items.
+const NEW_ARRIVALS_COUNT = 5
 
 /**
  * One full collection screen — search, scan, add, filter, sort, delete —
@@ -98,7 +104,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     return () => document.removeEventListener('keydown', onKey)
   }, [fabOpen])
 
-  const { Grid, Detail, ManualAdd } = catalog.components
+  const { Grid, Detail, ManualAdd, Card } = catalog.components
   const copy = catalog.copy
 
   function showToast(msg, kind = 'add') {
@@ -156,6 +162,92 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }, [items])
 
   const hasActiveFilters = debouncedQuery.trim() !== '' || activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending
+
+  // The Floor (§ Phase 1): curated shelves shown in the default browse state
+  // (grid view, no filters, "Recently added" sort). New arrivals appear only
+  // once the collection is big enough that the shelf adds value; On loan and
+  // Pinned shelves appear whenever they're non-empty. `floor` is a stable
+  // reference (catalog module copy), so the memo stays valid.
+  // copy is a stable module reference, so this memo keeps `floor` stable
+  // (no new object every render — keeps exhaustive-deps happy).
+  const floor = useMemo(() => copy.floor || {}, [copy])
+  const floorSections = useMemo(() => {
+    const sections = []
+    if (items.length > NEW_ARRIVALS_COUNT) {
+      const sorted = [...items].sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
+      sections.push({
+        id: 'floor-new',
+        key: 'floor-new',
+        kicker: floor.newArrivals?.kicker || '',
+        title: floor.newArrivals?.title || '',
+        count: NEW_ARRIVALS_COUNT,
+        items: sorted.slice(0, NEW_ARRIVALS_COUNT),
+      })
+    }
+    if (lendingEnabled) {
+      const onLoan = items.filter((it) => it.lending)
+      if (onLoan.length) {
+        sections.push({
+          id: 'floor-loan',
+          key: 'floor-loan',
+          kicker: floor.onLoan?.kicker || '',
+          title: floor.onLoan?.title || '',
+          count: onLoan.length,
+          items: onLoan,
+        })
+      }
+    }
+    const pinned = items.filter((it) => it.pinned)
+    if (pinned.length) {
+      sections.push({
+        id: 'floor-pinned',
+        key: 'floor-pinned',
+        kicker: floor.pinned?.kicker || '',
+        title: floor.pinned?.title || '',
+        count: pinned.length,
+        items: pinned,
+      })
+    }
+    return sections
+  }, [items, lendingEnabled, floor])
+
+  // The Floor activates once the collection grows past NEW_ARRIVALS_COUNT
+  // items (e.g. > 5) — below that the plain grid is the whole store and
+  // curated shelves would just duplicate it.
+  const showFloor =
+    status === 'ready' &&
+    items.length > NEW_ARRIVALS_COUNT &&
+    view === 'grid' &&
+    sortBy === 'added' &&
+    !hasActiveFilters &&
+    floorSections.length > 0
+
+  function openItem(item) {
+    setSelectedItem(item)
+    setModal('detail')
+  }
+
+  // Crate dive (§ Phase 1): like pulling a random record off the shelf —
+  // opens a random item's detail sheet.
+  function handleCrateDive() {
+    if (!items.length) return
+    const pick = items[Math.floor(Math.random() * items.length)]
+    setSelectedItem(pick)
+    setModal('detail')
+  }
+
+  // Pin/unpin (§ Phase 1): `pinned` is an additive item field (the collection
+  // PUT spreads any patch, so no server change). Optimistic via useCollection.
+  async function handleTogglePinned(item) {
+    const next = !item.pinned
+    try {
+      await update(item.id, { pinned: next })
+      setSelectedItem((prev) => (prev ? { ...prev, pinned: next } : prev))
+      showToast(next ? (floor.pinnedToast || 'Pinned') : (floor.unpinnedToast || 'Unpinned'))
+    } catch {
+      showToast(t('view.couldNotSave'), 'error')
+    }
+  }
 
   // The core "am I looking at a duplicate" step — every path into the app
   // (barcode auto-match, picking from multiple pressings/editions, text
@@ -422,17 +514,55 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           <EmptyState kind="no-results" copy={copy} onClear={clearFilters} />
         )}
 
-        {status === 'ready' && visibleItems.length > 0 && (
+        {status === 'ready' && visibleItems.length > 0 && showFloor && (
+          <div className="collection-floor">
+            {floorSections.map((section) => (
+              <section key={section.key} className="floor-section" aria-labelledby={section.id}>
+                <SectionHeader id={section.id} kicker={section.kicker} title={section.title} count={section.count} />
+                <CoverShelf
+                  items={section.items}
+                  Card={Card}
+                  onOpen={openItem}
+                  lendingEnabled={lendingEnabled}
+                  copy={copy}
+                  label={section.title}
+                />
+              </section>
+            ))}
+
+            <section className="floor-section" aria-labelledby="floor-browse-all">
+              <SectionHeader
+                id="floor-browse-all"
+                kicker={floor.browseAll?.kicker || ''}
+                title={floor.browseAll?.title || ''}
+                count={items.length}
+                action={!isDemo && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost section-action-btn"
+                    onClick={handleCrateDive}
+                    aria-label={floor.diveAria || floor.dive}
+                  >
+                    {floor.dive}
+                  </button>
+                )}
+              />
+              <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} />
+            </section>
+          </div>
+        )}
+
+        {status === 'ready' && visibleItems.length > 0 && !showFloor && (
           view === 'list' ? (
             <ListView
               items={visibleItems}
               sortBy={sortBy}
               copy={copy}
               lendingEnabled={lendingEnabled}
-              onOpen={(item) => { setSelectedItem(item); setModal('detail') }}
+              onOpen={openItem}
             />
           ) : (
-            <Grid items={visibleItems} onOpen={(item) => { setSelectedItem(item); setModal('detail') }} lendingEnabled={lendingEnabled} copy={copy} />
+            <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} />
           )
         )}
 
@@ -550,6 +680,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onClose={() => { setModal(null); setSelectedItem(null) }}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
+          onTogglePinned={() => handleTogglePinned(selectedItem)}
           lendingEnabled={lendingEnabled}
           onLend={handleLend}
           onReturn={handleReturn}

@@ -145,3 +145,19 @@
   color: var(--jacket-kraft-dim);
   margin: 8px 0 0;
 }
+
+/* Pin toggle (§ Phase 1) — sits in the sheet header next to Close. */
+.detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-pin {
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove-2);
+  color: var(--jacket-kraft-dim);
+}
+.detail-pin.pinned {
+  color: var(--runout-gold);
+  border-color: var(--runout-gold);
+}
