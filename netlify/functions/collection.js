@@ -1,6 +1,7 @@
 import { getStore } from '@netlify/blobs'
 import { randomUUID } from 'node:crypto'
 import { COLLECTIONS, authorize, json, readIndex, writeIndex } from './_shared/collection-store'
+import { DEMO_SEED, seedDemoStore } from './_shared/demo-data'
 import { planLimitFor } from './_shared/plans'
 import { storeNameFor } from './_shared/users'
 
@@ -32,6 +33,13 @@ export default async (req) => {
 
   try {
     if (req.method === 'GET') {
+      // Demo space self-seeds on first access (ADR-0001): a fresh store is
+      // populated with the curated items so a demo visitor never sees an empty
+      // collection — no manual admin seed step required. Idempotent — the seed
+      // is skipped as soon as the index is non-empty.
+      if (user.role === 'demo') {
+        await seedDemoStore(store, DEMO_SEED[collection])
+      }
       const ids = await readIndex(store)
       const items = await Promise.all(ids.map((itemId) => store.get(`item:${itemId}`, { type: 'json' })))
       return json(200, { items: items.filter(Boolean) })
