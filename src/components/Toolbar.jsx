@@ -32,12 +32,17 @@ export default function Toolbar({
   lendingEnabled = false,
   activeLending = false,
   onToggleLending,
+  onOpenLoans,
+  loansButtonRef,
+  minimal = false,
 }) {
   const scrolled = useScrolled()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sortOpen, setSortOpen] = useState(false)
   const filterBtnRef = useRef(null)
   const sortBtnRef = useRef(null)
+
+  const loansLabel = copy.lending?.loans || t('lending.loans')
 
   const activeFilterCount = activeFormats.length + activeGenres.length + (activeArtist ? 1 : 0) + (activeLending ? 1 : 0)
   const currentSortLabel = useMemo(
@@ -57,6 +62,40 @@ export default function Toolbar({
   function closeSort() {
     setSortOpen(false)
     sortBtnRef.current?.focus()
+  }
+
+  // W7: global loans dashboard button — icon + "Loans" label, no numeric
+  // badge (the dashboard is global across records + books, so a per-tab count
+  // would mislead). Rendered whenever lending is enabled.
+  function renderLoansButton() {
+    if (!lendingEnabled) return null
+    return (
+      <button
+        ref={loansButtonRef}
+        type="button"
+        className="toolbar-btn loans-btn"
+        onClick={onOpenLoans}
+        aria-label={loansLabel}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="7" y="3" width="10" height="4" rx="1" />
+          <path d="M5 9h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z" />
+          <path d="M12 13v4M10 15h4" />
+        </svg>
+        <span className="loans-label">{loansLabel}</span>
+      </button>
+    )
+  }
+
+  // Minimal toolbar: an empty collection still needs the Loans button when
+  // lending is enabled, so the global dashboard stays reachable. Everything
+  // else (search/filter/sort/toggle) is meaningless over zero items.
+  if (minimal) {
+    return (
+      <div className={scrolled ? 'toolbar scrolled' : 'toolbar'}>
+        {renderLoansButton()}
+      </div>
+    )
   }
 
   return (
@@ -115,6 +154,9 @@ export default function Toolbar({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
+
+      {/* W7: global loans dashboard — only when lending is enabled. */}
+      {renderLoansButton()}
 
       <div className="view-toggle">
         <button

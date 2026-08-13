@@ -18,6 +18,21 @@
 | `localization-dictionary.md` | **Translation dictionary (v1)** — EN/FR/NL/PT-BR/DE/ES/IT content for every key, `[VALIDATE]` |
 | `ticket-localization.md` | **Dev implementation ticket** — exact file/string scope for `feat/localization`, non-string fixes, tests, DoD |
 
+## Launch campaign — "What lives in your alcove?" (2026-08-13)
+
+Public viral launch across **X · Instagram · Facebook · WhatsApp**, curiosity-first
+progressive reveal, video produced in **PicsArt**.
+
+| File | What it is |
+| --- | --- |
+| `campaign-viral-launch.md` | **Master plan** — concept, info-control ladder, 5 phases, channel strategy, calendar, KPIs/UTM, risks, gates |
+| `campaign-copy-bank.md` | **Post copy** — every caption/hook/thread per day & platform, hashtags, translation notes |
+| `campaign-picsart-video-spec.md` | **Video production spec** — brand kit (dark `#16130F` + gold), 14 storyboarded assets (V1–V14), PicsArt techniques |
+| `campaign-whatsapp-playbook.md` | **Personal WhatsApp sequence** — segments, invite flow, statuses, codes are private, admin workload |
+
+> Campaign Phases 1–2 are **name-free** (safe to run now). Phase 3 (name reveal)
+> is gated on the `chore/rename-alcove` branch + legal/domain gate + icon.
+
 ## Iteration history (drafts — superseded, kept for reference)
 
 | File | Round | Proposal |

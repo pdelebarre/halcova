@@ -1,0 +1,188 @@
+/* Loans dashboard (W7): full-screen sheet listing every item on loan across
+   records + books, with search/sort and a two-step mark-returned action.
+   Reuses the shared .sheet-overlay / .sheet styles from styles/shared.css. */
+
+.loans-sheet {
+  position: relative;
+  padding-bottom: calc(var(--safe-bottom) + 18px);
+}
+
+.loans-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.loans-search {
+  flex: 1;
+  min-width: 0;
+}
+.loans-search input {
+  width: 100%;
+  height: 44px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: 15px;
+  color: var(--jacket-kraft);
+}
+.loans-search input::placeholder { color: var(--static-grey); }
+.loans-search input:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: -1px;
+}
+
+.loans-sort { flex-shrink: 0; }
+.loans-sort select {
+  height: 44px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--jacket-kraft-dim);
+}
+
+.loans-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -6px;
+  padding: 0 6px;
+}
+
+.loans-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loan-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+}
+
+/* Overdue rows get a subtle left accent so they scan at a glance — the
+   "Overdue since…" line already carries the danger-bright text. */
+.loan-row.is-overdue {
+  box-shadow: inset 3px 0 0 var(--danger-bright);
+}
+
+.loan-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.loan-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+}
+.loan-title-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loan-kind {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  color: var(--runout-gold);
+}
+.loan-kind-books { color: #9FB4C7; }
+
+.loan-artist {
+  font-size: 12.5px;
+  color: var(--static-grey);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loan-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+  color: var(--static-grey);
+}
+.loan-status-out { color: var(--jacket-kraft-dim); }
+.loan-due-overdue { color: var(--danger-bright); font-weight: 600; }
+
+.loans-return {
+  flex-shrink: 0;
+  min-height: 44px;
+  white-space: nowrap;
+}
+/* Armed "Confirm returned?" step — gold, not red: returning a loan finalizes
+   it, it isn't destructive. Matches LendingControls (.btn-confirm):
+   --runout-gold fill + --sleeve-black text ≈ 7.7:1. */
+.loans-return.btn-confirm {
+  background: var(--runout-gold);
+  border-color: var(--runout-gold);
+  color: var(--sleeve-black);
+}
+.loans-return.btn-confirm:hover { filter: brightness(1.07); }
+.loans-return.btn-confirm:active { filter: brightness(0.93); }
+
+.loans-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+}
+.loans-error .sheet-error { padding: 0; margin: 0; }
+
+.loans-no-results-sub { margin: 6px 0 0; font-size: 12.5px; }
+
+/* Transient toast inside the panel (mirrors the app toast) — anchored to the
+   bottom of the sheet, above the safe-area inset. */
+.loans-notice {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: calc(var(--safe-bottom) + 14px);
+  z-index: 5;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--jacket-kraft);
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-float);
+}
+.loans-notice-error {
+  border-color: var(--danger);
+  color: var(--danger-bright);
+}

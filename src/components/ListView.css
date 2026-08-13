@@ -102,6 +102,28 @@
   color: var(--static-grey);
 }
 
+/* W7: On-loan / Overdue badge (list view). Inline, next to the format badge —
+   same palette as the grid's `.lending-badge` but non-absolute so it sits in
+   the row flow without breaking the 56px row layout. */
+.list-lending-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--success);
+  background: var(--vinyl-groove-2);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.list-lending-badge.overdue {
+  color: var(--danger-bright);
+  border-color: rgba(224, 105, 91, 0.6);
+}
+
 /* Decorative hover only — never on touch. */
 @media (hover: hover) and (pointer: fine) {
   .list-row:hover { background: var(--vinyl-groove); }

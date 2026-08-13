@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
 import CreditModal from './components/CreditModal'
+import LoansDashboard from './components/LoansDashboard'
 import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
@@ -18,6 +19,12 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
+  // W7: loans dashboard — owns whether the global overlay is open and a
+  // counter that bumps whenever a loan is returned so the visible collection
+  // re-fetches and stays in sync.
+  const [loansOpen, setLoansOpen] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
+  const loansButtonRef = useRef(null)
 
   // Reset to the first collection when a different user signs in.
   useEffect(() => {
@@ -74,11 +81,27 @@ export default function App() {
       />
 
       {/* keyed by kind so each collection remounts fresh when you switch tabs */}
-      <CollectionView key={catalog.kind} catalog={catalog} onRequestSettings={() => setSettingsOpen(true)} lendingEnabled={lendingEnabled} />
+      <CollectionView
+        key={catalog.kind}
+        catalog={catalog}
+        onRequestSettings={() => setSettingsOpen(true)}
+        lendingEnabled={lendingEnabled}
+        onOpenLoans={() => setLoansOpen(true)}
+        refreshTick={refreshTick}
+        loansButtonRef={loansButtonRef}
+      />
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
       {creditOpen && <CreditModal onClose={() => setCreditOpen(false)} />}
+      {lendingEnabled && loansOpen && (
+        <LoansDashboard
+          open={loansOpen}
+          onClose={() => setLoansOpen(false)}
+          onLoanReturned={() => setRefreshTick((n) => n + 1)}
+          returnFocusRef={loansButtonRef}
+        />
+      )}
     </>
   )
 }
