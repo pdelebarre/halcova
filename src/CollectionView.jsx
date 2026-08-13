@@ -21,6 +21,16 @@ function cleanBarcode(raw) {
   return String(raw).replace(/[^0-9Xx]/g, '')
 }
 
+// Load the persisted browse path (§ Phase 4) — filters/sort/aisle are restored
+// across reloads and offline, per-kind keying like runout.view.<kind>.
+function loadBrowseState(kind) {
+  try {
+    const raw = localStorage.getItem(`runout.browse.${kind}`)
+    const s = raw ? JSON.parse(raw) : null
+    return s && typeof s === 'object' ? s : {}
+  } catch { return {} }
+}
+
 // Leading toast status icons (§4.17): ✓ add / – remove / ✕ error.
 const TOAST_ICONS = { add: '✓', remove: '–', error: '✕' }
 
@@ -50,14 +60,20 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [activeFormats, setActiveFormats] = useState([])
-  const [activeGenres, setActiveGenres] = useState([])
-  const [activeArtist, setActiveArtist] = useState('')
-  const [activeLending, setActiveLending] = useState(false) // W7: only on-loan items
-  const [sortBy, setSortBy] = useState('added')
+  // The browse path (§ Phase 4) is persisted per kind so filters/sort/aisle
+  // survive a reload and work offline. Parsed once; seeds the state below.
+  const [browseState] = useState(() => loadBrowseState(catalog.kind))
+  const [activeFormats, setActiveFormats] = useState(() => (Array.isArray(browseState.activeFormats) ? browseState.activeFormats : []))
+  const [activeGenres, setActiveGenres] = useState(() => (Array.isArray(browseState.activeGenres) ? browseState.activeGenres : []))
+  const [activeArtist, setActiveArtist] = useState(() => browseState.activeArtist || '')
+  const [activeLending, setActiveLending] = useState(() => !!browseState.activeLending)
+  const [sortBy, setSortBy] = useState(() => (catalog.sortOptions.some((o) => o.value === browseState.sortBy) ? browseState.sortBy : 'added'))
   // The Aisles (§ Phase 2): a selected browse bin ({ axisId, value }) acts as
-  // a filter; the sheet is the picker.
-  const [activeAisle, setActiveAisle] = useState(null)
+  // a filter; the sheet is the picker. Only restore it if the axis still exists.
+  const [activeAisle, setActiveAisle] = useState(() => {
+    const a = browseState.activeAisle
+    return a && a.axisId && catalog.browseAxes?.some((ax) => ax.id === a.axisId) ? a : null
+  })
   const [aisleSheetOpen, setAisleSheetOpen] = useState(false)
   // The Catalog (§ Phase 3): recent searches persisted per kind + focus state
   // for the "recent searches" row under the toolbar.
@@ -69,6 +85,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     } catch { return [] }
   })
   const [searchFocused, setSearchFocused] = useState(false)
+  // Jump-to-top (§ Phase 4): shown once the user scrolls deep.
+  const [showJumpTop, setShowJumpTop] = useState(false)
 
   // Free tier: the counter reflects the WHOLE collection (items.length, not the
   // filtered/visible count) and add flows are gated once the cap is reached so
@@ -83,10 +101,29 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     try { localStorage.setItem(`runout.view.${catalog.kind}`, view) } catch { /* ignore */ }
   }, [view, catalog.kind])
 
+  // Persist the browse path (§ Phase 4) — filters/sort/aisle across reloads.
+  useEffect(() => {
+    const state = { sortBy, activeFormats, activeGenres, activeArtist, activeLending, activeAisle }
+    try { localStorage.setItem(`runout.browse.${catalog.kind}`, JSON.stringify(state)) } catch { /* ignore */ }
+  }, [sortBy, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog.kind])
+
   // Persist the recent-searches list (capped at 6, most recent first).
   useEffect(() => {
     try { localStorage.setItem(`runout.recentSearches.${catalog.kind}`, JSON.stringify(recentSearches)) } catch { /* ignore */ }
   }, [recentSearches, catalog.kind])
+
+  // Jump-to-top (§ Phase 4): capture-phase scroll listener catches both the
+  // page scroll (grid) and the list's own scroller.
+  useEffect(() => {
+    function onScroll() {
+      const scroller = document.querySelector('.list-scroller')
+      const deep = (window.scrollY || 0) > 400 || (scroller ? scroller.scrollTop > 400 : false)
+      setShowJumpTop(deep)
+    }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    onScroll()
+    return () => document.removeEventListener('scroll', onScroll, { capture: true })
+  }, [])
 
   // Debounce the search filter so typing stays instant on large collections
   // (§4.18): the input updates immediately, the filter computation lags ~150ms.
@@ -288,6 +325,19 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   function handleClearAisle() {
     setActiveAisle(null)
+  }
+
+  // Jump-to-top (§ Phase 4): scroll the list's own container when in list
+  // view, otherwise the page. Reduced-motion users get an instant jump.
+  function jumpToTop() {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    const behavior = reduce ? 'auto' : 'smooth'
+    const scroller = document.querySelector('.list-scroller')
+    if (scroller) {
+      scroller.scrollTo?.({ top: 0, behavior })
+      return
+    }
+    try { window.scrollTo({ top: 0, behavior }) } catch { /* jsdom / no-op */ }
   }
 
   // The Catalog (§ Phase 3): a "did you mean" suggestion when a query matches
@@ -759,6 +809,19 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
             <span>{t('common.scan')}</span>
           </button>
         </>
+      )}
+
+      {showJumpTop && (
+        <button
+          type="button"
+          className="jump-top"
+          onClick={jumpToTop}
+          aria-label={copy.view?.backToTop || 'Back to top'}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
       )}
 
       {toast && (

@@ -24,7 +24,7 @@ const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 // and get 429'd constantly because that per-IP quota is shared across tenants.
 // The key NEVER reaches the browser: it only ever appears in this function's
 // outbound fetch and is never logged.
-const GOOGLE_API_KEY = process.env.RUNOUT_GOOGLE_BOOKS_API_KEY
+const GOOGLE_API_KEY = process.env.GOOGLE_BOOKS_API_KEY
 // Warn once per warm instance about keyless mode — deliberately degrade (books
 // previously had no key), don't hard-error like Discogs' SERVER_NO_TOKEN.
 let warnedKeyless = false
@@ -83,7 +83,7 @@ function googleUrl(path, params = {}) {
     url.searchParams.set('key', GOOGLE_API_KEY)
   } else if (!warnedKeyless) {
     warnedKeyless = true
-    console.warn('RUNOUT_GOOGLE_BOOKS_API_KEY not set — keyless Google Books requests are subject to per-IP rate limits (429). Set the key in Netlify env to fix rate limiting.')
+    console.warn('GOOGLE_BOOKS_API_KEY not set — keyless Google Books requests are subject to per-IP rate limits (429). Set the key in Netlify env to fix rate limiting.')
   }
   return url.toString()
 }

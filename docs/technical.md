@@ -334,7 +334,7 @@ chip/select filters.
 - **`api/books.js`** — calls the `books` function proxy
   (`/.netlify/functions/books`) with the access code as Bearer; the proxy hits
   the public Google Books `v1` endpoints (optionally with the server-side
-  `RUNOUT_GOOGLE_BOOKS_API_KEY`, plus a transient retry on 429/5xx/network
+  `GOOGLE_BOOKS_API_KEY`, plus a transient retry on 429/5xx/network
   errors) and serves from the shared `books-cache` blob store. This module
   normalizes the returned volumes into
   the shared item shape, upgrades thumbnail URLs `http → https`
@@ -508,7 +508,7 @@ already-owned barcodes still match from local state.
   region-appropriate results and caches responses in the shared `books-cache`
   Blob store.
 - Auth: none on Google's side by default (public API) — but setting a
-  server-side `RUNOUT_GOOGLE_BOOKS_API_KEY` is recommended. Keyless requests
+  server-side `GOOGLE_BOOKS_API_KEY` is recommended. Keyless requests
   are quota'd per-IP, and Netlify Functions egress from shared IP pools, so the
   per-IP quota is exhausted constantly and Google returns `429` → the proxy
   surfaces `RATE_LIMIT`. With the key set, the proxy appends `key=<key>` to
@@ -550,7 +550,7 @@ already-owned barcodes still match from local state.
   dev fallback). Never commit or log it.
 - **Set `RUNOUT_DISCOGS_TOKEN`** too — the `discogs` lookup proxy reads it
   server-side; without it record lookups fail with `SERVER_NO_TOKEN`.
-- **Set `RUNOUT_GOOGLE_BOOKS_API_KEY`** (optional but recommended) — the
+- **Set `GOOGLE_BOOKS_API_KEY`** (optional but recommended) — the
   `books` lookup proxy appends it to outbound Google Books requests; without
   it book lookups still work but are keyless and get 429'd against the shared
   Netlify egress IP under load.
@@ -578,7 +578,7 @@ skips functions), or Git-connected import.
   at this scale (rotate codes by deleting + recreating a member if needed).
 - The **Discogs token is server-only** — the single `RUNOUT_DISCOGS_TOKEN` env
   var lives on the `discogs` lookup proxy and never reaches the browser.
-- The **Google Books API key is server-only too** — `RUNOUT_GOOGLE_BOOKS_API_KEY`
+- The **Google Books API key is server-only too** — `GOOGLE_BOOKS_API_KEY`
   lives on the `books` lookup proxy, is appended to the outbound request
   server-side, and never reaches the browser.
 - Users never bring or paste tokens — there is no token field in the Settings
