@@ -305,6 +305,22 @@ const de = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Kostenloser Plan & Demo
+  'plan.freeCounter': '{count} von {cap} Artikeln hinzugefügt',
+  'plan.atLimitHint': 'Sie haben {cap} Artikel hinzugefügt — das Limit des kostenlosen Plans. Bitten Sie den Admin um ein Upgrade, um weiterhin hinzuzufügen.',
+  'plan.limitToast': 'Limit des kostenlosen Plans erreicht. Bitten Sie den Admin um ein Upgrade, um mehr hinzuzufügen.',
+  'plan.limitFab': 'Kostenloser Plan voll — upgraden, um mehr hinzuzufügen',
+  'admin.plan': 'Tarif',
+  'admin.planFree': 'Kostenlos',
+  'admin.planUnlimited': 'Unbegrenzt',
+  'demo.tryButton': 'Kostenlose Demo ausprobieren',
+  'demo.banner': 'Sie durchsuchen die schreibgeschützte Demo-Sammlung.',
+  'demo.signInPrompt': 'Melden Sie sich an, um eigene Schallplatten & Bücher hinzuzufügen.',
+  'demo.leaveDemo': 'Demo verlassen',
+  'demo.readOnlyNotice': 'Dies ist die schreibgeschützte Demo-Sammlung — melden Sie sich an, um eigene hinzuzufügen.',
+  'demo.readOnlyToast': 'Die Demo-Sammlung ist schreibgeschützt.',
+  'demo.notesReadOnly': 'Notizen sind in der Demo schreibgeschützt.',
 }
 
 export default de

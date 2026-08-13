@@ -20,12 +20,17 @@ function cleanBarcode(raw) {
 // Leading toast status icons (§4.17): ✓ add / – remove / ✕ error.
 const TOAST_ICONS = { add: '✓', remove: '–', error: '✕' }
 
+// Free tier cap (mirrors PLAN_LIMITS.free in netlify/functions/_shared/plans.js).
+// The server is authoritative — this only drives the counter and disabling the
+// add UI so users aren't sent on a doomed add.
+const FREE_PLAN_CAP = 10
+
 /**
  * One full collection screen — search, scan, add, filter, sort, delete —
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, plan, isFree = false, isDemo = false, user }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   const [modal, setModal] = useState(null) // 'scan' | 'pick' | 'manual' | 'result' | 'detail'
@@ -42,6 +47,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const [activeArtist, setActiveArtist] = useState('')
   const [activeLending, setActiveLending] = useState(false) // W7: only on-loan items
   const [sortBy, setSortBy] = useState('added')
+
+  // Free tier: the counter reflects the WHOLE collection (items.length, not the
+  // filtered/visible count) and add flows are gated once the cap is reached so
+  // a free user never attempts an add the server will reject with PLAN_LIMIT.
+  const atLimit = isFree && items.length >= FREE_PLAN_CAP
 
   // Grid vs List, remembered per kind (§4.6).
   const [view, setView] = useState(() => {
@@ -192,6 +202,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }
 
   async function handleAddCandidate(candidate) {
+    // Defensive: a free user at the cap should never reach here — the FAB and
+    // empty-state entries are gated — but guard anyway so no doomed POST fires.
+    if (atLimit) {
+      showToast(t('plan.limitToast'), 'error')
+      return
+    }
     // Strip anything carried over from an already-owned item (id, dateAdded,
     // notes) so "Add anyway" creates a genuinely new entry, not a stale clone.
     const payload = { ...candidate }
@@ -203,8 +219,16 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       setModal(null)
       setScanCandidate(null)
       showToast(copy.addToast, 'add')
-    } catch {
-      showToast(t('view.couldNotSave'), 'error')
+    } catch (err) {
+      // Server branchable codes (T3): the free-tier cap and the read-only demo
+      // space get clear upgrade/sign-in prompts instead of a generic save error.
+      if (err?.code === 'PLAN_LIMIT') {
+        showToast(t('plan.limitToast'), 'error')
+      } else if (err?.code === 'DEMO_READONLY') {
+        showToast(t('demo.readOnlyToast'), 'error')
+      } else {
+        showToast(t('view.couldNotSave'), 'error')
+      }
     }
   }
 
@@ -325,6 +349,20 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   return (
     <>
+      {/* Free tier: total-items counter (items.length, not the visible count)
+          + the at-cap hint. Shown only for free-plan members — absent for
+          owner/unlimited and demo visitors. */}
+      {status === 'ready' && isFree && (
+        <div className="plan-banner" role="status">
+          <span className="plan-banner-counter">
+            {t('plan.freeCounter', { count: items.length, cap: FREE_PLAN_CAP })}
+          </span>
+          {atLimit && (
+            <span className="plan-banner-hint">{t('plan.atLimitHint', { cap: FREE_PLAN_CAP })}</span>
+          )}
+        </div>
+      )}
+
       {status === 'ready' && items.length > 0 && (
         <Toolbar
           query={query} setQuery={setQuery}
@@ -401,15 +439,15 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         )}
       </main>
 
-      {items.length > 0 && (
+      {items.length > 0 && !isDemo && (
         <>
-          {fabOpen && <div className="fab-overlay" onClick={closeFab} aria-hidden="true" />}
+          {fabOpen && !atLimit && <div className="fab-overlay" onClick={closeFab} aria-hidden="true" />}
           <div
             className="fab-menu"
             role="menu"
             aria-label={copy.fabMenu.label}
             ref={fabMenuRef}
-            hidden={!fabOpen}
+            hidden={!fabOpen || atLimit}
           >
             <button type="button" role="menuitem" className="fab-option" onClick={() => fabAction('scan')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -436,11 +474,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           <button
             ref={fabRef}
             type="button"
-            className="fab"
+            className={`fab${atLimit ? ' at-limit' : ''}`}
             aria-haspopup="menu"
             aria-expanded={fabOpen}
-            onClick={() => setFabOpen((s) => !s)}
-            aria-label={t('common.scan')}
+            aria-disabled={atLimit || undefined}
+            onClick={atLimit
+              ? () => showToast(t('plan.limitToast'), 'error')
+              : () => setFabOpen((s) => !s)}
+            aria-label={atLimit ? t('plan.limitFab') : t('common.scan')}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3" />

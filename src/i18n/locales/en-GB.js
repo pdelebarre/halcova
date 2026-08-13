@@ -306,6 +306,22 @@ const enGB = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Free plan & demo — same copy as en for the baseline
+  'plan.freeCounter': '{count} of {cap} items added',
+  'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Ask the admin to upgrade your plan to keep adding.",
+  'plan.limitToast': 'Free-plan limit reached. Ask the admin to upgrade your plan to add more.',
+  'plan.limitFab': 'Free plan full — upgrade to add more',
+  'admin.plan': 'Plan',
+  'admin.planFree': 'Free',
+  'admin.planUnlimited': 'Unlimited',
+  'demo.tryButton': 'Try the free demo',
+  'demo.banner': "You're browsing the read-only demo collection.",
+  'demo.signInPrompt': 'Sign in to add your own records & books.',
+  'demo.leaveDemo': 'Leave demo',
+  'demo.readOnlyNotice': 'This is the read-only demo collection — sign in to add your own.',
+  'demo.readOnlyToast': 'The demo collection is read-only.',
+  'demo.notesReadOnly': 'Notes are read-only in the demo.',
 }
 
 export default enGB

@@ -305,6 +305,22 @@ const it = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Piano gratuito e demo
+  'plan.freeCounter': '{count} di {cap} articoli aggiunti',
+  'plan.atLimitHint': 'Hai aggiunto {cap} articoli — il limite del piano gratuito. Chiedi all\'admin di passare al piano superiore per continuare ad aggiungere.',
+  'plan.limitToast': 'Limite del piano gratuito raggiunto. Chiedi all\'admin di passare al piano superiore per aggiungere altro.',
+  'plan.limitFab': 'Piano gratuito pieno — passa al piano superiore per aggiungere',
+  'admin.plan': 'Piano',
+  'admin.planFree': 'Gratuito',
+  'admin.planUnlimited': 'Illimitato',
+  'demo.tryButton': 'Prova la demo gratuita',
+  'demo.banner': 'Stai esplorando la collezione demo in sola lettura.',
+  'demo.signInPrompt': 'Accedi per aggiungere i tuoi dischi e libri.',
+  'demo.leaveDemo': 'Esci dalla demo',
+  'demo.readOnlyNotice': 'Questa è la collezione demo in sola lettura — accedi per aggiungere la tua.',
+  'demo.readOnlyToast': 'La collezione demo è in sola lettura.',
+  'demo.notesReadOnly': 'Le note sono in sola lettura nella demo.',
 }
 
 export default it

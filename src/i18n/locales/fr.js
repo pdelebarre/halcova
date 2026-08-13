@@ -305,6 +305,22 @@ const fr = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Plan gratuit & démo
+  'plan.freeCounter': '{count} / {cap} articles ajoutés',
+  'plan.atLimitHint': 'Vous avez ajouté {cap} articles — la limite du plan gratuit. Demandez à l\'admin de passer au plan supérieur pour continuer.',
+  'plan.limitToast': 'Limite du plan gratuit atteinte. Demandez à l\'admin de passer au plan supérieur pour ajouter plus d\'articles.',
+  'plan.limitFab': 'Plan gratuit plein — passez au plan supérieur pour ajouter',
+  'admin.plan': 'Formule',
+  'admin.planFree': 'Gratuite',
+  'admin.planUnlimited': 'Illimitée',
+  'demo.tryButton': 'Essayer la démo gratuite',
+  'demo.banner': 'Vous parcourez la collection de démonstration en lecture seule.',
+  'demo.signInPrompt': 'Connectez-vous pour ajouter vos propres disques et livres.',
+  'demo.leaveDemo': 'Quitter la démo',
+  'demo.readOnlyNotice': 'Ceci est la collection de démonstration en lecture seule — connectez-vous pour ajouter les vôtres.',
+  'demo.readOnlyToast': 'La collection de démonstration est en lecture seule.',
+  'demo.notesReadOnly': 'Les notes sont en lecture seule dans la démo.',
 }
 
 export default fr
