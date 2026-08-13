@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { t } from '../i18n'
 import './FilterSheet.css'
 
+// How many filters a saved view carries (pure — no component state needed).
+function activeCount(state) {
+  return (state?.activeFormats?.length || 0) + (state?.activeGenres?.length || 0) + (state?.activeArtist ? 1 : 0) + (state?.activeLending ? 1 : 0)
+}
+
 /**
  * Bottom-sheet filter panel (§4.4, §5.2): Format (records only) + Genre/
  * Category chips and a searchable Artist/Author combobox. Selections apply
@@ -20,16 +25,42 @@ export default function FilterSheet({
   onToggleLending,
   onClear,
   onClose,
+  savedViews = [],
+  onSaveView,
+  onApplyView,
+  onDeleteView,
+  onRenameView,
 }) {
   const sheet = copy.filterSheet || {}
   const lending = copy?.lending || {}
+  const views = copy.views || {}
   const closeRef = useRef(null)
   const comboWrapRef = useRef(null)
   const [artistQuery, setArtistQuery] = useState('')
   const [artistOpen, setArtistOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
+  const [viewName, setViewName] = useState('')
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameText, setRenameText] = useState('')
 
   const hasFilters = activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending
+
+  // Saved views (§ Phase 5): name the current filter set, apply/rename/delete.
+  function saveCurrentView() {
+    const name = viewName.trim()
+    if (!name || !hasFilters) return
+    onSaveView?.(name)
+    setViewName('')
+  }
+  function startRename(view) {
+    setRenamingId(view.id)
+    setRenameText(view.name)
+  }
+  function commitRename(id) {
+    const name = renameText.trim()
+    if (name) onRenameView?.(id, name)
+    setRenamingId(null)
+  }
 
   const filteredArtists = useMemo(() => {
     const q = artistQuery.trim().toLowerCase()
@@ -208,6 +239,52 @@ export default function FilterSheet({
               </button>
             </section>
           )}
+
+          <section className="filter-section filter-section-views">
+            <h3 className="filter-section-title">{views.title || 'Saved views'}</h3>
+            {savedViews.length === 0 && (
+              <p className="views-empty">{views.empty || 'No saved views yet.'}</p>
+            )}
+            {savedViews.map((view) => (
+              <div key={view.id} className="saved-view-row">
+                {renamingId === view.id ? (
+                  <input
+                    className="saved-view-input saved-view-name-input"
+                    value={renameText}
+                    onChange={(e) => setRenameText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename(view.id)
+                      if (e.key === 'Escape') setRenamingId(null)
+                    }}
+                    onBlur={() => commitRename(view.id)}
+                    aria-label={`${views.rename || 'Rename'}: ${view.name}`}
+                  />
+                ) : (
+                  <button type="button" className="saved-view-apply" onClick={() => onApplyView?.(view.state)}>
+                    <span className="saved-view-name">{view.name}</span>
+                    <span className="saved-view-meta">
+                      {typeof views.summary === 'function' ? views.summary(activeCount(view.state)) : `${activeCount(view.state)} filters`}
+                    </span>
+                  </button>
+                )}
+                <button type="button" className="saved-view-icon" onClick={() => startRename(view)} aria-label={`${views.rename || 'Rename'}: ${view.name}`}>✎</button>
+                <button type="button" className="saved-view-icon" onClick={() => onDeleteView?.(view.id)} aria-label={`${views.delete || 'Delete view'}: ${view.name}`}>✕</button>
+              </div>
+            ))}
+            <div className="saved-view-save">
+              <input
+                className="saved-view-input"
+                value={viewName}
+                onChange={(e) => setViewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentView() }}
+                placeholder={views.savePlaceholder || 'Name this view…'}
+                aria-label={views.savePlaceholder || 'Name this view'}
+              />
+              <button type="button" className="btn btn-ghost" onClick={saveCurrentView} disabled={!viewName.trim() || !hasFilters}>
+                {views.save || 'Save view'}
+              </button>
+            </div>
+          </section>
         </div>
 
         <div className="filter-footer sheet-actions">

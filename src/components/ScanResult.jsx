@@ -64,19 +64,34 @@ function RelatedSection({ heading, items, onOpen, moreLabel }) {
   )
 }
 
-export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArtist, onAdd, onOpenItem, onScanNext, onClose, copy, isDemo = false }) {
+export default function ScanResult({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist, onAdd, onAddToWishlist, onOwnWishlist, onOpenItem, onScanNext, onClose, copy, isDemo = false }) {
   const { artist, album } = splitArtistTitle(candidate.title)
   const [adding, setAdding] = useState(false)
+  const [wishlistAdding, setWishlistAdding] = useState(false)
   const addTimer = useRef(null)
+  const wishlistTimer = useRef(null)
 
-  useEffect(() => () => { if (addTimer.current) clearTimeout(addTimer.current) }, [])
+  useEffect(() => {
+    return () => {
+      if (addTimer.current) clearTimeout(addTimer.current)
+      if (wishlistTimer.current) clearTimeout(wishlistTimer.current)
+    }
+  }, [])
 
   let banner = { tone: 'good', ...copy.resultGood }
   if (ownedExact) {
     banner = { tone: 'owned', ...copy.resultOwned }
+  } else if (wishlistExact) {
+    banner = { tone: 'owned', ...(copy.wishlist?.resultWishlisted || { label: 'In your wishlist' }) }
   } else if (sameAlbum.length > 0) {
     banner = { tone: 'caution', ...copy.resultSame }
   }
+
+  // Primary action label: owned → "Add anyway"; wishlisted → "Own it"
+  // (convert); otherwise the plain add.
+  let primaryLabel = copy.add || t('catalog.add', { collectionLabel: '' })
+  if (ownedExact) primaryLabel = copy.addAnyway || t('catalog.addAnyway')
+  else if (wishlistExact) primaryLabel = copy.wishlist?.ownIt || 'Own it'
 
   // On add: brief spinning-disc "Added" state (~0.8s) with a haptic + visual
   // pulse, then the parent's add() runs and fires the toast (§4.10, §6).
@@ -87,6 +102,27 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
     addTimer.current = setTimeout(() => {
       setAdding(false)
       onAdd(candidate)
+    }, 800)
+  }
+
+  // Same pulse for "Add to wishlist" (a want) and "Own it" (convert).
+  function handleWishlistAdd() {
+    if (wishlistAdding) return
+    setWishlistAdding(true)
+    navigator.vibrate?.(20)
+    wishlistTimer.current = setTimeout(() => {
+      setWishlistAdding(false)
+      onAddToWishlist(candidate)
+    }, 800)
+  }
+
+  function handleOwn() {
+    if (adding) return
+    setAdding(true)
+    navigator.vibrate?.(30)
+    addTimer.current = setTimeout(() => {
+      setAdding(false)
+      onOwnWishlist?.(candidate)
     }, 800)
   }
 
@@ -147,22 +183,38 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
             // notice pointing visitors at signing in with their own account.
             <p className="demo-readonly-notice">{t('demo.readOnlyNotice')}</p>
           ) : (
-            <button
-              type="button"
-              className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
-              onClick={handleAdd}
-              disabled={adding}
-              aria-busy={adding}
-            >
-              {adding ? (
-                <>
-                  <span className="add-disc" aria-hidden="true" />
-                  {copy.addDone || t('catalog.addDone')}
-                </>
-              ) : (
-                <>{ownedExact ? (copy.addAnyway || t('catalog.addAnyway')) : (copy.add || t('catalog.add', { collectionLabel: '' }))}</>
+            <>
+              {!ownedExact && !wishlistExact && (
+                <button
+                  type="button"
+                  className={`btn btn-ghost btn-wishlist${wishlistAdding ? ' adding' : ''}`}
+                  onClick={handleWishlistAdd}
+                  disabled={wishlistAdding}
+                  aria-busy={wishlistAdding}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20s-7-4.5-9.2-8.6C1.2 8.4 2.9 5 6.4 5c2 0 3.2 1.2 3.6 1.8C10.4 5 13 4.4 15 5.6 17 7 18 10 16.4 12.4 15.2 14.2 12 20 12 20z" />
+                  </svg>
+                  {copy.wishlist?.addToWishlist || 'Add to wishlist'}
+                </button>
               )}
-            </button>
+              <button
+                type="button"
+                className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
+                onClick={wishlistExact ? handleOwn : handleAdd}
+                disabled={adding}
+                aria-busy={adding}
+              >
+                {adding ? (
+                  <>
+                    <span className="add-disc" aria-hidden="true" />
+                    {copy.addDone || t('catalog.addDone')}
+                  </>
+                ) : (
+                  primaryLabel
+                )}
+              </button>
+            </>
           )}
         </div>
       </div>

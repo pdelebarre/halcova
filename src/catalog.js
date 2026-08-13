@@ -99,6 +99,21 @@ export const recordsCatalog = {
       pinnedToast: 'Pinned to your picks',
       unpinnedToast: 'Removed from your picks',
     },
+    // Wishlist (§ Fix): a list of UNOWNED wants (e.g. scanned in a shop).
+    // Not part of the owned crate until the user converts it.
+    wishlist: {
+      button: 'Wishlist',
+      title: 'Your wishlist',
+      empty: 'Your wishlist is empty — scan something in a shop and add it here.',
+      addToCrate: 'Add to crate',
+      addToCrateToast: 'Added to your crate',
+      remove: 'Remove from wishlist',
+      removeToast: 'Removed from your wishlist',
+      ownIt: 'Own it',
+      addedToast: 'Added to your wishlist',
+      addToWishlist: 'Add to wishlist',
+      resultWishlisted: { label: 'In your wishlist', sub: 'Add it to your crate when you own it.' },
+    },
     browse: {
       label: 'Browse',
       title: 'Browse your crate',
@@ -112,6 +127,23 @@ export const recordsCatalog = {
       clearRecent: 'Clear recent',
       didYouMeanPrefix: 'Did you mean',
       done: 'Done',
+    },
+    stats: {
+      button: 'Stats',
+      title: 'Your crate, by the numbers',
+      total: (n) => `${n} ${n === 1 ? 'item' : 'items'}`,
+      byGenre: 'By genre',
+      byDecade: 'By decade',
+      empty: 'Nothing to count yet — add some items first.',
+    },
+    views: {
+      title: 'Saved views',
+      savePlaceholder: 'Name this view…',
+      save: 'Save view',
+      rename: 'Rename',
+      delete: 'Delete view',
+      empty: 'No saved views yet.',
+      summary: (n) => `${n} ${n === 1 ? 'filter' : 'filters'}`,
     },
     lending: {
       section: t('lending.section'),
@@ -249,6 +281,21 @@ export const booksCatalog = {
       unpin: 'Unpin',
       pinnedToast: 'Pinned to your picks',
       unpinnedToast: 'Removed from your picks',
+    },
+    // Wishlist (§ Fix): a list of UNOWNED wants (e.g. scanned in a shop).
+    // Not part of the owned shelf until the user converts it.
+    wishlist: {
+      button: 'Wishlist',
+      title: 'Your wishlist',
+      empty: 'Your wishlist is empty — scan something in a shop and add it here.',
+      addToCrate: 'Add to shelf',
+      addToCrateToast: 'Added to your shelf',
+      remove: 'Remove from wishlist',
+      removeToast: 'Removed from your wishlist',
+      ownIt: 'Own it',
+      addedToast: 'Added to your wishlist',
+      addToWishlist: 'Add to wishlist',
+      resultWishlisted: { label: 'On your wishlist', sub: 'Add it to your shelf when you own it.' },
     },
     browse: {
       label: 'Browse',

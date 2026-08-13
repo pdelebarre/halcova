@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { binCounts, decadeOf, itemInBin } from './browse'
+import { binCounts, countBy, decadeOf, itemInBin } from './browse'
 
 describe('decadeOf', () => {
   it('buckets a year into its decade', () => {
@@ -45,5 +45,25 @@ describe('itemInBin', () => {
   it('matches an item whose axis value includes the bin', () => {
     expect(itemInBin({ artist: 'Nina Simone' }, artistAxis, 'Nina Simone')).toBe(true)
     expect(itemInBin({ artist: 'Miles Davis' }, artistAxis, 'Nina Simone')).toBe(false)
+  })
+})
+
+describe('countBy', () => {
+  it('counts values, sorted by count desc then label', () => {
+    const items = [
+      { genre: ['Rock', 'Jazz'] },
+      { genre: ['Rock'] },
+      { genre: ['Jazz'] },
+      { genre: ['Funk'] },
+    ]
+    expect(countBy(items, (it) => it.genre || [])).toEqual([
+      { label: 'Jazz', count: 2 },
+      { label: 'Rock', count: 2 },
+      { label: 'Funk', count: 1 },
+    ])
+  })
+
+  it('skips blank values', () => {
+    expect(countBy([{ genre: ['', '  '] }], (it) => it.genre || [])).toEqual([])
   })
 })

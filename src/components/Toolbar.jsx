@@ -40,6 +40,16 @@ export default function Toolbar({
   onSearchFocus,
   onSearchBlur,
   onSearchCommit,
+  onOpenStats,
+  statsOpen = false,
+  onOpenWishlist,
+  wishlistOpen = false,
+  wishlistCount = 0,
+  savedViews = [],
+  onSaveView,
+  onApplyView,
+  onDeleteView,
+  onRenameView,
   minimal = false,
 }) {
   const scrolled = useScrolled()
@@ -219,6 +229,35 @@ export default function Toolbar({
         </svg>
       </button>
 
+      <button
+        type="button"
+        className="toolbar-btn stats-btn"
+        onClick={onOpenStats}
+        aria-haspopup="dialog"
+        aria-expanded={statsOpen}
+        aria-label={copy.stats?.button || 'Stats'}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 20V10M10 20V4M16 20v-6M22 20H2" />
+        </svg>
+      </button>
+
+      {/* Wishlist (§ Fix): UNOWNED wants — opens the Wishlist sheet, with a
+          badge when there are items to convert to owned. */}
+      <button
+        type="button"
+        className="toolbar-btn wishlist-btn"
+        onClick={onOpenWishlist}
+        aria-haspopup="dialog"
+        aria-expanded={wishlistOpen}
+        aria-label={copy.wishlist?.button || 'Wishlist'}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 20s-7-4.5-9.2-8.6C1.2 8.4 2.9 5 6.4 5c2 0 3.2 1.2 3.6 1.8C10.4 5 13 4.4 15 5.6 17 7 18 10 16.4 12.4 15.2 14.2 12 20 12 20z" />
+        </svg>
+        {wishlistCount > 0 && <span className="filter-badge">{wishlistCount}</span>}
+      </button>
+
       {/* W7: global loans dashboard — only when lending is enabled. */}
       {renderLoansButton()}
 
@@ -277,6 +316,11 @@ export default function Toolbar({
           onToggleLending={onToggleLending}
           onClear={onResetFilters || onClearFilters}
           onClose={closeSheet}
+          savedViews={savedViews}
+          onSaveView={onSaveView}
+          onApplyView={onApplyView}
+          onDeleteView={onDeleteView}
+          onRenameView={onRenameView}
         />
       )}
 

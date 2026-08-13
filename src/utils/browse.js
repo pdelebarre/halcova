@@ -31,3 +31,21 @@ export function binCounts(items, axis) {
 export function itemInBin(item, axis, value) {
   return axis.value(item).includes(value)
 }
+
+/**
+ * Count the values returned by `getValues(item)` across items, sorted by
+ * count descending (ties broken alphabetically). Used by the stats dashboard
+ * (§ Phase 5).
+ */
+export function countBy(items, getValues) {
+  const counts = new Map()
+  for (const item of items) {
+    for (const v of getValues(item)) {
+      if (v == null || String(v).trim() === '') continue
+      counts.set(v, (counts.get(v) || 0) + 1)
+    }
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || String(a.label).localeCompare(String(b.label)))
+}

@@ -13,19 +13,23 @@ function normalize(s) {
 /**
  * Given a scanned/looked-up candidate release, figure out:
  * - ownedExact: this precise release (same Discogs release, or same barcode) is already in the crate
+ * - wishlistExact: this precise release is already in the user's wishlist (a "want", not owned)
  * - sameAlbum: this album is owned under a different pressing/format
  * - otherArtist: other, different albums by the same artist already in the crate
  */
-export function findRelated(candidate, items) {
-  const ownedExact = items.find((it) => {
+export function findRelated(candidate, items, wishlist = []) {
+  const findExact = (list) => list.find((it) => {
     if (candidate.discogsId && it.discogsId && it.discogsId === candidate.discogsId) return true
     if (candidate.googleBooksId && it.googleBooksId && it.googleBooksId === candidate.googleBooksId) return true
     if (candidate.barcode && it.barcode && it.barcode === candidate.barcode) return true
     return false
   }) || null
 
+  const ownedExact = findExact(items)
+  const wishlistExact = findExact(wishlist)
+
   const { artist, album } = splitArtistTitle(candidate.title)
-  if (!artist) return { ownedExact, sameAlbum: [], otherArtist: [] }
+  if (!artist) return { ownedExact, wishlistExact, sameAlbum: [], otherArtist: [] }
 
   const artistLower = normalize(artist)
   const albumLower = normalize(album)
@@ -39,7 +43,7 @@ export function findRelated(candidate, items) {
   const sameAlbumIds = new Set(sameAlbum.map((it) => it.id))
   const otherArtist = byArtist.filter((it) => !sameAlbumIds.has(it.id))
 
-  return { ownedExact, sameAlbum, otherArtist }
+  return { ownedExact, wishlistExact, sameAlbum, otherArtist }
 }
 
 // ============================================================================
