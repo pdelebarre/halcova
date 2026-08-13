@@ -99,7 +99,7 @@ Two boundaries matter:
 │   ├── auth.js                    # Request access / sign in / session validation
 │   ├── admin.js                   # Admin API (approve requests, manage members)
 │   ├── discogs.js                 # Discogs lookup proxy (single server-side token + shared cache)
-│   ├── books.js                   # Google Books lookup proxy (shared cache, no token)
+│   ├── books.js                   # Google Books lookup proxy (shared cache, optional API key)
 │   └── _shared/                   # auth.js + users.js helpers (bundled, not deployed)
 └── src/
     ├── main.jsx                   # React root + shared CSS
@@ -184,7 +184,7 @@ by Netlify Blobs (no database to provision):
 | `netlify/functions/auth.js` | Request access, sign in, validate session | none / bearer for `me` |
 | `netlify/functions/admin.js` | Admin panel: approve requests, manage members | `Authorization: Bearer <admin key>` |
 | `netlify/functions/discogs.js` | Discogs lookup proxy (single server-side token, shared cache) | `Authorization: Bearer <access code>` |
-| `netlify/functions/books.js` | Google Books lookup proxy (shared cache, no token) | `Authorization: Bearer <access code>` |
+| `netlify/functions/books.js` | Google Books lookup proxy (shared cache, optional API key) | `Authorization: Bearer <access code>` |
 
 Shared helpers live in `netlify/functions/_shared/` (`auth.js`: admin key,
 bearer parsing, `publicUser`, code generation; `users.js`: identity store CRUD
@@ -333,8 +333,10 @@ chip/select filters.
   `LP/EP/CD/7"/12"/Other` from the raw format array.
 - **`api/books.js`** — calls the `books` function proxy
   (`/.netlify/functions/books`) with the access code as Bearer; the proxy hits
-  the public Google Books `v1` endpoints and serves from the shared
-  `books-cache` blob store. This module normalizes the returned volumes into
+  the public Google Books `v1` endpoints (optionally with the server-side
+  `RUNOUT_GOOGLE_BOOKS_API_KEY`, plus a transient retry on 429/5xx/network
+  errors) and serves from the shared `books-cache` blob store. This module
+  normalizes the returned volumes into
   the shared item shape, upgrades thumbnail URLs `http → https`
   (mixed-content), and reduces published dates to the year.
 - **`api/collection.js`** — thin `fetch` wrapper around the Netlify Function;
@@ -505,8 +507,17 @@ already-owned barcodes still match from local state.
   the `netlify/functions/books.js` proxy, which appends `country=US` for
   region-appropriate results and caches responses in the shared `books-cache`
   Blob store.
-- Auth: none on Google's side (public API); the proxy uses the same Bearer
-  access-code contract as every other function.
+- Auth: none on Google's side by default (public API) — but setting a
+  server-side `RUNOUT_GOOGLE_BOOKS_API_KEY` is recommended. Keyless requests
+  are quota'd per-IP, and Netlify Functions egress from shared IP pools, so the
+  per-IP quota is exhausted constantly and Google returns `429` → the proxy
+  surfaces `RATE_LIMIT`. With the key set, the proxy appends `key=<key>` to
+  the outbound request (never exposed to the browser), attributing quota to
+  the project (a per-project quota, default ~1000 requests/100s, raiseable in
+  the Google Cloud console). The proxy also retries transient failures
+  (429/5xx/network errors) once with a short backoff before surfacing
+  `RATE_LIMIT`/`HTTP_ERROR`. Caller auth stays the same Bearer access-code
+  contract as every other function.
 
 ---
 
@@ -538,11 +549,14 @@ already-owned barcodes still match from local state.
   the owner signs in with it (see `netlify/functions/_shared/auth.js` for the
   dev fallback). Never commit or log it.
 - **Set `RUNOUT_DISCOGS_TOKEN`** too — the `discogs` lookup proxy reads it
-  server-side; without it record lookups fail with `SERVER_NO_TOKEN`. Books
-  need no token.
+  server-side; without it record lookups fail with `SERVER_NO_TOKEN`.
+- **Set `RUNOUT_GOOGLE_BOOKS_API_KEY`** (optional but recommended) — the
+  `books` lookup proxy appends it to outbound Google Books requests; without
+  it book lookups still work but are keyless and get 429'd against the shared
+  Netlify egress IP under load.
 
 Deployment options are covered in the
-[README](../README.md#2-deploy-to-netlify): Netlify CLI, drag-and-drop (note:
+[README](../README.md#3-deploy-to-netlify): Netlify CLI, drag-and-drop (note:
 skips functions), or Git-connected import.
 
 ---
@@ -564,6 +578,9 @@ skips functions), or Git-connected import.
   at this scale (rotate codes by deleting + recreating a member if needed).
 - The **Discogs token is server-only** — the single `RUNOUT_DISCOGS_TOKEN` env
   var lives on the `discogs` lookup proxy and never reaches the browser.
+- The **Google Books API key is server-only too** — `RUNOUT_GOOGLE_BOOKS_API_KEY`
+  lives on the `books` lookup proxy, is appended to the outbound request
+  server-side, and never reaches the browser.
 - Users never bring or paste tokens — there is no token field in the Settings
   modal (the old per-user token storage is gone).
 - All lookups go through the Netlify function proxies and are cached in shared
