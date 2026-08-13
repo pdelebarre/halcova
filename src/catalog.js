@@ -79,7 +79,22 @@ export const recordsCatalog = {
     scanNext: 'Scan next',
     add: 'Add to crate',
     manualTitleRequired: 'Add a title — give this record a name first.',
-    fabMenu: { label: 'Add options', scan: 'Scan barcode', searchTitle: 'Search by title', manual: 'Enter manually' },
+    fabMenu: { label: 'Add options', scan: 'Scan barcode', searchTitle: 'Search by title', manual: 'Enter manually', scanCover: 'Scan cover' },
+    // Cover OCR (§ cover-scan-ocr): photograph a sleeve with no readable
+    // barcode and read the artist/title off it on-device.
+    coverScan: {
+      title: 'Scan a cover',
+      help: 'Frame the front of the cover so the artist and title are readable.',
+      capture: 'Capture',
+      choosePhoto: 'Choose a photo',
+      retake: 'Retake',
+      identifying: 'Reading the cover…',
+      noText: "Couldn't read the cover — try a clearer photo or enter the details manually.",
+      searching: 'Looking it up…',
+      timedOut: 'Reading the cover took too long — try again or pick a different photo.',
+      error: 'Something went wrong with the camera or photo.',
+      close: 'Cancel cover scan',
+    },
     filterSheet: {
       artist: 'Artist',
       noArtists: 'No matching artists',
@@ -262,7 +277,22 @@ export const booksCatalog = {
     scanNext: 'Scan next',
     add: 'Add to shelf',
     manualTitleRequired: 'Add a title — give this book a name first.',
-    fabMenu: { label: 'Add options', scan: 'Scan barcode', searchTitle: 'Search by title', manual: 'Enter manually' },
+    fabMenu: { label: 'Add options', scan: 'Scan barcode', searchTitle: 'Search by title', manual: 'Enter manually', scanCover: 'Scan cover' },
+    // Cover OCR (§ cover-scan-ocr): photograph a jacket with no readable ISBN
+    // and read the title/author off it on-device.
+    coverScan: {
+      title: 'Scan a cover',
+      help: 'Frame the front of the cover so the title and author are readable.',
+      capture: 'Capture',
+      choosePhoto: 'Choose a photo',
+      retake: 'Retake',
+      identifying: 'Reading the cover…',
+      noText: "Couldn't read the cover — try a clearer photo or enter the details manually.",
+      searching: 'Looking it up…',
+      timedOut: 'Reading the cover took too long — try again or pick a different photo.',
+      error: 'Something went wrong with the camera or photo.',
+      close: 'Cancel cover scan',
+    },
     filterSheet: {
       artist: 'Author',
       noArtists: 'No matching authors',

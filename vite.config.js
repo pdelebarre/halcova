@@ -33,7 +33,13 @@ export default defineConfig({
       workbox: {
         // woff2/woff added so the self-hosted @fontsource faces are precached
         // (offline-complete shell, phase 0). wasm must stay for the scanner.
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,wasm,woff2,woff}'],
+        // gz added for the OCR traineddata (Tesseract lang data) so cover
+        // scanning works offline once the worker has loaded once.
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,wasm,gz,woff2,woff}'],
+        // The OCR core (3.9 MB wasm.js) and English traineddata (10.9 MB gz)
+        // blow past workbox's default 2 MiB precache cap — raise it so cover
+        // scanning is fully available offline.
+        maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         runtimeCaching: [
           {
             // Lookups go through the Netlify function proxies (the server-side

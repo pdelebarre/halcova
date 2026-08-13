@@ -11,6 +11,7 @@ import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
 import { useCollection } from './hooks/useCollection'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
+import { extractSearchQuery } from './utils/ocrText'
 import { itemInBin } from './utils/browse'
 import { t, getLocale } from './i18n'
 import './App.css'
@@ -18,6 +19,9 @@ import './App.css'
 // The WASM barcode decoder is heavy — only worth loading once the person
 // actually taps "Scan", not on first paint.
 const ScannerModal = lazy(() => import('./components/ScannerModal'))
+// Cover OCR is heavier still (Tesseract wasm + traineddata), so the capture
+// modal is also lazy — it only loads when someone actually scans a cover.
+const CoverScanModal = lazy(() => import('./components/CoverScanModal'))
 
 function cleanBarcode(raw) {
   return String(raw).replace(/[^0-9Xx]/g, '')
@@ -60,8 +64,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const ownedItems = useMemo(() => items.filter((it) => !it.wishlist), [items])
   const wishlistItems = useMemo(() => items.filter((it) => it.wishlist), [items])
 
-  const [modal, setModal] = useState(null) // 'scan' | 'pick' | 'manual' | 'result' | 'detail'
+  const [modal, setModal] = useState(null) // 'scan' | 'cover' | 'pick' | 'manual' | 'result' | 'detail'
   const [pickerState, setPickerState] = useState({ matches: null, loading: false, errorMsg: '' })
+  // Cover OCR progress lives INSIDE the cover modal ("Reading the cover…" /
+  // error with retry), so the modal stays mounted until OCR + lookup resolve
+  // and a failure is shown in the cover flow, never a blank picker.
+  const [coverState, setCoverState] = useState({ busy: false, error: '' })
   const [scanCandidate, setScanCandidate] = useState(null) // { candidate, ownedExact, wishlistExact, sameAlbum, otherArtist }
   const [selectedItem, setSelectedItem] = useState(null)
   const [toast, setToast] = useState(null) // { msg, kind: 'add' | 'remove' | 'error' }
@@ -454,6 +462,9 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // search, manual entry) funnels through here before anything gets added.
   // `wishlistExact` lets the scan result offer "Own it" for an existing want.
   function presentCandidate(candidate) {
+    // Defensive: a malformed candidate must never crash the result sheet (no
+    // error boundary — a render throw unmounts to the dark screen).
+    if (!candidate || typeof candidate !== 'object') return
     const { ownedExact, wishlistExact, sameAlbum, otherArtist } = findRelated(candidate, ownedItems, wishlistItems)
     setScanCandidate({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist })
     setModal('result')
@@ -486,6 +497,60 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         return
       }
       setPickerState({ matches: [], loading: false, errorMsg: err.message })
+    }
+  }
+
+  // Cover OCR (§ cover-scan-ocr): read artist/title (or a visible barcode) off
+  // a photo of the cover with on-device Tesseract, then funnel whatever we get
+  // through the SAME duplicate-checked add path as a barcode scan. The modal
+  // stays open on a visible "Reading the cover…" progress (`coverState.busy`)
+  // while OCR + lookup run; on success it switches to the picker/result, on
+  // failure the error is shown INSIDE the cover flow (retry / re-pick). Must
+  // never crash on empty/weird OCR output — there's no error boundary.
+  async function handleCoverCaptured(blob) {
+    setCoverState({ busy: true, error: '' })
+    try {
+      const { recognizeImage } = await import('./utils/ocr')
+      const { lines } = await recognizeImage(blob)
+      const { query, barcode } = extractSearchQuery(lines, catalog.kind)
+      let results = null
+      if (barcode) {
+        results = await catalog.api.searchByBarcode(barcode)
+      } else if (query) {
+        results = await catalog.api.searchByText(query)
+      }
+      // Nothing readable on the cover — surface a friendly hint instead of
+      // fabricating a search. Stays inside the cover flow.
+      if (results === null) {
+        throw new Error(copy.coverScan?.noText || t('coverScan.noText'))
+      }
+      const safeResults = Array.isArray(results) ? results : []
+      setCoverState({ busy: false, error: '' })
+      if (safeResults.length === 0) {
+        setModal('pick')
+        setPickerState({ matches: [], loading: false, errorMsg: '' })
+      } else if (safeResults.length === 1 && safeResults[0] && typeof safeResults[0] === 'object') {
+        presentCandidate(safeResults[0])
+      } else {
+        setModal('pick')
+        setPickerState({ matches: safeResults, loading: false, errorMsg: '' })
+      }
+    } catch (err) {
+      if (err.code === 'SERVER_NO_TOKEN') {
+        onRequestSettings()
+        showToast(`${catalog.lookupName} ${t('view.lookupsNotConfigured', { lookupName: catalog.lookupName })}`, 'error')
+        setCoverState({ busy: false, error: '' })
+        setModal(null)
+        return
+      }
+      // OCR or lookup failure: surface the error inside the cover flow so the
+      // user can retry / pick a photo again — never a blank picker.
+      setCoverState({
+        busy: false,
+        error: err?.code === 'OCR_TIMEOUT'
+          ? (copy.coverScan?.timedOut || t('coverScan.timedOut'))
+          : (err?.message || copy.coverScan?.error || t('coverScan.error')),
+      })
     }
   }
 
@@ -591,8 +656,18 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     fabRef.current?.focus()
   }
 
+  // Opening the cover flow always starts from a clean (non-busy) state.
+  function openCoverScan() {
+    setCoverState({ busy: false, error: '' })
+    setModal('cover')
+  }
+
   function fabAction(m) {
     setFabOpen(false)
+    if (m === 'cover') {
+      openCoverScan()
+      return
+    }
     setModal(m)
   }
 
@@ -748,6 +823,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           <EmptyState
             copy={copy}
             onScan={isDemo ? undefined : () => setModal('scan')}
+            onScanCover={isDemo ? undefined : openCoverScan}
             onManualAdd={isDemo ? undefined : () => setModal('manual')}
           />
         )}
@@ -874,6 +950,13 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
               </svg>
               {copy.fabMenu.scan}
             </button>
+            <button type="button" role="menuitem" className="fab-option" onClick={() => fabAction('cover')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              {copy.fabMenu.scanCover}
+            </button>
             <button type="button" role="menuitem" className="fab-option" onClick={() => fabAction('manual')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
@@ -933,6 +1016,18 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       {modal === 'scan' && (
         <Suspense fallback={<div className="scanner-loading">Starting camera…</div>}>
           <ScannerModal onDetected={handleBarcodeDetected} onClose={handleScannerClose} />
+        </Suspense>
+      )}
+
+      {modal === 'cover' && (
+        <Suspense fallback={<div className="scanner-loading">Starting camera…</div>}>
+          <CoverScanModal
+            copy={copy}
+            onCaptured={handleCoverCaptured}
+            onClose={() => { setModal(null); setCoverState({ busy: false, error: '' }) }}
+            busy={coverState.busy}
+            busyError={coverState.error}
+          />
         </Suspense>
       )}
 

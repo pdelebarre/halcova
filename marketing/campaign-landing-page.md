@@ -13,6 +13,11 @@ F-02, Google Books F-03, duplicate detection F-07, crate/shelf F-08–F-13,
 notes F-15, request access F-21, per-member plans F-24, PWA F-19/F-20). No
 invented features, metrics, pricing, or testimonials.
 
+**Benefits-first & humor layer:** say the feature once, sell the benefit three
+times (benefit bank: `review-benefits-humor.md` §4). Humor is wry and
+self-deprecating, collector-culture — situational jokes only; no puns without
+a native pass (voice guide: `review-benefits-humor.md` §5).
+
 **Do-not-say (always):** no access codes (`RU-…`), no admin/approval
 internals, no app-store/pricing claims, no fake testimonials or counts. Public
 version of the multi-user flow: *"family and friends can join and keep their
@@ -43,7 +48,7 @@ own private crate and shelf."*
 - **Sub:** Your records and books, in their own halcova.
 - **CTA button:** Request access → (scrolls to §2.6 / opens the request-access form)
 
-### 2.2 The pain (why people stop and read)
+### 2.2 The pain → the payoff (why people stop and read)
 **Heading:** You've bought this record twice. Be honest.
 
 > The one you pulled off the shelf at the record fair, held up, squinted at —
@@ -52,7 +57,8 @@ own private crate and shelf."*
 > And the book: "Do I own this?" → bought it to be safe → it was on your shelf
 > the whole time.
 >
-> Halcova is the thing I built for people like us.
+> Halcova is the thing I built for people like us. It won't judge your crate.
+> It will just finally tell you what's in it.
 
 ### 2.3 How it works (3 steps)
 1. **Scan.** Point your camera at a barcode — the EAN/UPC on a sleeve or the
@@ -64,50 +70,56 @@ own private crate and shelf."*
 **And the best part:** Halcova remembers what you already own. Before you add
 something it tells you whether it's *already in your crate*, a *different
 pressing*, or *more by the same artist* — so the "I think I have this" moment
-at the used store disappears.
+at the used store disappears. Consider it your wallet's new best friend.
 
-### 2.4 About / features (from `copy-kit-halcova.md` §4)
+### 2.4 About — what it does FOR you (from `copy-kit-halcova.md` §4)
 **Halcova** is for people whose record crate and bookshelf refuse to stay small.
 
-Point your phone at a barcode — the EAN/UPC on a sleeve or the ISBN on a cover —
-and Halcova identifies the release or edition instantly. Records come from
-Discogs, books from Google Books, so every entry is the real thing with real
-metadata: artist, title, year, label or publisher, genre, tracklist or
-description.
+**You'll finally know what you own.** Point your phone at a barcode — the
+EAN/UPC on a sleeve or the ISBN on a cover — and Halcova identifies the release
+or edition instantly. Records come from Discogs, books from Google Books, so
+every entry is the real thing with real metadata: artist, title, year, label or
+publisher, genre, tracklist or description. Catalog a whole crate in an
+afternoon — not a weekend, and definitely not the spreadsheet you gave up on in
+2017.
 
-Halcova remembers what you already own. Before you add something, it tells you
-whether you have the exact release, another pressing of the same album, or
-other work by the same artist — so the used-store "I think I have this" moment
-disappears.
+**You'll stop buying things twice.** Halcova remembers what you already own.
+Before you add something, it tells you whether you have the exact release,
+another pressing of the same album, or other work by the same artist — so the
+used-store "I think I have this" moment disappears. Consider it your wallet's
+new best friend.
 
-Your collection is organized the way you think about it: **your crate** for
-records, **your shelf** for books, in one cozy place. Search, filter, and sort
-either one in a tap; add notes on the spot; remove anything with a couple of
-taps.
+**Your two loves, one cozy place.** Your collection is organized the way you
+think about it: **your crate** for records, **your shelf** for books, in one
+place. Search, filter, and sort either one in a tap; add notes on the spot;
+remove anything with a couple of taps.
 
-Halcova was built to be shared. Family and friends can join and keep their own
-private crate and shelf — no passwords, no app-store downloads. Everything is
-stored server-side, so clearing your browser or switching phones doesn't lose a
-single record.
+**Built to be shared.** Family and friends can join and keep their own private
+crate and shelf — no passwords, no app-store downloads. (Your records stay
+yours, even if your sibling has "borrowed" a few.) Everything is stored
+server-side, so clearing your browser or switching phones doesn't lose a single
+record.
 
-It runs entirely in your browser and installs to your home screen like a native
-app, opening instantly even on a flaky connection.
+**Nothing to download, nothing to update.** It runs entirely in your browser and
+installs to your home screen like a native app, opening instantly even on a
+flaky connection — and skipping the "update available" tantrums for good.
 
 **Two loves. One halcova.**
 
-### 2.5 Feature chips (quick-scan row)
-- Scan to catalog (EAN/UPC · ISBN)
-- Never double-buy
-- Your crate + your shelf, one app
-- Search · filter · sort · notes
+### 2.5 Benefit chips (quick-scan row — benefits, not features)
+- Catalog a crate or shelf in an afternoon
+- Never rebuy what you already own
+- Your crate + your shelf, one cozy place
+- Find anything in a tap · add notes
 - Family & friends, each their own space
-- Runs in your browser · installs to home screen
+- Nothing to download · nothing to update
 
 ### 2.6 Access — the CTA
 **Heading:** It's open. Request access.
 
 > Halcova opens in waves. Request access and we'll set you up with your own
-> crate and shelf — records, books, or both.
+> crate and shelf — records, books, or both. (No more squinting at your own
+> shelf asking "do I have this?" — from now on, you'll know.)
 
 - **Form (the app's real request-access flow, F-21):** Name · Email →
   **Request access**
@@ -131,7 +143,7 @@ app, opening instantly even on a flaky connection.
 > source apart (funnel in §7 of the master plan).
 
 **Generic pattern**
-`[HALCOVA-URL]/?utm_source=<x|instagram|facebook|whatsapp>&utm_medium=<social|status|chat>&utm_campaign=halcova-launch-2026&utm_content=<asset>`
+`[HALCOVA-URL]/?utm_source=<x|instagram|facebook|whatsapp|youtube>&utm_medium=<social|status|chat>&utm_campaign=halcova-launch-2026&utm_content=<asset>`
 
 ### Links for the Phase 4 "Open" (Day 14)
 | Where | Full link (paste-ready) |
@@ -146,6 +158,9 @@ app, opening instantly even on a flaky connection.
 | **WhatsApp — 1:1 invite** | `[HALCOVA-URL]/?utm_source=whatsapp&utm_medium=chat&utm_campaign=halcova-launch-2026&utm_content=invite` |
 | **WhatsApp — status** | `[HALCOVA-URL]/?utm_source=whatsapp&utm_medium=status&utm_campaign=halcova-launch-2026&utm_content=status-open` |
 | **WhatsApp — nudge** | `[HALCOVA-URL]/?utm_source=whatsapp&utm_medium=chat&utm_campaign=halcova-launch-2026&utm_content=nudge` |
+| **YouTube — channel page** | `[HALCOVA-URL]/?utm_source=youtube&utm_medium=social&utm_campaign=halcova-launch-2026&utm_content=channel-page` |
+| **YouTube — V11 open Short** | `[HALCOVA-URL]/?utm_source=youtube&utm_medium=social&utm_campaign=halcova-launch-2026&utm_content=v11-open` |
+| **YouTube — "How it works" long-form** | `[HALCOVA-URL]/?utm_source=youtube&utm_medium=social&utm_campaign=halcova-launch-2026&utm_content=how-it-works` |
 
 ### Also used earlier (Phase 3, pre-open — same pattern)
 | Where | `utm_content` to use |
@@ -154,6 +169,9 @@ app, opening instantly even on a flaky connection.
 | Reveal reel (IG, V7) | `v7-reveal` |
 | Demo reel (IG, V8/V9/V10) | `v8-demo` / `v9-demo` / `v10-never-rebuy` |
 | Challenge (Day 15+) | `v12-challenge` |
+| YouTube — V7 reveal Short | `v7-reveal` |
+| YouTube — demo Shorts (V8/V9/V10) | `v8-demo` / `v9-demo` / `v10-never-rebuy` |
+| YouTube — "Meet Halcova" long-form | `meet-halcova` |
 
 ### Notes
 - **One link per post, one `utm_content` per post.** Don't reuse the same link

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Runout OCR browser check</title>
+</head>
+<body>
+  <pre id="out">starting…</pre>
+  <script type="module">
+    // Browser verification harness for the REAL cover-OCR path. Imports the
+    // actual production chunk (built from src/utils/ocr.js) and drives
+    // recognizeImage() on a canvas-generated cover — the worker script, the
+    // embedded-wasm core, and /tessdata/eng.traineddata.gz are all served from
+    // this same origin, exactly as deployed. Written for headless Chromium:
+    // --headless=new --dump-dom, then grep for OCR_RESULT / OCR_FAILED.
+    import { recognizeImage } from '/assets/ocr-BDNZduny.js'
+
+    const out = document.getElementById('out')
+    const log = (...a) => { out.textContent += '\n' + a.join(' ') }
+
+    function renderCoverText() {
+      return new Promise((resolve) => {
+        const c = document.createElement('canvas')
+        c.width = 800
+        c.height = 600
+        const ctx = c.getContext('2d')
+        ctx.fillStyle = '#16130F'
+        ctx.fillRect(0, 0, 800, 600)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.font = 'bold 96px Arial, Helvetica, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('Miles Davis', 400, 280)
+        ctx.fillStyle = '#C9A227'
+        ctx.font = '56px Arial, Helvetica, sans-serif'
+        ctx.fillText('Kind of Blue', 400, 380)
+        c.toBlob(resolve, 'image/jpeg', 0.9)
+      })
+    }
+
+    try {
+      log('env ok, importing production ocr chunk…')
+      const blob = await renderCoverText()
+      log('cover blob bytes:', blob.size)
+      const t0 = performance.now()
+      const { text, lines } = await recognizeImage(blob)
+      log('OCR took', Math.round(performance.now() - t0), 'ms')
+      log('OCR_TEXT:\n' + text)
+      log('OCR_LINES:' + JSON.stringify(lines.map((l) => ({ text: l.text, confidence: l.confidence }))))
+      const ok = /miles davis/i.test(text) && /kind of blue/i.test(text)
+      log('OCR_RESULT:' + (ok ? 'PASS' : 'FAIL'))
+    } catch (e) {
+      log('FATAL:', e && e.message ? e.message : String(e))
+      log('OCR_FAILED')
+    }
+  </script>
+</body>
+</html>

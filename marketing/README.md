@@ -7,6 +7,7 @@
 | File | What it is |
 | --- | --- |
 | `copy-kit-halcova.md` | **Halcova copy kit** — taglines, positioning, descriptions, store-listing drafts, launch posts, per-market messaging + glossary (the live brand) |
+| `review-benefits-humor.md` | **Benefits & humor layer** — review of the launch set + the reusable benefit bank (feature → benefit → payoff) and the humor voice/joke bank the campaign files now draw from |
 | `brief-halcova-icon.md` | **Halcova icon brief** — for the UI/UX Expert: dark/gold tokens, **barcode element required** (the icon must show a code bar) |
 | `private-test-plan.md` | **Private-test plan** — friends & family circle (FR/NL/PT-BR/DE/ES/IT), setup, feedback form, go/no-go |
 | `private-test-invite.md` | **Invite copy** — EN master + FR/NL/PT-BR/DE/ES/IT drafts, with personal-code placeholders |
@@ -22,8 +23,8 @@
 
 ## Launch campaign — "What lives in your halcova?" (2026-08-13)
 
-Public viral launch across **X · Instagram · Facebook · WhatsApp**, curiosity-first
-progressive reveal, video produced in **PicsArt**. Brand: **Halcova**.
+Public viral launch across **X · Instagram · Facebook · WhatsApp · YouTube**,
+curiosity-first progressive reveal, video produced in **PicsArt**. Brand: **Halcova**.
 
 | File | What it is |
 | --- | --- |
@@ -32,9 +33,15 @@ progressive reveal, video produced in **PicsArt**. Brand: **Halcova**.
 | `campaign-picsart-video-spec.md` | **Video production spec** — brand kit (dark `#16130F` + gold), 14 storyboarded assets (V1–V14), PicsArt techniques |
 | `campaign-whatsapp-playbook.md` | **Personal WhatsApp sequence** — segments, invite flow, statuses, codes are private, admin workload |
 | `campaign-landing-page.md` | **Landing page copy** — SEO/meta, hero→access sections (from `copy-kit-halcova.md` §4) + ready-to-paste UTM links per channel |
+| `campaign-youtube-playbook.md` | **YouTube channel plan** — Shorts mirror of the campaign + weekly long-form, channel setup, SEO titles/descriptions/hashtags, thumbnails, UTM, KPIs |
 
 > Campaign Phases 1–2 are **name-free** (safe to run now). Phase 3 (name reveal)
 > is gated on the Hokan→Halcova code rename + legal/domain gate + icon (with a barcode).
+
+> **Benefits & humor layer (2026-08-13):** the campaign set now leads with
+> benefits ("never rebuy", "finally know what you own") and carries a wry,
+> self-deprecating collector humor voice. Benefit bank + joke bank:
+> `review-benefits-humor.md`.
 
 ## Iteration history (drafts — superseded, kept for reference)
 

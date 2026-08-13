@@ -17,6 +17,13 @@ broadcast channel.
 - **This is Phase 4.** WhatsApp invites go out when the app is actually open and
   you can approve people. Not before (nothing to sign in to).
 
+**Benefits & humor layer:** lead with *what it does for them* ("you'll stop
+buying things twice", "finally know what's on that shelf"), then one warm,
+self-deprecating joke — WhatsApp is personal, so this is the friendliest the
+voice gets. Situational jokes only (joke bank: `review-benefits-humor.md` §5).
+Never joke about features we don't have, and never leak internals — even
+privately.
+
 ---
 
 ## 1. Segment your contacts (do this once, in your head or a private list)
@@ -66,7 +73,7 @@ One question, no guilt:
 If they've signed in and added a few items — thank them and invite one small
 action:
 > You've added [n] already?? 🎉 Try searching your crate — it filters by genre,
-> artist, format.
+> artist, format. Go on, find the record you forgot you owned.
 
 If they haven't signed in: let it go. WhatsApp is personal; one gentle nudge is
 the max. Don't chase.
@@ -83,8 +90,9 @@ sparingly and **never with a code**:
 - **Phase 3 (reveal):** one status with V7 (name reveal) + caption "something I
   built 🏛️". If a contact *replies* to the status → that's your opening to DM
   them a personal invite (they self-qualified).
-- **Phase 4 (open):** one status: "It's open. Message me if you want in." —
-  the word "message me" routes them into a 1:1 where a code is safe to share.
+- **Phase 4 (open):** one status: "It's open. Message me if you want in. (Yes,
+  it stops you buying the same record twice.)" — the word "message me" routes
+  them into a 1:1 where a code is safe to share.
 - **Phase 5 (loop):** occasionally a real user's "look what I cataloged" clip
   (permissioned) — social proof, no ask.
 
@@ -97,7 +105,9 @@ Status = a door. A DM = the invite. Never put the key (code) on the door.
 **Collector invite (Segment A):**
 > Hey [Name] — I built this little app called **Halcova**. You point your phone
 > at a record sleeve (or book cover), it scans the barcode and catalogues it —
-> and it remembers what you already own, so you stop buying things twice. 😅
+> and it remembers what you already own, so you stop buying things twice.
+> (Finally, something that knows your crate better than you do. Built it for
+> people like us — I'm the worst offender.) 😅
 >
 > You're on my short list — here's your personal code: [CODE]
 >

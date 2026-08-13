@@ -1,0 +1,149 @@
+/* Cover scan modal — camera/gallery capture for on-device OCR.
+   Mirrors the ScannerModal fullscreen overlay + dark #16130F chrome so both
+   capture flows feel like the same action. */
+
+.cover-scan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cover-scan-video {
+  position: absolute;
+  inset: 0;
+}
+
+.cover-scan-video video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+.cover-scan-chrome {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: calc(var(--safe-top) + 20px) 20px calc(var(--safe-bottom) + 28px);
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(22, 19, 15, 0) 0%, rgba(22, 19, 15, 0.45) 60%, rgba(22, 19, 15, 0.82) 100%);
+}
+
+.cover-scan-close {
+  position: absolute;
+  top: calc(var(--safe-top) + 16px);
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(22, 19, 15, 0.65);
+  color: var(--jacket-kraft);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  backdrop-filter: blur(4px);
+}
+
+.cover-scan-status {
+  margin: 0 0 14px;
+  color: var(--jacket-kraft);
+  font-size: 15px;
+  text-align: center;
+  max-width: 90vw;
+  pointer-events: auto;
+}
+
+.cover-scan-retry {
+  margin-bottom: 12px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(201, 162, 39, 0.9);
+  color: #16130F;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+.cover-scan-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: auto;
+}
+
+.cover-scan-capture {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 3px solid var(--jacket-kraft);
+  background: rgba(22, 19, 15, 0.55);
+  color: var(--jacket-kraft);
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.cover-scan-capture:disabled {
+  opacity: 0.45;
+}
+
+/* Choose a photo is the first-class path — the user's mental model is "pick a
+   cover from my device". A filled, high-contrast gold button that reads as
+   the primary action, with the camera circle offered as the alternative. */
+.cover-scan-gallery {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  background: var(--jacket-kraft);
+  color: #16130F;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.cover-scan-gallery:active {
+  transform: scale(0.97);
+}
+
+.cover-scan-gallery:disabled {
+  opacity: 0.5;
+}
+
+/* When the camera is unavailable/denied, the gold pick-a-photo action is the
+   whole point — give it extra presence instead of a dead Capture circle. */
+.cover-scan-overlay.no-camera .cover-scan-gallery {
+  padding: 16px 28px;
+  font-size: 16px;
+}
+
+/* While OCR reads the cover, the status line gets a gentle pulse so the
+   "Reading the cover…" progress reads as busy rather than stuck. */
+.cover-scan-overlay.identifying .cover-scan-status {
+  animation: cover-scan-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cover-scan-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.cover-scan-file {
+  display: none;
+}
