@@ -126,4 +126,113 @@ describe('LendingControls', () => {
     renderControls({ id: 'r1', title: 'X', lending: { lentOn: '2026-08-01T00:00:00Z' } })
     expect(screen.getByRole('button', { name: 'Mark returned' })).toBeInTheDocument()
   })
+
+  describe('lending history', () => {
+    const historyItem = (lendingHistory) => ({
+      id: 'r1',
+      title: 'Miles Davis - Kind of Blue',
+      lendingHistory,
+    })
+
+    it('renders the History label with one entry per lendingHistory item', () => {
+      const { container } = renderControls(historyItem([
+        { borrower: { name: 'Zoe' }, lentOn: '2026-08-01' },
+        { borrower: { name: 'Alice' }, lentOn: '2026-06-01' },
+        { borrower: { name: 'Bob' }, lentOn: '2026-05-01' },
+      ]))
+
+      expect(screen.getByText('History')).toBeInTheDocument()
+      expect(container.querySelectorAll('.lending-history-entry')).toHaveLength(3)
+      expect(screen.getByText('Zoe')).toBeInTheDocument()
+      expect(screen.getByText('Alice')).toBeInTheDocument()
+      expect(screen.getByText('Bob')).toBeInTheDocument()
+    })
+
+    it('shows Lent {date} plus Returned {date} only when returnedOn is present', () => {
+      const { container } = renderControls(historyItem([
+        { borrower: { name: 'Zoe' }, lentOn: '2026-08-01', returnedOn: '2026-08-15' },
+        { borrower: { name: 'Alice' }, lentOn: '2026-06-01' },
+      ]))
+
+      const entries = container.querySelectorAll('.lending-history-entry')
+      expect(entries).toHaveLength(2)
+      expect(entries[0].textContent).toMatch(/Lent /)
+      expect(entries[0].textContent).toMatch(/Returned /)
+      expect(entries[1].textContent).toMatch(/Lent /)
+      expect(entries[1].textContent).not.toMatch(/Returned /)
+    })
+
+    it('renders history newest-first in the given array order', () => {
+      const { container } = renderControls(historyItem([
+        { borrower: { name: 'Zoe' }, lentOn: '2026-08-01' },
+        { borrower: { name: 'Alice' }, lentOn: '2026-06-01' },
+      ]))
+
+      const entries = container.querySelectorAll('.lending-history-entry')
+      expect(entries).toHaveLength(2)
+      expect(entries[0].textContent).toContain('Zoe')
+      expect(entries[1].textContent).toContain('Alice')
+    })
+
+    it('falls back to an em dash when the borrower name is missing', () => {
+      renderControls(historyItem([{ lentOn: '2026-08-01' }]))
+      expect(screen.getByText('—')).toBeInTheDocument()
+    })
+
+    it('renders no history section when lendingHistory is an empty array', () => {
+      renderControls(historyItem([]))
+      expect(screen.queryByText('History')).not.toBeInTheDocument()
+    })
+
+    it('renders no history section when lendingHistory is undefined', () => {
+      renderControls(historyItem(undefined))
+      expect(screen.queryByText('History')).not.toBeInTheDocument()
+    })
+
+    it('renders no history section when the item has no lendingHistory field', () => {
+      renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' })
+      expect(screen.queryByText('History')).not.toBeInTheDocument()
+    })
+
+    it('renders nothing when lending is disabled, even with history present', () => {
+      const { container } = renderControls(
+        historyItem([{ borrower: { name: 'Alice' }, lentOn: '2026-08-01' }]),
+        { lendingEnabled: false }
+      )
+      expect(container).toBeEmptyDOMElement()
+    })
+
+    it('does not crash on a null history entry', () => {
+      renderControls(historyItem([null]))
+      expect(screen.getByText('—')).toBeInTheDocument()
+    })
+
+    it('does not crash on a history entry with no dates', () => {
+      renderControls(historyItem([{ borrower: { name: 'Alice' } }]))
+      expect(screen.getByText('Alice')).toBeInTheDocument()
+    })
+
+    it('does not crash on a non-array lendingHistory value', () => {
+      renderControls(historyItem({}))
+      expect(screen.getByText('Not on loan')).toBeInTheDocument()
+      expect(screen.queryByText('History')).not.toBeInTheDocument()
+    })
+
+    it('renders the on-loan status block and the history list together', () => {
+      const { container } = renderControls({
+        id: 'r1',
+        title: 'Miles Davis - Kind of Blue',
+        lending: { borrower: { name: 'Alice' }, lentOn: '2026-08-01T00:00:00Z' },
+        lendingHistory: [
+          { borrower: { name: 'Alice' }, lentOn: '2026-08-01' },
+          { borrower: { name: 'Zoe' }, lentOn: '2026-06-01', returnedOn: '2026-06-10' },
+        ],
+      })
+
+      expect(screen.getByText(/On loan to Alice/)).toBeInTheDocument()
+      expect(screen.getByText('History')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Mark returned' })).toBeInTheDocument()
+      expect(container.querySelectorAll('.lending-history-entry')).toHaveLength(2)
+    })
+  })
 })

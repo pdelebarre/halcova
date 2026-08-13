@@ -86,6 +86,7 @@ export default function LendingControls({ item, catalog, lendingEnabled, onLend,
 
   const isOut = !!item.lending
   const status = buildStatus(item, lending)
+  const history = Array.isArray(item?.lendingHistory) ? item.lendingHistory : []
 
   // Toast without assuming the parent always wired one up.
   function notify(msg, kind) {
@@ -226,6 +227,29 @@ export default function LendingControls({ item, catalog, lendingEnabled, onLend,
             </button>
           </div>
         </form>
+      )}
+
+      {history.length > 0 && (
+        <div className="lending-history">
+          <p className="detail-section-label">{lending.history}</p>
+          <ul className="lending-history-list">
+            {history.map((entry, i) => (
+              <li key={`${entry?.returnedOn || entry?.lentOn || ''}-${i}`} className="lending-history-entry">
+                <span className="lending-history-borrower">{entry?.borrower?.name || '—'}</span>
+                <span className="lending-history-dates">
+                  {(() => {
+                    const lent = formatDate(entry?.lentOn)
+                    const returned = entry?.returnedOn ? formatDate(entry.returnedOn) : ''
+                    const parts = []
+                    if (lent) parts.push(lending.historyLent(lent))
+                    if (returned) parts.push(lending.historyReturned(returned))
+                    return parts.join(' · ')
+                  })()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   )
