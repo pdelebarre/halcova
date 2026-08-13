@@ -52,10 +52,15 @@ export default async (req) => {
       // users bypass it (planLimitFor returns null). The index is read BEFORE
       // writing and re-read again right before writeIndex to narrow the
       // concurrent-POST race (Netlify Blobs has no transactions — see ADR-0001).
+      // The cap counts OWNED items only — wishlist "wants" are a separate list
+      // of things the member doesn't own yet and never consume the cap.
       const limit = planLimitFor(user)
       if (limit != null) {
         const before = await readIndex(store)
-        if (before.length >= limit) {
+        const ownedCount = (await Promise.all(
+          before.map((itemId) => store.get(`item:${itemId}`, { type: 'json' })),
+        )).filter(Boolean).filter((it) => !it.wishlist).length
+        if (ownedCount >= limit) {
           return json(403, {
             error: `You've reached the free plan limit of ${limit} items. Ask the admin to upgrade your plan.`,
             code: 'PLAN_LIMIT',

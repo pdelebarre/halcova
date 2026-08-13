@@ -78,6 +78,63 @@
 }
 .artist-chip-remove:active { background: rgba(201, 162, 39, 0.18); }
 
+/* --- Saved views (§ Phase 5) --- */
+.filter-section-views {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.views-empty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--jacket-kraft-dim);
+  margin: 0;
+}
+.saved-view-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.saved-view-apply {
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.saved-view-apply:active { background: var(--vinyl-groove); }
+.saved-view-name { font-size: 14px; font-weight: 600; color: var(--jacket-kraft); }
+.saved-view-meta { font-family: var(--font-mono); font-size: 11px; color: var(--static-grey); }
+.saved-view-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--jacket-kraft-dim);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.saved-view-icon:active { background: var(--vinyl-groove-2); color: var(--runout-gold); }
+.saved-view-save { display: flex; gap: 8px; margin-top: 10px; }
+.saved-view-input {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove-2);
+  color: var(--jacket-kraft);
+  font-size: 14px;
+}
+.saved-view-save .saved-view-input { flex: 1; min-width: 0; }
+
 .combo-field {
   position: relative;
 }

@@ -19,6 +19,8 @@ function renderResult(overrides = {}) {
     sameAlbum: [],
     otherArtist: [],
     onAdd: vi.fn(),
+    onAddToWishlist: vi.fn(),
+    onOwnWishlist: vi.fn(),
     onOpenItem: vi.fn(),
     onScanNext: vi.fn(),
     onClose: vi.fn(),
@@ -77,5 +79,30 @@ describe('ScanResult', () => {
 
     expect(screen.getByText('Other pressings you own')).toBeInTheDocument()
     expect(screen.getByText('CD · 1997')).toBeInTheDocument()
+  })
+
+  it('offers "Add to wishlist" for a candidate that is neither owned nor wishlisted', () => {
+    vi.useFakeTimers()
+    const onAddToWishlist = vi.fn()
+    renderResult({ onAddToWishlist })
+
+    const btn = screen.getByRole('button', { name: 'Add to wishlist' })
+    fireEvent.click(btn)
+    act(() => { vi.advanceTimersByTime(800) })
+    expect(onAddToWishlist).toHaveBeenCalledTimes(1)
+    expect(onAddToWishlist).toHaveBeenCalledWith(CANDIDATE)
+  })
+
+  it('shows "In your wishlist" and an "Own it" primary for an already-wishlisted candidate', () => {
+    vi.useFakeTimers()
+    const onOwnWishlist = vi.fn()
+    renderResult({ wishlistExact: { id: 'w1', title: 'Miles Davis - Kind of Blue' }, onOwnWishlist })
+
+    expect(screen.getByText('In your wishlist')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add to wishlist' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Own it' }))
+    act(() => { vi.advanceTimersByTime(800) })
+    expect(onOwnWishlist).toHaveBeenCalledTimes(1)
   })
 })

@@ -7,6 +7,8 @@ import CoverShelf from './components/CoverShelf'
 import MatchPicker from './components/MatchPicker'
 import ScanResult from './components/ScanResult'
 import AisleSheet from './components/AisleSheet'
+import CollectionStats from './components/CollectionStats'
+import WishlistSheet from './components/WishlistSheet'
 import { useCollection } from './hooks/useCollection'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { itemInBin } from './utils/browse'
@@ -41,9 +43,16 @@ const NEW_ARRIVALS_COUNT = 5
 export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, isFree = false, isDemo = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
+  // Partition (§ Fix): wishlist items are UNOWNED wants — they never count as
+  // owned, and never appear in the crate/shelf, stats, aisles or search.
+  // `wishlistItems` feeds the dedicated Wishlist sheet; converting flips the
+  // flag off and the item joins `ownedItems` (the shelf).
+  const ownedItems = useMemo(() => items.filter((it) => !it.wishlist), [items])
+  const wishlistItems = useMemo(() => items.filter((it) => it.wishlist), [items])
+
   const [modal, setModal] = useState(null) // 'scan' | 'pick' | 'manual' | 'result' | 'detail'
   const [pickerState, setPickerState] = useState({ matches: null, loading: false, errorMsg: '' })
-  const [scanCandidate, setScanCandidate] = useState(null) // { candidate, ownedExact, sameAlbum, otherArtist }
+  const [scanCandidate, setScanCandidate] = useState(null) // { candidate, ownedExact, wishlistExact, sameAlbum, otherArtist }
   const [selectedItem, setSelectedItem] = useState(null)
   const [toast, setToast] = useState(null) // { msg, kind: 'add' | 'remove' | 'error' }
   const toastTimer = useRef(null)
@@ -70,10 +79,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   })
   const [searchFocused, setSearchFocused] = useState(false)
 
-  // Free tier: the counter reflects the WHOLE collection (items.length, not the
-  // filtered/visible count) and add flows are gated once the cap is reached so
-  // a free user never attempts an add the server will reject with PLAN_LIMIT.
-  const atLimit = isFree && items.length >= FREE_PLAN_CAP
+  // Free tier: the counter reflects the OWNED collection (ownedItems.length,
+  // not the filtered/visible count; wishlist wants are excluded) and add flows
+  // are gated once the cap is reached so a free user never attempts an add the
+  // server will reject with PLAN_LIMIT.
+  const atLimit = isFree && ownedItems.length >= FREE_PLAN_CAP
 
   // Grid vs List, remembered per kind (§4.6).
   const [view, setView] = useState(() => {
@@ -83,10 +93,23 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     try { localStorage.setItem(`runout.view.${catalog.kind}`, view) } catch { /* ignore */ }
   }, [view, catalog.kind])
 
+  // Stats sheet (§ Phase 5), saved views (persisted per kind, capped at 20)
+  // and the Wishlist sheet (§ Fix — unowned wants).
+  const [wishlistOpen, setWishlistOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
+  const [savedViews, setSavedViews] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`runout.views.${catalog.kind}`) || '[]') } catch { return [] }
+  })
+
   // Persist the recent-searches list (capped at 6, most recent first).
   useEffect(() => {
     try { localStorage.setItem(`runout.recentSearches.${catalog.kind}`, JSON.stringify(recentSearches)) } catch { /* ignore */ }
   }, [recentSearches, catalog.kind])
+
+  // Persist saved views (§ Phase 5), capped at 20.
+  useEffect(() => {
+    try { localStorage.setItem(`runout.views.${catalog.kind}`, JSON.stringify(savedViews.slice(-20))) } catch { /* ignore */ }
+  }, [savedViews, catalog.kind])
 
   // Debounce the search filter so typing stays instant on large collections
   // (§4.18): the input updates immediately, the filter computation lags ~150ms.
@@ -197,8 +220,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const floor = useMemo(() => copy.floor || {}, [copy])
   const floorSections = useMemo(() => {
     const sections = []
-    if (items.length > NEW_ARRIVALS_COUNT) {
-      const sorted = [...items].sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
+    if (ownedItems.length > NEW_ARRIVALS_COUNT) {
+      const sorted = [...ownedItems].sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
       sections.push({
         id: 'floor-new',
         key: 'floor-new',
@@ -209,7 +232,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       })
     }
     if (lendingEnabled) {
-      const onLoan = items.filter((it) => it.lending)
+      const onLoan = ownedItems.filter((it) => it.lending)
       if (onLoan.length) {
         sections.push({
           id: 'floor-loan',
@@ -221,7 +244,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         })
       }
     }
-    const pinned = items.filter((it) => it.pinned)
+    const pinned = ownedItems.filter((it) => it.pinned)
     if (pinned.length) {
       sections.push({
         id: 'floor-pinned',
@@ -233,14 +256,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       })
     }
     return sections
-  }, [items, lendingEnabled, floor])
+  }, [ownedItems, lendingEnabled, floor])
 
   // The Floor activates once the collection grows past NEW_ARRIVALS_COUNT
   // items (e.g. > 5) — below that the plain grid is the whole store and
   // curated shelves would just duplicate it.
   const showFloor =
     status === 'ready' &&
-    items.length > NEW_ARRIVALS_COUNT &&
+    ownedItems.length > NEW_ARRIVALS_COUNT &&
     view === 'grid' &&
     sortBy === 'added' &&
     !hasActiveFilters &&
@@ -254,8 +277,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // Crate dive (§ Phase 1): like pulling a random record off the shelf —
   // opens a random item's detail sheet.
   function handleCrateDive() {
-    if (!items.length) return
-    const pick = items[Math.floor(Math.random() * items.length)]
+    if (!ownedItems.length) return
+    const pick = ownedItems[Math.floor(Math.random() * ownedItems.length)]
     setSelectedItem(pick)
     setModal('detail')
   }
@@ -271,6 +294,71 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     } catch {
       showToast(t('view.couldNotSave'), 'error')
     }
+  }
+
+  // Wishlist (§ Fix): UNOWNED wants, kept separate from the owned crate.
+  // Converting flips the `wishlist` flag off so the item joins the owned
+  // collection and appears on the shelf/Floor. Removing deletes it outright.
+  async function handleAddToWishlist(candidate) {
+    const payload = { ...candidate, wishlist: true }
+    delete payload.id
+    delete payload.dateAdded
+    delete payload.notes
+    try {
+      await add({ ...payload, notes: '' })
+      setModal(null)
+      setScanCandidate(null)
+      showToast(copy.wishlist?.addedToast || 'Added to your wishlist', 'add')
+    } catch (err) {
+      if (err?.code === 'PLAN_LIMIT') showToast(t('plan.limitToast'), 'error')
+      else if (err?.code === 'DEMO_READONLY') showToast(t('demo.readOnlyToast'), 'error')
+      else showToast(t('view.couldNotSave'), 'error')
+    }
+  }
+
+  async function handleConvertToOwned(item) {
+    if (!item) return
+    if (atLimit) { showToast(t('plan.limitToast'), 'error'); return }
+    try {
+      await update(item.id, { wishlist: false })
+      setWishlistOpen(false)
+      setModal(null)
+      setScanCandidate(null)
+      setSelectedItem(null)
+      showToast(copy.wishlist?.addToCrateToast || 'Added to your crate', 'add')
+    } catch (err) {
+      if (err?.code === 'DEMO_READONLY') showToast(t('demo.readOnlyToast'), 'error')
+      else showToast(t('view.couldNotSave'), 'error')
+    }
+  }
+
+  async function handleRemoveFromWishlist(item) {
+    try {
+      await remove(item.id)
+      showToast(copy.wishlist?.removeToast || 'Removed from your wishlist', 'remove')
+    } catch {
+      showToast(t('view.couldNotSave'), 'error')
+    }
+  }
+
+  // Saved views (§ Phase 5): capture the current filter set under a name, or
+  // apply / delete / rename one. Filters only (search + sort stay live).
+  function handleSaveView(name) {
+    const state = { activeFormats, activeGenres, activeArtist, activeLending }
+    const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${savedViews.length}`
+    setSavedViews((prev) => [...prev, { id, name, state }].slice(-20))
+  }
+  function handleApplyView(state) {
+    setActiveFormats(Array.isArray(state?.activeFormats) ? state.activeFormats : [])
+    setActiveGenres(Array.isArray(state?.activeGenres) ? state.activeGenres : [])
+    setActiveArtist(state?.activeArtist || '')
+    setActiveLending(!!state?.activeLending)
+  }
+  function handleDeleteView(id) {
+    setSavedViews((prev) => prev.filter((v) => v.id !== id))
+  }
+  function handleRenameView(id, name) {
+    setSavedViews((prev) => prev.map((v) => (v.id === id ? { ...v, name } : v)))
   }
 
   // The Aisles (§ Phase 2): picking a bin applies it as a filter; the chip
@@ -292,7 +380,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   // The Catalog (§ Phase 3): a "did you mean" suggestion when a query matches
   // nothing, and the recent-searches history (committed on Enter or blur).
-  const suggestion = useMemo(() => (hasQuery ? didYouMean(items, debouncedQuery) : null), [items, hasQuery, debouncedQuery])
+  const suggestion = useMemo(() => (hasQuery ? didYouMean(ownedItems, debouncedQuery) : null), [ownedItems, hasQuery, debouncedQuery])
 
   function commitRecentSearch(q) {
     const clean = q.trim()
@@ -314,9 +402,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // The core "am I looking at a duplicate" step — every path into the app
   // (barcode auto-match, picking from multiple pressings/editions, text
   // search, manual entry) funnels through here before anything gets added.
+  // `wishlistExact` lets the scan result offer "Own it" for an existing want.
   function presentCandidate(candidate) {
-    const { ownedExact, sameAlbum, otherArtist } = findRelated(candidate, items)
-    setScanCandidate({ candidate, ownedExact, sameAlbum, otherArtist })
+    const { ownedExact, wishlistExact, sameAlbum, otherArtist } = findRelated(candidate, ownedItems, wishlistItems)
+    setScanCandidate({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist })
     setModal('result')
   }
 
@@ -458,7 +547,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }
 
   const visibleItems = useMemo(() => {
-    let list = items
+    let list = ownedItems
     if (activeFormats.length) {
       list = list.filter((it) => activeFormats.includes(it.formatType))
     }
@@ -503,7 +592,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       }
     }
     return sorted
-  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog, sortBy, hasQuery])
+  }, [ownedItems, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog, sortBy, hasQuery])
 
   return (
     <>
@@ -513,7 +602,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       {status === 'ready' && isFree && (
         <div className="plan-banner" role="status">
           <span className="plan-banner-counter">
-            {t('plan.freeCounter', { count: items.length, cap: FREE_PLAN_CAP })}
+            {t('plan.freeCounter', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
           </span>
           {atLimit && (
             <span className="plan-banner-hint">{t('plan.atLimitHint', { cap: FREE_PLAN_CAP })}</span>
@@ -549,6 +638,16 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onSearchFocus={() => setSearchFocused(true)}
           onSearchBlur={handleSearchBlur}
           onSearchCommit={handleSearchCommit}
+          onOpenStats={() => setStatsOpen(true)}
+          statsOpen={statsOpen}
+          onOpenWishlist={() => setWishlistOpen(true)}
+          wishlistOpen={wishlistOpen}
+          wishlistCount={wishlistItems.length}
+          savedViews={savedViews}
+          onSaveView={handleSaveView}
+          onApplyView={handleApplyView}
+          onDeleteView={handleDeleteView}
+          onRenameView={handleRenameView}
         />
       )}
 
@@ -595,7 +694,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           </div>
         )}
 
-        {status === 'ready' && items.length === 0 && (
+        {status === 'ready' && ownedItems.length === 0 && (
           <EmptyState
             copy={copy}
             onScan={isDemo ? undefined : () => setModal('scan')}
@@ -603,7 +702,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           />
         )}
 
-        {status === 'ready' && items.length > 0 && visibleItems.length === 0 && hasQuery && suggestion && (
+        {status === 'ready' && ownedItems.length > 0 && visibleItems.length === 0 && hasQuery && suggestion && (
           <div className="did-you-mean">
             <span>{copy.search?.didYouMeanPrefix || 'Did you mean'}: </span>
             <button type="button" className="did-you-mean-btn" onClick={() => setQuery(suggestion)}>
@@ -612,7 +711,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           </div>
         )}
 
-        {status === 'ready' && items.length > 0 && visibleItems.length === 0 && (
+        {status === 'ready' && ownedItems.length > 0 && visibleItems.length === 0 && (
           <EmptyState kind="no-results" copy={copy} onClear={clearFilters} />
         )}
 
@@ -669,7 +768,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
                 id="floor-browse-all"
                 kicker={floor.browseAll?.kicker || ''}
                 title={floor.browseAll?.title || ''}
-                count={items.length}
+                count={ownedItems.length}
                 action={!isDemo && (
                   <button
                     type="button"
@@ -701,9 +800,9 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           )
         )}
 
-        {status === 'ready' && items.length > 0 && (
+        {status === 'ready' && ownedItems.length > 0 && (
           <span className="visually-hidden" role="status" aria-live="polite">
-            {copy.view?.showing ? copy.view.showing(visibleItems.length, items.length) : ''}
+            {copy.view?.showing ? copy.view.showing(visibleItems.length, ownedItems.length) : ''}
           </span>
         )}
       </main>
@@ -797,9 +896,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         <ScanResult
           candidate={scanCandidate.candidate}
           ownedExact={scanCandidate.ownedExact}
+          wishlistExact={scanCandidate.wishlistExact}
           sameAlbum={scanCandidate.sameAlbum}
           otherArtist={scanCandidate.otherArtist}
           onAdd={handleAddCandidate}
+          onAddToWishlist={handleAddToWishlist}
+          onOwnWishlist={() => handleConvertToOwned(scanCandidate.wishlistExact)}
           onOpenItem={handleOpenFromResult}
           onScanNext={handleScanNext}
           onClose={() => { setModal(null); setScanCandidate(null) }}
@@ -833,6 +935,21 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onClear={handleClearAisle}
           onClose={() => setAisleSheetOpen(false)}
           copy={copy}
+        />
+      )}
+
+      {statsOpen && (
+        <CollectionStats items={ownedItems} onClose={() => setStatsOpen(false)} copy={copy} />
+      )}
+
+      {wishlistOpen && (
+        <WishlistSheet
+          items={wishlistItems}
+          onConvert={handleConvertToOwned}
+          onRemove={handleRemoveFromWishlist}
+          onClose={() => setWishlistOpen(false)}
+          copy={copy}
+          isDemo={isDemo}
         />
       )}
     </>

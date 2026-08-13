@@ -91,6 +91,25 @@ describe('findRelated', () => {
     expect(res.sameAlbum).toEqual([])
     expect(res.otherArtist).toEqual([])
   })
+
+  it('flags an exact match that lives in the wishlist (not owned)', () => {
+    const wishlist = [{ id: 'w1', title: 'Miles Davis - Kind of Blue', barcode: '7777' }]
+    const res = findRelated({ title: 'Miles Davis - Kind of Blue', barcode: '7777' }, items, wishlist)
+    expect(res.ownedExact).toBeNull()
+    expect(res.wishlistExact).toEqual(wishlist[0])
+  })
+
+  it('does not flag a wishlist match when the candidate is not on it', () => {
+    const res = findRelated({ title: 'Nina Simone - Pastel Blues', barcode: '5555' }, items, [])
+    expect(res.wishlistExact).toBeNull()
+  })
+
+  it('still flags ownedExact even when the same release is also wishlisted', () => {
+    const wishlist = [{ id: 'w1', title: 'Miles Davis - Kind of Blue', barcode: '1111' }]
+    const res = findRelated({ title: 'Miles Davis - Kind of Blue', discogsId: 111 }, items, wishlist)
+    expect(res.ownedExact).toEqual(items[0])
+    expect(res.wishlistExact).toBeNull()
+  })
 })
 
 describe('normalizeText', () => {
