@@ -287,6 +287,17 @@ const nl = {
   'lending.featureLabel': 'Lending',
   'lending.featureHint': 'Let this member lend items and track who has them.',
   'lending.notEnabled': "Lending isn't enabled for your account.",
+  'lending.loans': 'Loans',
+  'lending.dashboardTitle': 'On loan',
+  'lending.dashboardEmpty': 'Nothing on loan right now.',
+  'lending.dashboardSearch': 'Search loans…',
+  'lending.dashboardSort': 'Sort',
+  'lending.sortBorrower': 'Borrower A–Z',
+  'lending.sortDue': 'Due soonest',
+  'lending.sortLent': 'Recently lent',
+  'lending.sortTitle': 'Title A–Z',
+  'lending.dashboardDue': 'Due {date}',
+  'lending.dashboardOverdue': 'Overdue since {date}',
 
   // §16 Update
   'update.newVersion': 'New version available',

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
+import { isOverdue } from '../utils/lending'
 import { t, getLocale } from '../i18n'
 import './ListView.css'
 
@@ -30,7 +31,7 @@ function letterOf(name, locale = 'en') {
  * viewport (fixed row heights keep the math cheap), with sticky letter group
  * headers when sorted by Artist A–Z and an A–Z jump rail on tablet/desktop.
  */
-export default function ListView({ items = [], sortBy, onOpen, copy = {} }) {
+export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendingEnabled = false }) {
   const scrollerRef = useRef(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportH, setViewportH] = useState(0)
@@ -139,7 +140,7 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {} }) {
           {visible.map((r) => (
             r.type === 'header'
               ? <div key={`h-${r.label}`} className="list-group-header">{r.label}</div>
-              : <ListItemRow key={r.item.id} item={r.item} onOpen={onOpen} />
+              : <ListItemRow key={r.item.id} item={r.item} onOpen={onOpen} lendingEnabled={lendingEnabled} copy={copy} />
           ))}
           <div style={{ height: padBottom }} aria-hidden="true" />
         </div>
@@ -148,17 +149,27 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {} }) {
   )
 }
 
-function ListItemRow({ item, onOpen }) {
+function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {} }) {
   const { artist, album } = splitArtistTitle(item.title)
   const meta = [item.label, item.catno, item.year].filter(Boolean)
   const badge = BADGE_CLASS[item.formatType] || 'other'
+
+  // W7: on-loan badge — mirrors the grid card. Optional-chained + isOverdue's
+  // NaN guard keep weird item shapes from crashing (no error boundary).
+  const lending = item?.lending
+  const isOnLoan = lendingEnabled && !!lending
+  const overdue = isOnLoan && isOverdue(lending?.dueOn)
+  const lendingBadge = overdue
+    ? (copy.lending?.badgeOverdue || t('lending.badgeOverdue'))
+    : (copy.lending?.badge || t('lending.badge'))
+  const baseLabel = [artist, album].filter(Boolean).join(' — ') || t('list.collectionItem')
 
   return (
     <button
       type="button"
       className="list-row"
       onClick={() => onOpen(item)}
-      aria-label={[artist, album].filter(Boolean).join(' — ') || t('list.collectionItem')}
+      aria-label={isOnLoan ? `${baseLabel} — ${lendingBadge}` : baseLabel}
     >
       <span className="list-cover" aria-hidden="true">
         {item.coverImage
@@ -177,6 +188,9 @@ function ListItemRow({ item, onOpen }) {
         </span>
       </span>
       {item.formatType && <span className={`format-badge ${badge}`}>{item.formatType}</span>}
+      {isOnLoan && (
+        <span className={`list-lending-badge${overdue ? ' overdue' : ''}`} aria-hidden="true">{lendingBadge}</span>
+      )}
       <svg className="list-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M9 6l6 6-6 6" />
       </svg>

@@ -25,7 +25,7 @@ const TOAST_ICONS = { add: '✓', remove: '–', error: '✕' }
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   const [modal, setModal] = useState(null) // 'scan' | 'pick' | 'manual' | 'result' | 'detail'
@@ -57,6 +57,18 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     const t = setTimeout(() => setDebouncedQuery(query), 150)
     return () => clearTimeout(t)
   }, [query])
+
+  // W7: when App bumps `refreshTick` (e.g. returning an item from the loans
+  // dashboard), re-fetch this collection so the visible state stays in sync.
+  // Skip the first run — useCollection already fetches on mount.
+  const skipFirstRefreshTick = useRef(true)
+  useEffect(() => {
+    if (skipFirstRefreshTick.current) {
+      skipFirstRefreshTick.current = false
+      return
+    }
+    refresh()
+  }, [refreshTick, refresh])
 
   // FAB add menu (§4.8): Scan barcode / Search by title / Enter manually.
   const [fabOpen, setFabOpen] = useState(false)
@@ -333,6 +345,20 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           lendingEnabled={lendingEnabled}
           activeLending={activeLending}
           onToggleLending={toggleLending}
+          onOpenLoans={onOpenLoans}
+          loansButtonRef={loansButtonRef}
+        />
+      )}
+
+      {/* W7: empty collection + lending enabled — a minimal toolbar still
+          exposes the Loans button so the global dashboard stays reachable. */}
+      {status === 'ready' && items.length === 0 && lendingEnabled && (
+        <Toolbar
+          minimal
+          copy={copy}
+          lendingEnabled={lendingEnabled}
+          onOpenLoans={onOpenLoans}
+          loansButtonRef={loansButtonRef}
         />
       )}
 
@@ -360,6 +386,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
               items={visibleItems}
               sortBy={sortBy}
               copy={copy}
+              lendingEnabled={lendingEnabled}
               onOpen={(item) => { setSelectedItem(item); setModal('detail') }}
             />
           ) : (

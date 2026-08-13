@@ -113,4 +113,26 @@ describe('Toolbar (single-row redesign)', () => {
     fireEvent.click(sw)
     expect(onToggleLending).toHaveBeenCalledTimes(1)
   })
+
+  it('shows the Loans button without a count badge when lending is enabled', () => {
+    const { container } = renderToolbar({ lendingEnabled: true })
+
+    expect(screen.getByRole('button', { name: 'Loans' })).toBeInTheDocument()
+    expect(container.querySelector('.loans-badge')).not.toBeInTheDocument()
+  })
+
+  it('hides the Loans button when lending is disabled', () => {
+    renderToolbar({ lendingEnabled: false })
+
+    expect(screen.queryByRole('button', { name: 'Loans' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Loans')).not.toBeInTheDocument()
+  })
+
+  it('opens the loans dashboard from the Loans button', () => {
+    const onOpenLoans = vi.fn()
+    renderToolbar({ lendingEnabled: true, onOpenLoans })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Loans' }))
+    expect(onOpenLoans).toHaveBeenCalledTimes(1)
+  })
 })

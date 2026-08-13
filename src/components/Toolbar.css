@@ -109,6 +109,26 @@
   background: rgba(201, 162, 39, 0.1);
 }
 
+/* W7: Loans dashboard button — rendered only when lending is enabled. */
+.loans-btn:active {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+/* On narrow screens the Loans label hides so the toolbar row doesn't crowd —
+   icon stays. The Filter label hides too (parity with the other collapsed
+   labels), so the search pill keeps a usable width at 375px. */
+@media (max-width: 639px) {
+  .filter-label { display: none; }
+  .loans-btn { padding: 0 10px; gap: 4px; }
+  .loans-label { display: none; }
+}
+/* Tighten the Loans button to a compact icon-only pill on phone widths. */
+@media (max-width: 479px) {
+  .loans-btn { padding: 0 8px; }
+}
+
 .filter-badge {
   display: inline-flex;
   align-items: center;
