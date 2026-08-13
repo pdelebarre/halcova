@@ -3,6 +3,7 @@
 // Layout inside the single "runout-identity" store:
 //   user:<id>      -> { id, name, email, code, collections:{records,books},
 //                       features:{lending},   // per-account capability flags; off by default
+//                       plan:'free'|'unlimited', // free-tier plan; defaults to 'free'
 //                       role:'admin'|'member', status:'active'|'disabled', createdAt }
 //   request:<id>   -> { id, name, email, status:'pending'|'approved'|'rejected', createdAt }
 //   index:users    -> ordered list of user ids
@@ -12,6 +13,11 @@
 // `{ lending: boolean }`). New members start without it (absent/false) — the
 // admin grants `features.lending` via approve / updateUser (see admin.js);
 // the owner always has `features: { lending: true }` (see authorize()).
+//
+// `plan` is the free-tier plan: new members are stamped `'free'` on approve
+// (see admin.js) and reads default to `'free'` when the field is absent (no
+// record migration needed). The owner is implicitly unlimited (planLimitFor
+// in _shared/plans.js).
 //
 // Access codes are stored in plaintext so an admin can re-reveal a lost code
 // from the admin panel. The blob store is private to the site; this is an
@@ -50,10 +56,18 @@ async function removeRecord(prefix, indexKey, id) {
 
 // ---- Users ----
 
-export const listUsers = () => listRecords(USER_PREFIX, USERS_INDEX)
+// Every stored user may predate the `plan` field (no migration was run), so
+// reads normalize it here — the single choke point every user read flows
+// through (listUsers feeds findUserByCode, and getUser covers direct lookups).
+function normalizeUser(user) {
+  if (!user) return null
+  return { ...user, plan: user.plan || 'free' }
+}
+
+export const listUsers = async () => (await listRecords(USER_PREFIX, USERS_INDEX)).map(normalizeUser)
 export const saveUser = (user) => saveRecord(USER_PREFIX, USERS_INDEX, user)
 export const removeUserRecord = (id) => removeRecord(USER_PREFIX, USERS_INDEX, id)
-export const getUser = async (id) => identity().get(`${USER_PREFIX}${id}`, { type: 'json' })
+export const getUser = async (id) => normalizeUser(await identity().get(`${USER_PREFIX}${id}`, { type: 'json' }))
 
 export async function findUserByCode(code) {
   const users = await listUsers()

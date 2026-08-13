@@ -31,6 +31,13 @@ function sanitizeCollections(collections) {
   }
 }
 
+// Only these plan values exist. Anything else is rejected (returns null) — an
+// unknown plan must never be silently accepted onto a user record.
+function sanitizePlan(value) {
+  if (value === 'free' || value === 'unlimited') return value
+  return null
+}
+
 // Only these per-account feature flags exist. Anything a client sends that
 // isn't in this list is dropped, and every value is coerced to a boolean — a
 // client can never smuggle arbitrary feature payloads onto a user record.
@@ -66,6 +73,8 @@ async function handleApprove(body) {
     email: request.email,
     collections,
     features: sanitizeFeatures(body.features),
+    // New members start on the free tier (T1); the admin can upgrade later.
+    plan: 'free',
     code: generateAccessCode(),
     role: 'member',
     status: 'active',
@@ -101,6 +110,11 @@ async function handleUpdateUser(body) {
   }
   if (body.features) user.features = sanitizeFeatures(body.features)
   if (body.status === 'active' || body.status === 'disabled') user.status = body.status
+  if (body.plan !== undefined) {
+    const plan = sanitizePlan(body.plan)
+    if (!plan) return json(400, { error: 'Unknown plan.' })
+    user.plan = plan
+  }
 
   await saveUser(user)
   return json(200, { user: publicUser(user) })
