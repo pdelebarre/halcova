@@ -28,6 +28,21 @@ describe('recordsCatalog', () => {
     expect(recordsCatalog.copy.nothingElseBy('Miles Davis')).toBe('Nothing else by Miles Davis in your crate')
     expect(recordsCatalog.copy.resultGood.label).toBe('Not in your crate yet')
   })
+
+  it('exposes browse axes (Genre · Artist · Decade · Format · Label)', () => {
+    expect(recordsCatalog.browseAxes.map((a) => a.id)).toEqual(['genre', 'artist', 'decade', 'format', 'label'])
+    for (const axis of recordsCatalog.browseAxes) {
+      expect(axis.label).toBeTypeOf('string')
+      expect(axis.value).toBeTypeOf('function')
+    }
+    const decade = recordsCatalog.browseAxes.find((a) => a.id === 'decade')
+    expect(decade.value({ year: 1963 })).toEqual(['1960s'])
+    const artist = recordsCatalog.browseAxes.find((a) => a.id === 'artist')
+    expect(artist.value({ title: 'Miles Davis - Kind of Blue' })).toEqual(['Miles Davis'])
+    const format = recordsCatalog.browseAxes.find((a) => a.id === 'format')
+    expect(format.value({ formatType: 'LP' })).toEqual(['LP'])
+    expect(format.value({})).toEqual([])
+  })
 })
 
 describe('booksCatalog', () => {
@@ -54,5 +69,14 @@ describe('booksCatalog', () => {
     expect(booksCatalog.copy.emptyTitle).toBe('Your shelf is empty')
     expect(booksCatalog.copy.addToast).toBe('Added to your shelf')
     expect(booksCatalog.copy.moreBy('Le Guin', 2)).toBe('More by Le Guin on your shelf (2)')
+  })
+
+  it('exposes browse axes (Category · Author · Year)', () => {
+    expect(booksCatalog.browseAxes.map((a) => a.id)).toEqual(['category', 'author', 'year'])
+    const author = booksCatalog.browseAxes.find((a) => a.id === 'author')
+    expect(author.value({ title: 'Ursula K. Le Guin - The Left Hand of Darkness' })).toEqual(['Ursula K. Le Guin'])
+    const year = booksCatalog.browseAxes.find((a) => a.id === 'year')
+    expect(year.value({ year: 1969 })).toEqual(['1969'])
+    expect(year.value({})).toEqual([])
   })
 })

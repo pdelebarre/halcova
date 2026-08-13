@@ -121,6 +121,7 @@
    labels), so the search pill keeps a usable width at 375px. */
 @media (max-width: 639px) {
   .filter-label { display: none; }
+  .browse-label { display: none; }
   .loans-btn { padding: 0 10px; gap: 4px; }
   .loans-label { display: none; }
 }

@@ -6,8 +6,10 @@ import SectionHeader from './components/SectionHeader'
 import CoverShelf from './components/CoverShelf'
 import MatchPicker from './components/MatchPicker'
 import ScanResult from './components/ScanResult'
+import AisleSheet from './components/AisleSheet'
 import { useCollection } from './hooks/useCollection'
 import { findRelated, splitArtistTitle } from './utils/match'
+import { itemInBin } from './utils/browse'
 import { t, getLocale } from './i18n'
 import './App.css'
 
@@ -53,6 +55,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const [activeArtist, setActiveArtist] = useState('')
   const [activeLending, setActiveLending] = useState(false) // W7: only on-loan items
   const [sortBy, setSortBy] = useState('added')
+  // The Aisles (§ Phase 2): a selected browse bin ({ axisId, value }) acts as
+  // a filter; the sheet is the picker.
+  const [activeAisle, setActiveAisle] = useState(null)
+  const [aisleSheetOpen, setAisleSheetOpen] = useState(false)
 
   // Free tier: the counter reflects the WHOLE collection (items.length, not the
   // filtered/visible count) and add flows are gated once the cap is reached so
@@ -131,6 +137,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     setActiveGenres([])
     setActiveArtist('')
     setActiveLending(false)
+    setActiveAisle(null)
   }
 
   // Reset only the format/genre/artist/lending filters (search stays) — used
@@ -140,6 +147,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     setActiveGenres([])
     setActiveArtist('')
     setActiveLending(false)
+    setActiveAisle(null)
   }
 
   // Distinct genres and artists present in the collection — drives the classification filters.
@@ -161,7 +169,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     }
   }, [items])
 
-  const hasActiveFilters = debouncedQuery.trim() !== '' || activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending
+  const hasActiveFilters = debouncedQuery.trim() !== '' || activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending || activeAisle !== null
 
   // The Floor (§ Phase 1): curated shelves shown in the default browse state
   // (grid view, no filters, "Recently added" sort). New arrivals appear only
@@ -247,6 +255,23 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     } catch {
       showToast(t('view.couldNotSave'), 'error')
     }
+  }
+
+  // The Aisles (§ Phase 2): picking a bin applies it as a filter; the chip
+  // above the grid shows the active bin and clears it.
+  const activeAisleLabel = useMemo(() => {
+    if (!activeAisle) return ''
+    const axis = catalog.browseAxes?.find((a) => a.id === activeAisle.axisId)
+    return axis ? `${axis.label}: ${activeAisle.value}` : activeAisle.value
+  }, [activeAisle, catalog])
+
+  function handlePickAisle(axisId, value) {
+    setActiveAisle({ axisId, value })
+    setAisleSheetOpen(false)
+  }
+
+  function handleClearAisle() {
+    setActiveAisle(null)
   }
 
   // The core "am I looking at a duplicate" step — every path into the app
@@ -410,6 +435,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     if (activeLending) {
       list = list.filter((it) => !!it.lending)
     }
+    // The Aisles (§ Phase 2): a selected bin filters to items in that bin.
+    if (activeAisle) {
+      const axis = catalog.browseAxes?.find((a) => a.id === activeAisle.axisId)
+      if (axis) list = list.filter((it) => itemInBin(it, axis, activeAisle.value))
+    }
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.trim().toLowerCase()
       list = list.filter((it) =>
@@ -437,7 +467,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       sorted.sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
     }
     return sorted
-  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, sortBy])
+  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog, sortBy])
 
   return (
     <>
@@ -477,6 +507,9 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onToggleLending={toggleLending}
           onOpenLoans={onOpenLoans}
           loansButtonRef={loansButtonRef}
+          onOpenAisles={() => setAisleSheetOpen(true)}
+          aislesOpen={aisleSheetOpen}
+          extraFilterCount={activeAisle ? 1 : 0}
         />
       )}
 
@@ -512,6 +545,20 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
         {status === 'ready' && items.length > 0 && visibleItems.length === 0 && (
           <EmptyState kind="no-results" copy={copy} onClear={clearFilters} />
+        )}
+
+        {activeAisle && (
+          <div className="aisle-chip-row">
+            <button
+              type="button"
+              className="aisle-chip"
+              onClick={handleClearAisle}
+              aria-label={`${copy.browse?.clear || 'Clear browse'}: ${activeAisleLabel}`}
+            >
+              <span className="aisle-chip-label">{activeAisleLabel}</span>
+              <span className="aisle-chip-clear" aria-hidden="true">✕</span>
+            </button>
+          </div>
         )}
 
         {status === 'ready' && visibleItems.length > 0 && showFloor && (
@@ -686,6 +733,18 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onReturn={handleReturn}
           showToast={showToast}
           isDemo={isDemo}
+        />
+      )}
+
+      {aisleSheetOpen && (
+        <AisleSheet
+          axes={catalog.browseAxes || []}
+          items={items}
+          activeAisle={activeAisle}
+          onPick={handlePickAisle}
+          onClear={handleClearAisle}
+          onClose={() => setAisleSheetOpen(false)}
+          copy={copy}
         />
       )}
     </>

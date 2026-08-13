@@ -9,6 +9,8 @@
 import * as discogs from './api/discogs'
 import * as books from './api/books'
 import { t } from './i18n'
+import { splitArtistTitle } from './utils/match'
+import { decadeOf } from './utils/browse'
 import AlbumCard from './components/AlbumCard'
 import AlbumGrid from './components/AlbumGrid'
 import AlbumDetail from './components/AlbumDetail'
@@ -36,6 +38,15 @@ export const recordsCatalog = {
     { value: 'artist', label: 'Artist A–Z' },
     { value: 'year', label: 'Year' },
     { value: 'format', label: 'Format' },
+  ],
+  // The Aisles (§ Phase 2): browse axes for the aisle picker. Each axis knows
+  // how to extract its bin value(s) from an item; bins are counted client-side.
+  browseAxes: [
+    { id: 'genre', label: 'Genre', value: (item) => (item.genre || []).map((g) => String(g).trim()).filter(Boolean) },
+    { id: 'artist', label: 'Artist', value: (item) => [splitArtistTitle(item.title).artist].filter(Boolean) },
+    { id: 'decade', label: 'Decade', value: (item) => [decadeOf(item.year)] },
+    { id: 'format', label: 'Format', value: (item) => (item.formatType ? [item.formatType] : []) },
+    { id: 'label', label: 'Label', value: (item) => (item.label ? [item.label] : []) },
   ],
   components: {
     Card: AlbumCard,
@@ -88,6 +99,12 @@ export const recordsCatalog = {
       pinnedToast: 'Pinned to your picks',
       unpinnedToast: 'Removed from your picks',
     },
+    browse: {
+      label: 'Browse',
+      title: 'Browse your crate',
+      clear: 'Clear browse',
+      empty: 'Nothing to show here yet.',
+    },
     lending: {
       section: t('lending.section'),
       statusOut: (name, date) => t('lending.statusOut', { name, date }),
@@ -139,6 +156,13 @@ export const booksCatalog = {
     { value: 'artist', label: 'Author A–Z' },
     { value: 'title', label: 'Title A–Z' },
     { value: 'year', label: 'Year' },
+  ],
+  // The Aisles (§ Phase 2): browse axes for the aisle picker. Books have no
+  // series field in the item shape, so the axes cover the data we actually have.
+  browseAxes: [
+    { id: 'category', label: 'Category', value: (item) => (item.genre || []).map((g) => String(g).trim()).filter(Boolean) },
+    { id: 'author', label: 'Author', value: (item) => [splitArtistTitle(item.title).artist].filter(Boolean) },
+    { id: 'year', label: 'Year', value: (item) => (item.year ? [String(item.year)] : []) },
   ],
   components: {
     Card: BookCard,
@@ -216,6 +240,12 @@ export const booksCatalog = {
       unpin: 'Unpin',
       pinnedToast: 'Pinned to your picks',
       unpinnedToast: 'Removed from your picks',
+    },
+    browse: {
+      label: 'Browse',
+      title: 'Browse your shelf',
+      clear: 'Clear browse',
+      empty: 'Nothing to show here yet.',
     },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,

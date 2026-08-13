@@ -34,6 +34,9 @@ export default function Toolbar({
   onToggleLending,
   onOpenLoans,
   loansButtonRef,
+  onOpenAisles,
+  aislesOpen = false,
+  extraFilterCount = 0,
   minimal = false,
 }) {
   const scrolled = useScrolled()
@@ -43,8 +46,10 @@ export default function Toolbar({
   const sortBtnRef = useRef(null)
 
   const loansLabel = copy.lending?.loans || t('lending.loans')
+  const browseLabel = copy.browse?.label || 'Browse'
 
-  const activeFilterCount = activeFormats.length + activeGenres.length + (activeArtist ? 1 : 0) + (activeLending ? 1 : 0)
+  // extraFilterCount lets the owner add the active browse aisle to the badge.
+  const activeFilterCount = activeFormats.length + activeGenres.length + (activeArtist ? 1 : 0) + (activeLending ? 1 : 0) + (extraFilterCount || 0)
   const currentSortLabel = useMemo(
     () => sortOptions.find((o) => o.value === sortBy)?.label || sortBy,
     [sortOptions, sortBy],
@@ -123,6 +128,21 @@ export default function Toolbar({
         )}
         <span className="toolbar-count" aria-hidden="true">{Number(count || 0).toLocaleString(getLocale())}</span>
       </div>
+
+      <button
+        type="button"
+        className="toolbar-btn browse-btn"
+        onClick={onOpenAisles}
+        aria-haspopup="dialog"
+        aria-expanded={aislesOpen}
+        aria-label={browseLabel}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" />
+        </svg>
+        <span className="browse-label">{browseLabel}</span>
+      </button>
 
       <button
         ref={filterBtnRef}
