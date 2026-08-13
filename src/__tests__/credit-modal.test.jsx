@@ -40,6 +40,16 @@ describe('CreditModal', () => {
     expect(screen.getByText('Hokan')).toBeInTheDocument()
   })
 
+  it('shows the Treasure Nook app mark above the wordmark', () => {
+    renderModal()
+
+    const mark = document.querySelector('.credits-mark svg')
+    expect(mark).toBeInTheDocument()
+    // The mark is the Gothic arch + tilted card — the app's collection-agnostic icon.
+    expect(mark.querySelector('path[stroke]')).toBeInTheDocument()
+    expect(mark.querySelector('rect[fill]')).toBeInTheDocument()
+  })
+
   it('renders all section headings in English', () => {
     renderModal()
 

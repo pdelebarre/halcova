@@ -30,6 +30,12 @@
 			"type": "shell",
 			"command": "npm run lint && npm test",
 			"group": "none"
+		},
+		{
+			"label": "Verify all gates",
+			"type": "shell",
+			"command": "npm run lint 2>&1 | tail -5 && npm test 2>&1 | tail -8 && npm run build 2>&1 | tail -8",
+			"group": "none"
 		}
 	]
 }

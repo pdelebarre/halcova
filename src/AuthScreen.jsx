@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { t } from './i18n'
+import TreasureNookMark from './components/TreasureNookMark'
 import './AuthScreen.css'
 
 // First screen a visitor sees. Two paths:
@@ -133,7 +134,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-disc" aria-hidden="true" />
+        <TreasureNookMark className="auth-mark" size={104} />
         <h1 className="auth-wordmark">Hokan</h1>
         <p className="auth-tagline">{t('auth.tagline')}</p>
         <div className="auth-actions">

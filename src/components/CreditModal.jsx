@@ -1,4 +1,5 @@
 import { t } from '../i18n'
+import TreasureNookMark from './TreasureNookMark'
 import './CreditModal.css'
 
 export default function CreditModal({ onClose }) {
@@ -11,6 +12,7 @@ export default function CreditModal({ onClose }) {
         </div>
 
         <div className="credits-body">
+          <div className="credits-mark"><TreasureNookMark size={72} /></div>
           <div className="credits-wordmark">Hokan</div>
 
           <section className="credits-section">
