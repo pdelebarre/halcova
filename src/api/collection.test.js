@@ -84,4 +84,48 @@ describe('collection API', () => {
     })
     await expect(collection.listItems()).rejects.toThrow('Request failed (500)')
   })
+
+  it('attaches the server code to a 403 PLAN_LIMIT error from add', async () => {
+    global.fetch.mockResolvedValue(errorJson(403, {
+      error: "You've reached the free plan limit of 10 items. Ask the admin to upgrade your plan.",
+      code: 'PLAN_LIMIT',
+    }))
+    try {
+      await collection.addItem({ title: 'X' }, 'records')
+      throw new Error('expected addItem to reject')
+    } catch (err) {
+      expect(err.message).toContain('free plan limit of 10 items')
+      expect(err.code).toBe('PLAN_LIMIT')
+    }
+  })
+
+  it('attaches the server code to a 403 DEMO_READONLY error from delete', async () => {
+    global.fetch.mockResolvedValue(errorJson(403, {
+      error: 'The demo collection is read-only. Sign in to add your own items.',
+      code: 'DEMO_READONLY',
+    }))
+    await expect(collection.deleteItem('r1', 'records')).rejects.toMatchObject({
+      message: 'The demo collection is read-only. Sign in to add your own items.',
+      code: 'DEMO_READONLY',
+    })
+  })
+
+  it('surfaces the server message for a 403 / 404 error body', async () => {
+    global.fetch.mockResolvedValue(errorJson(403, { error: "Your plan doesn't include the books collection." }))
+    await expect(collection.listItems('books')).rejects.toThrow("Your plan doesn't include the books collection.")
+
+    global.fetch.mockResolvedValue(errorJson(404, { error: 'Not found' }))
+    await expect(collection.updateItem('nope', { notes: 'x' })).rejects.toThrow('Not found')
+  })
+
+  it('throws a code-less error when the error body has an error but no code', async () => {
+    global.fetch.mockResolvedValue(errorJson(500, { error: 'Blob store exploded' }))
+    try {
+      await collection.listItems()
+      throw new Error('expected listItems to reject')
+    } catch (err) {
+      expect(err.message).toBe('Blob store exploded')
+      expect(err.code).toBeUndefined()
+    }
+  })
 })
