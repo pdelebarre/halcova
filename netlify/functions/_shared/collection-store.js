@@ -8,7 +8,7 @@
 // any per-account capability (e.g. the owner's `features: { lending: true }`)
 // belongs here.
 
-import { ADMIN_KEY, OWNER_ID, bearer } from './auth'
+import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './auth'
 import { findUserByCode } from './users'
 
 // Only these collection kinds exist; anything else is rejected.
@@ -45,6 +45,11 @@ export async function authorize(req) {
       // The owner has every feature flag on by default (W3).
       features: { lending: true },
     }
+  } else if (isDemoCode(code)) {
+    // The demo code is a constant identity, NOT a stored user — resolve it
+    // before the member lookup so no user record ever needs to exist. The
+    // demo profile passes the `status === 'active'` check below.
+    user = DEMO_USER
   } else {
     user = await findUserByCode(code)
   }

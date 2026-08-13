@@ -17,6 +17,15 @@ export default async (req) => {
     return json(403, { error: `Your plan doesn't include the ${collection} collection.` })
   }
 
+  // The demo space is read-only, enforced server-side. GET stays open so demo
+  // visitors can browse, scan and search; every write is rejected.
+  if (req.method !== 'GET' && user.role === 'demo') {
+    return json(403, {
+      error: 'The demo collection is read-only. Sign in to add your own items.',
+      code: 'DEMO_READONLY',
+    })
+  }
+
   // Owner → legacy stores (existing data preserved); members → their own
   // isolated store per kind.
   const store = getStore(storeNameFor(user.id, collection))

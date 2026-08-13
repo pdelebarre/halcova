@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, OWNER_ID, bearer } from './_shared/auth'
+import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
 import { findUserByCode } from './_shared/users'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
@@ -38,6 +38,9 @@ async function authorize(req) {
   let user
   if (code === ADMIN_KEY) {
     user = { id: OWNER_ID, role: 'admin', status: 'active', collections: { records: true, books: true } }
+  } else if (isDemoCode(code)) {
+    // Lookups must keep working for the demo identity (T6) — never gate them.
+    user = DEMO_USER
   } else {
     user = await findUserByCode(code)
   }

@@ -3,7 +3,7 @@
 // admin from the admin panel, and the admin key comes from RUNOUT_ADMIN_KEY.
 
 import { randomUUID } from 'node:crypto'
-import { ADMIN_KEY, OWNER_ID, bearer, publicUser } from './_shared/auth'
+import { ADMIN_KEY, DEMO_CODE, DEMO_USER, OWNER_ID, bearer, isDemoCode, publicUser } from './_shared/auth'
 import {
   findPendingRequestByEmail,
   findUserByCode,
@@ -64,6 +64,11 @@ async function profileForCode(code) {
       status: 'active',
     }
   }
+  // The demo code is a constant identity (like the owner) — resolve it before
+  // the member lookup so no user record is needed (see _shared/auth.js).
+  if (isDemoCode(code)) {
+    return DEMO_USER
+  }
   return findUserByCode(code.toUpperCase())
 }
 
@@ -77,13 +82,14 @@ async function handleLogin(body) {
   return json(200, sessionPayload(user))
 }
 
-// The canonical code for a session: the admin key for the owner, or the
-// member's stored (uppercase) code. Storing this client-side means every later
-// API call authenticates no matter how the code was typed at sign-in.
+// The canonical code for a session: the admin key for the owner, the public
+// demo code for the demo identity, or the member's stored (uppercase) code.
+// Storing this client-side means every later API call authenticates no matter
+// how the code was typed at sign-in.
 function sessionPayload(user) {
   return {
     user: publicUser(user),
-    code: user.role === 'admin' ? ADMIN_KEY : user.code,
+    code: user.role === 'admin' ? ADMIN_KEY : (user.role === 'demo' ? DEMO_CODE : user.code),
   }
 }
 

@@ -14,6 +14,29 @@ export const ADMIN_KEY = process.env.RUNOUT_ADMIN_KEY || 'runout-dev-admin-key'
 // blob stores (runout-collection / runout-library) so nothing needs migrating.
 export const OWNER_ID = 'owner'
 
+// The public demo space rides the auth model as a CONSTANT identity, exactly
+// like the owner — no user record is created. RUNOUT_DEMO_CODE is deliberately
+// NOT secret: it ships in the client so the "Try the free demo" button can
+// sign visitors in. It is safe only because the demo store is read-only
+// (collection.js rejects demo writes with DEMO_READONLY).
+export const DEMO_CODE = process.env.RUNOUT_DEMO_CODE || 'RUNOUT-DEMO-0000'
+
+export function isDemoCode(code) {
+  return typeof code === 'string' && code.toUpperCase() === DEMO_CODE.toUpperCase()
+}
+
+// The demo visitor's profile. Same special-case pattern as the owner constant;
+// `features: {}` deliberately — the demo space has no lending.
+export const DEMO_USER = {
+  id: 'demo',
+  role: 'demo',
+  name: 'Demo',
+  email: '',
+  collections: { records: true, books: true },
+  features: {},
+  status: 'active',
+}
+
 // Pull the Bearer token out of an Authorization header, if present.
 export function bearer(req) {
   const header = req.headers.get('authorization') || ''
