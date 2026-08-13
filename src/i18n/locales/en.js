@@ -66,6 +66,19 @@ const en = {
   'scan.retryCamera': 'Retry camera',
   'scan.enterManually': 'Enter details manually instead',
 
+  // §6b Cover scan (on-device OCR — camera/gallery, no barcode needed)
+  'coverScan.title': 'Scan a cover',
+  'coverScan.help': 'Frame the front of the cover so the artist and title are readable.',
+  'coverScan.capture': 'Capture',
+  'coverScan.choosePhoto': 'Choose a photo',
+  'coverScan.retake': 'Retake',
+  'coverScan.identifying': 'Reading the cover…',
+  'coverScan.noText': "Couldn't read the cover — try a clearer photo or enter the details manually.",
+  'coverScan.searching': 'Looking it up…',
+  'coverScan.timedOut': 'Reading the cover took too long — try again or pick a different photo.',
+  'coverScan.error': 'Something went wrong with the camera or photo.',
+  'coverScan.close': 'Cancel cover scan',
+
   // §7 Manual add (records & books)
   'add.searchResults': 'Search results',
   'add.lookingUpDiscogs': 'Looking it up on Discogs…',

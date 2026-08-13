@@ -43,11 +43,34 @@ guide is your friend.
 | Facebook Reels | 9:16 | 15–60s | feed + groups |
 | Facebook feed | 1:1 (1080×1080) | 15–30s | square crop of the reel |
 | X | 16:9 (1280×720) or 1:1 | 15–30s | video embeds in tweets |
+| YouTube Shorts | 9:16 (1080×1920) | ≤60s | Shorts feed + search + channel |
+| YouTube long-form | 16:9 (1920×1080) | 3–5 min | watch page + search (Phase 4+) |
 
 **Rule of thumb:** build every asset at 9:16 with the hook in the top-center
 third; export 1:1 and 16:9 crops from the same project. **Hook rule:** the first
 2 seconds must contain the full question/statement in text — most viewers decide
 in 1.5s, with sound off.
+
+**YouTube specifics:** Shorts export at 9:16 1080×1920 MP4, ≤60s (keeps the
+audio picker + loop-friendly), and get a **re-cut hook/title** from the IG
+version — never upload an untouched Reel. Long-form exports at 16:9 1080p and
+gets a custom **thumbnail (1280×720, high-contrast, one benefit line + the
+barcode mark)** — thumbnails drive YouTube's impressions CTR. Full workflow:
+`campaign-youtube-playbook.md` §4–§5.
+
+### Benefits & humor on screen (applies to every asset)
+
+- **Say the feature once, sell the benefit three times.** On-screen text leads
+  with *what you get*: **"Never rebuy."** · **"Know what you own."** · **"A
+  crate cataloged in an afternoon."** Feature words (Discogs, ISBN, EAN) only
+  appear as small labels.
+- **Humor = one wry caption, never slapstick.** A self-deprecating collector
+  line or a "villain line" per asset at most (joke bank:
+  `review-benefits-humor.md` §5.2). It lands as text in the safe zone or in the
+  caption — not as a skit.
+- **Muted-first:** if the joke needs the audio to land, it's not a video joke —
+  put it in the caption instead.
+- **Never joke about** features we don't have, internals, or anyone's taste.
 
 ---
 
@@ -123,10 +146,12 @@ Real screen recording of Halcova (record tab), edited in PicsArt:
 - **0–2s:** hook text overlay: **"The whole app in 30 seconds."**
 - **2–14s:** scan a real record sleeve → match picker → confirm. Overlays:
   mono captions **"SCANNING…"**, **"FOUND IT"**, gold scan-sweep over the
-  barcode. *(Screen recording zoomed to keep the phone UI readable.)*
+  barcode. Benefit caption: **"A whole crate, cataloged in an afternoon."**
+  *(Screen recording zoomed to keep the phone UI readable.)*
 - **14–22s:** the "not in your crate yet" flag. Caption: **"It remembers what
-  you own."**
-- **22–30s:** added to crate. End card: **"Your crate. Cataloged."**
+  you own — so you never rebuy."**
+- **22–30s:** added to crate. End card: **"Your crate. Cataloged."** — small
+  wry sub-line: *(no spreadsheet required)*
 - **Audio:** the app's real beep/vibration sound if any, else a clean beep +
   light beat. Keep it ASMR-satisfying.
 - **Never fabricate the UI.** This is a real recording; if the screen is messy,
@@ -134,24 +159,31 @@ Real screen recording of Halcova (record tab), edited in PicsArt:
 
 ### V9 — Demo: scan a book (30s, 9:16) · Phase 3
 - Same structure as V8 on the Books tab: **"SCANNING…"** → ISBN → edition →
-  **"Already on your shelf?"** → added. End card: **"Your shelf. Cataloged."**
+  **"Already on your shelf?"** → added. Benefit caption during the scan:
+  **"Finally know what's on that shelf."** End card: **"Your shelf.
+  Cataloged."** — wry sub-line: *(even the pile from 2019)*
 - **Audio:** softer — page-turn under the beep.
 
 ### V10 — "Never double-buy" (20s, 9:16) · Phase 3
 - **0–3s:** reenact the used-store moment (your hand picking up a sleeve).
-  Text: **"At the record shop."**
+  Text: **"At the record shop."** — small caption below: *(the collector's
+  prayer: "do I have this?" — hold up, squint, buy it anyway)*
 - **3–8s:** cut to the app flag: **"This exact record is already yours."** (real
-  screen recording of F-07, red accent).
+  screen recording of F-07, red accent). Caption: **"The record fair's worst
+  nightmare: a customer with a memory."**
 - **8–14s:** **"Different pressing? It tells you that too."** (the "other
   pressings you own" panel).
-- **14–20s:** end card: **"Never rebuy what you already own."** — gold serif.
+- **14–20s:** end card: **"Never rebuy what you already own."** — gold serif,
+  with **"Your wallet's new best friend."** as the wry sub-line.
 - **Audio:** record-fair ambience (light chatter) dropping out when the flag
   appears, replaced by a single clean "ding".
 
 ### V11 — The Open "It's open." (20s, 9:16) · Phase 4
 - **0–2s:** hook: **"It's open."** *(big, gold, quick zoom)*
 - **2–10s:** fast cut of V8/V9's best 4 seconds each (scan → flag → added).
-- **10–16s:** text: **"Your crate. Your shelf. One halcova."**
+  Benefit captions flash: **"Never rebuy."** · **"Know what you own."**
+- **10–16s:** text: **"Your crate. Your shelf. One halcova."** — wry sub-line:
+  *(two piles of guilt, now one cozy place)*
 - **16–20s:** **"Request access →"** with the link/QR. *(Stories: swipe-up/
   link sticker.)*
 - **Audio:** triumphant, warm; end on a solid chord.
@@ -159,7 +191,8 @@ Real screen recording of Halcova (record tab), edited in PicsArt:
 ### V12 — UGC challenge "Show us your halcova." (15s, 9:16) · Phase 5
 - **0–3s:** hook: **"New challenge."**
 - **3–10s:** montage of real user scans (permissioned) — *or* a stylized
-  re-enactment until you have real ones.
+  re-enactment until you have real ones. Caption: **"Watch the 'do I have
+  this?' moment die on camera."**
 - **10–15s:** **"Post your scan with #WhatsInYourHalcova. Best ones get
   reposted."**
 - **Audio:** trending/upbeat; keep captions on (many watch muted).

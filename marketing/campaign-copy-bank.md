@@ -8,6 +8,14 @@ F-21–F-24). No invented features, metrics, pricing, or testimonials. Copy is *
 master**; per-market lines from `copy-kit-halcova.md` §7 apply at the name-reveal.
 Asset IDs (V1–V14) map to `campaign-picsart-video-spec.md`.
 
+**Benefits & humor layer (applies to every post):** say the feature once, sell
+the benefit three times — lead with *what you get* (never rebuy · finally know
+what you own · catalog a crate in an afternoon · two loves, one place). Add one
+wry, self-deprecating collector joke where it fits (joke bank + voice:
+`review-benefits-humor.md` §4–§5). Situational jokes translate; puns get
+`[VALIDATE]`. Never joke about features we don't have, leak internals, or roast
+competitors/artists/users.
+
 **Do-not-say (always):** no access codes (`RU-…`), no admin/approval internals,
 no app-store/pricing claims, no fake testimonials or counts.
 
@@ -197,26 +205,31 @@ Tomorrow." — builds the DM relationship early.
 **IG/FB:**
 > Meet **Halcova**. 🏛️✨
 >
-> Your crate. Your shelf. One halcova.
+> The thing I built for people like us — the ones who've bought the same record
+> twice. (I once bought the same book twice. On purpose, apparently.)
 >
-> Scan a barcode → it looks the record up on Discogs (or the book up on Google
-> Books) → confirm → done. And it remembers what you already own, so you never
-> double-buy.
+> What it does for you: scan a barcode → it finds the real release on Discogs
+> (or the edition on Google Books) → confirm → done. Catalog your crate in an
+> afternoon, not a weekend. And it remembers what you already own, so you
+> **never rebuy** — consider it your wallet's new best friend.
 >
-> This is the thing I've been teasing. It's almost ready. 🎶📚
+> Two loves. One halcova. 🎶📚
+>
+> This is the thing I've been teasing. It's almost ready.
 >
 > Follow — it opens soon.
 >
-> #Halcova #WhatsInYourHalcova #vinyl #bookstagram
+> #Halcova #WhatsInYourHalcova #vinyl #bookstagram #NeverRebuy
 
-**X — the reveal thread (7 tweets):**
+**X — the reveal thread (8 tweets):**
 > 1/ You know the feeling: record fair, pull the sleeve, "do I have this?" — buy it, get home, it's yours.
-> 2/ Or the book you ordered twice. We've all been there.
+> 2/ Or the book you ordered twice. We've all been there. (I once bought the same book twice. On purpose, apparently.)
 > 3/ So I built something for people like us.
 > 4/ Meet **Halcova** — your records and your books, in one cozy place.
-> 5/ Point your camera at a barcode. It looks it up (Discogs for records, Google Books for books). Confirm. Done. It remembers what you own — no more double-buying.
-> 6/ No app store. No passwords. It runs in your browser and installs to your home screen.
-> 7/ It opens soon. Request access when it does. — [link]
+> 5/ What it does for you: point your camera at a barcode → it finds the real release (Discogs for records, Google Books for books) → confirm → done. Catalog a crate in an afternoon.
+> 6/ It remembers what you own, so you never rebuy. Your wallet's new best friend.
+> 7/ No app store. No passwords. It runs in your browser and installs to your home screen.
+> 8/ It opens soon. Request access when it does. — [link]
 
 ### Day 12 · V8 — Demo: scan a record
 
@@ -225,7 +238,10 @@ Tomorrow." — builds the DM relationship early.
 >
 > Point → scan → it finds the exact release → "not in your crate yet" → added.
 >
-> Yes, it tells you when you already own something. Yes, that's the best part.
+> That's a whole crate cataloged in an afternoon — not the weekend you planned
+> around a spreadsheet.
+>
+> And yes, it tells you when you already own something. Yes, that's the best part.
 >
 > #vinyl #recordcollection #Halcova #NeverRebuy
 
@@ -239,6 +255,9 @@ Tomorrow." — builds the DM relationship early.
 **IG/FB (V9):**
 > The shelf side of Halcova: scan the ISBN, it finds the edition, onto your
 > shelf. 📚
+>
+> Finally know what's on that shelf — even the stack you've been meaning to
+> sort since 2019.
 >
 > Two loves. One halcova.
 >
@@ -254,6 +273,8 @@ Tomorrow." — builds the DM relationship early.
 > At the record shop, about to buy a duplicate?
 >
 > Halcova says: "This exact record is already yours." 🤝
+>
+> The record fair's worst nightmare: a customer with a memory.
 >
 > Tag the friend who needs this. #vinyl #NeverRebuy
 
@@ -283,6 +304,8 @@ Tomorrow." — builds the DM relationship early.
 > Request access → [LINK]
 >
 > Opening in waves. If you've ever bought a record twice, you know why.
+>
+> (Your wallet's new best friend.)
 
 **Stories:** swipe-up/link sticker + "I'm in" excitement + a real first scan
 (permissioned).
@@ -295,7 +318,8 @@ Tomorrow." — builds the DM relationship early.
 > Catalog a shelf or a crate with Halcova, film the scan, post it with
 > #WhatsInYourHalcova — I'll repost the best ones.
 >
-> Your crate. Your shelf. One halcova.
+> Watch those "do I have this?" moments die on camera. Your crate. Your shelf.
+> One halcova.
 >
 > #Halcova #vinyl #bookstagram #recordcollection
 
@@ -324,12 +348,18 @@ Tomorrow." — builds the DM relationship early.
 > Tell me the record (or book) you own twice. I'll go first: mine was a
 > certain blue Christmas album. 👀 — [replace with the owner's real one or drop
 > this line]
+>
+> No judgment. We've all got at least one. Mine has its own shelf space.
 
 ---
 
 ## Translation-ready notes (post-reveal)
 
 - **Halcova** stays untranslated everywhere (proper noun).
+- **Humor translates by situation, not by word.** Situational jokes (double-buy,
+  sorting piles, the squint) survive translation; wordplay needs a native
+  rewrite — keep at least one situational joke per localized post
+  (`review-benefits-humor.md` §5).
 - Per-market tone + draft lines: `copy-kit-halcova.md` §7 (FR/PT/NL/DE/ES/IT).
 - Localize **the pain, not the pitch** first: the double-buy confession and the
   "do I own this?" moment are culture-proof; the wordplay ("Two loves. One
@@ -349,3 +379,61 @@ Tomorrow." — builds the DM relationship early.
 - Never post the identical caption on X, IG, and FB — retune the first line
   and CTA per platform.
 - Reply to every comment on Days 5–11 (curiosity phase = every reply compounds).
+
+---
+
+## YouTube — Shorts titles & descriptions (strategy/workflow: `campaign-youtube-playbook.md`)
+
+Re-cut each 9:16 hero as a **Short** the same day — new hook text, new title,
+never an untouched IG export. Titles are benefit-led, keyword-front-loaded,
+≤60 chars, and **name-free before Day 11** (no spoilers).
+
+### Shorts title bank
+
+| Asset | Title (≤60 chars) |
+| --- | --- |
+| V1 | "You've bought this record twice. Be honest. 🫣 #Shorts" |
+| V2 | "300 records and I don't know what I own #Shorts" |
+| V4 | "Two loves, one place. (clue #2) #Shorts" |
+| V5 | "Point your camera at it. That's the whole trick #Shorts" |
+| V7 | "Meet Halcova — never rebuy what you already own #Shorts" |
+| V8 | "Scan a barcode → your crate, cataloged. In 30 seconds #Shorts" |
+| V9 | "Scan the ISBN → your bookshelf, finally known #Shorts" |
+| V10 | "The record fair's worst nightmare: a customer with a memory #Shorts" |
+| V11 | "It's open — request access to Halcova #Shorts" |
+| V12 | "Show us your halcova: the #WhatsInYourHalcova challenge #Shorts" |
+
+### Description template (keyword-rich first 2 lines — the part people see before "…more")
+
+```
+[Benefit line — e.g. "Catalog your vinyl and books by scanning their barcodes.
+Never buy the same record twice again."]
+
+Request access: [LANDING-URL]?utm_source=youtube&utm_medium=social&utm_campaign=halcova-launch-2026&utm_content=<asset>
+
+Your crate. Your shelf. One halcova.
+Two loves — records and books — in one cozy place. Scan a barcode, it finds the
+real release (Discogs) or edition (Google Books), and it remembers what you
+already own so you never double-buy. Runs in your browser, installs to your
+home screen. No app store, no passwords.
+```
+
+### YouTube hashtags & tags
+
+- **Hashtags:** `#vinyl` `#vinylcollection` `#bookstagram` `#recordcollection`
+  `#Shorts` (required) + campaign `#Halcova` (post-reveal only) ·
+  `#WhatsInYourHalcova` · `#NeverRebuy`
+- **Tags (hidden, for discovery):** `vinyl collection app`, `catalog records`,
+  `barcode scanner vinyl`, `bookshelf organizer`, `never double buy`, `discogs`,
+  `isbn scanner`, `halcova`
+
+### Long-form titles (Phase 4+, 1/week)
+
+| Video | Title |
+| --- | --- |
+| "Meet Halcova" (2–3 min) — reveal + first demo | "Meet Halcova — your records and books, in one cozy place" |
+| "How Halcova works" (3–5 min) — V14 explainer | "How Halcova works: catalog records & books by scanning barcodes" |
+| "Why collectors double-buy (and how to stop)" | "Why collectors double-buy (and how to stop)" |
+
+Each long-form gets chapters, an end screen (next video + Request access link),
+and a mid-video card with the UTM'd link.

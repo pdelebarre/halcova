@@ -35,6 +35,9 @@ the name reveal.
    See §7 R-3 for the approval-bottleneck warning.
 4. **Budget.** Default: **near-zero, organic** (PicsArt subscription only). Paid boosts
    (IG/FB) are optional after Phase 3 if the teaser metrics justify it.
+5. **YouTube.** Default: **yes** — mirror the daily hero as a Short + weekly
+   long-form from Phase 4 (playbook: `campaign-youtube-playbook.md`). Adds ~10 min
+   upload work/day, no extra budget. Channel handle/brand gate before Day 11.
 
 ---
 
@@ -184,11 +187,13 @@ Goal: users become the channel. **This is where real virality compounds.**
 | **Instagram** | Reach engine (Reels) + Stories | 9:16 Reels (PicsArt), carousels, Stories countdown/polls | Reel 1/day; Stories 2–4/day | 7–9am, 12–1pm, 7–9pm |
 | **Facebook** | Groups + warm profile reach | Reels, square posts, group shares | 1/day | 12–1pm, 6–8pm |
 | **WhatsApp** | High-trust personal conversion | 1:1 messages + statuses (no broadcast) | sequenced, see playbook | personal; evenings/weekends |
+| **YouTube** | Search + long-tail reach; the archive | Shorts 9:16 (≤60s) mirror of the hero; 3–5 min long-form (16:9) from Phase 4 | Short 1/day Ph 1–4, then 2–3/wk; long-form 1/wk | evenings; weekends for long-form |
 
 **Cross-posting rule:** make the asset once in PicsArt, then **tune** per platform
-(captions, hashtags, CTA, first-line). Never paste the identical post on all four
+(captions, hashtags, CTA, first-line). Never paste the identical post on all five
 — each platform punishes copy-paste laziness differently and your audience on
-each is different.
+each is different. On YouTube the asset is **re-cut as a Short** (hook + title
+retuned) — never uploaded as an untouched IG export (`campaign-youtube-playbook.md` §4).
 
 **Hashtag strategy (IG/FB):** 3–5 tags, mixed:
 - Broad reach: `#vinyl`, `#vinylcollection`, `#bookstagram`, `#recordcollection`, `#vinylcommunity`
@@ -219,9 +224,10 @@ Never stuff tags; put the important ones in the caption, extras in the first com
 
 ## 6. Calendar (default: starts Mon 2026-08-17)
 
-> Every day = 1 X post + 1 IG Reel + 1 FB post + Stories. Asset IDs (V1–V14)
-> map to `campaign-picsart-video-spec.md`. Copy for each lives in
-> `campaign-copy-bank.md`. WhatsApp events are personal (playbook file).
+> Every day = 1 X post + 1 IG Reel + 1 FB post + 1 YouTube Short + Stories.
+> Asset IDs (V1–V14) map to `campaign-picsart-video-spec.md`. Copy for each
+> lives in `campaign-copy-bank.md`; Shorts titles in `campaign-youtube-playbook.md`
+> §5. WhatsApp events are personal (playbook file).
 
 | Day | Date | Phase | Hero asset | Hook (first line) | CTA |
 | --- | --- | --- | --- | --- | --- |
@@ -266,9 +272,12 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 | Retention | week-2 return | ≥ 30% | the real test |
 | Brand | "halcova app" branded search % | trending up | the brand-search KPI (grows after the reveal) |
 | Loop | shares per post; UGC entries | growing | Phase 5 compounding |
+| YouTube reach | Shorts views / avg % viewed | 1–3k views, ≥60% avg viewed | Shorts ramp over 48–72h — judge at 3 days |
+| YouTube funnel | Short/long → landing (UTM) → requests | ≥ 5% request click-through from YT visits | measure via `utm_source=youtube` |
+| YouTube SEO | long-form views from search | growing | "how to catalog your collection" search crowd |
 
 ### UTM scheme (one link per channel, per post)
-`https://<halcova-domain>/?utm_source=<x|instagram|facebook|whatsapp>&utm_medium=<social|status|chat>&utm_campaign=halcova-launch-2026&utm_content=<V#|post-slug>`
+`https://<halcova-domain>/?utm_source=<x|instagram|facebook|whatsapp|youtube>&utm_medium=<social|status|chat>&utm_campaign=halcova-launch-2026&utm_content=<V#|post-slug>`
 
 ### Risks & mitigations
 
@@ -282,6 +291,8 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 | R-6 | Claiming features we don't have (store listings, pricing, metrics) | Copy bank is grounded in real behavior (F-01…F-24); do-not-say list in `copy-kit-halcova.md` §8. Never invent testimonials. |
 | R-7 | International backlash / "Halcova" meaning or sound in a target language | A native-speaker check for **Halcova** must pass before localized reveals `[VALIDATE]`. |
 | R-8 | WhatsApp feels like spam to contacts | Personal, sequenced, opt-in feeling — playbook file. Never mass-broadcast, never send codes to group chats/statuses. |
+| R-9 | **YouTube spoils the reveal** — Shorts leak the name before Day 11 | Phases 1–2 Shorts stay name-free; V7 scheduled exactly for Day 11 (playbook R-Y1). |
+| R-10 | Shorts judged after 24h and killed early | Shorts ramp over a couple of days — re-check at 72h before pulling (playbook R-Y2). |
 
 ---
 
@@ -293,7 +304,7 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 | **Front End Developer** | Ship the `Hokan`→`Halcova` code rename (wordmark/manifest/index.html/docs) — **required before Phase 3** (new dev ticket; model: `ticket-rename-Halcova.md`). |
 | **UI/UX Expert** | Hand over the Halcova icon **with a barcode element** (PNGs for `public/`) — `marketing/brief-halcova-icon.md` (before Phase 3). |
 | **Tester** | Green gates after rename (lint/test/build). |
-| **Marketing (me)** | Copy bank, video spec, WhatsApp playbook, UTM tracking, calendar. |
+| **Marketing (me)** | Copy bank, video spec, WhatsApp playbook, YouTube playbook (Shorts titles + long-form scripts), UTM tracking, calendar. |
 
 ## 9. Next steps
 

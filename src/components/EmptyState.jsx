@@ -1,7 +1,7 @@
 import { t } from '../i18n'
 import './EmptyState.css'
 
-export default function EmptyState({ kind = 'empty', copy = {}, onScan, onManualAdd, onClear }) {
+export default function EmptyState({ kind = 'empty', copy = {}, onScan, onScanCover, onManualAdd, onClear }) {
   const iconClass = copy.emptyIcon || 'empty-disc'
 
   if (kind === 'no-results') {
@@ -26,6 +26,11 @@ export default function EmptyState({ kind = 'empty', copy = {}, onScan, onManual
       <p className="empty-sub">{copy.emptySub || t('catalog.emptySub')}</p>
       {copy.emptyTagline && <p className="empty-tagline">{copy.emptyTagline}</p>}
       {onScan && <button type="button" className="btn btn-primary" onClick={onScan}>{copy.emptyBtn || t('catalog.emptyBtn')}</button>}
+      {onScanCover && (
+        <button type="button" className="btn btn-ghost" onClick={onScanCover} style={{ marginTop: 8 }}>
+          {copy.coverScan?.title || t('coverScan.title')}
+        </button>
+      )}
       {onManualAdd && (
         <button type="button" className="btn btn-ghost" onClick={onManualAdd} style={{ marginTop: 8 }}>
           {copy.emptyManualBtn || t('catalog.emptyManualBtn')}

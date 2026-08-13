@@ -31,13 +31,32 @@
   backdrop-filter: blur(8px);
 }
 
+/* Phone: search + six controls rarely fit one row. Scroll the row
+   horizontally instead of crushing the pill (see .toolbar-search min-width).
+   Scrollbar hidden; overflow-y: clip avoids a vertical scrollbar from the
+   search pill's glow. While search is active the siblings collapse to 0 so
+   the row fits and the scroll stays inert. */
+@media (max-width: 767px) {
+  .toolbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overflow-y: clip;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+}
+
 /* --- Search pill --- */
 .toolbar-search {
   position: relative;
   display: flex;
   align-items: center;
   flex: 1 1 auto;
-  min-width: 0;
+  /* The pill must never be crushed below its icon (left:14px) + a usable
+     field — otherwise the absolutely-positioned magnifying glass paints over
+     the next button (seen on phones once the row gained a 6th control). */
+  min-width: 132px;
   max-width: none;
 }
 
