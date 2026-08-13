@@ -1,6 +1,7 @@
 import { getStore } from '@netlify/blobs'
 import { randomUUID } from 'node:crypto'
 import { COLLECTIONS, authorize, json, readIndex, writeIndex } from './_shared/collection-store'
+import { planLimitFor } from './_shared/plans'
 import { storeNameFor } from './_shared/users'
 
 export default async (req) => {
@@ -16,6 +17,15 @@ export default async (req) => {
     return json(403, { error: `Your plan doesn't include the ${collection} collection.` })
   }
 
+  // The demo space is read-only, enforced server-side. GET stays open so demo
+  // visitors can browse, scan and search; every write is rejected.
+  if (req.method !== 'GET' && user.role === 'demo') {
+    return json(403, {
+      error: 'The demo collection is read-only. Sign in to add your own items.',
+      code: 'DEMO_READONLY',
+    })
+  }
+
   // Owner → legacy stores (existing data preserved); members → their own
   // isolated store per kind.
   const store = getStore(storeNameFor(user.id, collection))
@@ -29,6 +39,22 @@ export default async (req) => {
 
     if (req.method === 'POST') {
       const body = await req.json()
+
+      // Free-tier cap: enforced on ADDS only, server-side. Owner / unlimited
+      // users bypass it (planLimitFor returns null). The index is read BEFORE
+      // writing and re-read again right before writeIndex to narrow the
+      // concurrent-POST race (Netlify Blobs has no transactions — see ADR-0001).
+      const limit = planLimitFor(user)
+      if (limit != null) {
+        const before = await readIndex(store)
+        if (before.length >= limit) {
+          return json(403, {
+            error: `You've reached the free plan limit of ${limit} items. Ask the admin to upgrade your plan.`,
+            code: 'PLAN_LIMIT',
+          })
+        }
+      }
+
       const newId = randomUUID()
       const item = { ...body, id: newId, dateAdded: body.dateAdded || new Date().toISOString() }
       await store.setJSON(`item:${newId}`, item)

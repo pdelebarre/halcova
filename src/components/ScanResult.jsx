@@ -64,7 +64,7 @@ function RelatedSection({ heading, items, onOpen, moreLabel }) {
   )
 }
 
-export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArtist, onAdd, onOpenItem, onScanNext, onClose, copy }) {
+export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArtist, onAdd, onOpenItem, onScanNext, onClose, copy, isDemo = false }) {
   const { artist, album } = splitArtistTitle(candidate.title)
   const [adding, setAdding] = useState(false)
   const addTimer = useRef(null)
@@ -142,22 +142,28 @@ export default function ScanResult({ candidate, ownedExact, sameAlbum, otherArti
 
         <div className="sheet-actions">
           <button className="btn btn-ghost" onClick={onScanNext}>{copy.scanNext}</button>
-          <button
-            type="button"
-            className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
-            onClick={handleAdd}
-            disabled={adding}
-            aria-busy={adding}
-          >
-            {adding ? (
-              <>
-                <span className="add-disc" aria-hidden="true" />
-                {copy.addDone || t('catalog.addDone')}
-              </>
-            ) : (
-              <>{ownedExact ? (copy.addAnyway || t('catalog.addAnyway')) : (copy.add || t('catalog.add', { collectionLabel: '' }))}</>
-            )}
-          </button>
+          {isDemo ? (
+            // Read-only demo space (ADR-0001): there is no Add action — just a
+            // notice pointing visitors at signing in with their own account.
+            <p className="demo-readonly-notice">{t('demo.readOnlyNotice')}</p>
+          ) : (
+            <button
+              type="button"
+              className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
+              onClick={handleAdd}
+              disabled={adding}
+              aria-busy={adding}
+            >
+              {adding ? (
+                <>
+                  <span className="add-disc" aria-hidden="true" />
+                  {copy.addDone || t('catalog.addDone')}
+                </>
+              ) : (
+                <>{ownedExact ? (copy.addAnyway || t('catalog.addAnyway')) : (copy.add || t('catalog.add', { collectionLabel: '' }))}</>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

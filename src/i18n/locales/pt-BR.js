@@ -305,6 +305,22 @@ const ptBR = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Plano gratuito e demo
+  'plan.freeCounter': '{count} de {cap} itens adicionados',
+  'plan.atLimitHint': 'Você adicionou {cap} itens — o limite do plano gratuito. Peça ao admin para fazer upgrade para continuar adicionando.',
+  'plan.limitToast': 'Limite do plano gratuito atingido. Peça ao admin para fazer upgrade para adicionar mais.',
+  'plan.limitFab': 'Plano gratuito cheio — faça upgrade para adicionar mais',
+  'admin.plan': 'Plano',
+  'admin.planFree': 'Grátis',
+  'admin.planUnlimited': 'Ilimitado',
+  'demo.tryButton': 'Experimentar a demo gratuita',
+  'demo.banner': 'Você está explorando a coleção de demonstração somente leitura.',
+  'demo.signInPrompt': 'Entre para adicionar seus próprios discos e livros.',
+  'demo.leaveDemo': 'Sair da demo',
+  'demo.readOnlyNotice': 'Esta é a coleção de demonstração somente leitura — entre para adicionar a sua.',
+  'demo.readOnlyToast': 'A coleção de demonstração é somente leitura.',
+  'demo.notesReadOnly': 'As notas são somente leitura na demo.',
 }
 
 export default ptBR

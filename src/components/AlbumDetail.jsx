@@ -5,7 +5,7 @@ import { t } from '../i18n'
 import LendingControls from './LendingControls'
 import './AlbumDetail.css'
 
-export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, catalog, lendingEnabled, onLend, onReturn, showToast }) {
+export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, catalog, lendingEnabled, onLend, onReturn, showToast, isDemo = false }) {
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
@@ -116,16 +116,26 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
               onChange={(e) => { setNotes(e.target.value); if (notesError) setNotesError('') }}
               placeholder={t('detail.notesPlaceholderRecord')}
               rows={3}
+              readOnly={isDemo}
+              disabled={isDemo}
               aria-invalid={!!notesError}
               aria-describedby={notesError ? 'detail-notes-error' : undefined}
             />
-            <div className="detail-notes-actions">
-              <button type="button" className="btn btn-ghost" onClick={saveNotes} disabled={!notesDirty}>
-                {notesSaved ? (copy.notesSaved || t('catalog.notesSaved')) : (copy.notesSave || t('catalog.notesSave'))}
-              </button>
-            </div>
-            {notesError && (
-              <p id="detail-notes-error" className="detail-field-error" role="alert">{notesError}</p>
+            {isDemo ? (
+              // Read-only demo (ADR-0001): notes can't be edited — show a hint
+              // instead of the Save action.
+              <p className="demo-notes-hint">{t('demo.notesReadOnly')}</p>
+            ) : (
+              <>
+                <div className="detail-notes-actions">
+                  <button type="button" className="btn btn-ghost" onClick={saveNotes} disabled={!notesDirty}>
+                    {notesSaved ? (copy.notesSaved || t('catalog.notesSaved')) : (copy.notesSave || t('catalog.notesSave'))}
+                  </button>
+                </div>
+                {notesError && (
+                  <p id="detail-notes-error" className="detail-field-error" role="alert">{notesError}</p>
+                )}
+              </>
             )}
           </div>
 
@@ -150,13 +160,15 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, cata
               {catalog.detailLinkLabel}
             </a>
           )}
-          <button
-            type="button"
-            className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
-            onClick={handleRemove}
-          >
-            {confirmDelete ? (copy.removeConfirm || t('catalog.removeConfirm')) : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))}
-          </button>
+          {!isDemo && (
+            <button
+              type="button"
+              className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
+              onClick={handleRemove}
+            >
+              {confirmDelete ? (copy.removeConfirm || t('catalog.removeConfirm')) : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))}
+            </button>
+          )}
         </div>
       </div>
     </div>

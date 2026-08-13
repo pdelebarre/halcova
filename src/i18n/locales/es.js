@@ -305,6 +305,22 @@ const es = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Plan gratuito y demo
+  'plan.freeCounter': '{count} de {cap} artículos añadidos',
+  'plan.atLimitHint': 'Has añadido {cap} artículos — el límite del plan gratuito. Pide al admin que mejore tu plan para seguir añadiendo.',
+  'plan.limitToast': 'Límite del plan gratuito alcanzado. Pide al admin que mejore tu plan para añadir más.',
+  'plan.limitFab': 'Plan gratuito lleno — mejora para añadir más',
+  'admin.plan': 'Plan',
+  'admin.planFree': 'Gratuito',
+  'admin.planUnlimited': 'Ilimitado',
+  'demo.tryButton': 'Probar la demo gratuita',
+  'demo.banner': 'Estás explorando la colección de demostración de solo lectura.',
+  'demo.signInPrompt': 'Inicia sesión para añadir tus propios discos y libros.',
+  'demo.leaveDemo': 'Salir de la demo',
+  'demo.readOnlyNotice': 'Esta es la colección de demostración de solo lectura: inicia sesión para añadir la tuya.',
+  'demo.readOnlyToast': 'La colección de demostración es de solo lectura.',
+  'demo.notesReadOnly': 'Las notas son de solo lectura en la demo.',
 }
 
 export default es

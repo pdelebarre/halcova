@@ -3,6 +3,7 @@ import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
 import CreditModal from './components/CreditModal'
 import LoansDashboard from './components/LoansDashboard'
+import DemoBanner from './components/DemoBanner'
 import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
@@ -50,6 +51,13 @@ export default function App() {
   // (user.features.lending). Gate for the shared LendingControls in details.
   const lendingEnabled = !!user.features?.lending
 
+  // Free tier & demo (ADR-0001). The owner/admin is implicitly unlimited; demo
+  // visitors are read-only (no plan, no adds), so `isFree` is forced off for
+  // them and only the demo banner/read-only UI applies.
+  const isDemo = user.role === 'demo'
+  const plan = user.role === 'admin' ? 'unlimited' : (user.plan || 'free')
+  const isFree = plan === 'free' && !isDemo
+
   if (!catalog) {
     // Signed in but no collections granted — shouldn't normally happen, but
     // be defensive rather than mounting a broken collection view.
@@ -80,6 +88,10 @@ export default function App() {
         onLogout={logout}
       />
 
+      {/* Read-only demo notice (ADR-0001): demo visitors browse but can't add
+          or edit. Leaving the demo signs out back to the auth screen. */}
+      {isDemo && <DemoBanner onLeave={logout} />}
+
       {/* keyed by kind so each collection remounts fresh when you switch tabs */}
       <CollectionView
         key={catalog.kind}
@@ -89,6 +101,10 @@ export default function App() {
         onOpenLoans={() => setLoansOpen(true)}
         refreshTick={refreshTick}
         loansButtonRef={loansButtonRef}
+        plan={plan}
+        isFree={isFree}
+        isDemo={isDemo}
+        user={user}
       />
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}

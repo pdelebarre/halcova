@@ -19,14 +19,22 @@ function fnUrl(collection, extra = {}) {
   return url.pathname + url.search
 }
 
+// Mirror the lookup clients (discogs.js / books.js): surface the server's
+// error message AND its machine-readable `code` (e.g. PLAN_LIMIT,
+// DEMO_READONLY) so callers can branch on the failure instead of string-
+// matching. Code-less errors just carry the message.
 async function handle(res) {
   if (!res.ok) {
     let msg = `Request failed (${res.status})`
+    let code
     try {
       const body = await res.json()
       if (body?.error) msg = body.error
+      if (body?.code) code = body.code
     } catch { /* ignore */ }
-    throw new Error(msg)
+    const err = new Error(msg)
+    if (code) err.code = code
+    throw err
   }
   return res.json()
 }

@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { t } from './i18n'
+import { DEMO_CODE } from './api/auth'
 import TreasureNookMark from './components/TreasureNookMark'
 import './AuthScreen.css'
 
 // First screen a visitor sees. Two paths:
 //   - "I have an access code" — members/owner sign in (code validated server-side)
 //   - "Request access" — creates a pending request the admin approves
+// Plus a public "Try the free demo" that signs into the read-only demo space
+// (ADR-0001) with the intentionally-public DEMO_CODE.
 export default function AuthScreen({ onLogin, onRequestAccess }) {
   const [mode, setMode] = useState('welcome') // welcome | login | request | sent
   const [code, setCode] = useState('')
@@ -22,6 +25,19 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     try {
       await onLogin(code.trim())
       // Success unmounts this screen (App renders the collection).
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+
+  async function handleDemo() {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await onLogin(DEMO_CODE)
+      // Success unmounts this screen; App renders the read-only demo space.
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -143,6 +159,9 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
           </button>
           <button className="btn btn-ghost btn-block" onClick={() => setMode('request')}>
             {t('auth.requestAccess')}
+          </button>
+          <button className="btn btn-demo btn-block" onClick={handleDemo} disabled={busy}>
+            {t('demo.tryButton')}
           </button>
         </div>
       </div>

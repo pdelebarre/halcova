@@ -305,6 +305,22 @@ const nl = {
   // §16 Update
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
+
+  // §17 Gratis abonnement & demo
+  'plan.freeCounter': '{count} van {cap} items toegevoegd',
+  'plan.atLimitHint': 'Je hebt {cap} items toegevoegd — de limiet van het gratis abonnement. Vraag de beheerder om een upgrade om door te gaan.',
+  'plan.limitToast': 'Limiet van het gratis abonnement bereikt. Vraag de beheerder om een upgrade om meer toe te voegen.',
+  'plan.limitFab': 'Gratis abonnement vol — upgrade om meer toe te voegen',
+  'admin.plan': 'Plan',
+  'admin.planFree': 'Gratis',
+  'admin.planUnlimited': 'Onbeperkt',
+  'demo.tryButton': 'Probeer de gratis demo',
+  'demo.banner': 'Je bekijkt de alleen-lezen demo-collectie.',
+  'demo.signInPrompt': 'Log in om je eigen platen & boeken toe te voegen.',
+  'demo.leaveDemo': 'Demo verlaten',
+  'demo.readOnlyNotice': 'Dit is de alleen-lezen demo-collectie — log in om je eigen toe te voegen.',
+  'demo.readOnlyToast': 'De demo-collectie is alleen-lezen.',
+  'demo.notesReadOnly': 'Notities zijn alleen-lezen in de demo.',
 }
 
 export default nl
