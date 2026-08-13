@@ -71,16 +71,16 @@ export async function adminList() {
   return getJson(ADMIN_URL, getAccessCode())
 }
 
-export async function adminApprove({ requestId, collections, features }) {
-  return postJson(ADMIN_URL, { action: 'approve', requestId, collections, features }, getAccessCode())
+export async function adminApprove({ requestId, collections, features, plan }) {
+  return postJson(ADMIN_URL, { action: 'approve', requestId, collections, features, plan }, getAccessCode())
 }
 
 export async function adminReject({ requestId }) {
   return postJson(ADMIN_URL, { action: 'reject', requestId }, getAccessCode())
 }
 
-export async function adminUpdateUser({ userId, collections, status, features }) {
-  return postJson(ADMIN_URL, { action: 'updateUser', userId, collections, status, features }, getAccessCode())
+export async function adminUpdateUser({ userId, collections, status, features, plan }) {
+  return postJson(ADMIN_URL, { action: 'updateUser', userId, collections, status, features, plan }, getAccessCode())
 }
 
 export async function adminDeleteUser({ userId }) {

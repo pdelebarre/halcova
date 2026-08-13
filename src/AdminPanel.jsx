@@ -45,7 +45,7 @@ export default function AdminPanel({ onClose }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [approving, setApproving] = useState(null) // request id being approved
-  const [draft, setDraft] = useState({ records: true, books: true, lending: false })
+  const [draft, setDraft] = useState({ records: true, books: true, lending: false, plan: 'free' })
   const [granted, setGranted] = useState(null) // { user, code } just approved
   const [revealed, setRevealed] = useState({}) // userId -> show code?
   const [copied, setCopied] = useState(null) // which code was just copied
@@ -72,10 +72,11 @@ export default function AdminPanel({ onClose }) {
         requestId: approving,
         collections: { records: draft.records, books: draft.books },
         features: { lending: draft.lending },
+        plan: draft.plan,
       })
       setGranted(res)
       setApproving(null)
-      setDraft({ records: true, books: true, lending: false })
+      setDraft({ records: true, books: true, lending: false, plan: 'free' })
       await load()
     } catch (err) {
       setError(err.message)
@@ -114,6 +115,21 @@ export default function AdminPanel({ onClose }) {
         userId,
         features: { lending: !user.features?.lending },
       })
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // Free tier (T5): flip a member between 'free' and 'unlimited'. The switch is
+  // ON when unlimited; OFF (free) is the default. The owner is never listed here.
+  async function togglePlan(userId) {
+    const user = data.users.find((u) => u.id === userId)
+    if (!user) return
+    const plan = user.plan === 'unlimited' ? 'free' : 'unlimited'
+    setError('')
+    try {
+      await authApi.adminUpdateUser({ userId, plan })
       await load()
     } catch (err) {
       setError(err.message)
@@ -230,6 +246,17 @@ export default function AdminPanel({ onClose }) {
                   />
                 </div>
               </div>
+              <div className="admin-features">
+                <h4 className="admin-features-title">{t('admin.plan')}</h4>
+                <p className="admin-sub">{t('admin.planFree')} · {t('admin.planUnlimited')}</p>
+                <div className="admin-switches">
+                  <Switch
+                    checked={draft.plan === 'unlimited'}
+                    onChange={() => setDraft((d) => ({ ...d, plan: d.plan === 'unlimited' ? 'free' : 'unlimited' }))}
+                    label={`${t('admin.plan')}: ${draft.plan === 'unlimited' ? t('admin.planUnlimited') : t('admin.planFree')}`}
+                  />
+                </div>
+              </div>
               <div className="sheet-actions">
                 <button
                   className="btn btn-primary"
@@ -285,6 +312,11 @@ export default function AdminPanel({ onClose }) {
                           onChange={() => toggleFeature(u.id)}
                           label={t('lending.featureLabel')}
                           hint={t('lending.featureHint')}
+                        />
+                        <Switch
+                          checked={u.plan === 'unlimited'}
+                          onChange={() => togglePlan(u.id)}
+                          label={`${t('admin.plan')}: ${u.plan === 'unlimited' ? t('admin.planUnlimited') : t('admin.planFree')}`}
                         />
                       </div>
                       {revealed[u.id] && (
