@@ -1,4 +1,4 @@
-# Alcove Arcade — elaborated requirements
+# Halcova Arcade — elaborated requirements
 
 Working spec for gamifying the app. Creative rationale → [`concept.md`](concept.md).
 Copy → [`copy-bank.md`](copy-bank.md).

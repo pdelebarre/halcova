@@ -1,8 +1,9 @@
 import { splitArtistTitle } from '../utils/match'
 import { isOverdue } from '../utils/lending'
+import Highlight from './Highlight'
 import './BookCard.css'
 
-export default function BookCard({ item, onOpen, lendingEnabled = false, copy = {} }) {
+export default function BookCard({ item, onOpen, lendingEnabled = false, copy = {}, query = '' }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
 
   // W7: on-loan badge — only when lending is enabled for this member. Overdue
@@ -28,8 +29,8 @@ export default function BookCard({ item, onOpen, lendingEnabled = false, copy = 
         )}
       </span>
       <span className="book-card-info">
-        <span className="book-card-title">{bookTitle}</span>
-        <span className="book-card-author">{author}</span>
+        <span className="book-card-title"><Highlight text={bookTitle} query={query} /></span>
+        <span className="book-card-author"><Highlight text={author} query={query} /></span>
       </span>
     </button>
   )

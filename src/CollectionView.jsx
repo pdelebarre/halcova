@@ -8,7 +8,7 @@ import MatchPicker from './components/MatchPicker'
 import ScanResult from './components/ScanResult'
 import AisleSheet from './components/AisleSheet'
 import { useCollection } from './hooks/useCollection'
-import { findRelated, splitArtistTitle } from './utils/match'
+import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { itemInBin } from './utils/browse'
 import { t, getLocale } from './i18n'
 import './App.css'
@@ -59,6 +59,16 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // a filter; the sheet is the picker.
   const [activeAisle, setActiveAisle] = useState(null)
   const [aisleSheetOpen, setAisleSheetOpen] = useState(false)
+  // The Catalog (§ Phase 3): recent searches persisted per kind + focus state
+  // for the "recent searches" row under the toolbar.
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      const raw = localStorage.getItem(`runout.recentSearches.${catalog.kind}`)
+      const arr = raw ? JSON.parse(raw) : []
+      return Array.isArray(arr) ? arr.slice(0, 6) : []
+    } catch { return [] }
+  })
+  const [searchFocused, setSearchFocused] = useState(false)
 
   // Free tier: the counter reflects the WHOLE collection (items.length, not the
   // filtered/visible count) and add flows are gated once the cap is reached so
@@ -72,6 +82,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   useEffect(() => {
     try { localStorage.setItem(`runout.view.${catalog.kind}`, view) } catch { /* ignore */ }
   }, [view, catalog.kind])
+
+  // Persist the recent-searches list (capped at 6, most recent first).
+  useEffect(() => {
+    try { localStorage.setItem(`runout.recentSearches.${catalog.kind}`, JSON.stringify(recentSearches)) } catch { /* ignore */ }
+  }, [recentSearches, catalog.kind])
 
   // Debounce the search filter so typing stays instant on large collections
   // (§4.18): the input updates immediately, the filter computation lags ~150ms.
@@ -170,6 +185,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }, [items])
 
   const hasActiveFilters = debouncedQuery.trim() !== '' || activeFormats.length > 0 || activeGenres.length > 0 || activeArtist !== '' || activeLending || activeAisle !== null
+  const hasQuery = debouncedQuery.trim() !== ''
 
   // The Floor (§ Phase 1): curated shelves shown in the default browse state
   // (grid view, no filters, "Recently added" sort). New arrivals appear only
@@ -272,6 +288,27 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   function handleClearAisle() {
     setActiveAisle(null)
+  }
+
+  // The Catalog (§ Phase 3): a "did you mean" suggestion when a query matches
+  // nothing, and the recent-searches history (committed on Enter or blur).
+  const suggestion = useMemo(() => (hasQuery ? didYouMean(items, debouncedQuery) : null), [items, hasQuery, debouncedQuery])
+
+  function commitRecentSearch(q) {
+    const clean = q.trim()
+    if (!clean) return
+    setRecentSearches((prev) => [clean, ...prev.filter((s) => s !== clean)].slice(0, 6))
+  }
+
+  function handleSearchCommit() {
+    const q = query.trim()
+    if (q) commitRecentSearch(q)
+  }
+
+  function handleSearchBlur() {
+    setSearchFocused(false)
+    const q = query.trim()
+    if (q) commitRecentSearch(q)
   }
 
   // The core "am I looking at a duplicate" step — every path into the app
@@ -440,34 +477,33 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       const axis = catalog.browseAxes?.find((a) => a.id === activeAisle.axisId)
       if (axis) list = list.filter((it) => itemInBin(it, axis, activeAisle.value))
     }
-    if (debouncedQuery.trim()) {
-      const q = debouncedQuery.trim().toLowerCase()
-      list = list.filter((it) =>
-        it.title?.toLowerCase().includes(q) ||
-        it.label?.toLowerCase().includes(q) ||
-        it.catno?.toLowerCase().includes(q) ||
-        (it.genre || []).some((g) => g.toLowerCase().includes(q)))
-    }
-    const sorted = [...list]
-    if (sortBy === 'artist') {
-      const locale = getLocale()
-      sorted.sort((a, b) => {
-        const artistCmp = splitArtistTitle(a.title).artist.localeCompare(splitArtistTitle(b.title).artist, locale)
-        return artistCmp !== 0 ? artistCmp : (a.title || '').localeCompare(b.title || '', locale)
-      })
-    } else if (sortBy === 'year') {
-      sorted.sort((a, b) => (b.year || 0) - (a.year || 0))
-    } else if (sortBy === 'format') {
-      const locale = getLocale()
-      sorted.sort((a, b) => (a.formatType || '').localeCompare(b.formatType || '', locale))
-    } else if (sortBy === 'title') {
-      const locale = getLocale()
-      sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', locale))
+    // The Catalog (§ Phase 3): with a query, OPAC-style fuzzy + ranked search
+    // (relevance overrides the sort). Otherwise the normal sort applies.
+    let sorted
+    if (hasQuery) {
+      sorted = searchItems(list, debouncedQuery)
     } else {
-      sorted.sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
+      sorted = [...list]
+      if (sortBy === 'artist') {
+        const locale = getLocale()
+        sorted.sort((a, b) => {
+          const artistCmp = splitArtistTitle(a.title).artist.localeCompare(splitArtistTitle(b.title).artist, locale)
+          return artistCmp !== 0 ? artistCmp : (a.title || '').localeCompare(b.title || '', locale)
+        })
+      } else if (sortBy === 'year') {
+        sorted.sort((a, b) => (b.year || 0) - (a.year || 0))
+      } else if (sortBy === 'format') {
+        const locale = getLocale()
+        sorted.sort((a, b) => (a.formatType || '').localeCompare(b.formatType || '', locale))
+      } else if (sortBy === 'title') {
+        const locale = getLocale()
+        sorted.sort((a, b) => (a.title || '').localeCompare(b.title || '', locale))
+      } else {
+        sorted.sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
+      }
     }
     return sorted
-  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog, sortBy])
+  }, [items, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog, sortBy, hasQuery])
 
   return (
     <>
@@ -510,6 +546,9 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onOpenAisles={() => setAisleSheetOpen(true)}
           aislesOpen={aisleSheetOpen}
           extraFilterCount={activeAisle ? 1 : 0}
+          onSearchFocus={() => setSearchFocused(true)}
+          onSearchBlur={handleSearchBlur}
+          onSearchCommit={handleSearchCommit}
         />
       )}
 
@@ -523,6 +562,27 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onOpenLoans={onOpenLoans}
           loansButtonRef={loansButtonRef}
         />
+      )}
+
+      {searchFocused && !query.trim() && recentSearches.length > 0 && (
+        <div className="recent-searches">
+          <span className="recent-searches-title">{copy.search?.recentTitle || 'Recent searches'}</span>
+          <div className="recent-searches-chips">
+            {recentSearches.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="recent-chip"
+                onClick={() => { setQuery(s); setSearchFocused(false) }}
+              >
+                {s}
+              </button>
+            ))}
+            <button type="button" className="recent-clear" onClick={() => setRecentSearches([])}>
+              {copy.search?.clearRecent || 'Clear recent'}
+            </button>
+          </div>
+        </div>
       )}
 
       <main className="app-main">
@@ -543,8 +603,35 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           />
         )}
 
+        {status === 'ready' && items.length > 0 && visibleItems.length === 0 && hasQuery && suggestion && (
+          <div className="did-you-mean">
+            <span>{copy.search?.didYouMeanPrefix || 'Did you mean'}: </span>
+            <button type="button" className="did-you-mean-btn" onClick={() => setQuery(suggestion)}>
+              {suggestion}
+            </button>
+          </div>
+        )}
+
         {status === 'ready' && items.length > 0 && visibleItems.length === 0 && (
           <EmptyState kind="no-results" copy={copy} onClear={clearFilters} />
+        )}
+
+        {status === 'ready' && hasQuery && visibleItems.length > 0 && (
+          <div className="search-summary">
+            <span className="search-summary-text">
+              {typeof copy.search?.results === 'function'
+                ? copy.search.results(visibleItems.length, debouncedQuery)
+                : `${visibleItems.length} matches`}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost section-action-btn"
+              onClick={() => setQuery('')}
+              aria-label={copy.search?.clear || 'Clear search results'}
+            >
+              Clear
+            </button>
+          </div>
         )}
 
         {activeAisle && (
@@ -594,7 +681,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
                   </button>
                 )}
               />
-              <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} />
+              <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
             </section>
           </div>
         )}
@@ -607,9 +694,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
               copy={copy}
               lendingEnabled={lendingEnabled}
               onOpen={openItem}
+              query={debouncedQuery}
             />
           ) : (
-            <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} />
+            <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
           )
         )}
 

@@ -18,7 +18,7 @@
 
 | Name | EN | FR | PT | NL | DE | ES | IT | Bad meaning? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Alcove** ⭐ | alcove | *alcôve* | *alcova* | *alkoof* | *Alkoven* | *alcoba* | *alcova* | none found |
+| **Halcova** ⭐ | Halcova | *alcôve* | *alcova* | *alkoof* | *Alkoven* | *alcoba* | *alcova* | none found |
 | **Grotto** | grotto | *grotte* | *gruta* | *grot* | *Grotte* | *gruta* | *grotta* | none found |
 | **Coffer** | coffer | *coffre* | *cofre* | *koffer* (suitcase) | *Koffer* (suitcase) | *cofre* | *cofano* | none found |
 | **Relic** | relic | *relique* | *relíquia* | *relikwie* | *Reliquie* | *reliquia* | *reliquia* | none found |
@@ -32,7 +32,7 @@
 
 ## Recommendation
 
-- **Primary: `Alcove`** — coziest of the three (a warm recessed nook that holds
+- **Primary: `Halcova`** — coziest of the three (a warm recessed nook that holds
   your treasures), soft two-syllable sound, contains the earlier-liked "cove",
   and is a true cognate family across all 7 languages. 6 letters (fits PWA
   short_name ≤12).
@@ -41,13 +41,13 @@
 - **Hidden-treasure middle: `Grotto`** — a cave of treasure; a touch heavier in
   sound.
 
-## Brand-line ideas (Alcove)
+## Brand-line ideas (Halcova)
 
-- *"Your records and books, in their own alcove."*
-- *"Your crate, your shelf, your alcove."*
+- *"Your records and books, in their own Halcova."*
+- *"Your crate, your shelf, your Halcova."*
 - *"Every treasure, in its place."*
 
 ## Next step
 
-Await the user's pick (Alcove / Coffer / Grotto) → native-speaker + trademark
+Await the user's pick (Halcova / Coffer / Grotto) → native-speaker + trademark
 check → rewrite `rename-copy-kit.md` → reissue Section 9 rollout map.

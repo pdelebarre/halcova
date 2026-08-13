@@ -1,6 +1,6 @@
-# marketing/gamification — "Alcove Arcade"
+# marketing/gamification — "Halcova Arcade"
 
-Gamification suite for the app (working brand: **Alcove**). Turns a private
+Gamification suite for the app (working brand: **Halcova**). Turns a private
 catalog into a daily habit loop that helps members discover **what they like**,
 **what to buy next**, **what they remember**, and **what they learned** from
 their collection.

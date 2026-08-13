@@ -1,6 +1,6 @@
 # marketing/ — Runout rebrand workspace
 
-**Current decision (2026-08-13): the public brand is `Halcova`** — the earlier `Hokan` and `Alcove` names are **superseded** (their docs are kept for reference).
+**Current decision (2026-08-13): the public brand is `Halcova`** — the earlier `Hokan` and `Halcova` names are **superseded** (their docs are kept for reference).
 
 ## Authoritative files
 
@@ -13,12 +13,12 @@
 | `localization-plan.md` | **Localization plan** — 7 languages, per-user preference + switcher, architecture, rollout |
 | `localization-dictionary.md` | **Translation dictionary (v1)** — EN/FR/NL/PT-BR/DE/ES/IT content for every key, `[VALIDATE]` |
 | `ticket-localization.md` | **Dev implementation ticket** — exact file/string scope for `feat/localization`, non-string fixes, tests, DoD |
-| `rename-alcove.md` | *Superseded* — earlier "rename to Alcove" plan (kept for reference) |
-| `copy-kit-alcove.md` | *Superseded* — earlier "Alcove" copy kit (kept for reference) |
-| `ticket-rename-alcove.md` | *Superseded* — earlier rename dev ticket (model for a new Hokan→Halcova ticket) |
-| `name-check-alcove-7-languages.md` | *Superseded* — earlier Alcove name check (a Halcova version is needed) |
-| `brief-alcove-icon.md` | *Superseded* — earlier Alcove icon brief (use `brief-halcova-icon.md`) |
-| `handoff-rename-alcove.md` | *Superseded* — earlier coordination handoff (kept for reference) |
+| `rename-Halcova.md` | *Superseded* — earlier "rename to Halcova" plan (kept for reference) |
+| `copy-kit-Halcova.md` | *Superseded* — earlier "Halcova" copy kit (kept for reference) |
+| `ticket-rename-Halcova.md` | *Superseded* — earlier rename dev ticket (model for a new Hokan→Halcova ticket) |
+| `name-check-Halcova-7-languages.md` | *Superseded* — earlier Halcova name check (a Halcova version is needed) |
+| `brief-Halcova-icon.md` | *Superseded* — earlier Halcova icon brief (use `brief-halcova-icon.md`) |
+| `handoff-rename-Halcova.md` | *Superseded* — earlier coordination handoff (kept for reference) |
 
 ## Launch campaign — "What lives in your halcova?" (2026-08-13)
 
@@ -43,9 +43,9 @@ progressive reveal, video produced in **PicsArt**. Brand: **Halcova**.
 | `rename-strategy.md` | 1 | Original strategy — "Trove" (rejected on sound) |
 | `rename-strategy-round2.md` | 2 | Sound-first menu — Cove / Lore / etc. |
 | `rename-strategy-round3.md` | 3 | Treasure × cozy menu — Keepsake / Cove / Coffer / etc. |
-| `rename-strategy-round4-international.md` | 4 | 7-language sound check — narrowed to cognate family → Alcove chosen |
+| `rename-strategy-round4-international.md` | 4 | 7-language sound check — narrowed to cognate family → Halcova chosen |
 
-> **Final name (2026-08-13): `Halcova`** — supersedes the "Alcove" decision; the
+> **Final name (2026-08-13): `Halcova`** — supersedes the "Halcova" decision; the
 > campaign and copy kit now use Halcova.
 
 ## Open items `[VALIDATE]`

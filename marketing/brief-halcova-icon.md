@@ -98,4 +98,4 @@ Directions to develop (each must show a barcode):
 - [ ] Uses the real dark/gold tokens (no invented palette).
 - [ ] Approved by Marketing → handed to Front End Developer to swap into `public/`
       alongside the Hokan→Halcova code rename (new dev ticket; model:
-      `ticket-rename-alcove.md`).
+      `ticket-rename-Halcova.md`).

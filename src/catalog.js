@@ -105,6 +105,14 @@ export const recordsCatalog = {
       clear: 'Clear browse',
       empty: 'Nothing to show here yet.',
     },
+    search: {
+      results: (n, q) => `${n} ${n === 1 ? 'match' : 'matches'} for “${q}”`,
+      clear: 'Clear search results',
+      recentTitle: 'Recent searches',
+      clearRecent: 'Clear recent',
+      didYouMeanPrefix: 'Did you mean',
+      done: 'Done',
+    },
     lending: {
       section: t('lending.section'),
       statusOut: (name, date) => t('lending.statusOut', { name, date }),
@@ -246,6 +254,14 @@ export const booksCatalog = {
       title: 'Browse your shelf',
       clear: 'Clear browse',
       empty: 'Nothing to show here yet.',
+    },
+    search: {
+      results: (n, q) => `${n} ${n === 1 ? 'match' : 'matches'} for “${q}”`,
+      clear: 'Clear search results',
+      recentTitle: 'Recent searches',
+      clearRecent: 'Clear recent',
+      didYouMeanPrefix: 'Did you mean',
+      done: 'Done',
     },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,

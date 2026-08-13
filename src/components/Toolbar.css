@@ -7,8 +7,20 @@
   gap: 8px;
   height: var(--toolbar-h);
   min-height: var(--toolbar-h);
-  padding: 8px 16px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
   background: linear-gradient(var(--sleeve-black) 82%, transparent);
+  transition: height 0.25s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Search focused/active: the row stays fixed at --toolbar-h — the taller pill
+   (48px) fits by trimming the row padding (48 + 6 + 6 = 60) instead of growing
+   the toolbar. */
+.toolbar.search-active {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 /* Scroll elevation: subtle border + frosted backdrop (§4.1). */
@@ -26,6 +38,7 @@
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
+  max-width: none;
 }
 
 .search-icon {
@@ -46,6 +59,16 @@
   padding: 0 44px 0 42px;
   font-size: 15px;
   color: var(--jacket-kraft);
+  transition: height 0.22s cubic-bezier(0.2, 0.7, 0.3, 1), font-size 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+/* "Bigger when I search": the pill grows, the type scales up, and a gold
+   ring + soft shadow mark it as the active control. */
+.toolbar.search-active .toolbar-search input {
+  height: 48px;
+  font-size: 16px;
+  border-color: var(--runout-gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.22), 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 .toolbar-search input::placeholder { color: var(--static-grey); }
 
@@ -99,7 +122,66 @@
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+/* Search-mode takeover (mobile < 768px): the pill genuinely expands to fill the
+   row as the sibling controls collapse away. Transitions live on the base rule
+   so expand and collapse are symmetric; the pill "grows" because flex reflows
+   as siblings shrink to 0. */
+.toolbar-btn, .view-toggle {
+  overflow: hidden;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1),
+    width 0.22s ease, min-width 0.22s ease, padding 0.22s ease, margin 0.22s ease,
+    border-width 0.22s ease, visibility 0s 0.22s;
+}
+@media (max-width: 767px) {
+  .toolbar.search-active .toolbar-btn,
+  .toolbar.search-active .view-toggle {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    width: 0;
+    min-width: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+/* Done pill — always mounted, animates in/out via max-width. Hidden and inert
+   while search is inactive (pointer-events + visibility). */
+.search-exit {
+  flex-shrink: 0;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft-dim);
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1),
+    max-width 0.22s ease, padding 0.22s ease, border-width 0.22s ease;
+}
+.toolbar.search-active .search-exit {
+  max-width: 96px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-width: 1px;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 .toolbar-btn:active { background: var(--vinyl-groove-2); }
 
@@ -178,5 +260,12 @@
   background: var(--vinyl-groove-2);
   color: var(--runout-gold);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* Desktop ≥768px: siblings stay visible — the pill just caps and left-aligns
+   (Done pill is pointless on wide screens, so it's hidden). */
+@media (min-width: 768px) {
+  .toolbar.search-active .toolbar-search { max-width: 560px; margin-right: auto; }
+  .toolbar.search-active .search-exit { display: none; }
 }
 

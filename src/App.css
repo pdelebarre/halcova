@@ -72,6 +72,83 @@
 }
 .aisle-chip-clear:active { background: rgba(201, 162, 39, 0.18); }
 
+/* Search results header (§ Phase 3). */
+.search-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 2px 0;
+}
+.search-summary-text {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--jacket-kraft-dim);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Recent searches (§ Phase 3). */
+.recent-searches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 4px;
+}
+.recent-searches-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--static-grey);
+}
+.recent-searches-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.recent-chip {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--jacket-kraft-dim);
+}
+.recent-chip:active { background: var(--vinyl-groove-2); }
+.recent-clear {
+  min-height: 40px;
+  padding: 8px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--danger);
+}
+.recent-clear:active { opacity: 0.8; }
+
+/* Did you mean (§ Phase 3). */
+.did-you-mean {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 18px 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
+}
+.did-you-mean-btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--runout-gold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.did-you-mean-btn:active { opacity: 0.8; }
+
 .scanner-loading {
   position: fixed;
   inset: 0;

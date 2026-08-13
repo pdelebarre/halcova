@@ -1,4 +1,4 @@
-# Alcove Arcade — copy bank
+# Halcova Arcade — copy bank
 
 Copy for the gamification suite. EN master first; translation notes + `[VALIDATE]`
 flags per the localization rules (en, en-GB, fr, nl, pt-BR, de, es, it).
@@ -19,7 +19,7 @@ flags per the localization rules (en, en-GB, fr, nl, pt-BR, de, es, it).
 | `arcade.subtagline` | Your collection, but with games. | |
 | `arcade.nav` | Play | Nav label (short) |
 | `arcade.hint` | Turn your crate (shelf) into a game. | Per-kind via catalog `.copy` |
-| `arcade.share.hashtag` | #WhatsInYourAlcove | Reuses the launch-campaign hashtag |
+| `arcade.share.hashtag` | #WhatsInYourHalcova | Reuses the launch-campaign hashtag |
 
 ---
 
@@ -138,7 +138,7 @@ talking.* (shown before enough data exists)
 
 | Card | Headline (EN) | Subline |
 | --- | --- | --- |
-| Persona | My collection, according to my crate: **{archetype}** | `{stat1} · {stat2} · {stat3}` — catalog once, play forever. #WhatsInYourAlcove |
+| Persona | My collection, according to my crate: **{archetype}** | `{stat1} · {stat2} · {stat3}` — catalog once, play forever. #WhatsInYourHalcova |
 | Level-up | Just hit **{level}** | `{n}` items cataloged · `{xp}` XP |
 | Badge | Unlocked: **{badge}** | `{line}` |
 | Quiz | **{n}/{n}** on today's Crate Quiz | "You remembered. The crate is proud." |

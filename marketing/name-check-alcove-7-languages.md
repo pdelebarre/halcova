@@ -1,4 +1,4 @@
-# Native-speaker check — "Alcove" across EN · FR · PT · NL · DE · ES · IT
+# Native-speaker check — "Halcova" across EN · FR · PT · NL · DE · ES · IT
 
 **Owner:** Marketing Manager · **Status:** `[VALIDATE]` — open
 **Goal:** confirm the locked name **sounds good, has no accidental meaning, and
@@ -11,8 +11,8 @@ feels treasure + cozy** in each of the 7 target languages before the "name day".
 1. Recruit **2 native speakers per language** (ideally one more informal, one
    more design/creative-minded). For PT, cover BR + PT if possible; for EN,
    cover US + UK.
-2. Show them the wordmark `Alcove` **and** the brand line *"Your records and
-   books, in their own alcove."*
+2. Show them the wordmark `Halcova` **and** the brand line *"Your records and
+   books, in their own Halcova."*
 3. Ask them to **read it aloud** (record audio if you can) and answer the
    5 questions + two ratings in the scorecard below.
 4. Also run a quick **dictionary/slang search** in that language for the written
@@ -43,13 +43,13 @@ feels treasure + cozy** in each of the 7 target languages before the "name day".
 
 | Lang | Written form | Local cognate | Expected pronunciation | Phonetic traps to watch |
 | --- | --- | --- | --- | --- |
-| **EN** | Alcove | alcove | `/ˈæl.kəʊv/` (UK) · `/ˈæl.koʊv/` (US) — **AL**-cove | stress on first syllable; not "al-COVE" |
-| **FR** | Alcove | *alcôve* | `/al.kɔv/` — al-KOV | final silent `e`; must not become "al-cove-uh" |
-| **PT** | Alcove | *alcova* | likely `/awˈkɔ.vi/` (BR) — al-KO-vi | final `e`; watch nasalization; not "al côve" |
-| **NL** | Alcove | *alkoof* | "AL-kof" / "AL-ko-ve" | Dutch `v` is labiodental `/v/`; confirm clear read |
-| **DE** | Alcove | *Alkoven* | "AL-ko-ve" (final `e` pronounced `/ə/`) | no link to negative terms; *Alkoven* = cozy nook ✓ |
-| **ES** | Alcove | *alcoba* | "al-KO-ve" (`v`→`b` merger: "al-KO-be") | possible mishearing as "al cobre" (copper) — check if awkward |
-| **IT** | Alcove | *alcova* | "al-KO-ve" | note: *alcove* is the plural of *alcova* — check it reads fine |
+| **EN** | Halcova | Halcova | `/ˈæl.kəʊv/` (UK) · `/ˈæl.koʊv/` (US) — **AL**-cove | stress on first syllable; not "al-COVE" |
+| **FR** | Halcova | *alcôve* | `/al.kɔv/` — al-KOV | final silent `e`; must not become "al-cove-uh" |
+| **PT** | Halcova | *alcova* | likely `/awˈkɔ.vi/` (BR) — al-KO-vi | final `e`; watch nasalization; not "al côve" |
+| **NL** | Halcova | *alkoof* | "AL-kof" / "AL-ko-ve" | Dutch `v` is labiodental `/v/`; confirm clear read |
+| **DE** | Halcova | *Alkoven* | "AL-ko-ve" (final `e` pronounced `/ə/`) | no link to negative terms; *Alkoven* = cozy nook ✓ |
+| **ES** | Halcova | *alcoba* | "al-KO-ve" (`v`→`b` merger: "al-KO-be") | possible mishearing as "al cobre" (copper) — check if awkward |
+| **IT** | Halcova | *alcova* | "al-KO-ve" | note: *Halcova* is the plural of *alcova* — check it reads fine |
 
 > **Cognate families (why the name was chosen):** every language has a natural
 > local word in the same family (alcôve / alcova / alkoof / Alkoven / alcoba /
@@ -84,5 +84,5 @@ with the exact quote before the "name day".
 | No accidental/rude meaning in any language | ☐ |
 | Naturalness ≥ 3 and Vibe ≥ 3 in all languages | ☐ |
 | Brand line reads well in each language | ☐ |
-| Legal/domain gate (see `rename-alcove.md` §5) | ☐ |
+| Legal/domain gate (see `rename-Halcova.md` §5) | ☐ |
 | **Name cleared for "name day"** | ☐ |

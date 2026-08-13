@@ -1,12 +1,13 @@
 import { splitArtistTitle } from '../utils/match'
 import { isOverdue } from '../utils/lending'
+import Highlight from './Highlight'
 import './AlbumCard.css'
 
 const badgeClass = {
   LP: 'lp', EP: 'ep', CD: 'cd', '7"': 'seven', '12"': 'lp',
 }
 
-export default function AlbumCard({ item, onOpen, lendingEnabled = false, copy = {} }) {
+export default function AlbumCard({ item, onOpen, lendingEnabled = false, copy = {}, query = '' }) {
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
 
   // W7: on-loan badge — only when lending is enabled for this member. Overdue
@@ -33,8 +34,8 @@ export default function AlbumCard({ item, onOpen, lendingEnabled = false, copy =
         )}
       </span>
       <span className="album-card-info">
-        <span className="album-card-title">{albumTitle}</span>
-        <span className="album-card-artist">{artist}</span>
+        <span className="album-card-title"><Highlight text={albumTitle} query={query} /></span>
+        <span className="album-card-artist"><Highlight text={artist} query={query} /></span>
       </span>
     </button>
   )

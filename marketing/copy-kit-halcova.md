@@ -127,7 +127,7 @@ Pre-written for a future native launch; today the product is a PWA.
 
 | EN term | Meaning | Keep / localize |
 | --- | --- | --- |
-| Halcova | the product + the cozy place the collection lives (a real Romance word for "alcove") | **keep as proper noun** |
+| Halcova | the product + the cozy place the collection lives (a real Romance word for "Halcova") | **keep as proper noun** |
 | crate | the records collection (vinyl) | localize (plattenkiste, bac, caja…) |
 | shelf | the books collection | localize (regal, étagère, estante…) |
 | scan | the barcode camera action | localize |

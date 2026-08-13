@@ -1,6 +1,6 @@
-# Alcove Arcade — concept
+# Halcova Arcade — concept
 
-**Working title** (pending a name-check like the Alcove rename): **Alcove Arcade** —
+**Working title** (pending a name-check like the Halcova rename): **Halcova Arcade** —
 "your collection, but with games." This document is the creative concept behind
 gamifying the app. It stays true to the real product: every mechanic is built
 only from data the app already stores (`title`, `year`, `label`, `formatType`,
@@ -23,7 +23,7 @@ A collection is not a list. It is:
 - and an **accidental autobiography** (what you learned by owning things).
 
 A barcode scanner gets people in the door once. Games get them to come back every
-day. The whole point of Alcove Arcade is to make the *existing catalog* the game
+day. The whole point of Halcova Arcade is to make the *existing catalog* the game
 board — no leaderboards, no generic content, no invented scarcity. Only your
 stuff.
 
@@ -64,7 +64,7 @@ flowchart LR
 - **Play** → a 60-second daily quiz from your own data; streaks make you come back.
 - **Dig** → quests tell you exactly what to hunt next; you scan it, the loop closes.
 - **Share** → a beautiful dark/gold card; a friend requests access. Fits the
-  existing `#WhatsInYourAlcove` UGC campaign.
+  existing `#WhatsInYourHalcova` UGC campaign.
 
 This is a **daily habit loop**: each visit is short, personal, and ends with a
 reason to come back tomorrow (the streak) and a reason to buy something (the
@@ -188,7 +188,7 @@ Locally rendered (SVG/canvas), dark `#16130F` + gold, no external services:
   Quiz" card.
 - **Privacy rules**: a card shows only the headline + 2–3 stats — never the full
   collection, never access codes, never the admin key.
-- Plugs straight into the existing `#WhatsInYourAlcove` UGC campaign and the
+- Plugs straight into the existing `#WhatsInYourHalcova` UGC campaign and the
   "request access" funnel.
 
 ---

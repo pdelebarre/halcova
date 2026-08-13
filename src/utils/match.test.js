@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { splitArtistTitle, findRelated } from './match'
+import { splitArtistTitle, findRelated, normalizeText, searchItems, didYouMean } from './match'
 
 describe('splitArtistTitle', () => {
   it('splits "Artist - Album" on the first separator', () => {
@@ -90,5 +90,69 @@ describe('findRelated', () => {
     expect(res.ownedExact).toBeNull()
     expect(res.sameAlbum).toEqual([])
     expect(res.otherArtist).toEqual([])
+  })
+})
+
+describe('normalizeText', () => {
+  it('lowercases, strips diacritics and trims', () => {
+    expect(normalizeText('Café Tacuba')).toBe('cafe tacuba')
+    expect(normalizeText('  Élan  ')).toBe('elan')
+    expect(normalizeText(null)).toBe('')
+  })
+})
+
+describe('searchItems', () => {
+  const items = [
+    { id: '1', title: 'Nirvana - Nevermind', label: 'DGC', catno: 'DGCD-24425', genre: ['Grunge'] },
+    { id: '2', title: 'Miles Davis - Kind of Blue', label: 'Columbia', catno: 'CS 8163', genre: ['Jazz'] },
+    { id: '3', title: 'Café Tacuba - Re', label: 'Warner', catno: '1', genre: ['Rock'] },
+  ]
+
+  it('returns [] for an empty query', () => {
+    expect(searchItems(items, '')).toEqual([])
+    expect(searchItems(items, '   ')).toEqual([])
+  })
+
+  it('matches a substring and returns the matching item', () => {
+    expect(searchItems(items, 'blue').map((i) => i.id)).toEqual(['2'])
+  })
+
+  it('tolerates a single typo in a word (Nirvanaa)', () => {
+    expect(searchItems(items, 'Nirvanaa').map((i) => i.id)).toEqual(['1'])
+  })
+
+  it('matches diacritic-insensitively', () => {
+    expect(searchItems(items, 'cafe').map((i) => i.id)).toEqual(['3'])
+  })
+
+  it('ranks a title match ahead of a genre match', () => {
+    const ranked = [
+      { id: 'a', title: 'Jazz Butcher - Album A', genre: ['Post-punk'] },
+      { id: 'b', title: 'Other - Album B', genre: ['Jazz'] },
+    ]
+    expect(searchItems(ranked, 'jazz').map((i) => i.id)).toEqual(['a', 'b'])
+  })
+
+  it('returns [] when nothing matches', () => {
+    expect(searchItems(items, 'zzzqqq')).toEqual([])
+  })
+})
+
+describe('didYouMean', () => {
+  const items = [
+    { id: '1', title: 'Nirvana - Nevermind', label: 'DGC' },
+    { id: '2', title: 'Miles Davis - Kind of Blue', label: 'Columbia' },
+  ]
+
+  it('suggests a close word when nothing matches (2 edits)', () => {
+    expect(didYouMean(items, 'Nirvnaa')).toBe('nirvana')
+  })
+
+  it('returns null when nothing is close', () => {
+    expect(didYouMean(items, 'zzzqqq')).toBeNull()
+  })
+
+  it('returns null for an empty query', () => {
+    expect(didYouMean(items, '')).toBeNull()
   })
 })

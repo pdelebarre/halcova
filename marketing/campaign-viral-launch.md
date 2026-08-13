@@ -16,7 +16,7 @@ the name reveal.
 
 | Gate | Where | Blocks |
 | --- | --- | --- |
-| Code rename `Hokan` → `Halcova` shipped (wordmark, `index.html`, `vite.config.js`, README, docs) | new dev ticket (model: `ticket-rename-alcove.md`) | Phase 3 (name reveal) |
+| Code rename `Hokan` → `Halcova` shipped (wordmark, `index.html`, `vite.config.js`, README, docs) | new dev ticket (model: `ticket-rename-Halcova.md`) | Phase 3 (name reveal) |
 | Legal/domain gate green for "Halcova" (trademark, domain, handles) | `[VALIDATE]` — run before the reveal | Phase 3 |
 | Icon with a barcode element approved + deployed (PNGs in `public/`) | `marketing/brief-halcova-icon.md` | Phase 3 |
 | Stable public URL + landing page live (copy from `copy-kit-halcova.md` §4) with **Request access** | owner/deploy | Phase 4 (any CTA) |
@@ -290,7 +290,7 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 | Role | Need |
 | --- | --- |
 | **You (owner)** | Approve this plan + defaults (§0); run the legal/domain gate; be the admin for access approval in waves. |
-| **Front End Developer** | Ship the `Hokan`→`Halcova` code rename (wordmark/manifest/index.html/docs) — **required before Phase 3** (new dev ticket; model: `ticket-rename-alcove.md`). |
+| **Front End Developer** | Ship the `Hokan`→`Halcova` code rename (wordmark/manifest/index.html/docs) — **required before Phase 3** (new dev ticket; model: `ticket-rename-Halcova.md`). |
 | **UI/UX Expert** | Hand over the Halcova icon **with a barcode element** (PNGs for `public/`) — `marketing/brief-halcova-icon.md` (before Phase 3). |
 | **Tester** | Green gates after rename (lint/test/build). |
 | **Marketing (me)** | Copy bank, video spec, WhatsApp playbook, UTM tracking, calendar. |

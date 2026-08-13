@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
 import { isOverdue } from '../utils/lending'
 import { t, getLocale } from '../i18n'
+import Highlight from './Highlight'
 import './ListView.css'
 
 const ROW_H = 56
@@ -31,7 +32,7 @@ function letterOf(name, locale = 'en') {
  * viewport (fixed row heights keep the math cheap), with sticky letter group
  * headers when sorted by Artist A–Z and an A–Z jump rail on tablet/desktop.
  */
-export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendingEnabled = false }) {
+export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendingEnabled = false, query = '' }) {
   const scrollerRef = useRef(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportH, setViewportH] = useState(0)
@@ -140,7 +141,7 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendin
           {visible.map((r) => (
             r.type === 'header'
               ? <div key={`h-${r.label}`} className="list-group-header">{r.label}</div>
-              : <ListItemRow key={r.item.id} item={r.item} onOpen={onOpen} lendingEnabled={lendingEnabled} copy={copy} />
+              : <ListItemRow key={r.item.id} item={r.item} onOpen={onOpen} lendingEnabled={lendingEnabled} copy={copy} query={query} />
           ))}
           <div style={{ height: padBottom }} aria-hidden="true" />
         </div>
@@ -149,7 +150,7 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendin
   )
 }
 
-function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {} }) {
+function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {}, query = '' }) {
   const { artist, album } = splitArtistTitle(item.title)
   const meta = [item.label, item.catno, item.year].filter(Boolean)
   const badge = BADGE_CLASS[item.formatType] || 'other'
@@ -177,9 +178,9 @@ function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {} }) {
           : <span className="list-cover-ph">{album?.[0] || '?'}</span>}
       </span>
       <span className="list-main">
-        <span className="list-title">{album || item.title}</span>
+        <span className="list-title"><Highlight text={album || item.title} query={query} /></span>
         <span className="list-meta">
-          {artist && <span className="list-artist">{artist}</span>}
+          {artist && <span className="list-artist"><Highlight text={artist} query={query} /></span>}
           {meta.map((m) => (
             <span key={m} className={m === item.catno ? 'list-mono' : undefined}>
               {artist ? ' · ' : ''}{m}

@@ -37,16 +37,36 @@ export default function Toolbar({
   onOpenAisles,
   aislesOpen = false,
   extraFilterCount = 0,
+  onSearchFocus,
+  onSearchBlur,
+  onSearchCommit,
   minimal = false,
 }) {
   const scrolled = useScrolled()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sortOpen, setSortOpen] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
   const filterBtnRef = useRef(null)
   const sortBtnRef = useRef(null)
+  const inputRef = useRef(null)
 
   const loansLabel = copy.lending?.loans || t('lending.loans')
   const browseLabel = copy.browse?.label || 'Browse'
+  const doneLabel = copy.search?.done || 'Done'
+
+  // The search pill grows taller + glows while the field is focused or a
+  // search is active (§ Phase 3 — "bigger when I search").
+  const searchActive = searchFocused || query.trim() !== ''
+
+  // Exit search mode without clearing the query — blur + handlers (CollectionView
+  // decides whether to clear). Shared by Escape and the Done pill.
+  function exitSearch() {
+    inputRef.current?.blur()
+    setSearchFocused(false)
+    onSearchBlur?.()
+  }
+
+  const toolbarClass = ['toolbar', scrolled && 'scrolled', searchActive && 'search-active'].filter(Boolean).join(' ')
 
   // extraFilterCount lets the owner add the active browse aisle to the badge.
   const activeFilterCount = activeFormats.length + activeGenres.length + (activeArtist ? 1 : 0) + (activeLending ? 1 : 0) + (extraFilterCount || 0)
@@ -80,6 +100,7 @@ export default function Toolbar({
         type="button"
         className="toolbar-btn loans-btn"
         onClick={onOpenLoans}
+        tabIndex={searchActive ? -1 : 0}
         aria-label={loansLabel}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -104,15 +125,22 @@ export default function Toolbar({
   }
 
   return (
-    <div className={scrolled ? 'toolbar scrolled' : 'toolbar'}>
+    <div className={toolbarClass}>
       <div className={`toolbar-search${query ? ' has-text' : ''}`}>
         <svg className="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <circle cx="11" cy="11" r="7" />
           <path d="M21 21l-4.35-4.35" />
         </svg>
         <input
+          ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => { setSearchFocused(true); onSearchFocus?.() }}
+          onBlur={() => { setSearchFocused(false); onSearchBlur?.() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSearchCommit?.()
+            if (e.key === 'Escape') exitSearch()
+          }}
           placeholder={placeholder}
           aria-label={t('toolbar.searchCollection')}
         />
@@ -129,9 +157,23 @@ export default function Toolbar({
         <span className="toolbar-count" aria-hidden="true">{Number(count || 0).toLocaleString(getLocale())}</span>
       </div>
 
+      {/* Done pill — ALWAYS mounted so it can animate in/out with the
+          search-active state; hidden + unfocusable while collapsed. */}
+      <button
+        type="button"
+        className="search-exit"
+        tabIndex={searchActive ? 0 : -1}
+        aria-hidden={!searchActive}
+        aria-label={doneLabel}
+        onClick={exitSearch}
+      >
+        {doneLabel}
+      </button>
+
       <button
         type="button"
         className="toolbar-btn browse-btn"
+        tabIndex={searchActive ? -1 : 0}
         onClick={onOpenAisles}
         aria-haspopup="dialog"
         aria-expanded={aislesOpen}
@@ -148,6 +190,7 @@ export default function Toolbar({
         ref={filterBtnRef}
         type="button"
         className={`toolbar-btn filter-btn${activeFilterCount > 0 ? ' active' : ''}`}
+        tabIndex={searchActive ? -1 : 0}
         onClick={() => setSheetOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={sheetOpen}
@@ -164,6 +207,7 @@ export default function Toolbar({
         ref={sortBtnRef}
         type="button"
         className="toolbar-btn sort-btn"
+        tabIndex={searchActive ? -1 : 0}
         onClick={() => setSortOpen(true)}
         aria-haspopup="menu"
         aria-expanded={sortOpen}
@@ -182,6 +226,7 @@ export default function Toolbar({
         <button
           type="button"
           className={`view-toggle-btn${view === 'grid' ? ' active' : ''}`}
+          tabIndex={searchActive ? -1 : 0}
           onClick={() => setView('grid')}
           aria-pressed={view === 'grid'}
           aria-label={copy.view?.grid || t('toolbar.gridView')}
@@ -196,6 +241,7 @@ export default function Toolbar({
         <button
           type="button"
           className={`view-toggle-btn${view === 'list' ? ' active' : ''}`}
+          tabIndex={searchActive ? -1 : 0}
           onClick={() => setView('list')}
           aria-pressed={view === 'list'}
           aria-label={copy.view?.list || t('toolbar.listView')}

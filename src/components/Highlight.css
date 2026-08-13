@@ -1,0 +1,8 @@
+/* Matched-search-substring highlight (§ Phase 3) — subtle gold, readable on
+   the dark theme without overpowering the card text. */
+mark.search-hit {
+  background: rgba(201, 162, 39, 0.22);
+  color: var(--runout-gold);
+  border-radius: 2px;
+  padding: 0 1px;
+}

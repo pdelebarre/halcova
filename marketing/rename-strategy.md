@@ -1,8 +1,8 @@
 # Rename Strategy — from "Runout" to a name that sticks
 
 > **⚠️ SUPERSEDED (2026-08-12).** This Round-1 draft recommended "Trove", which
-> was rejected on sound. The **final, locked decision is `Alcove`** — see
-> [`rename-alcove.md`](./rename-alcove.md). This file is kept as iteration
+> was rejected on sound. The **final, locked decision is `Halcova`** — see
+> [`rename-Halcova.md`](./rename-Halcova.md). This file is kept as iteration
 > history only.
 
 **Status:** Draft for discussion (superseded) · **Owner:** Marketing Manager · **Date:** 2026-08-12
