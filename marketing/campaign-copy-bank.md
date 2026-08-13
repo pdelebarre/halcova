@@ -1,11 +1,11 @@
-# Campaign copy bank — "What lives in your alcove?"
+# Campaign copy bank — "What lives in your halcova?"
 
 **Owner:** Marketing Manager · **Status:** Draft · **Date:** 2026-08-13
 **For:** X · Instagram · Facebook (+ WhatsApp is its own playbook file)
 **Grounding:** every line traces to real behavior (barcode scanning F-01, Discogs
 F-02, Google Books F-03, duplicate detection F-07, crate/shelf F-08–F-09, multi-user
 F-21–F-24). No invented features, metrics, pricing, or testimonials. Copy is **EN
-master**; per-market lines from `copy-kit-alcove.md` §7 apply at the name-reveal.
+master**; per-market lines from `copy-kit-halcova.md` §7 apply at the name-reveal.
 Asset IDs (V1–V14) map to `campaign-picsart-video-spec.md`.
 
 **Do-not-say (always):** no access codes (`RU-…`), no admin/approval internals,
@@ -190,14 +190,14 @@ Tomorrow." — builds the DM relationship early.
 
 ---
 
-## Phase 3 — The Reveal (name + demo) — gated on rename + legal + icon
+## Phase 3 — The Reveal (name + demo) — gated on code rename + legal + icon
 
-### Day 11 · V7 — "Meet Alcove."
+### Day 11 · V7 — "Meet Halcova."
 
 **IG/FB:**
-> Meet **Alcove**. 🏛️✨
+> Meet **Halcova**. 🏛️✨
 >
-> Your crate. Your shelf. One alcove.
+> Your crate. Your shelf. One halcova.
 >
 > Scan a barcode → it looks the record up on Discogs (or the book up on Google
 > Books) → confirm → done. And it remembers what you already own, so you never
@@ -207,13 +207,13 @@ Tomorrow." — builds the DM relationship early.
 >
 > Follow — it opens soon.
 >
-> #Alcove #WhatsInYourAlcove #vinyl #bookstagram
+> #Halcova #WhatsInYourHalcova #vinyl #bookstagram
 
 **X — the reveal thread (7 tweets):**
 > 1/ You know the feeling: record fair, pull the sleeve, "do I have this?" — buy it, get home, it's yours.
 > 2/ Or the book you ordered twice. We've all been there.
 > 3/ So I built something for people like us.
-> 4/ Meet **Alcove** — your records and your books, in one cozy place.
+> 4/ Meet **Halcova** — your records and your books, in one cozy place.
 > 5/ Point your camera at a barcode. It looks it up (Discogs for records, Google Books for books). Confirm. Done. It remembers what you own — no more double-buying.
 > 6/ No app store. No passwords. It runs in your browser and installs to your home screen.
 > 7/ It opens soon. Request access when it does. — [link]
@@ -227,7 +227,7 @@ Tomorrow." — builds the DM relationship early.
 >
 > Yes, it tells you when you already own something. Yes, that's the best part.
 >
-> #vinyl #recordcollection #Alcove #NeverRebuy
+> #vinyl #recordcollection #Halcova #NeverRebuy
 
 **X:**
 > This is the whole app in 30 seconds.
@@ -237,12 +237,12 @@ Tomorrow." — builds the DM relationship early.
 ### Day 13 · V9 + V10 — Books demo + "never double-buy"
 
 **IG/FB (V9):**
-> The shelf side of Alcove: scan the ISBN, it finds the edition, onto your
+> The shelf side of Halcova: scan the ISBN, it finds the edition, onto your
 > shelf. 📚
 >
-> Two loves. One alcove.
+> Two loves. One halcova.
 >
-> #bookstagram #personallibrary #Alcove
+> #bookstagram #personallibrary #Halcova
 
 **X (V10):**
 > The best part isn't the scan. It's the flag.
@@ -253,7 +253,7 @@ Tomorrow." — builds the DM relationship early.
 **IG/FB (V10):**
 > At the record shop, about to buy a duplicate?
 >
-> Alcove says: "This exact record is already yours." 🤝
+> Halcova says: "This exact record is already yours." 🤝
 >
 > Tag the friend who needs this. #vinyl #NeverRebuy
 
@@ -266,7 +266,7 @@ Tomorrow." — builds the DM relationship early.
 **IG/FB:**
 > It's open. 🚪
 >
-> Alcove is live. Request access, and when you're in:
+> Halcova is live. Request access, and when you're in:
 > - scan a barcode → cataloged
 > - know exactly what you own
 > - never double-buy again
@@ -275,10 +275,10 @@ Tomorrow." — builds the DM relationship early.
 >
 > Opening in waves, so if you want in, ask now.
 >
-> #Alcove #WhatsInYourAlcove #vinyl #bookstagram
+> #Halcova #WhatsInYourHalcova #vinyl #bookstagram
 
 **X:**
-> Alcove is open.
+> Halcova is open.
 >
 > Request access → [LINK]
 >
@@ -287,20 +287,20 @@ Tomorrow." — builds the DM relationship early.
 **Stories:** swipe-up/link sticker + "I'm in" excitement + a real first scan
 (permissioned).
 
-### Day 15+ · V12 — "Show us your alcove" (UGC challenge)
+### Day 15+ · V12 — "Show us your halcova" (UGC challenge)
 
 **IG/FB:**
-> New challenge: **show us your alcove.** 🏛️
+> New challenge: **show us your halcova.** 🏛️
 >
-> Catalog a shelf or a crate with Alcove, film the scan, post it with
-> #WhatsInYourAlcove — I'll repost the best ones.
+> Catalog a shelf or a crate with Halcova, film the scan, post it with
+> #WhatsInYourHalcova — I'll repost the best ones.
 >
-> Your crate. Your shelf. One alcove.
+> Your crate. Your shelf. One halcova.
 >
-> #Alcove #vinyl #bookstagram #recordcollection
+> #Halcova #vinyl #bookstagram #recordcollection
 
 **X:**
-> Challenge: scan something with Alcove, post it with #WhatsInYourAlcove. Best
+> Challenge: scan something with Halcova, post it with #WhatsInYourHalcova. Best
 > ones get reposted. Go. 🏛️
 
 ---
@@ -311,14 +311,14 @@ Tomorrow." — builds the DM relationship early.
 **IG/FB:**
 > "I finally know what I own." — [real name + their words] 🏛️
 >
-> (Shared with permission. Their crate, their shelf, their alcove.)
+> (Shared with permission. Their crate, their shelf, their halcova.)
 >
-> #WhatsInYourAlcove
+> #WhatsInYourHalcova
 
 **X:**
 > "I finally know what I own." — real user, real crate.
 >
-> #WhatsInYourAlcove
+> #WhatsInYourHalcova
 
 ### Double-buy story ask
 > Tell me the record (or book) you own twice. I'll go first: mine was a
@@ -329,11 +329,11 @@ Tomorrow." — builds the DM relationship early.
 
 ## Translation-ready notes (post-reveal)
 
-- **Alcove** stays untranslated everywhere (proper noun).
-- Per-market tone + draft lines: `copy-kit-alcove.md` §7 (FR/PT/NL/DE/ES/IT).
+- **Halcova** stays untranslated everywhere (proper noun).
+- Per-market tone + draft lines: `copy-kit-halcova.md` §7 (FR/PT/NL/DE/ES/IT).
 - Localize **the pain, not the pitch** first: the double-buy confession and the
   "do I own this?" moment are culture-proof; the wordplay ("Two loves. One
-  alcove.") needs a native pass.
+  halcova.") needs a native pass.
 - For FR/NL/PT-BR/DE/ES/IT hashtags, keep `#vinyl`/`#bookstagram` (global) and
   add local ones (e.g. `#vinyles`, `#schallplatten`, `#livros`…) — `[VALIDATE]`
   with native testers.

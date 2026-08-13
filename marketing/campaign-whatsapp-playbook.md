@@ -1,4 +1,4 @@
-# WhatsApp personal playbook — Alcove launch
+# WhatsApp personal playbook — Halcova launch
 
 **Owner:** Marketing Manager + site owner · **Status:** Draft · **Date:** 2026-08-13
 **Channel role:** the high-trust, high-conversion channel. It's *personal* —
@@ -95,7 +95,7 @@ Status = a door. A DM = the invite. Never put the key (code) on the door.
 ## 4. What to send when (templates — fill the brackets)
 
 **Collector invite (Segment A):**
-> Hey [Name] — I built this little app called **Alcove**. You point your phone
+> Hey [Name] — I built this little app called **Halcova**. You point your phone
 > at a record sleeve (or book cover), it scans the barcode and catalogues it —
 > and it remembers what you already own, so you stop buying things twice. 😅
 >
@@ -144,7 +144,7 @@ Status = a door. A DM = the invite. Never put the key (code) on the door.
 | Referrals ("tell a friend") | ask in the follow-up; count in the sheet |
 
 UTM for any link you paste in chat:
-`https://<alcove-domain>/?utm_source=whatsapp&utm_medium=chat&utm_campaign=alcove-launch-2026&utm_content=<invite|status|nudge>`
+`https://<halcova-domain>/?utm_source=whatsapp&utm_medium=chat&utm_campaign=halcova-launch-2026&utm_content=<invite|status|nudge>`
 
 ---
 

@@ -15,9 +15,9 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Hokan — Records & Books',
-        short_name: 'Hokan',
-        description: 'Hokan — scan a barcode, catalog the thing. Your records and books in one app. Never double-buy: it knows what you already own.',
+        name: 'Halcova — Records & Books',
+        short_name: 'Halcova',
+        description: 'Halcova — scan a barcode, catalog the thing. Your records and books in one app. Never double-buy: it knows what you already own.',
         theme_color: '#16130F',
         background_color: '#16130F',
         display: 'standalone',

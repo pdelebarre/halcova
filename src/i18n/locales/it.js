@@ -240,7 +240,7 @@ const it = {
 
   // §14 Crediti
   'credits.aboutName': 'Sul nome',
-  'credits.aboutNameBody': '"hokan" è un nome proprio inventato e intraducibile — una parola calda e accogliente che dà un nome al luogo in cui vive la tua collezione, come "alcova" nelle lingue romanze. Collega dischi e libri senza pregiudizi per nessuno dei due supporti. Scelto dopo un processo di denominazione internazionale che ha coinvolto 7 lingue (EN, FR, PT, NL, DE, ES, IT) e l\'estetica scura da collezionista.',
+  'credits.aboutNameBody': '"Halcova" è una parola vera che significa "alcova" — un angolo caldo e accogliente dove custodisci i tuoi tesori. È quasi identica nelle lingue romanze: alcôve in francese, alcova in spagnolo, italiano e portoghese, alkoof in olandese, Alkoven in tedesco. Collega dischi e libri senza pregiudizi per nessuno dei due supporti — dà semplicemente un nome al luogo in cui vive la tua collezione. Scelta per un pubblico internazionale, nelle nostre otto lingue supportate, e l\'estetica scura da collezionista.',
   'credits.builtWith': 'Realizzato con',
   'credits.techReact': 'React 19',
   'credits.techReactDesc': 'Libreria UI',

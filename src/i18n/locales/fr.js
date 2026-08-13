@@ -240,7 +240,7 @@ const fr = {
 
   // §14 Crédits
   'credits.aboutName': 'À propos du nom',
-  'credits.aboutNameBody': '« hokan » est un nom propre inventé, intraduisible — un mot chaleureux et douillet qui désigne l\'endroit où vit votre collection, comme « alcôve » dans les langues romanes. Il relie les disques et les livres sans biais pour l\'un ou l\'autre support. Choisi après un processus de nommage international couvrant 7 langues (EN, FR, PT, NL, DE, ES, IT) et l\'esthétique sombre des collectionneurs.',
+  'credits.aboutNameBody': '« Halcova » est un vrai mot qui signifie « alcôve » — un recoin chaleureux et douillet où l\'on garde ses trésors. Il est presque identique dans les langues romanes : alcôve en français, alcova en espagnol, en italien et en portugais, alkoof en néerlandais, Alkoven en allemand. Il relie les disques et les livres sans privilégier un support — il nomme simplement l\'endroit où vit votre collection. Choisi pour un public international, à travers nos huit langues prises en charge, et l\'esthétique sombre des collectionneurs.',
   'credits.builtWith': 'Construit avec',
   'credits.techReact': 'React 19',
   'credits.techReactDesc': 'Bibliothèque UI',

@@ -1,7 +1,7 @@
 # Ticket — `feat/localization`: 7-language i18n, per-user preference + switcher
 
 **For:** Front End Developer (implement) · **Owner:** Marketing Manager
-**Branch:** `feat/localization` (off `main`, **after** `chore/rename-alcove`
+**Branch:** `feat/localization` (off `main`, **after** `chore/rename-halcova`
 merges — both touch the same string lines) → PR. **Never `main`.**
 **Plan:** `marketing/localization-plan.md` · **Copy:** `marketing/localization-dictionary.md`
 
@@ -106,7 +106,7 @@ currently surface English messages and already carry **error codes**
 
 ## 6. KEEP — do not translate
 
-- **`Alcove`** wordmark (proper noun), `RU-…` code format, `ISBN`, `Discogs`,
+- **`Halcova`** wordmark (proper noun), `RU-…` code format, `ISBN`, `Discogs`,
   `Google Books`.
 - **Example placeholders** ("Miles Davis", "Kind of Blue", "1959",
   "Columbia", "you@example.com") — examples, not UI.

@@ -1,11 +1,11 @@
-# PicsArt video production spec — "What lives in your alcove?"
+# PicsArt video production spec — "What lives in your halcova?"
 
 **Owner:** Marketing Manager · **Status:** Draft · **Date:** 2026-08-13
 **Tool:** PicsArt (free/paid tier — all assets below are template-friendly)
 **Grounding:** visuals match the real app aesthetic (dark `#16130F`, gold
 `#C9A227`, cream `#EFE6D8`, label-red `#B23A2E` for "double-buy" alarm moments;
 Fraunces serif + Inter + IBM Plex Mono). No fake UI, no invented screens — demo
-shots are real screen recordings of Alcove with motion/title overlays.
+shots are real screen recordings of Halcova with motion/title overlays.
 
 ---
 
@@ -21,12 +21,12 @@ shots are real screen recordings of Alcove with motion/title overlays.
 | Body font | Inter (sans) | if missing, use a clean geometric sans — subtitles |
 | Tech accent font | IBM Plex Mono → fallback to any mono | "SCANNING…", barcode labels |
 | Motif | **barcode** | scan-line sweep, "beep" flash, thin black/gold bars |
-| Motif 2 | **the alcove arch** | a simple arch outline (the brand's "cozy place") |
+| Motif 2 | **the Halcova arch + barcode** (the brand mark) | Gothic arch / treasure nook with a barcode element — see `marketing/brief-halcova-icon.md` + `docs/icon-treasure-nook-spec.md` |
 
-**PicsArt setup:** create a **Project** called `alcove-campaign` with saved
-templates (9:16, 1:1, 16:9) pre-loaded with the bg color, fonts, and the arch
-logo. Every asset below starts from the template — this is how you produce 14
-videos in an afternoon.
+**PicsArt setup:** create a **Project** called `halcova-campaign` with saved
+templates (9:16, 1:1, 16:9) pre-loaded with the bg color, fonts, and the
+arch + barcode logo. Every asset below starts from the template — this is how
+you produce 14 videos in an afternoon.
 
 **Master text-safety margins:** keep text inside the center 80% (Stories/Reels
 hide top 15% behind UI and bottom 20% behind caption/CTA). PicsArt's safe-zone
@@ -84,8 +84,9 @@ in 1.5s, with sound off.
 
 ### V4 — "Two loves. One place." (9s, 9:16) · Phase 2
 - **0–2s:** left half shows a record, right half shows a book (split screen).
-- **2–5s:** the two halves slide together into the **alcove arch** outline.
-  *(Use PicsArt's arch/sticker or draw a simple arch; animate the halves into it.)*
+- **2–5s:** the two halves slide together into the **Halcova arch (brand mark)**
+  outline. *(Use PicsArt's arch/sticker or draw the arch + barcode from the icon
+  brief; animate the halves into it.)*
 - **5–9s:** centered under the arch: **"Two loves. One place."** — serif, gold.
   Then small mono line: **"clue #2"**.
 - **Audio:** warm pad; a vinyl crackle on the record side, a soft page-turn on
@@ -104,21 +105,21 @@ in 1.5s, with sound off.
 - **Audio:** rising tick, cut off at the end (cliffhanger).
 - **Stories:** pair with the built-in countdown sticker (Day 9–10).
 
-### V7 — Name reveal "Meet Alcove." (15s, 9:16) · Phase 3 ⭐
+### V7 — Name reveal "Meet Halcova." (15s, 9:16) · Phase 3 ⭐
 - **0–2s:** black, no text — just the crackle starting.
-- **2–6s:** the alcove arch draws itself in gold. *(PicsArt: draw-on animation or
-  a gold arch sticker revealed by a wipe.)*
-- **6–10s:** **"ALCOVE"** types in, serif, gold, letter by letter. *(PicsArt
+- **2–6s:** the Halcova arch + barcode (brand mark) draws itself in gold.
+  *(PicsArt: draw-on animation or a gold arch sticker revealed by a wipe.)*
+- **6–10s:** **"HALCOVA"** types in, serif, gold, letter by letter. *(PicsArt
   typewriter, slow.)*
-- **10–13s:** sub-line: **"Your records and books, in their own alcove."**
+- **10–13s:** sub-line: **"Your records and books, in their own halcova."**
 - **13–15s:** **"Soon. 👀"** — *gold glow fade.*
-- **Audio:** vinyl crackle resolving into a warm, confident chord at "ALCOVE";
+- **Audio:** vinyl crackle resolving into a warm, confident chord at "HALCOVA";
   subtle heartbeat/rising swell under the reveal.
 - **Post it at the reveal time on ALL platforms the same day** (this is the
   spike).
 
 ### V8 — Demo: scan a record (30s, 9:16) · Phase 3 ⭐
-Real screen recording of Alcove (record tab), edited in PicsArt:
+Real screen recording of Halcova (record tab), edited in PicsArt:
 - **0–2s:** hook text overlay: **"The whole app in 30 seconds."**
 - **2–14s:** scan a real record sleeve → match picker → confirm. Overlays:
   mono captions **"SCANNING…"**, **"FOUND IT"**, gold scan-sweep over the
@@ -150,21 +151,21 @@ Real screen recording of Alcove (record tab), edited in PicsArt:
 ### V11 — The Open "It's open." (20s, 9:16) · Phase 4
 - **0–2s:** hook: **"It's open."** *(big, gold, quick zoom)*
 - **2–10s:** fast cut of V8/V9's best 4 seconds each (scan → flag → added).
-- **10–16s:** text: **"Your crate. Your shelf. One alcove."**
+- **10–16s:** text: **"Your crate. Your shelf. One halcova."**
 - **16–20s:** **"Request access →"** with the link/QR. *(Stories: swipe-up/
   link sticker.)*
 - **Audio:** triumphant, warm; end on a solid chord.
 
-### V12 — UGC challenge "Show us your alcove." (15s, 9:16) · Phase 5
+### V12 — UGC challenge "Show us your halcova." (15s, 9:16) · Phase 5
 - **0–3s:** hook: **"New challenge."**
 - **3–10s:** montage of real user scans (permissioned) — *or* a stylized
   re-enactment until you have real ones.
-- **10–15s:** **"Post your scan with #WhatsInYourAlcove. Best ones get
+- **10–15s:** **"Post your scan with #WhatsInYourHalcova. Best ones get
   reposted."**
 - **Audio:** trending/upbeat; keep captions on (many watch muted).
 
 ### V13 — Brand bumper (6s, 9:16 + 1:1) · all phases
-- The arch draws itself → **ALCOVE** → **"two loves, one place."**
+- The arch + barcode draws itself → **HALCOVA** → **"two loves, one halcova."**
 - Used as an end-card or Stories bumper on every post (consistency = recall).
 
 ### V14 — "How it works" explainer (60s, 16:9 for X / 9:16 for IG) · Phase 4+
@@ -184,7 +185,7 @@ Real screen recording of Alcove (record tab), edited in PicsArt:
 | Typewriter text | reveals (V7, name) | text animation preset |
 | Countdown | V6, Stories | countdown sticker + manual numbers |
 | Split-screen | V4 (record/book) | split effect; animate halves together |
-| Draw-on / wipe | alcove arch (V4, V7, V13) | draw animation or a shaped mask wipe |
+| Draw-on / wipe | Halcova arch + barcode (V4, V7, V13) | draw animation or a shaped mask wipe |
 | Glow fade | cliffhangers (V1, V2, V7) | opacity/glow keyframe at the end |
 | Zoom text | hooks (V2, V11) | scale-in text on the hook line |
 | Color grade | all | keep `#16130F` blacks, gold accents — consistent brand |

@@ -1,27 +1,29 @@
 # marketing/ — Runout rebrand workspace
 
-**Current decision (locked 2026-08-12): rename the public brand to `Alcove`.**
+**Current decision (2026-08-13): the public brand is `Halcova`** — the earlier `Hokan` and `Alcove` names are **superseded** (their docs are kept for reference).
 
-## Authoritative files (use these)
+## Authoritative files
 
 | File | What it is |
 | --- | --- |
-| `rename-alcove.md` | **Final rename plan** — decision, rationale, brand architecture, international summary, legal checklist, full rollout map, measurement, next steps |
-| `copy-kit-alcove.md` | **Final copy kit** — taglines, positioning, descriptions, store-listing drafts, launch posts, per-market messaging + glossary |
-| `ticket-rename-alcove.md` | **Dev implementation ticket** — exact file/line scope, keep-list, verification, definition of done |
-| `name-check-alcove-7-languages.md` | **Native-speaker check sheet** — 7-language pronunciation/meaning/vibe validation to run before launch |
-| `brief-alcove-icon.md` | **Icon design brief** — for the UI/UX Expert (Figma), with real dark/gold tokens and maskable constraints |
-| `handoff-rename-alcove.md` | **Coordination handoff** — who does what, dependency map, "name day" checklist |
+| `copy-kit-halcova.md` | **Halcova copy kit** — taglines, positioning, descriptions, store-listing drafts, launch posts, per-market messaging + glossary (the live brand) |
+| `brief-halcova-icon.md` | **Halcova icon brief** — for the UI/UX Expert: dark/gold tokens, **barcode element required** (the icon must show a code bar) |
 | `private-test-plan.md` | **Private-test plan** — friends & family circle (FR/NL/PT-BR/DE/ES/IT), setup, feedback form, go/no-go |
 | `private-test-invite.md` | **Invite copy** — EN master + FR/NL/PT-BR/DE/ES/IT drafts, with personal-code placeholders |
 | `localization-plan.md` | **Localization plan** — 7 languages, per-user preference + switcher, architecture, rollout |
 | `localization-dictionary.md` | **Translation dictionary (v1)** — EN/FR/NL/PT-BR/DE/ES/IT content for every key, `[VALIDATE]` |
 | `ticket-localization.md` | **Dev implementation ticket** — exact file/string scope for `feat/localization`, non-string fixes, tests, DoD |
+| `rename-alcove.md` | *Superseded* — earlier "rename to Alcove" plan (kept for reference) |
+| `copy-kit-alcove.md` | *Superseded* — earlier "Alcove" copy kit (kept for reference) |
+| `ticket-rename-alcove.md` | *Superseded* — earlier rename dev ticket (model for a new Hokan→Halcova ticket) |
+| `name-check-alcove-7-languages.md` | *Superseded* — earlier Alcove name check (a Halcova version is needed) |
+| `brief-alcove-icon.md` | *Superseded* — earlier Alcove icon brief (use `brief-halcova-icon.md`) |
+| `handoff-rename-alcove.md` | *Superseded* — earlier coordination handoff (kept for reference) |
 
-## Launch campaign — "What lives in your alcove?" (2026-08-13)
+## Launch campaign — "What lives in your halcova?" (2026-08-13)
 
 Public viral launch across **X · Instagram · Facebook · WhatsApp**, curiosity-first
-progressive reveal, video produced in **PicsArt**.
+progressive reveal, video produced in **PicsArt**. Brand: **Halcova**.
 
 | File | What it is |
 | --- | --- |
@@ -29,9 +31,10 @@ progressive reveal, video produced in **PicsArt**.
 | `campaign-copy-bank.md` | **Post copy** — every caption/hook/thread per day & platform, hashtags, translation notes |
 | `campaign-picsart-video-spec.md` | **Video production spec** — brand kit (dark `#16130F` + gold), 14 storyboarded assets (V1–V14), PicsArt techniques |
 | `campaign-whatsapp-playbook.md` | **Personal WhatsApp sequence** — segments, invite flow, statuses, codes are private, admin workload |
+| `campaign-landing-page.md` | **Landing page copy** — SEO/meta, hero→access sections (from `copy-kit-halcova.md` §4) + ready-to-paste UTM links per channel |
 
 > Campaign Phases 1–2 are **name-free** (safe to run now). Phase 3 (name reveal)
-> is gated on the `chore/rename-alcove` branch + legal/domain gate + icon.
+> is gated on the Hokan→Halcova code rename + legal/domain gate + icon (with a barcode).
 
 ## Iteration history (drafts — superseded, kept for reference)
 
@@ -42,10 +45,13 @@ progressive reveal, video produced in **PicsArt**.
 | `rename-strategy-round3.md` | 3 | Treasure × cozy menu — Keepsake / Cove / Coffer / etc. |
 | `rename-strategy-round4-international.md` | 4 | 7-language sound check — narrowed to cognate family → Alcove chosen |
 
+> **Final name (2026-08-13): `Halcova`** — supersedes the "Alcove" decision; the
+> campaign and copy kit now use Halcova.
+
 ## Open items `[VALIDATE]`
 
-1. Native-speaker pronunciation/meaning check (EN/FR/PT/NL/DE/ES/IT).
-2. Trademark + domain + app-store + social-handle check for "Alcove".
-3. New app icon mark on the dark `#16130F` theme.
-4. Implement rollout items in `rename-alcove.md` §6 on a `chore/rename-alcove` branch.
+1. Native-speaker pronunciation/meaning check for **Halcova** (a coined word) across EN/FR/PT/NL/DE/ES/IT.
+2. Trademark + domain + social-handle check for "Halcova".
+3. Halcova icon **with a barcode element** — approved by Marketing, PNGs in `public/` (`brief-halcova-icon.md`).
+4. Hokan→Halcova code rename on a `chore/rename-halcova` branch (new dev ticket).
 5. Localization dictionaries validated by native testers (FR/NL/PT-BR/DE/ES/IT) before the `feat/localization` branch ships.

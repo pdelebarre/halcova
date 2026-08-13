@@ -240,7 +240,7 @@ const nl = {
 
   // §14 Credits
   'credits.aboutName': 'Over de naam',
-  'credits.aboutNameBody': '"hokan" is een verzonnen, onvertaalbaar eigennaam — een warm, knus woord dat de plek benoemt waar je collectie leeft, zoals "alkoof" in Romaanse talen. Het verbindt platen en boeken zonder voorkeur voor één medium. Gekozen na een internationaal naamgevingsproces in 7 talen (EN, FR, PT, NL, DE, ES, IT) en de donkere verzamelaarsesthetiek.',
+  'credits.aboutNameBody': '"Halcova" is een echt woord dat "alkoof" betekent — een warme, knusse nis waar je je schatten bewaart. Het is vrijwel identiek in de Romaanse talen: alcôve in het Frans, alcova in het Spaans, Italiaans en Portugees, alkoof in het Nederlands, Alkoven in het Duits. Het verbindt platen en boeken zonder voorkeur voor één medium — het benoemt simpelweg de plek waar je collectie leeft. Gekozen voor een internationaal publiek, in onze acht ondersteunde talen, en de donkere verzamelaarsesthetiek.',
   'credits.builtWith': 'Gebouwd met',
   'credits.techReact': 'React 19',
   'credits.techReactDesc': 'UI-bibliotheek',

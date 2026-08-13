@@ -290,13 +290,13 @@ For exports at 48 px and below, apply these tweaks **programmatically** (do not 
 
 ## 7. Wordmark Option (512 px Only)
 
-An optional "hokan" wordmark in Fraunces, placed below the arch.
+An optional "halcova" wordmark in Fraunces, placed below the arch.
 
 ### 7.1 Specification
 
 | Parameter | Value |
 |---|---|
-| Text | `hokan` (all lowercase) |
+| Text | `halcova` (all lowercase) |
 | Font | Fraunces, 72 pt (regular weight, ~400) |
 | Color | `#C9A227` (gold) |
 | Text anchor | `middle` (centered on X) |
@@ -314,7 +314,7 @@ An optional "hokan" wordmark in Fraunces, placed below the arch.
       fill="#C9A227"
       text-anchor="middle"
       letter-spacing="0.05em">
-  hokan
+  halcova
 </text>
 ```
 
@@ -366,7 +366,7 @@ The icon works equally well without the wordmark. The arch + card composition is
         font-size="72" font-weight="400"
         fill="#C9A227"
         text-anchor="middle" letter-spacing="0.05em">
-    hokan
+    halcova
   </text>
 
 </svg>

@@ -34,10 +34,10 @@ describe('CreditModal', () => {
     expect(dialog).toHaveAttribute('aria-label', 'Credits')
   })
 
-  it('displays the "Hokan" wordmark', () => {
+  it('displays the "Halcova" wordmark', () => {
     renderModal()
 
-    expect(screen.getByText('Hokan')).toBeInTheDocument()
+    expect(screen.getByText('Halcova')).toBeInTheDocument()
   })
 
   it('shows the Treasure Nook app mark above the wordmark', () => {
