@@ -1,9 +1,9 @@
-# Private Test Plan — Alcove (friends & family, FR · NL · BR · DE)
+# Private Test Plan — Halcova (friends & family, FR · NL · BR · DE)
 
 **Owner:** Marketing Manager + site owner · **Status:** Ready to execute · **Date:** 2026-08-12
 **Scope:** **private first** — a closed circle of friends & family from
 **France, the Netherlands, Brazil, Germany**. No public launch yet.
-**Ref:** `rename-alcove.md`, `ticket-rename-alcove.md`, `handoff-rename-alcove.md`.
+**Ref:** `copy-kit-halcova.md`, `private-test-invite.md` (name-check: run a Halcova native-speaker check `[VALIDATE]`).
 
 ---
 
@@ -20,7 +20,7 @@
 
 ## 2. What the test must answer
 
-1. **Name:** Does "Alcove" sound natural and good in FR/NL/PT-BR/DE/ES/IT?
+1. **Name:** Does "Halcova" sound natural and good in FR/NL/PT-BR/DE/ES/IT?
    (vibe + accidental meaning)
 2. **Core flow:** scan → lookup → confirm → add; duplicate detection (the
    "never double-buy" moment).
@@ -32,10 +32,10 @@
 
 ## 3. Setup checklist (before invites go out)
 
-- [ ] **Branch:** `chore/rename-alcove` off `main`; implement
-      `ticket-rename-alcove.md` (wordmark + manifest + docs).
+- [ ] **Branch:** `chore/rename-halcova` off `main`; implement the Hokan→Halcova
+      code rename (wordmark + manifest + docs).
 - [ ] **Deploy:** `netlify deploy --build` (never drag-drop `dist`).
-- [ ] **Domain:** register an Alcove domain now so the shared link is stable
+- [ ] **Domain:** register a Halcova domain now so the shared link is stable
       `[VALIDATE]` (test can run on the `*.netlify.app` URL meanwhile).
 - [ ] **Env:** set `RUNOUT_ADMIN_KEY` in production (no dev fallback).
 - [ ] **Codes:** from the admin panel, generate one access code per tester,
@@ -67,7 +67,7 @@
 ## 6. Feedback form (2 minutes — questions)
 
 **Name (the important part):**
-- Q1: Say "Alcove" out loud. Does it sound natural in your language? (1–5)
+- Q1: Say "Halcova" out loud. Does it sound natural in your language? (1–5)
 - Q2: Does it mean anything odd or rude to you? (free text)
 - Q3: Does it feel "cozy + treasure" — a warm place that keeps the things you
   love? (1–5)
@@ -98,4 +98,4 @@
 **Go** when: name OK (Q1 & Q3 ≥ 3) in FR/NL/PT-BR/DE/ES/IT · localized UI reads
 naturally (Q8) · no unresolved dark-screen/crash reports · ≥ 1 returning user
 per country · core flow confirmed. Then run the trademark/domain gate
-(`rename-alcove.md` §5) before scaling beyond the circle.
+(the Halcova legal/domain gate) before scaling beyond the circle.

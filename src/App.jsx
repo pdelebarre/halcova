@@ -56,7 +56,7 @@ export default function App() {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Hokan</h1>
+          <h1 className="auth-wordmark">Halcova</h1>
           <p className="auth-copy">
             {t('auth.noCollections', { name: user.name })}
           </p>

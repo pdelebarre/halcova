@@ -1,6 +1,6 @@
-# Copy Kit — "Hokan" (FINAL)
+# Copy Kit — "Halcova" (FINAL)
 
-**Status:** Ready to use · **Owner:** Marketing Manager · **Date:** 2026-08-12
+**Status:** Ready to use · **Owner:** Marketing Manager · **Date:** 2026-08-13
 **For:** landing page, PWA install copy, social, email, per-market messaging.
 **Grounding:** every line traces to real product behavior (barcode scanning,
 Discogs/Google Books lookup, duplicate detection, crate + shelf, PWA). No
@@ -13,22 +13,22 @@ copywriter or a product/legal check are marked `[VALIDATE]`.
 
 | Line | Usage | Maps to real behavior |
 | --- | --- | --- |
-| **Two loves. One hokan.** | Hero / brand line | Records + books, one shared flow |
-| **Your records and books, in their own hokan.** | Hero sub-line | The core promise |
+| **Two loves. One halcova.** | Hero / brand line | Records + books, one shared flow |
+| **Your records and books, in their own halcova.** | Hero sub-line | The core promise |
 | **Scan it. Keep it. Find it.** | Sub-line | Scan (F-01) → add → search/filter (F-08, F-09) |
 | **Never rebuy what you already own.** | Benefit banner | Duplicate detection (F-07) |
-| **Every crate, every shelf, in its own hokan.** | Feature line | Two catalogs, one app |
+| **Every crate, every shelf, in its own halcova.** | Feature line | Two catalogs, one app |
 
 **Hero lockup (recommended):**
 
-> **ALCOVE**
-> *Your records and books, in their own hokan.*
+> **HALCOVA**
+> *Your records and books, in their own halcova.*
 
 ---
 
 ## 2. One-line positioning (landing page / README / press)
 
-> Hokan is the app that catalogs your records and books by scanning their
+> Halcova is the app that catalogs your records and books by scanning their
 > barcodes — it looks them up on Discogs and Google Books, remembers what you
 > already own so you never double-buy, and keeps your crate and your shelf
 > together in one cozy place. No app store, no account setup: it runs in your
@@ -38,22 +38,22 @@ copywriter or a product/legal check are marked `[VALIDATE]`.
 
 ## 3. Short description (≤ 160 chars — SEO meta / PWA manifest)
 
-> Hokan — scan a barcode, catalog the thing. Your records and books in one
-> app. Never double-buy: it knows what you already own. (134 chars)
+> Halcova — scan a barcode, catalog the thing. Your records and books in one
+> app. Never double-buy: it knows what you already own. (136 chars)
 
 ---
 
 ## 4. Long description (landing page "About", ~250 words)
 
-**Hokan** is for people whose record crate and bookshelf refuse to stay small.
+**Halcova** is for people whose record crate and bookshelf refuse to stay small.
 
 Point your phone at a barcode — the EAN/UPC on a sleeve or the ISBN on a cover —
-and Hokan identifies the release or edition instantly. Records come from
+and Halcova identifies the release or edition instantly. Records come from
 Discogs, books from Google Books, so every entry is the real thing with real
 metadata: artist, title, year, label or publisher, genre, tracklist or
 description.
 
-Hokan remembers what you already own. Before you add something, it tells you
+Halcova remembers what you already own. Before you add something, it tells you
 whether you have the exact release, another pressing of the same album, or
 other work by the same artist — so the used-store "I think I have this" moment
 disappears.
@@ -63,7 +63,7 @@ records, **your shelf** for books, in one cozy place. Search, filter, and sort
 either one in a tap; add notes on the spot; remove anything with a couple of
 taps.
 
-Hokan was built to be shared. Family and friends can join and keep their own
+Halcova was built to be shared. Family and friends can join and keep their own
 private crate and shelf — no passwords, no app-store downloads. Everything is
 stored server-side, so clearing your browser or switching phones doesn't lose a
 single record.
@@ -71,7 +71,7 @@ single record.
 It runs entirely in your browser and installs to your home screen like a native
 app, opening instantly even on a flaky connection.
 
-**Two loves. One hokan.**
+**Two loves. One halcova.**
 
 ---
 
@@ -79,7 +79,7 @@ app, opening instantly even on a flaky connection.
 
 Pre-written for a future native launch; today the product is a PWA.
 
-- **App name:** `Hokan — Vinyl & Books` (21 chars ✓)
+- **App name:** `Halcova — Vinyl & Books` (23 chars ✓)
 - **Subtitle (iOS, ≤ 30):** `Scan barcodes. Never rebuy.` (29 chars ✓)
 - **Short description (Android, ≤ 80):** `Scan barcodes to catalog records & books. Never double-buy.` (61 chars ✓)
 - **Keywords (Android / ASO):** `vinyl,records,books,isbn,barcode,scan,catalog,collection,library,discogs,album,book`
@@ -92,30 +92,30 @@ Pre-written for a future native launch; today the product is a PWA.
 ## 6. Launch announcement posts (social)
 
 **Instagram / TikTok (caption):**
-> Your crate. Your shelf. One hokan. 📚🎵 Scan a barcode → it looks the release
+> Your crate. Your shelf. One halcova. 📚🎵 Scan a barcode → it looks the release
 > up → you confirm → done. It remembers what you already own, so you never
 > double-buy. Runs in your browser, installs to your home screen. #vinyl
 > #bookstagram #recordcollection #personallibrary
 
 **Bluesky / X (short):**
-> Meet Hokan — the app that catalogs your records and books by scanning their
+> Meet Halcova — the app that catalogs your records and books by scanning their
 > barcodes. No app store, no passwords. Your crate + your shelf, in one cozy
 > place. → link
 
 **Launch email subject line:**
-> Your crate and your shelf just moved into one hokan.
+> Your crate and your shelf just moved into one halcova.
 
 ---
 
 ## 7. Per-market messaging (draft lines — translation-ready)
 
-> Proper noun **Hokan** stays untranslated everywhere; only the surrounding
+> Proper noun **Halcova** stays untranslated everywhere; only the surrounding
 > copy is localized. The local words below are draft marketing lines —
 > **a native copywriter should polish tone per market** `[VALIDATE]`.
 
 | Market | Tone | Draft line (source → local) |
 | --- | --- | --- |
-| EN | wry, feature-forward | "Never double-buy again." / "Your crate and shelf, in one hokan." |
+| EN | wry, feature-forward | "Never double-buy again." / "Your crate and shelf, in one halcova." |
 | FR | treasure, warm | "Vos disques et vos livres, bien au chaud dans leur alcôve." |
 | PT | cozy corner | "Os seus discos e livros, guardados no seu cantinho." |
 | NL | gezellig | "Je platen en je boeken, gezellig in hun alkoof." |
@@ -127,7 +127,7 @@ Pre-written for a future native launch; today the product is a PWA.
 
 | EN term | Meaning | Keep / localize |
 | --- | --- | --- |
-| Hokan | the product + the cozy place the collection lives | **keep as proper noun** |
+| Halcova | the product + the cozy place the collection lives (a real Romance word for "alcove") | **keep as proper noun** |
 | crate | the records collection (vinyl) | localize (plattenkiste, bac, caja…) |
 | shelf | the books collection | localize (regal, étagère, estante…) |
 | scan | the barcode camera action | localize |

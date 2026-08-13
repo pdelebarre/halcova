@@ -240,7 +240,7 @@ const ptBR = {
 
   // §14 Créditos
   'credits.aboutName': 'Sobre o nome',
-  'credits.aboutNameBody': '"hokan" é um substantivo próprio inventado e intraduzível — uma palavra calorosa e aconchegante que nomeia o lugar onde sua coleção vive, como "alcova" nas línguas românicas. Ela conecta discos e livros sem viés para nenhum dos formatos. Escolhida após um processo internacional de nomeação abrangendo 7 idiomas (EN, FR, PT, NL, DE, ES, IT) e a estética escura de colecionador.',
+  'credits.aboutNameBody': '"Halcova" é uma palavra real que significa "alcova" — um nicho quente e aconchegante onde você guarda seus tesouros. Ela é quase idêntica nas línguas românicas: alcôve em francês, alcova em espanhol, italiano e português, alkoof em holandês, Alkoven em alemão. Ela conecta discos e livros sem viés para nenhum dos formatos — ela simplesmente nomeia o lugar onde sua coleção vive. Escolhida para um público internacional, em nossos oito idiomas suportados, e a estética escura de colecionador.',
   'credits.builtWith': 'Construído com',
   'credits.techReact': 'React 19',
   'credits.techReactDesc': 'Biblioteca de UI',

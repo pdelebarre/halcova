@@ -241,7 +241,7 @@ const enGB = {
 
   // §14 Credits
   'credits.aboutName': 'About the name',
-  'credits.aboutNameBody': '"hokan" is a coined, untranslatable proper noun — a warm, cozy word that names the place your collection lives, like "alcove" in Romance languages. It bridges records and books without bias toward either medium. Chosen after an international naming process spanning 7 languages (EN, FR, PT, NL, DE, ES, IT) and the dark collector aesthetic.',
+  'credits.aboutNameBody': '"Halcova" is a real word meaning "alcove" — a warm, cosy nook where you keep your treasures. It is nearly identical across the Romance languages: alcôve in French, alcova in Spanish, Italian and Portuguese, alkoof in Dutch, Alkoven in German. It bridges records and books without bias toward either medium — it simply names the place where your collection lives. Chosen for an international audience spanning our eight supported languages and the dark collector aesthetic.',
   'credits.builtWith': 'Built with',
   'credits.techReact': 'React 19',
   'credits.techReactDesc': 'UI library',

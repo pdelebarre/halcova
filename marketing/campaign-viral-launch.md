@@ -1,8 +1,8 @@
-# Campaign — "What lives in your alcove?" (Viral launch, curiosity-first)
+# Campaign — "What lives in your halcova?" (Viral launch, curiosity-first)
 
 **Owner:** Marketing Manager · **Status:** Draft for approval · **Date:** 2026-08-13
 **Channels:** X · Instagram · Facebook · WhatsApp (personal) · **Video tool:** PicsArt
-**Brand:** Alcove (locked decision 2026-08-12; code rename + legal gate still `[VALIDATE]` — see §0)
+**Brand:** Halcova (new name — see `copy-kit-halcova.md`; code rename Hokan→Halcova + legal gate still `[VALIDATE]` — see §0)
 
 ---
 
@@ -16,10 +16,10 @@ the name reveal.
 
 | Gate | Where | Blocks |
 | --- | --- | --- |
-| Code rename `Runout/Hokan` → `Alcove` shipped | `ticket-rename-alcove.md` + `handoff-rename-alcove.md` §4 | Phase 3 (name reveal) |
-| Legal/domain gate green (trademark, domain, handles) | `rename-alcove.md` §5 | Phase 3 |
-| Icon on the dark theme approved + deployed | `brief-alcove-icon.md` | Phase 3 |
-| Stable public URL + landing page live (copy from `copy-kit-alcove.md` §4) with **Request access** | owner/deploy | Phase 4 (any CTA) |
+| Code rename `Hokan` → `Halcova` shipped (wordmark, `index.html`, `vite.config.js`, README, docs) | new dev ticket (model: `ticket-rename-alcove.md`) | Phase 3 (name reveal) |
+| Legal/domain gate green for "Halcova" (trademark, domain, handles) | `[VALIDATE]` — run before the reveal | Phase 3 |
+| Icon with a barcode element approved + deployed (PNGs in `public/`) | `marketing/brief-halcova-icon.md` | Phase 3 |
+| Stable public URL + landing page live (copy from `copy-kit-halcova.md` §4) with **Request access** | owner/deploy | Phase 4 (any CTA) |
 | UTM params on landing + a way to count visits/requests | analytics on landing | Phase 4 (measurement) |
 | Admin ready to approve access requests in waves | owner | Phase 4 (see §7 risk R-3) |
 
@@ -28,7 +28,7 @@ the name reveal.
 1. **Start date.** Default: **Mon 2026-08-17** (teaser, no name) — 2 weeks of prep
    available now.
 2. **Language.** Default: **EN master** for all public posts now; FR/NL/PT-BR/DE/ES/IT
-   localized follow-ups after the name reveal (per `copy-kit-alcove.md` §7). If you
+   localized follow-ups after the name reveal (per `copy-kit-halcova.md` §7). If you
    want localized posts from Day 1, tell me which markets matter most.
 3. **Access model during the campaign.** Default: public posts send people to a
    landing **"Request access"**; WhatsApp contacts get **personal codes** (private).
@@ -40,7 +40,7 @@ the name reveal.
 
 ## 1. Concept
 
-> **"What lives in your alcove?"**
+> **"What lives in your halcova?"**
 
 A three-week, four-phase **progressive-reveal** campaign. We never show the
 product in the first week. We make the audience feel the problem, guess the
@@ -48,7 +48,7 @@ solution, and beg for the name — then we hand it to them, let them in, and tur
 them into the ones who tell the next person.
 
 **Why curiosity-first works for this product:**
-- Alcove has a **built-in mystery** (the name) and a **built-in reveal** (scan →
+- Halcova has a **built-in mystery** (the name) and a **built-in reveal** (scan →
   it knows what you own).
 - Its two strongest hooks — "never double-buy" (duplicate detection, F-07) and
   "your crate and your shelf in one place" — are **relatable pains first, product
@@ -63,7 +63,7 @@ them into the ones who tell the next person.
 | --- | --- | --- | --- |
 | 1 — The Riddle (Days 1–5) | a painful truth (double-buying, un-cataloged crates) + "something is coming" | what it is, the name, the platform | to follow so they don't miss it |
 | 2 — The Clues (Days 6–10) | it catalogs records **and** books; it uses your camera; it's "a place" | the name, the look, the brand | to guess, to get in |
-| 3 — The Reveal (Days 11–13) | **Alcove**; first real demo; "never double-buy" | how to get in | access |
+| 3 — The Reveal (Days 11–13) | **Halcova**; first real demo; "never double-buy" | how to get in | access |
 | 4 — The Open (Day 14+) | it's live; request access; WhatsApp circle gets codes | (scarcity) | to be inside |
 | 5 — The Loop (ongoing) | everything — now they're the ones sharing | — | to show theirs |
 
@@ -71,7 +71,7 @@ them into the ones who tell the next person.
 
 ## 2. Positioning & the angle (what we're really selling)
 
-- **One line:** Alcove catalogs your records and books by scanning their
+- **One line:** Halcova catalogs your records and books by scanning their
   barcodes, remembers what you already own so you never double-buy, and keeps
   your crate and your shelf in one cozy place.
 - **Emotional angle:** "You love these things. Keep them straight. Stop
@@ -80,16 +80,16 @@ them into the ones who tell the next person.
   - *Books:* Goodreads (Amazon) is the giant for *reading* and "to-read" shelves,
     not for cataloging a physical library by ISBN with covers & editions —
     confirmed at goodreads.com/about (launched 2007, ~20B recommendation data
-    points; it's a social-reading platform). Alcove's angle: **catalog your
+    points; it's a social-reading platform). Halcova's angle: **catalog your
     physical shelf**, not your reading list.
   - *Records:* Discogs is the database & marketplace; its tools are
-    catalogue-nerd oriented. Alcove's angle: **camera-first, consumer-friendly
+    catalogue-nerd oriented. Halcova's angle: **camera-first, consumer-friendly
     "crate" for the person who owns 200 records and just wants them organized**,
     plus the never-double-buy guard at the record shop.
   - *Both at once:* nobody owns "crate + shelf in one cozy place." That is the
     white space this campaign claims. `[VALIDATE]` before quoting competitors by
     name in paid/press copy.
-- **Guardrails (from `copy-kit-alcove.md` §8):** never mention access codes
+- **Guardrails (from `copy-kit-halcova.md` §8):** never mention access codes
   (`RU-…`), the admin key, or approval mechanics publicly; never claim app-store
   availability or pricing; never invent testimonials, counts, or metrics.
 
@@ -127,10 +127,10 @@ Goal: reveal the *concept* (not the product) and start a guessing game.
 - **CTA:** "DM the word CRATE" (IG) / reply to the thread (X) — engagement DMs
   boost you hard. No links yet.
 
-### Phase 3 — The Reveal (Days 11–13) · *"Meet Alcove."*
+### Phase 3 — The Reveal (Days 11–13) · *"Meet Halcova."*
 
-Goal: the spike. Name + first real demo. **This is the phase gated on the rename
-+ legal + icon.**
+Goal: the spike. Name + first real demo. **This is the phase gated on the
+Hokan→Halcova code rename + legal + icon.**
 
 - **Content:**
   1. **Name-reveal hero video** (V7) — the wordmark, dark + gold, two loves.
@@ -149,7 +149,7 @@ Goal: the spike. Name + first real demo. **This is the phase gated on the rename
 Goal: convert curiosity into members. **Public landing goes live this day.**
 
 - **Content:**
-  1. **Open announcement** (V11): "Alcove is open. Request access." → link.
+  1. **Open announcement** (V11): "Halcova is open. Request access." → link.
   2. Demo reminders (recycle V8–V10 with new captions + UTM).
   3. **WhatsApp personal invitations go out here** — personal codes, 1:1
      (see `campaign-whatsapp-playbook.md`), NOT public.
@@ -159,7 +159,7 @@ Goal: convert curiosity into members. **Public landing goes live this day.**
   flow, F-24).
 - **CTA:** link with `utm_source` per channel → landing → **Request access**.
 
-### Phase 5 — The Loop (ongoing) · *"Show us your alcove."*
+### Phase 5 — The Loop (ongoing) · *"Show us your halcova."*
 
 Goal: users become the channel. **This is where real virality compounds.**
 
@@ -193,7 +193,7 @@ each is different.
 **Hashtag strategy (IG/FB):** 3–5 tags, mixed:
 - Broad reach: `#vinyl`, `#vinylcollection`, `#bookstagram`, `#recordcollection`, `#vinylcommunity`
 - Niche/collector: `#recordcollecting`, `#discogscollection`(avoid claiming), `#personallibrary`, `#bookshelfie`
-- Campaign/brand: `#Alcove`, `#WhatsInYourAlcove`, `#NeverRebuy`
+- Campaign/brand: `#Halcova`, `#WhatsInYourHalcova`, `#NeverRebuy`
 Never stuff tags; put the important ones in the caption, extras in the first comment.
 
 ---
@@ -235,11 +235,11 @@ Never stuff tags; put the important ones in the caption, extras in the first com
 | 8 | Mon 08-24 | 2 | carousel | "Signs you need this" | Save/tag a friend |
 | 9 | Tue 08-25 | 2 | V6 | countdown "3 days" | DM "CRATE" |
 | 10 | Wed 08-26 | 2 | V6 | countdown "tomorrow" | DM "CRATE" |
-| 11 | Thu 08-27 | 3 | **V7 name reveal** | "Meet Alcove." | Follow |
+| 11 | Thu 08-27 | 3 | **V7 name reveal** | "Meet Halcova." | Follow |
 | 12 | Fri 08-28 | 3 | V8 demo (record) | "Scan it. Keep it." | Save/share |
 | 13 | Sat 08-29 | 3 | V9 + V10 | "Never rebuy what you already own." | Tag a friend |
 | 14 | Sun 08-30 | 4 | **V11 open** | "It's open. Request access." | Link → request |
-| 15+ | Mon 08-31 → | 4→5 | V12 challenge | "Show us your alcove." | UGC + invite |
+| 15+ | Mon 08-31 → | 4→5 | V12 challenge | "Show us your halcova." | UGC + invite |
 | ongoing | — | 5 | V13/V14 + UGC | "Catalog your collection" | Share |
 
 ---
@@ -264,23 +264,23 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 | Funnel | landing visits → requests | ≥ 10% | measure with UTM |
 | Activation | requests → first scan | ≥ 50% | admin approves in waves |
 | Retention | week-2 return | ≥ 30% | the real test |
-| Brand | "alcove app" branded search % | trending up | the rename KPI (`rename-alcove.md` §7) |
+| Brand | "halcova app" branded search % | trending up | the brand-search KPI (grows after the reveal) |
 | Loop | shares per post; UGC entries | growing | Phase 5 compounding |
 
 ### UTM scheme (one link per channel, per post)
-`https://<alcove-domain>/?utm_source=<x|instagram|facebook|whatsapp>&utm_medium=<social|status|chat>&utm_campaign=alcove-launch-2026&utm_content=<V#|post-slug>`
+`https://<halcova-domain>/?utm_source=<x|instagram|facebook|whatsapp>&utm_medium=<social|status|chat>&utm_campaign=halcova-launch-2026&utm_content=<V#|post-slug>`
 
 ### Risks & mitigations
 
 | # | Risk | Mitigation |
 | --- | --- | --- |
-| R-1 | Name "Alcove" not yet live in code / legal gate open | Run Phases 1–2 with **no name**; block Phase 3 on the gates (§0). The teaser phase is safe to run now. |
+| R-1 | Hokan→Halcova code rename + legal/icon gates not green before the reveal | Phases 1–2 run name-free (safe now); block Phase 3 on the gates (§0). |
 | R-2 | Teaser fatigue (too much hype, no payoff) | Hard cap teaser window at 10 days; reveal on schedule even if imperfect; keep 1 strong post/day, not 5. |
 | R-3 | **Access approval is manual** — a viral wave could swamp the admin panel (F-23) | Open **in waves**; message "request access — opening in batches"; have the owner ready to batch-approve; if it truly breaks, pause Phase 4 amplification and reopen when stable. This is a real product constraint — flag to Netlify Backend for a waitlist auto-approve later. |
 | R-4 | Engagement-bait penalties (IG/FB down-rank "comment YES" bait) | Ask *genuine* questions ("how many have you bought twice?") — real engagement, not fake bait. |
 | R-5 | Copy-paste cross-posting feels lazy / algorithmic suppression | Tune captions + first lines per platform (§4). |
-| R-6 | Claiming features we don't have (store listings, pricing, metrics) | Copy bank is grounded in real behavior (F-01…F-24); do-not-say list in `copy-kit-alcove.md` §8. Never invent testimonials. |
-| R-7 | International backlash / name meaning in a target language | Native-speaker check (`name-check-alcove-7-languages.md`) must pass before the name reveal reaches those markets. |
+| R-6 | Claiming features we don't have (store listings, pricing, metrics) | Copy bank is grounded in real behavior (F-01…F-24); do-not-say list in `copy-kit-halcova.md` §8. Never invent testimonials. |
+| R-7 | International backlash / "Halcova" meaning or sound in a target language | A native-speaker check for **Halcova** must pass before localized reveals `[VALIDATE]`. |
 | R-8 | WhatsApp feels like spam to contacts | Personal, sequenced, opt-in feeling — playbook file. Never mass-broadcast, never send codes to group chats/statuses. |
 
 ---
@@ -290,8 +290,8 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 | Role | Need |
 | --- | --- |
 | **You (owner)** | Approve this plan + defaults (§0); run the legal/domain gate; be the admin for access approval in waves. |
-| **Front End Developer** | Ship `chore/rename-alcove` (wordmark/manifest/index.html/docs) — **required before Phase 3**. |
-| **UI/UX Expert** | Approve + hand over the Alcove icon on `#16130F` (before Phase 3). |
+| **Front End Developer** | Ship the `Hokan`→`Halcova` code rename (wordmark/manifest/index.html/docs) — **required before Phase 3** (new dev ticket; model: `ticket-rename-alcove.md`). |
+| **UI/UX Expert** | Hand over the Halcova icon **with a barcode element** (PNGs for `public/`) — `marketing/brief-halcova-icon.md` (before Phase 3). |
 | **Tester** | Green gates after rename (lint/test/build). |
 | **Marketing (me)** | Copy bank, video spec, WhatsApp playbook, UTM tracking, calendar. |
 
@@ -299,8 +299,8 @@ Impressions → Video views (3s+) → Profile visits → Landing visits (UTM)
 
 1. Approve this plan + the four decisions in §0.
 2. Start building the PicsArt **brand kit + templates** now (video spec).
-3. Register the social handles + domain for Alcove (legal gate) — before Phase 3.
-4. Prepare the landing page (copy from `copy-kit-alcove.md` §4) with UTM + a
+3. Register the social handles + domain for Halcova (legal gate) — before Phase 3.
+4. Prepare the landing page (copy from `copy-kit-halcova.md` §4) with UTM + a
    "request access" form.
 5. Kick off Phase 1 on 2026-08-17. Recalibrate KPIs from the first week's data.
 

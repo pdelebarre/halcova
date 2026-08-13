@@ -13,7 +13,7 @@ export default function CreditModal({ onClose }) {
 
         <div className="credits-body">
           <div className="credits-mark"><TreasureNookMark size={72} /></div>
-          <div className="credits-wordmark">Hokan</div>
+          <div className="credits-wordmark">Halcova</div>
 
           <section className="credits-section">
             <h3 className="credits-section-heading">{t('credits.aboutName')}</h3>

@@ -47,7 +47,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Hokan</h1>
+          <h1 className="auth-wordmark">Halcova</h1>
           <p className="auth-done">{t('auth.requestSent')}</p>
           <p className="auth-copy">
             {t('auth.requestSentBody')}
@@ -64,7 +64,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Hokan</h1>
+          <h1 className="auth-wordmark">Halcova</h1>
           <p className="auth-copy">{t('auth.enterCode')}</p>
           <form onSubmit={handleLogin} className="auth-form" noValidate>
             <input
@@ -97,7 +97,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1 className="auth-wordmark">Hokan</h1>
+          <h1 className="auth-wordmark">Halcova</h1>
           <p className="auth-copy">
             {t('auth.requestToStart')}
           </p>
@@ -135,7 +135,7 @@ export default function AuthScreen({ onLogin, onRequestAccess }) {
     <div className="auth-screen">
       <div className="auth-card">
         <TreasureNookMark className="auth-mark" size={104} />
-        <h1 className="auth-wordmark">Hokan</h1>
+        <h1 className="auth-wordmark">Halcova</h1>
         <p className="auth-tagline">{t('auth.tagline')}</p>
         <div className="auth-actions">
           <button className="btn btn-primary btn-block" onClick={() => setMode('login')}>

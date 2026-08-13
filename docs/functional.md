@@ -1,6 +1,6 @@
-# Hokan — Functional Documentation
+# Halcova — Functional Documentation
 
-This document describes **what Hokan does** from a user's point of view: the
+This document describes **what Halcova does** from a user's point of view: the
 features, screens, flows, states, and edge cases. For *how* it's built, see
 [`technical.md`](technical.md).
 
@@ -17,7 +17,7 @@ features, screens, flows, states, and edge cases. For *how* it's built, see
 
 ## 1. Overview
 
-Hokan lets people catalog **records** and **books** by scanning barcodes with
+Halcova lets people catalog **records** and **books** by scanning barcodes with
 their phone camera. It is a client-side progressive web app (PWA): no
 app-store download, no passwords. Access is by **admin approval** — visitors
 request access, the site owner approves them from an admin screen and grants
@@ -72,7 +72,7 @@ remove. The wording ("crate" vs "shelf") and the visual layout adapt per tab.
 
 ### 3.1 Header
 
-Always visible. Shows the **Hokan** wordmark, a tagline that matches the active
+Always visible. Shows the **Halcova** wordmark, a tagline that matches the active
 tab ("your crate, cataloged" / "your shelf, cataloged"), a **Records | Books**
 tab bar, and a gear button that opens Settings.
 
@@ -169,7 +169,7 @@ A small sheet to manage the **Discogs personal access token**:
 
 ### 3.9 Auth screen
 
-The first screen a visitor sees, with the Hokan wordmark and two actions:
+The first screen a visitor sees, with the Halcova wordmark and two actions:
 
 - **I have an access code** — a code field (`RU-XXXX-XXXX-XXXX`) plus
   **Sign in**. Wrong codes show an inline error; disabled accounts explain

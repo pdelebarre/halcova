@@ -1,4 +1,4 @@
-# Localization Plan — Hokan in 8 languages (user-switchable)
+# Localization Plan — Halcova in 8 languages (user-switchable)
 
 **Owner:** Marketing Manager (copy) + Front End Developer (implementation)
 **Status:** Ready to hand off · **Date:** 2026-08-12
@@ -74,7 +74,7 @@ testers validate it; the Front End Developer wires it to `t()` keys.
 
 ## 6. Rollout & handoff
 
-- **Branch:** `feat/localization`, off `main`, after `chore/rename-alcove`
+- **Branch:** `feat/localization`, off `main`, after `chore/rename-halcova`
   merges (both touch the same string lines — avoid the merge conflict).
 - **Order:**
   1. i18n scaffold + EN (baseline — existing tests must stay green).
@@ -92,7 +92,7 @@ testers validate it; the Front End Developer wires it to `t()` keys.
 ## 7. Handoff note (to the Front End Developer)
 
 - `localization-dictionary.md` = keys + 7-language content (v1, `[VALIDATE]`).
-- Do **not** localize the `Alcove` wordmark, `RU-…` code format, `ISBN`,
+- Do **not** localize the `Halcova` wordmark, `RU-…` code format, `ISBN`,
   `Discogs`/`Google Books` proper nouns, or record/book **example placeholders**
   (e.g. "Kind of Blue") unless the testers ask.
 - Keep the private-test feedback form Q8 updated: testers now check their own

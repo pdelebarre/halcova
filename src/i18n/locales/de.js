@@ -240,7 +240,7 @@ const de = {
 
   // §14 Credits
   'credits.aboutName': 'Über den Namen',
-  'credits.aboutNameBody': '"hokan" ist ein erfundenes, unübersetzbares Eigenwort — ein warmes, gemütliches Wort, das den Ort benennt, an dem deine Sammlung lebt, wie "Alkoven" in romanischen Sprachen. Es verbindet Platten und Bücher ohne Bevorzugung eines Mediums. Gewählt nach einem internationalen Namensfindungsprozess in 7 Sprachen (EN, FR, PT, NL, DE, ES, IT) und der dunklen Sammler-Ästhetik.',
+  'credits.aboutNameBody': '"Halcova" ist ein echtes Wort und bedeutet "Alkoven" — eine warme, gemütliche Nische, in der du deine Schätze aufbewahrst. Es ist in den romanischen Sprachen fast identisch: alcôve auf Französisch, alcova auf Spanisch, Italienisch und Portugiesisch, alkoof auf Niederländisch, Alkoven auf Deutsch. Es verbindet Platten und Bücher ohne Bevorzugung eines Mediums — es benennt einfach den Ort, an dem deine Sammlung lebt. Gewählt für ein internationales Publikum, in unseren acht unterstützten Sprachen, und die dunkle Sammler-Ästhetik.',
   'credits.builtWith': 'Entwickelt mit',
   'credits.techReact': 'React 19',
   'credits.techReactDesc': 'UI-Bibliothek',

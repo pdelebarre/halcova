@@ -1,4 +1,4 @@
-# Private-test invite — Alcove (draft, EN + FR · NL · PT-BR · DE)
+# Private-test invite — Halcova (draft, EN + FR · NL · PT-BR · DE)
 
 **For:** friends & family testers · **Owner:** Marketing Manager · **Draft**
 > The localized versions are **drafts** — because the testers are native
@@ -10,11 +10,11 @@
 
 ## EN (master)
 
-**Subject:** You're in! Try Alcove — your private invite
+**Subject:** You're in! Try Halcova — your private invite
 
 Hi [Name],
 
-I'm testing a little app I built called **Alcove** — it catalogs your records
+I'm testing a little app I built called **Halcova** — it catalogs your records
 and books just by scanning their barcodes. Point your phone at a sleeve or a
 book cover, it looks the release up (Discogs for records, Google Books for
 books), and it's saved. It even remembers what you already own, so you never
@@ -44,11 +44,11 @@ Thanks for helping me build this!
 
 ## FR (draft)
 
-**Objet :** C'est parti ! Essayez Alcove — votre invitation privée
+**Objet :** C'est parti ! Essayez Halcova — votre invitation privée
 
 Bonjour [Name],
 
-Je teste une petite appli que j'ai créée, **Alcove** — elle catalogue vos disques
+Je teste une petite appli que j'ai créée, **Halcova** — elle catalogue vos disques
 et vos livres en scannant simplement leurs codes-barres. Pointez votre téléphone
 vers une pochette ou une couverture, elle retrouve la référence (Discogs pour
 les disques, Google Books pour les livres) et c'est enregistré. Elle se
@@ -78,11 +78,11 @@ Merci de m'aider à la construire !
 
 ## NL (draft)
 
-**Onderwerp:** Je bent erbij! Probeer Alcove — je privé-uitnodiging
+**Onderwerp:** Je bent erbij! Probeer Halcova — je privé-uitnodiging
 
 Hoi [Name],
 
-Ik test een app die ik heb gebouwd, **Alcove** — hij catalogiseert je platen en
+Ik test een app die ik heb gebouwd, **Halcova** — hij catalogiseert je platen en
 boeken door simpelweg hun streepjescode te scannen. Houd je telefoon bij een
 hoes of een boekomslag, hij zoekt de uitgave op (Discogs voor platen, Google
 Books voor boeken) en het is opgeslagen. Hij onthoudt zelfs wat je al in huis
@@ -112,11 +112,11 @@ Bedankt dat je me helpt dit te bouwen!
 
 ## PT-BR (draft)
 
-**Assunto:** Você está dentro! Teste o Alcove — seu convite privado
+**Assunto:** Você está dentro! Teste o Halcova — seu convite privado
 
 Oi [Name],
 
-Estou testando um aplicativo que criei, o **Alcove** — ele cataloga seus discos
+Estou testando um aplicativo que criei, o **Halcova** — ele cataloga seus discos
 e livros só escaneando os códigos de barras. Aponte o celular para uma capa de
 disco ou de livro, ele encontra o lançamento (Discogs para discos, Google Books
 para livros) e pronto, está salvo. Ele até lembra o que você já tem, pra você
@@ -146,11 +146,11 @@ Obrigado(a) por me ajudar a construir isso!
 
 ## DE (draft)
 
-**Betreff:** Du bist dabei! Teste Alcove — deine private Einladung
+**Betreff:** Du bist dabei! Teste Halcova — deine private Einladung
 
 Hallo [Name],
 
-ich teste eine App, die ich gebaut habe — **Alcove**. Sie katalogisiert deine
+ich teste eine App, die ich gebaut habe — **Halcova**. Sie katalogisiert deine
 Platten und Bücher, indem du einfach den Barcode scannst. Halt dein Handy an
 eine Hülle oder einen Bucheinband, sie sucht die Ausgabe (Discogs für Platten,
 Google Books für Bücher) und schon ist sie gespeichert. Sie merkt sich sogar,
@@ -180,11 +180,11 @@ Danke, dass du mir hilfst, das aufzubauen!
 
 ## ES (draft)
 
-**Asunto:** ¡Dentro! Prueba Alcove — tu invitación privada
+**Asunto:** ¡Dentro! Prueba Halcova — tu invitación privada
 
 Hola [Name],
 
-Estoy probando una app que he creado, **Alcove** — cataloga tus discos y libros
+Estoy probando una app que he creado, **Halcova** — cataloga tus discos y libros
 con solo escanear sus códigos de barras. Apunta el móvil a una portada de disco
 o de libro, encuentra la edición (Discogs para discos, Google Books para
 libros) y listo, queda guardada. Hasta recuerda lo que ya tienes, para que no
@@ -214,11 +214,11 @@ Formulario breve (2 min): **[FORM]**
 
 ## IT (draft)
 
-**Oggetto:** Sei dentro! Prova Alcove — il tuo invito privato
+**Oggetto:** Sei dentro! Prova Halcova — il tuo invito privato
 
 Ciao [Name],
 
-sto testando un'app che ho creato, **Alcove** — cataloga i tuoi dischi e i tuoi
+sto testando un'app che ho creato, **Halcova** — cataloga i tuoi dischi e i tuoi
 libri semplicemente scansionando i codici a barre. Punta il telefono su una
 copertina di un disco o di un libro, trova l'edizione (Discogs per i dischi,
 Google Books per i libri) ed è salvata. Ricorda anche cosa hai già, così non
