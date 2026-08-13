@@ -3,6 +3,7 @@ import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
 import CreditModal from './components/CreditModal'
 import LoansDashboard from './components/LoansDashboard'
+import DemoBanner from './components/DemoBanner'
 import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
@@ -86,6 +87,10 @@ export default function App() {
         user={user}
         onLogout={logout}
       />
+
+      {/* Read-only demo notice (ADR-0001): demo visitors browse but can't add
+          or edit. Leaving the demo signs out back to the auth screen. */}
+      {isDemo && <DemoBanner onLeave={logout} />}
 
       {/* keyed by kind so each collection remounts fresh when you switch tabs */}
       <CollectionView

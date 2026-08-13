@@ -7,6 +7,11 @@ import { getAccessCode, saveSession } from '../utils/session'
 const AUTH_URL = '/.netlify/functions/auth'
 const ADMIN_URL = '/.netlify/functions/admin'
 
+// The public demo space code (ADR-0001). Intentionally NOT secret: it ships in
+// the client so the "Try the free demo" button can sign visitors in. It is
+// safe only because the demo store is read-only server-side (DEMO_READONLY).
+export const DEMO_CODE = 'RUNOUT-DEMO-0000'
+
 function authHeaders(code) {
   return {
     'Content-Type': 'application/json',

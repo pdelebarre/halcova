@@ -186,3 +186,17 @@
   35% { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
+
+/* Read-only demo notice (ADR-0001): shown in place of the Add button so the
+   demo visitor still sees the looked-up result but can't add it. */
+.demo-readonly-notice {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--jacket-kraft-dim);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  text-align: left;
+}

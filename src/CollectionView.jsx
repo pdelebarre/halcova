@@ -30,7 +30,7 @@ const FREE_PLAN_CAP = 10
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, plan, isFree = false, isDemo = false, user }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, isFree = false, isDemo = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   const [modal, setModal] = useState(null) // 'scan' | 'pick' | 'manual' | 'result' | 'detail'
@@ -411,7 +411,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         )}
 
         {status === 'ready' && items.length === 0 && (
-          <EmptyState copy={copy} onScan={() => setModal('scan')} onManualAdd={() => setModal('manual')} />
+          <EmptyState
+            copy={copy}
+            onScan={isDemo ? undefined : () => setModal('scan')}
+            onManualAdd={isDemo ? undefined : () => setModal('manual')}
+          />
         )}
 
         {status === 'ready' && items.length > 0 && visibleItems.length === 0 && (
@@ -535,6 +539,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onScanNext={handleScanNext}
           onClose={() => { setModal(null); setScanCandidate(null) }}
           copy={copy}
+          isDemo={isDemo}
         />
       )}
 
@@ -549,6 +554,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onLend={handleLend}
           onReturn={handleReturn}
           showToast={showToast}
+          isDemo={isDemo}
         />
       )}
     </>

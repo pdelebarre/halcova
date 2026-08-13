@@ -70,6 +70,17 @@
   gap: 10px;
 }
 
+/* "Try the free demo" — distinct from the primary/ghost pair so the read-only
+   demo path reads as a separate, low-commitment offer (ADR-0001). */
+.btn-demo {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--runout-gold);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.btn-demo:hover { border-color: var(--runout-gold); }
+
 .auth-form {
   width: 100%;
   display: flex;
