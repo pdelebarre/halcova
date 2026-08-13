@@ -18,6 +18,17 @@ import { findUserByCode } from './_shared/users'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 
+// Optional server-side API key. When set, it's appended to every outbound
+// Google Books request so quota is attributed to the key (a per-project quota)
+// instead of Netlify's shared egress IP — keyless requests are quota'd per-IP
+// and get 429'd constantly because that per-IP quota is shared across tenants.
+// The key NEVER reaches the browser: it only ever appears in this function's
+// outbound fetch and is never logged.
+const GOOGLE_API_KEY = process.env.GOOGLE_BOOKS_API_KEY
+// Warn once per warm instance about keyless mode — deliberately degrade (books
+// previously had no key), don't hard-error like Discogs' SERVER_NO_TOKEN.
+let warnedKeyless = false
+
 // One shared store for ALL users: user A's lookup serves user B. Keys are
 // namespaced per action and hold { ts, data } so we can enforce a TTL (Netlify
 // Blobs has no native expiry).
@@ -68,6 +79,12 @@ function googleUrl(path, params = {}) {
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== '') url.searchParams.set(key, value)
   }
+  if (GOOGLE_API_KEY) {
+    url.searchParams.set('key', GOOGLE_API_KEY)
+  } else if (!warnedKeyless) {
+    warnedKeyless = true
+    console.warn('GOOGLE_BOOKS_API_KEY not set — keyless Google Books requests are subject to per-IP rate limits (429). Set the key in Netlify env to fix rate limiting.')
+  }
   return url.toString()
 }
 
@@ -101,6 +118,36 @@ function buildLookup(action, searchParams) {
   return null
 }
 
+// Transient failures (HTTP 429/5xx, or a network error) are retried a couple of
+// times with a short delay before RATE_LIMIT/HTTP_ERROR is surfaced. The loop
+// stays small (default: one retry ≈ 2 attempts total) so it fits comfortably
+// inside the Netlify function timeout (default 10s). This helper only fetches —
+// the caller decides what gets cached (successful bodies only).
+export async function fetchGoogleWithRetry(url, { retries = 1, delayMs = 800 } = {}) {
+  const isTransient = (status) => status === 429 || status >= 500
+  let lastResponse
+  let lastError
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } })
+      lastResponse = res
+      lastError = null
+      // Success or a non-transient failure is final; 429/5xx gets retried.
+      if (res.ok || !isTransient(res.status)) return res
+    } catch (err) {
+      lastError = err
+      // Network error — retry if attempts remain, otherwise rethrow below.
+    }
+  }
+
+  if (lastError) throw lastError
+  return lastResponse
+}
+
 // Serve from the shared cache when fresh; otherwise hit Google and cache the
 // response. Only successful responses are cached — never errors.
 async function lookup(store, lookupSpec, ttlMs) {
@@ -115,7 +162,13 @@ async function lookup(store, lookupSpec, ttlMs) {
     return { data: cached.data }
   }
 
-  const res = await fetch(lookupSpec.endpoint, { headers: { Accept: 'application/json' } })
+  let res
+  try {
+    res = await fetchGoogleWithRetry(lookupSpec.endpoint)
+  } catch {
+    // A network error survived the retries — surface HTTP_ERROR.
+    return { error: json(502, { error: 'Google Books request failed.', code: 'HTTP_ERROR' }) }
+  }
   if (!res.ok) {
     if (res.status === 429) {
       return { error: json(429, { error: 'Google Books rate limit hit.', code: 'RATE_LIMIT' }) }

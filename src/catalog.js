@@ -174,6 +174,7 @@ export const recordsCatalog = {
     },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,
+      backToTop: 'Back to top',
     },
   },
 }
@@ -312,6 +313,7 @@ export const booksCatalog = {
     },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,
+      backToTop: 'Back to top',
     },
   },
 }

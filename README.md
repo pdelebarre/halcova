@@ -104,8 +104,9 @@ RUNOUT_ADMIN_KEY="$(openssl rand -hex 24)"
 Each member's data lives in its own blob store (`collection-<userId>-<kind>`);
 your own collections stay in the original `runout-collection` /
 `runout-library` stores, so nothing needs migrating. Lookups run through
-server-side proxies, so the Discogs token is owned by the site (a single
-`RUNOUT_DISCOGS_TOKEN`), not by users — nobody pastes a token in Settings.
+server-side proxies, so the Discogs token and the Google Books API key
+(`RUNOUT_DISCOGS_TOKEN` / `GOOGLE_BOOKS_API_KEY`) are owned by the site,
+not by users — nobody pastes a token in Settings.
 
 ## Tech stack
 
@@ -114,7 +115,7 @@ server-side proxies, so the Discogs token is owned by the site (a single
 | UI | React 19 + Vite 8 |
 | Barcode decoding | `zxing-wasm` (WASM, self-hosted + precached) |
 | Record lookup | Discogs API via server-side proxy (single `RUNOUT_DISCOGS_TOKEN`) |
-| Book lookup | Google Books API (public, no key) |
+| Book lookup | Google Books API via server-side proxy (optional `GOOGLE_BOOKS_API_KEY`) |
 | Persistence | Netlify Blobs via Netlify Functions (`collection`, `auth`, `admin`) |
 | Auth | Access codes + admin key (`RUNOUT_ADMIN_KEY`) |
 | PWA | `vite-plugin-pwa` (Workbox, auto-update) |
@@ -134,9 +135,29 @@ personal token:
    "Deploy to Netlify" below) — the token lives server-side on the lookup
    proxy, never in anyone's browser.
 
-Books don't need a token — Google Books is a public API.
+### 2. Get a free Google Books API key (recommended)
 
-### 2. Deploy to Netlify
+Book lookups work without a key, but **keyless** Google Books requests are
+quota'd per-IP, and Netlify Functions egress from shared IP pools — so the
+per-IP quota gets exhausted constantly and scans start failing with "Google
+Books rate limit hit — wait a moment and try again." Setting a key moves the
+quota to the key (a per-project quota, ~1000 requests/100s by default), which
+fixes it:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and
+   create a project (or pick an existing one).
+2. **APIs & Services → Library** → search for **Google Books API** →
+   **Enable**.
+3. **APIs & Services → Credentials → Create credentials → API key**.
+4. Copy the key and set it as the site's `GOOGLE_BOOKS_API_KEY` (see
+   "Deploy to Netlify" below) — it lives server-side on the lookup proxy,
+   never in anyone's browser. For local `netlify dev`, add it to your `.env`:
+   `GOOGLE_BOOKS_API_KEY="<your Google Books API key>"`.
+
+Without the key, book lookups still work — they just use the keyless,
+per-IP-quota path and can hit 429s under load.
+
+### 3. Deploy to Netlify
 
 **Option A — Netlify CLI** (fastest if you have Node installed locally):
 
@@ -155,6 +176,7 @@ Discogs lookup token the server-side proxy uses:
 ```bash
 netlify env:set RUNOUT_ADMIN_KEY "$(openssl rand -hex 24)"
 netlify env:set RUNOUT_DISCOGS_TOKEN "<your Discogs personal access token>"
+netlify env:set GOOGLE_BOOKS_API_KEY "<your Google Books API key>"  # optional but recommended
 ```
 
 **Option B — drag and drop**: run `npm install && npm run build` locally,
@@ -168,14 +190,14 @@ in Netlify: **Add new site → Import an existing project**, point it at the
 repo. Build command `npm run build`, publish directory `dist` — both are
 already set in `netlify.toml`, so Netlify should pick them up automatically.
 
-### 3. Install it on your iPhone
+### 4. Install it on your iPhone
 
 1. Open your deployed `https://your-site.netlify.app` URL in **Safari** (has
    to be Safari, not Chrome, for the install step).
 2. Tap the Share icon → **Add to Home Screen**.
 3. Open it from the home screen icon — it now runs full-screen.
 4. No token to paste — lookups run through the server-side proxy, which owns
-   the Discogs token.
+   the Discogs token and the Google Books API key.
 5. Tap **Scan** and point the camera at a barcode.
 
 ## Local development

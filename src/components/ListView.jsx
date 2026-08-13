@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
 import { isOverdue } from '../utils/lending'
 import { t, getLocale } from '../i18n'
+import { useMedia } from '../hooks/useMedia'
 import Highlight from './Highlight'
 import './ListView.css'
 
@@ -36,6 +37,9 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendin
   const scrollerRef = useRef(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportH, setViewportH] = useState(0)
+  // A–Z rail variant (§ Phase 4): vertical edge rail on desktop, a horizontal
+  // thumb-friendly chip strip on phones.
+  const isDesktop = useMedia('(min-width: 768px)')
 
   const grouped = sortBy === 'artist'
 
@@ -115,7 +119,7 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendin
 
   return (
     <div className="list-view">
-      {grouped && letters.length > 0 && (
+      {grouped && letters.length > 0 && isDesktop && (
         <nav className="jump-rail" aria-label={copy.list?.jumpRail || t('list.jumpToLetter')}>
           {letters.map((l) => (
             <button
@@ -128,6 +132,21 @@ export default function ListView({ items = [], sortBy, onOpen, copy = {}, lendin
             </button>
           ))}
         </nav>
+      )}
+
+      {grouped && letters.length > 0 && !isDesktop && (
+        <div className="jump-rail-mobile" role="navigation" aria-label={copy.list?.jumpRail || t('list.jumpToLetter')}>
+          {letters.map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => jumpTo(l)}
+              aria-label={`${copy.list?.jumpTo || t('list.jumpTo')} ${l}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
       )}
 
       <div

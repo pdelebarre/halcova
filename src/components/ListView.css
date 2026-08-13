@@ -156,6 +156,30 @@
 }
 .jump-rail button:active { color: var(--runout-gold); background: var(--vinyl-groove); }
 
-@media (max-width: 767px) {
-  .jump-rail { display: none; }
+/* A–Z rail — mobile (§ Phase 4): a horizontal strip of ≥44px letter chips
+   above the list, scrollable when there are many letters. JS (useMedia)
+   decides which rail renders, so no media-query hiding needed here. */
+.jump-rail-mobile {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.jump-rail-mobile::-webkit-scrollbar { display: none; }
+.jump-rail-mobile button {
+  flex: 0 0 auto;
+  min-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--static-grey);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.jump-rail-mobile button:active { color: var(--runout-gold); border-color: var(--runout-gold); }
