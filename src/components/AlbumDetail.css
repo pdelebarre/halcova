@@ -1,4 +1,6 @@
 .detail-sheet {
+  /* vh fallback, then dvh (iOS < 15.4). */
+  max-height: 800px;
   max-height: min(90dvh, 800px);
 }
 

@@ -21,7 +21,8 @@ export default defineConfig({
         theme_color: '#16130F',
         background_color: '#16130F',
         display: 'standalone',
-        orientation: 'portrait',
+        // No orientation lock: the layout already supports landscape (iPad,
+        // desktop web apps), and `orientation` is ignored outside mobile.
         start_url: '/',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -30,7 +31,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,wasm}'],
+        // woff2/woff added so the self-hosted @fontsource faces are precached
+        // (offline-complete shell, phase 0). wasm must stay for the scanner.
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,wasm,woff2,woff}'],
         runtimeCaching: [
           {
             // Lookups go through the Netlify function proxies (the server-side

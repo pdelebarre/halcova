@@ -1,4 +1,8 @@
-.result-sheet { max-height: min(88dvh, 800px); }
+.result-sheet {
+  /* vh fallback, then dvh (iOS < 15.4). */
+  max-height: 800px;
+  max-height: min(88dvh, 800px);
+}
 
 .result-scroll {
   flex: 1;

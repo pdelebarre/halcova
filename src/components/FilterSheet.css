@@ -1,4 +1,6 @@
 .filter-sheet {
+  /* vh fallback, then dvh (iOS < 15.4). */
+  max-height: 720px;
   max-height: min(84dvh, 720px);
 }
 

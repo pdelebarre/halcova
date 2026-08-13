@@ -5,9 +5,16 @@
   gap: 6px;
   text-align: left;
   padding: 0;
-  /* Skip layout/paint off-screen cards so 1000+ spines stay smooth (§4.6). */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 260px;
+}
+
+/* Progressive enhancement (§4.6): only browsers with content-visibility
+   (Safari 18+, Chromium) get the off-screen skip — older Safari renders
+   cards normally, which is still correct. */
+@supports (content-visibility: auto) {
+  .book-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 260px;
+  }
 }
 
 .book-cover {

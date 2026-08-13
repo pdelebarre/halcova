@@ -64,6 +64,8 @@
 .sheet {
   width: 100%;
   max-width: 560px;
+  /* vh fallback for iOS < 15.4 (supports min(), not dvh). */
+  max-height: 720px;
   max-height: min(84dvh, 720px);
   background: var(--vinyl-groove);
   box-shadow: var(--shadow-card);

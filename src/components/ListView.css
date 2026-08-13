@@ -5,6 +5,8 @@
 /* Fills the space between the toolbar and the FAB clearance so the page
    doesn't scroll in list view — the list owns its own scroll container. */
 .list-scroller {
+  /* vh fallback for iOS < 15.4 (supports calc(), not dvh). */
+  height: calc(100vh - var(--header-h) - var(--toolbar-h) - var(--safe-bottom) - 90px);
   height: calc(100dvh - var(--header-h) - var(--toolbar-h) - var(--safe-bottom) - 90px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;

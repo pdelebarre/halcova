@@ -16,7 +16,7 @@
   --danger-bright: #E0695B; /* lighter danger for small text/badges: >= 4.5:1 on --vinyl-groove-2 and the grid chip */
   --success: #7A9A6B;
 
-  --font-display: 'Fraunces', Georgia, serif;
+  --font-display: 'Fraunces Variable', Georgia, serif; /* self-hosted variable face */
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
 
@@ -47,6 +47,8 @@ html, body {
 }
 
 #root {
+  /* vh fallback for browsers without dvh (iOS < 15.4), then the dynamic unit. */
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
