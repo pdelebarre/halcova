@@ -291,6 +291,8 @@ const enGB = {
   'lending.historyReturned': 'Returned {date}',
   'lending.featureLabel': 'Lending',
   'lending.featureHint': 'Let this member lend items and track who has them.',
+  'games.featureLabel': 'Games',
+  'games.featureHint': 'Unlock the Play hub — persona, quiz, XP, shelf stories — for this member.',
   'lending.notEnabled': "Lending isn't enabled for your account.",
   'lending.loans': 'Loans',
   'lending.dashboardTitle': 'On loan',

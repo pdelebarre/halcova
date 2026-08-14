@@ -15,7 +15,8 @@ import './StoriesPanel.css'
  *   Phase 2, so the button is honest: it emits `gamif_quest_started` (a no-op
  *   today) and shows a "quest-building arrives in Phase 2" note.
  *
- * Rendered inside the Play hub (PlayPanel) when GAMIFICATION_ENABLED is on.
+ * Rendered inside the Play hub (PlayPanel), which is gated by the member's
+ * admin-granted `features.games` entitlement.
  */
 export default function StoriesPanel({ items = [], catalog }) {
   const storiesCopy = (catalog?.copy?.gamif?.stories) || {}

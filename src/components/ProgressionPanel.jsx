@@ -22,7 +22,8 @@ import './ProgressionPanel.css'
  * - Badge share card: a leak-safe SVG (headline + badge name + 1–2 aggregate
  *   stats) exported via exportSvg.js — same pattern as the 1.1 persona card.
  *
- * Rendered inside the Play hub (PlayPanel) when GAMIFICATION_ENABLED is on.
+ * Rendered inside the Play hub (PlayPanel), which is gated by the member's
+ * admin-granted `features.games` entitlement.
  */
 export default function ProgressionPanel({ items = [], catalog }) {
   const progCopy = (catalog?.copy?.gamif?.progression) || {}

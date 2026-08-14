@@ -20,10 +20,11 @@ import BookGrid from './components/BookGrid'
 import BookDetail from './components/BookDetail'
 import BookManualAddModal from './components/BookManualAddModal'
 
-// Feature flag for the gamification suite (Phase 1 § Play — rollout-plan.md §1):
-// OFF by default, so nothing ships until validated. Flip to true to preview
-// release 1.1 (Collection Persona + share card) behind the "Play" entry point.
-export const GAMIFICATION_ENABLED = false
+// The gamification suite (Phase 1 § Play — rollout-plan.md §1) is NOT a
+// compile-time flag. The "Play" entry point is gated per account by the
+// member's `features.games` entitlement (admin-granted on approve / toggled
+// per member in the admin panel). The owner has it by default; demo visitors
+// do not. See App.jsx (`gamesEnabled`) and AdminPanel.jsx.
 
 export const recordsCatalog = {
   kind: 'records',

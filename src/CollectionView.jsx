@@ -131,9 +131,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // and the Wishlist sheet (§ Fix — unowned wants).
   const [wishlistOpen, setWishlistOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
-  // Gamification (Phase 1 § Play): the "Play" entry point is feature-flagged
-  // OFF by default (GAMIFICATION_ENABLED in catalog.js) — the modal only
-  // mounts when the flag is on.
+  // Gamification (Phase 1 § Play): the "Play" entry point is gated by the
+  // member's `features.games` entitlement (admin-granted) — the modal only
+  // mounts when the entitlement is on (passed as `gamificationEnabled` from
+  // App.jsx).
   const [playOpen, setPlayOpen] = useState(false)
   const [savedViews, setSavedViews] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`runout.views.${catalog.kind}`) || '[]') } catch { return [] }

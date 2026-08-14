@@ -290,6 +290,8 @@ const ptBR = {
   'lending.historyReturned': 'Returned {date}',
   'lending.featureLabel': 'Lending',
   'lending.featureHint': 'Let this member lend items and track who has them.',
+  'games.featureLabel': 'Jogos',
+  'games.featureHint': 'Desbloqueie o hub Play — persona, quiz, XP, histórias da estante — para este membro.',
   'lending.notEnabled': "Lending isn't enabled for your account.",
   'lending.loans': 'Loans',
   'lending.dashboardTitle': 'On loan',

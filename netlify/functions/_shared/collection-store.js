@@ -42,8 +42,9 @@ export async function authorize(req) {
       role: 'admin',
       status: 'active',
       collections: { records: true, books: true },
-      // The owner has every feature flag on by default (W3).
-      features: { lending: true },
+      // The owner has every feature flag on by default (W3) — lending AND
+      // games — mirroring profileForCode() in netlify/functions/auth.js.
+      features: { lending: true, games: true },
     }
   } else if (isDemoCode(code)) {
     // The demo code is a constant identity, NOT a stored user — resolve it

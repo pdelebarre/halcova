@@ -47,17 +47,51 @@ whole auth subsystem.
 
 ## Roles & Plans
 - **Owner** (`OWNER_ID = 'owner'`): signs in with `ADMIN_KEY`; owns all
-  collections; uses the legacy blob stores.
+  collections; uses the legacy blob stores. The owner has **every feature flag
+  on by default**: `features: { lending: true, games: true }` (set in
+  `profileForCode` in `netlify/functions/auth.js` and `authorize()` in
+  `netlify/functions/_shared/collection-store.js`).
 - **Member**: `user:{ id, name, email, code, collections: {records, books},
-  role: 'member', status: 'active'|'disabled' }`. Their collection access is
-  the per-collection plan. Since Scaling Phase 1 (ADR-0002), Postgres stores
-  only `code_hash` (sha256 of the normalized code); the admin "re-reveal a lost
-  code" is now **rotate** (POST `rotate` mints a NEW code and returns the new
-  plaintext exactly once). The legacy Blobs identity store keeps plaintext
-  during read-through so the cutover is reversible (see `docs/technical.md`
-  and `db/README.md`).
+  features: {lending, games}, role: 'member', status: 'active'|'disabled' }`.
+  Their collection access is the per-collection plan. Since Scaling Phase 1
+  (ADR-0002), Postgres stores only `code_hash` (sha256 of the normalized
+  code); the admin "re-reveal a lost code" is now **rotate** (POST `rotate`
+  mints a NEW code and returns the new plaintext exactly once). The legacy
+  Blobs identity store keeps plaintext during read-through so the cutover is
+  reversible (see `docs/technical.md` and `db/README.md`).
+- **Demo visitor** (`DEMO_USER` in `_shared/auth.js`): a constant identity with
+  `features: {}` — deliberately no feature flags, so demo visitors get no
+  lending and no games.
 - **Plan enforcement**: `collection.js` returns 403 when a member's
   `collections` doesn't include the requested kind.
+
+## Per-account Features (capability flags)
+`features` is a map of per-account capability entitlements the admin grants
+per member — NOT a global/compile-time switch. Known flags live in
+`KNOWN_FEATURES` in `netlify/functions/admin.js`:
+- `lending` — the loan-out dashboard (W3).
+- `games` — the gamification "Play" surface: Collection Persona, Progress
+  (XP/levels/badges), Crate Quiz, and Shelf Stories (Phase 1 § Play,
+  `marketing/gamification/rollout-plan.md`).
+
+Who gets what:
+- **Owner**: every flag on (`{ lending: true, games: true }`).
+- **Demo visitor**: `{}` — nothing.
+- **Member**: granted at **approve** time (the approve sheet has Lending + Games
+  switches) and toggled per member from the row's Lending/Games switches
+  (`updateUser`).
+
+The client gates on the flag (e.g. `const gamesEnabled = !!user.features?.games`
+in `src/App.jsx` → `gamificationEnabled` for `CollectionView`'s Play entry).
+`publicUser` passes `features` through untouched, so
+`session.user.features.games` is readable client-side.
+
+> ⚠️ **Full-map rule**: the server's `sanitizeFeatures` REBUILDS the whole
+> known map from whatever a client sends, so any `approve`/`updateUser` that
+> carries `features` must send BOTH flags
+> (`{ lending: …, games: … }`). Sending only one flag silently wipes the
+> other. The AdminPanel toggles always send the full map (see
+> `toggleFeature`/`toggleGames`); keep that invariant in any new callers.
 
 ## Security Rules (non-negotiable)
 - NEVER log or return access codes or the admin key.
@@ -82,6 +116,10 @@ index:requests  -> ordered list of request ids
 
 ## Common Tasks
 - **Grant/revoke a collection**: `adminUpdateUser({ userId, collections })`.
+- **Grant/revoke a feature flag** (lending / games):
+  `adminUpdateUser({ userId, features: { lending: …, games: … } })` — always
+  send the FULL map (see the full-map rule above). The admin panel's member
+  row exposes Lending and Games switches that do this.
 - **Disable a member**: `adminUpdateUser({ userId, status: 'disabled' })`
   (their code stops working — `me`/`login` return 403).
 - **Delete a member**: `adminDeleteUser({ userId })` — also wipes their stores.

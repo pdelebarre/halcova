@@ -8,7 +8,7 @@ import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
 import ErrorBoundary from './components/ErrorBoundary'
-import { recordsCatalog, booksCatalog, GAMIFICATION_ENABLED } from './catalog'
+import { recordsCatalog, booksCatalog } from './catalog'
 import { useAuth } from './hooks/useAuth'
 import { t } from './i18n'
 import './App.css'
@@ -48,9 +48,12 @@ export default function App() {
 
   const catalog = CATALOGS[activeTab]
 
-  // Feature flag for the lending MVP (§ W6): the admin grants it per member
-  // (user.features.lending). Gate for the shared LendingControls in details.
+  // Per-account capability flags (§ W6 / Phase 1 § Play): the admin grants
+  // them per member (user.features.lending / user.features.games). The owner
+  // has every flag on; demo visitors have none. Gate the lending controls and
+  // the Play surface respectively.
   const lendingEnabled = !!user.features?.lending
+  const gamesEnabled = !!user.features?.games
 
   // Free tier & demo (ADR-0001). The owner/admin is implicitly unlimited; demo
   // visitors are read-only (no plan, no adds), so `isFree` is forced off for
@@ -110,7 +113,7 @@ export default function App() {
           isFree={isFree}
           isDemo={isDemo}
           user={user}
-          gamificationEnabled={GAMIFICATION_ENABLED}
+          gamificationEnabled={gamesEnabled}
         />
       </ErrorBoundary>
 

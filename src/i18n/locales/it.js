@@ -290,6 +290,8 @@ const it = {
   'lending.historyReturned': 'Returned {date}',
   'lending.featureLabel': 'Lending',
   'lending.featureHint': 'Let this member lend items and track who has them.',
+  'games.featureLabel': 'Giochi',
+  'games.featureHint': 'Sblocca l\'hub Play — persona, quiz, XP, storie dello scaffale — per questo membro.',
   'lending.notEnabled': "Lending isn't enabled for your account.",
   'lending.loans': 'Loans',
   'lending.dashboardTitle': 'On loan',

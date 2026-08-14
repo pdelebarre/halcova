@@ -9,8 +9,8 @@ import './PersonaModal.css'
  * component so the single-view entry point (and its tests) stay intact while
  * the Play hub (PlayPanel) reuses the same PersonaBody in a tabbed surface.
  *
- * Feature-flagged OFF by default — CollectionView only mounts this when
- * GAMIFICATION_ENABLED is true (catalog.js).
+ * Gated per account — CollectionView only mounts this when the member has the
+ * admin-granted `features.games` entitlement (see App.jsx `gamesEnabled`).
  *
  * Events (default-off track, so harmless): `gamif_persona_generated` on view,
  * `gamif_share_exported` on export (both emitted by PersonaBody).
