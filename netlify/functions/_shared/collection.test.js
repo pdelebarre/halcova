@@ -7,9 +7,9 @@
 // units (pagination.js / counts.js / list-cache.js / rate-limit.js) are tested
 // separately; these tests assert the HANDLER does the right thing with them.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import handler from './collection'
-import { LIST_CACHE_KEY } from './_shared/list-cache'
-import { RATE_LIMIT_WINDOW_MS, windowIndex } from './_shared/rate-limit'
+import handler from '../collection'
+import { LIST_CACHE_KEY } from './list-cache'
+import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
 
 // Hoisted so the @netlify/blobs mock (which must be registered before the
 // module under test is imported) can share the in-memory store registry.

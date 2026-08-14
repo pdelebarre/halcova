@@ -6,8 +6,8 @@
 // covered by _shared/cover.test.js; these tests exercise the fetch + response
 // behavior with a mocked global fetch so no real network is touched.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import discogsHandler from './discogs'
-import booksHandler from './books'
+import discogsHandler from '../discogs'
+import booksHandler from '../books'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
