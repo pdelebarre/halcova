@@ -22,7 +22,11 @@ function authHeaders(code) {
 async function postJson(url, body, code) {
   const res = await fetch(url, { method: 'POST', headers: authHeaders(code), body: JSON.stringify(body) })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+  if (!res.ok) {
+    const err = new Error(data.error || `Request failed (${res.status})`)
+    err.code = data.code
+    throw err
+  }
   return data
 }
 
@@ -35,6 +39,23 @@ async function getJson(url, code) {
 
 // ---- Member / visitor endpoints ----
 
+
+// Self-serve signup (ADR-0003 S1): request a one-time sign-in link by email.
+// No auth header — a visitor can't sign in yet.
+export async function requestMagicLink({ email }) {
+  return postJson(AUTH_URL, { action: 'requestMagicLink', email })
+}
+
+// Exchange a magic-link token for a session. The backend auto-issues (or, for
+// a returning member, rotates) the RU- access code and returns { user, code }
+// — the same shape as login(), so the session persists identically. On a
+// rejected link the thrown Error carries `code` (LINK_EXPIRED | LINK_USED |
+// LINK_INVALID) for the UI to branch on.
+export async function verifyMagicLink({ token }) {
+  const data = await postJson(AUTH_URL, { action: 'verifyMagicLink', token })
+  saveSession({ user: data.user, code: data.code })
+  return data.user
+}
 // Ask to join: creates a pending request the admin approves from the panel.
 export async function requestAccess({ name, email }) {
   return postJson(AUTH_URL, { action: 'request', name, email })
