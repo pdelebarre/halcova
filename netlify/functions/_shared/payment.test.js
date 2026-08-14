@@ -14,12 +14,15 @@
 //   - the error codes: PRICE_UNKNOWN (400), CHECKOUT_FAILED (502),
 //     PAYMENT_INCOMPLETE (409),
 //   - status resolves a materialized session and reconciles via
-//     sessions.retrieve (both idempotent), returning the issued code once,
+//     sessions.retrieve (both idempotent), returning the issued code exactly
+//     ONCE and never to a signed-in member (M2),
+//   - checkout/status are rate-limited per-IP + per-email → 429 RATE_LIMIT (M1),
 //   - portal opens the Billing Portal for a paying member only.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../payment'
 import * as stripe from './stripe'
+import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
 import { findUserByStripeSession, listRequests, listUsers, saveRequest, saveUser } from './users'
 
 const { stores, createStore } = vi.hoisted(() => {
@@ -60,11 +63,16 @@ vi.mock('./stripe', async (importActual) => {
 const PREMIUM_PRICE = 'price_premium_pay'
 const LIFETIME_PRICE = 'price_lifetime_pay'
 
-function req(body, { method = 'POST', code } = {}) {
+function req(body, { method = 'POST', code, ip } = {}) {
   return {
     method,
     headers: {
-      get: (name) => (String(name).toLowerCase() === 'authorization' && code ? `Bearer ${code}` : ''),
+      get: (name) => {
+        const key = String(name).toLowerCase()
+        if (key === 'authorization' && code) return `Bearer ${code}`
+        if (key === 'x-nf-client-connection-ip' && ip) return ip
+        return ''
+      },
     },
     json: async () => body,
     text: async () => JSON.stringify(body),
@@ -104,6 +112,7 @@ afterEach(() => {
   delete process.env.STRIPE_PRICE_LIFETIME
   delete process.env.STRIPE_SECRET_KEY
   delete process.env.STRIPE_SITE_URL
+  delete process.env.NODE_ENV
   for (const key of Object.keys(stores)) delete stores[key]
   vi.clearAllMocks()
 })
@@ -203,6 +212,17 @@ describe('checkout — create a Checkout session', () => {
     expect(status).toBe(502)
     expect(body.code).toBe('CHECKOUT_FAILED')
   })
+
+  it('fails closed (503) in production when no site URL is configured (m2, #54)', async () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.STRIPE_SITE_URL
+    const { status, body } = await call({ action: 'checkout', plan: 'lifetime', name: 'Bob', email: 'bob@example.com' })
+    expect(status).toBe(503)
+    expect(body.code).toBe('CHECKOUT_FAILED')
+    // Never falls back to the request Host/Origin header in production, and no
+    // Checkout session is created.
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled()
+  })
 })
 
 describe('status — poll completion (webhook-first + reconcile)', () => {
@@ -241,9 +261,11 @@ describe('status — poll completion (webhook-first + reconcile)', () => {
     expect(stripe.retrieveSession).toHaveBeenCalledWith('cs_test_1')
 
     // Both the webhook and the reconcile path are idempotent — a second poll
-    // resolves through the index, not a duplicate account.
+    // resolves through the index, not a duplicate account. And (M2) the code
+    // was already delivered on the first poll, so it is NOT returned again.
     const { body: second } = await call({ action: 'status', sessionId: 'cs_test_1' })
     expect(second.status).toBe('complete')
+    expect(second).not.toHaveProperty('code')
     expect(await listUsers()).toHaveLength(1)
     expect(await findUserByStripeSession('cs_test_1')).toMatchObject({ id: body.user.id })
   })
@@ -280,6 +302,124 @@ describe('status — poll completion (webhook-first + reconcile)', () => {
   it('requires a sessionId', async () => {
     const { status } = await call({ action: 'status' })
     expect(status).toBe(400)
+  })
+})
+
+describe('status — one-time code delivery (M2, #54)', () => {
+  // The sessionId is a capability token: whoever holds `?session_id=…` can poll
+  // it. The code must go out exactly once so a leaked URL can't read the
+  // member's current code forever.
+
+  it('returns the code on the first reconcile poll, then suppresses it', async () => {
+    stripe.retrieveSession.mockResolvedValue({
+      id: 'cs_test_1',
+      client_reference_id: 'request:req-1',
+      customer_email: 'ada@example.com',
+      customer: 'cus_123',
+      mode: 'payment',
+      payment_status: 'paid',
+      status: 'complete',
+    })
+    await saveRequest({ id: 'req-1', name: 'Ada', email: 'ada@example.com', status: 'pending', createdAt: new Date().toISOString() })
+
+    const first = await call({ action: 'status', sessionId: 'cs_test_1' })
+    expect(first.status).toBe(200)
+    expect(first.body.status).toBe('complete')
+    expect(first.body.code).toMatch(/^RU-/)
+
+    // The SAME sessionId can no longer read the code — the delivery marker is
+    // persisted at materialization + on the first poll.
+    const second = await call({ action: 'status', sessionId: 'cs_test_1' })
+    expect(second.status).toBe(200)
+    expect(second.body.status).toBe('complete')
+    expect(second.body.user.id).toBe(first.body.user.id)
+    expect(second.body).not.toHaveProperty('code')
+    expect(stripe.retrieveSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the code once for a webhook-materialized session, then suppresses it', async () => {
+    await saveUser({ ...MEMBER, id: 'u-paid', plan: 'lifetime', stripeCheckoutSessionId: 'cs_test_1', stripeCustomerId: 'cus_123' })
+
+    const first = await call({ action: 'status', sessionId: 'cs_test_1' })
+    expect(first.body.code).toBe('RU-AAAA-BBBB-CCCC')
+
+    const second = await call({ action: 'status', sessionId: 'cs_test_1' })
+    expect(second.status).toBe(200)
+    expect(second.body.status).toBe('complete')
+    expect(second.body).not.toHaveProperty('code')
+    // No Stripe call needed — the webhook already landed, so the second poll
+    // resolves through the index only.
+    expect(stripe.retrieveSession).not.toHaveBeenCalled()
+  })
+
+  it('never returns the code to a signed-in member (they already hold it in their session)', async () => {
+    await saveUser({ ...MEMBER, id: 'u-paid', plan: 'lifetime', stripeCheckoutSessionId: 'cs_test_1', stripeCustomerId: 'cus_123' })
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'RU-AAAA-BBBB-CCCC' })
+    expect(status).toBe(200)
+    expect(body.status).toBe('complete')
+    expect(body.user.id).toBe('u-paid')
+    expect(body).not.toHaveProperty('code')
+  })
+
+  it('requires a valid Bearer when one is presented on status', async () => {
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'RU-NOPE-NOPE-NOPE' })
+    expect(status).toBe(401)
+    expect(body.error).toBeTruthy()
+  })
+
+  it('rejects the owner / demo Bearer on status (nothing to collect)', async () => {
+    const owner = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'runout-dev-admin-key' })
+    expect(owner.status).toBe(403)
+    const demo = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'RUNOUT-DEMO-0000' })
+    expect(demo.status).toBe(403)
+  })
+})
+
+describe('rate limiting (M1, #54)', () => {
+  // Both `checkout` (pre-auth, email-only) and `status` (unauthenticated) are
+  // public surfaces — per-IP + per-email fixed-window limits, mirroring
+  // auth.js. Pre-seed the counter at the limit (collection.test.js pattern).
+
+  it('429s checkout with RATE_LIMIT once the per-email window is exhausted', async () => {
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    rlStore.data.set('rl:payment:checkout:email:ada@example.com', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 5 })
+
+    const { status, body } = await call({ action: 'checkout', plan: 'lifetime', email: 'Ada@Example.com' })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled()
+  })
+
+  it('429s checkout with RATE_LIMIT once the per-IP window is exhausted', async () => {
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    rlStore.data.set('rl:payment:checkout:ip:203.0.113.9', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 20 })
+
+    const { status, body } = await call({ action: 'checkout', plan: 'lifetime', email: 'bob@example.com' }, { ip: '203.0.113.9' })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled()
+  })
+
+  it('429s status with RATE_LIMIT once the per-IP window is exhausted', async () => {
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    rlStore.data.set('rl:payment:status:ip:203.0.113.9', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 60 })
+
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { ip: '203.0.113.9' })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(stripe.retrieveSession).not.toHaveBeenCalled()
+  })
+
+  it('includes a Retry-After header on the 429', async () => {
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    rlStore.data.set('rl:payment:checkout:email:ada@example.com', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 5 })
+    const res = await handler(req({ action: 'checkout', plan: 'lifetime', email: 'ada@example.com' }))
+    expect(res.status).toBe(429)
+    expect(Number(res.headers.get('Retry-After'))).toBeGreaterThanOrEqual(1)
   })
 })
 

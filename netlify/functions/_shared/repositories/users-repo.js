@@ -73,6 +73,9 @@ function toUser(row) {
     stripeCustomerId: row.stripe_customer_id || null,
     stripeSubscriptionId: row.stripe_subscription_id || null,
     stripeCheckoutSessionId: row.stripe_checkout_session_id || null,
+    // S8 (#54, M2): undefined (NULL) means "not yet delivered" — the status
+    // poll treats it exactly like false, so pre-004 rows still deliver once.
+    codeDelivered: row.code_delivered ?? undefined,
     role: row.role,
     status: row.status,
     createdAt: toIso(row.created_at),
@@ -97,6 +100,9 @@ function userRowValues(user) {
     stripe_customer_id: user.stripeCustomerId ?? null,
     stripe_subscription_id: user.stripeSubscriptionId ?? null,
     stripe_checkout_session_id: user.stripeCheckoutSessionId ?? null,
+    // S8 (#54, M2): undefined = "preserve existing" (handled in saveUser);
+    // the status poll writes true after delivering the code once.
+    code_delivered: user.codeDelivered === undefined ? undefined : user.codeDelivered,
   }
 }
 
@@ -119,7 +125,12 @@ export function requestRowValues(request) {
 // S3 (ADR-0003 §2.3): the billing columns now EXIST (migration 003) and are
 // part of every read/write. toUser lights them up from the row; old rows that
 // predate the migration read as null.
-const USER_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id`
+//
+// S8 (#54, M2): `code_delivered` (migration 004) records whether the S3 status
+// poll already handed the one-time access code to the session owner — nullable
+// so pre-004 rows read as undefined ("not yet delivered", so their code still
+// gets delivered once) and the 003-era shape assertions stay stable.
+const USER_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id, code_delivered`
 
 export function createUsersRepo(db) {
   // O(1) member lookup by access code — the unique-indexed `code_hash` lookup
@@ -166,12 +177,12 @@ export function createUsersRepo(db) {
   async function saveUser(user) {
     const v = userRowValues(user)
     let codeHash = v.code_hash
-    const preserveBilling = ['planExpiresAt', 'planChangedAt', 'stripeCustomerId', 'stripeSubscriptionId', 'stripeCheckoutSessionId']
+    const preserveBilling = ['planExpiresAt', 'planChangedAt', 'stripeCustomerId', 'stripeSubscriptionId', 'stripeCheckoutSessionId', 'codeDelivered']
       .some((key) => user[key] === undefined)
     let existing = null
     if (!codeHash || preserveBilling) {
       const { rows } = await db.query(
-        `SELECT code_hash, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id
+        `SELECT code_hash, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id, code_delivered
          FROM users WHERE id = $1 LIMIT 1`,
         [user.id],
       )
@@ -183,9 +194,10 @@ export function createUsersRepo(db) {
     const stripeCustomerId = user.stripeCustomerId === undefined ? (existing?.stripe_customer_id ?? null) : (user.stripeCustomerId ?? null)
     const stripeSubscriptionId = user.stripeSubscriptionId === undefined ? (existing?.stripe_subscription_id ?? null) : (user.stripeSubscriptionId ?? null)
     const stripeCheckoutSessionId = user.stripeCheckoutSessionId === undefined ? (existing?.stripe_checkout_session_id ?? null) : (user.stripeCheckoutSessionId ?? null)
+    const codeDelivered = user.codeDelivered === undefined ? (existing?.code_delivered ?? null) : (user.codeDelivered ?? null)
 
     await db.query(
-      `INSERT INTO users (${USER_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      `INSERT INTO users (${USER_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name, email = EXCLUDED.email, code_hash = EXCLUDED.code_hash,
          role = EXCLUDED.role, status = EXCLUDED.status, plan = EXCLUDED.plan,
@@ -193,10 +205,11 @@ export function createUsersRepo(db) {
          plan_expires_at = EXCLUDED.plan_expires_at, plan_changed_at = EXCLUDED.plan_changed_at,
          stripe_customer_id = EXCLUDED.stripe_customer_id,
          stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-         stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id
+         stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
+         code_delivered = EXCLUDED.code_delivered
        `,
       [user.id, v.name, v.email, codeHash, v.role, v.status, v.plan, v.features, v.collections, v.created_at,
-        planExpiresAt, planChangedAt, stripeCustomerId, stripeSubscriptionId, stripeCheckoutSessionId],
+        planExpiresAt, planChangedAt, stripeCustomerId, stripeSubscriptionId, stripeCheckoutSessionId, codeDelivered],
     )
     return user
   }

@@ -98,6 +98,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.RUNOUT_MAGIC_LINK_SECRET
+  delete process.env.NODE_ENV
+  delete process.env.RUNOUT_DEV_EMAIL
   for (const key of Object.keys(stores)) delete stores[key]
 })
 
@@ -140,6 +142,37 @@ describe('requestMagicLink — email validation + pending request + devLink', ()
     const { status } = await call({ action: 'requestMagicLink' })
     expect(status).toBe(400)
     expect(await listRequests()).toHaveLength(0)
+  })
+})
+
+describe('requestMagicLink — M3 fail-closed in production (#54)', () => {
+  it('fails closed (503 MAIL_NOT_CONFIGURED) in production with no mail key — no link, no token, no request', async () => {
+    process.env.NODE_ENV = 'production'
+    const { status, body } = await call({ action: 'requestMagicLink', email: 'ada@example.com' })
+    expect(status).toBe(503)
+    expect(body.code).toBe('MAIL_NOT_CONFIGURED')
+    // No link is echoed, no token is issued, and no pending request is
+    // recorded — a misconfigured prod can never mint a sign-in link.
+    expect(body).not.toHaveProperty('devLink')
+    expect(body).not.toHaveProperty('ok')
+    expect(await listRequests()).toHaveLength(0)
+  })
+
+  it('still works in dev (no mail key) — the devLink is echoed so a developer can click through', async () => {
+    // NODE_ENV unset / 'test' — the no-op mailer + devLink are dev-only.
+    const { status, body } = await call({ action: 'requestMagicLink', email: 'ada@example.com' })
+    expect(status).toBe(200)
+    expect(body.devLink).toMatch(/^http:\/\/localhost:8888\/\?magic-link=/)
+    expect(await listRequests()).toHaveLength(1)
+  })
+
+  it('honors the explicit RUNOUT_DEV_EMAIL=1 opt-in even when NODE_ENV=production', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.RUNOUT_DEV_EMAIL = '1'
+    const { status, body } = await call({ action: 'requestMagicLink', email: 'ada@example.com' })
+    expect(status).toBe(200)
+    expect(body.devLink).toMatch(/^http:\/\/localhost:8888\/\?magic-link=/)
+    expect(await listRequests()).toHaveLength(1)
   })
 })
 

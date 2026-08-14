@@ -8,7 +8,7 @@ import { ADMIN_KEY, DEMO_CODE, DEMO_USER, OWNER_ID, bearer, generateAccessCode, 
 import { normalizeCode } from './_shared/codes'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { consumeMagicLink, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
-import { sendMagicLink } from './_shared/mailer'
+import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
 import {
   findPendingRequestByEmail,
   findUserByCode,
@@ -222,6 +222,14 @@ async function handleRequestMagicLink(body, req) {
     return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byEmail.retryAfter) })
   }
 
+  // M3 (S8, #54): FAIL CLOSED. In production the mail key is REQUIRED — check
+  // BEFORE issuing a token or recording a request, so a misconfigured prod can
+  // never mint a sign-in link (which would let an attacker rotate a member's
+  // code for any email). Dev keeps the no-op mailer + devLink echo below.
+  if (!isMailConfigured() && !isDevEmailMode()) {
+    return json(503, { error: "Sign-in email isn't configured yet — try again shortly.", code: 'MAIL_NOT_CONFIGURED' })
+  }
+
   // Reuse the existing pending `request:<id>` flow (ADR-0003 §2.2): the request
   // record is the stable identity the future payment webhook attaches
   // entitlements to. Deduped by email while pending.
@@ -241,9 +249,14 @@ async function handleRequestMagicLink(body, req) {
   const link = `${siteUrl(req)}/?magic-link=${encodeURIComponent(token)}`
   const result = await sendMagicLink({ email: normEmail, link })
 
-  // In dev (no mail key) the link is echoed so a developer can click through;
-  // in production the key is always set, so no link ever reaches the client.
-  return json(200, { ok: true, expiresAt, ...(result.sent ? {} : { devLink: link }) })
+  // Dev-only: when the mailer is a no-op the link is echoed so a developer can
+  // click through. In production the key is configured, so `result.sent` is
+  // always true and no link ever reaches the client (never log it there).
+  return json(200, {
+    ok: true,
+    expiresAt,
+    ...(result.sent || !isDevEmailMode() ? {} : { devLink: link }),
+  })
 }
 
 async function handleVerifyMagicLink(body) {

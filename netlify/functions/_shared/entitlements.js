@@ -156,10 +156,18 @@ export async function materializeCheckoutSession(session, deps = {}) {
       role: 'member',
       status: 'active',
       createdAt: new Date().toISOString(),
+      // M2 (S8, #54): the `status` poll delivers the freshly-issued code to the
+      // session owner exactly once. Mark it undelivered at materialization so
+      // the first successful poll (they hold the sessionId — a capability
+      // token) receives it, then flips to `true` so a leaked `?session_id=…`
+      // URL can never read it again.
+      codeDelivered: false,
     }
   } else {
-    // Existing member keeps their code, collections and feature flags.
-    user = { ...user }
+    // Existing member keeps their code, collections and feature flags — they
+    // already hold the code in their session, so it is never re-delivered via
+    // the status poll (M2).
+    user = { ...user, codeDelivered: true }
   }
 
   const applied = applyEntitlement(user, { type: 'checkout.session.completed', data: { object: session } })

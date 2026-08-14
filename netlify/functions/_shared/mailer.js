@@ -3,10 +3,16 @@
 // drop-in replacement behind sendMagicLink(). The API key is server-only —
 // read from RUNOUT_MAIL_API_KEY, never logged, never sent to the client.
 //
-// When the key is absent (local dev / preview) the mailer is a NO-OP: it
-// returns { sent: false } and logs the magic-link URL so a developer can still
-// click through. NEVER log the access code — only the link (acceptable per the
-// S1 spec). The access code is never even known in this module.
+// When the key is absent in DEV (NODE_ENV !== 'production', or an explicit
+// RUNOUT_DEV_EMAIL=1 opt-in) the mailer is a NO-OP: it returns { sent: false }
+// and logs the magic-link URL so a developer can still click through. NEVER
+// log the access code — only the link (acceptable per the S1 spec). The access
+// code is never even known in this module.
+//
+// S8 (#54, M3): in PRODUCTION a missing key FAILS CLOSED — sendMagicLink
+// throws (code MAIL_NOT_CONFIGURED) and no link is ever minted or logged. A
+// prod misconfiguration must not let an attacker mint sign-in links for any
+// email (and thereby rotate a member's code) — it surfaces as a 5xx instead.
 
 const RESEND_API = 'https://api.resend.com/emails'
 
@@ -18,12 +24,31 @@ export function mailFrom() {
   return process.env.RUNOUT_MAIL_FROM || 'Halcova <no-reply@halcova.app>'
 }
 
+// True when the transactional mail provider is configured.
+export function isMailConfigured() {
+  return !!mailApiKey()
+}
+
+// "Dev email mode": emit/log the magic-link URL only outside production, or
+// with an explicit RUNOUT_DEV_EMAIL=1 override (e.g. a preview branch). In
+// production the key is required and the link is never echoed to the client.
+export function isDevEmailMode() {
+  return process.env.NODE_ENV !== 'production' || process.env.RUNOUT_DEV_EMAIL === '1'
+}
+
 // Send a one-time sign-in link. Returns { sent: true } on success or
-// { sent: false } in dev no-op mode. Throws only on a real provider error so
-// the caller can surface a 502 — a missing key is NOT an error.
+// { sent: false } in dev no-op mode. Throws on a real provider error (the
+// caller surfaces a 502) — and, in production, when the key is missing (the
+// caller surfaces a 5xx instead of issuing/logging a link).
 export async function sendMagicLink({ email, link }) {
   const key = mailApiKey()
   if (!key) {
+    if (!isDevEmailMode()) {
+      // Production with no mail key: FAIL CLOSED — never mint or log a link.
+      const err = new Error('Mail is not configured (RUNOUT_MAIL_API_KEY missing).')
+      err.code = 'MAIL_NOT_CONFIGURED'
+      throw err
+    }
     // Dev no-op. The link is safe to log (expires ≤ 30 min, single-use); the
     // access code it eventually mints is never logged anywhere.
     console.log(`[mailer:dev] magic-link for ${email}: ${link}`)

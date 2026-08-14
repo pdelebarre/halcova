@@ -89,7 +89,9 @@ function authFindUserByCode(postgresFn, blobFn) {
 // S3 (migration 003_billing_fields.sql): the billing columns are part of the
 // snapshot/restore too, so an auth write that rolls back can never wipe the
 // payment-webhook fields a member already has (planExpiresAt, the Stripe ids).
-const USER_ROW_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id`
+// S8 (#54, M2): `code_delivered` (migration 004) rides along the same way, so
+// a rolled-back write never re-opens the one-time code delivery.
+const USER_ROW_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id, code_delivered`
 
 async function readUserRow(db, id) {
   const { rows } = await db.query(`SELECT ${USER_ROW_COLUMNS} FROM users WHERE id = $1 LIMIT 1`, [id])
@@ -100,9 +102,10 @@ async function writeUserRow(db, row) {
   const values = [row.id, row.name, row.email, row.code_hash, row.role, row.status, row.plan,
     JSON.stringify(row.features ?? {}), JSON.stringify(row.collections ?? {}), row.created_at,
     row.plan_expires_at ?? null, row.plan_changed_at ?? null,
-    row.stripe_customer_id ?? null, row.stripe_subscription_id ?? null, row.stripe_checkout_session_id ?? null]
+    row.stripe_customer_id ?? null, row.stripe_subscription_id ?? null, row.stripe_checkout_session_id ?? null,
+    row.code_delivered ?? null]
   await db.query(
-    `INSERT INTO users (${USER_ROW_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+    `INSERT INTO users (${USER_ROW_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      ON CONFLICT (id) DO UPDATE SET
        name = EXCLUDED.name, email = EXCLUDED.email, code_hash = EXCLUDED.code_hash,
        role = EXCLUDED.role, status = EXCLUDED.status, plan = EXCLUDED.plan,
@@ -110,7 +113,8 @@ async function writeUserRow(db, row) {
        plan_expires_at = EXCLUDED.plan_expires_at, plan_changed_at = EXCLUDED.plan_changed_at,
        stripe_customer_id = EXCLUDED.stripe_customer_id,
        stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-       stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id`,
+       stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
+       code_delivered = EXCLUDED.code_delivered`,
     values,
   )
 }
