@@ -76,6 +76,22 @@ function answerFirstWrong(quiz) {
   }
 }
 
+/** Answer questions 0..upTo-1 correctly (advancing each) — stops before `upTo`. */
+function answerUpTo(quiz, upTo) {
+  for (let i = 0; i < upTo; i += 1) {
+    const q = quiz.questions[i]
+    if (q.type === 'sortShelf') {
+      for (const id of q.answerIds) {
+        const opt = q.options.find((o) => o.itemId === id)
+        fireEvent.click(screen.getByRole('button', { name: opt.title }))
+      }
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: q.options[q.answerIndex] }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Next question|Day complete!/ }))
+  }
+}
+
 beforeEach(() => {
   localStorage.clear()
   setLocale('en')
@@ -295,5 +311,51 @@ describe('QuizPanel (release 1.3 — Crate Quiz)', () => {
     expect(body).not.toContain('hunter2')
     expect(body).not.toContain('978-3-16-148410-')
     expect(body).not.toContain('01234567890')
+  })
+
+  it('a guessYear miss reveals the correct year in text — a11y, not just a border', () => {
+    const items = fullCrate().map((it) => ({ ...it, notes: `note-${it.id}` }))
+    const quiz = buildQuiz(items, { day: TODAY, catalog: recordsCatalog })
+    const gy = quiz.questions.findIndex((q) => q.type === 'guessYear')
+    expect(gy).toBeGreaterThanOrEqual(0)
+
+    renderPanel(items)
+    fireEvent.click(screen.getByRole('button', { name: 'Start the quiz' }))
+    answerUpTo(quiz, gy)
+
+    // Miss the guessYear (pick the decoy year).
+    const gq = quiz.questions[gy]
+    const wrongIdx = gq.answerIndex === 0 ? 1 : 0
+    fireEvent.click(screen.getByRole('button', { name: gq.options[wrongIdx] }))
+
+    // The teaching reveal states the correct year in text.
+    const item = items.find((it) => it.id === gq.itemId)
+    const line = screen.getByText(/Wrong/)
+    expect(line.textContent).toContain(`it's actually from ${item.year}`)
+  })
+
+  it('options carry a non-color correct/wrong glyph + accessible state after an answer', () => {
+    const items = fullCrate().map((it) => ({ ...it, notes: `note-${it.id}` }))
+    const quiz = buildQuiz(items, { day: TODAY, catalog: recordsCatalog })
+    const gy = quiz.questions.findIndex((q) => q.type === 'guessYear')
+    expect(gy).toBeGreaterThanOrEqual(0)
+
+    renderPanel(items)
+    fireEvent.click(screen.getByRole('button', { name: 'Start the quiz' }))
+    answerUpTo(quiz, gy)
+
+    const gq = quiz.questions[gy]
+    const wrongIdx = gq.answerIndex === 0 ? 1 : 0
+    fireEvent.click(screen.getByRole('button', { name: gq.options[wrongIdx] }))
+
+    // The correct option is marked ✓ and named "Correct answer".
+    const correctBtn = screen.getByRole('button', { name: `${gq.options[gq.answerIndex]} — Correct answer` })
+    expect(correctBtn).toHaveTextContent('✓')
+    expect(correctBtn).toHaveClass('correct')
+
+    // The user's wrong pick is marked ✗ and named "Your answer — incorrect".
+    const wrongBtn = screen.getByRole('button', { name: `${gq.options[wrongIdx]} — Your answer — incorrect` })
+    expect(wrongBtn).toHaveTextContent('✗')
+    expect(wrongBtn).toHaveClass('wrong')
   })
 })

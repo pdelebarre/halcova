@@ -185,6 +185,15 @@ describe('buildQuiz', () => {
     expect(Number(q.options[q.answerIndex])).toBe(item.year)
   })
 
+  it('carries the correct year in the guessYear reveal (the teaching answer)', () => {
+    const quiz = buildQuiz(fullCrate(), { day: DAY, catalog: recordsCatalog })
+    const q = quiz.questions.find((x) => x.type === 'guessYear')
+    expect(q).toBeTruthy()
+    // A miss can now state the real answer in text — not just a border.
+    const item = fullCrate().find((it) => it.id === q.itemId)
+    expect(q.reveal.year).toBe(item.year)
+  })
+
   it('builds nameThatArtist with decoys that are other artists you own', () => {
     const quiz = buildQuiz(fullCrate(), { day: DAY, catalog: recordsCatalog })
     const q = quiz.questions.find((x) => x.type === 'nameThatArtist')
@@ -237,9 +246,13 @@ describe('buildQuiz', () => {
       for (const forbidden of ['barcode', 'isbn', 'adminKey', 'notes', 'dateAdded']) {
         expect(top).not.toContain(forbidden)
       }
-      // Reveal carries ONLY the teaching data (title + dateAdded + notes).
+      // Reveal carries ONLY the teaching data — title + dateAdded + notes,
+      // plus the correct year on guessYear (so a miss states the answer).
       const revealKeys = Object.keys(q.reveal || {}).filter((k) => k !== 'ordered')
-      expect(revealKeys.sort()).toEqual(['dateAdded', 'itemId', 'notes', 'title'])
+      const expected = q.type === 'guessYear'
+        ? ['dateAdded', 'itemId', 'notes', 'title', 'year']
+        : ['dateAdded', 'itemId', 'notes', 'title']
+      expect(revealKeys.sort()).toEqual(expected)
       expect(JSON.stringify(q)).not.toMatch(/SECRET/)
     }
   })

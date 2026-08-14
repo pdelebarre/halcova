@@ -42,6 +42,9 @@
 }
 .prog-toast-share {
   flex-shrink: 0;
+  /* ≥44px target — it's a .btn-sm by default; the toast Share must be tappable. */
+  min-height: 44px;
+  padding: 10px 14px;
 }
 .prog-toast-close {
   width: 34px;
@@ -180,13 +183,19 @@
   color: var(--jacket-kraft-dim);
 }
 .prog-badge-share {
-  margin-top: 6px;
+  /* ≥44px touch target — the text link reads small, but the tap area must not be. */
+  margin-top: 2px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--runout-gold);
   text-decoration: underline;
-  padding: 2px 0;
 }
 .prog-exported {
   font-family: var(--font-mono);

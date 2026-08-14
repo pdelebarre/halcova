@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { LocaleProvider, setLocale } from '../i18n'
 import ProgressionPanel from '../components/ProgressionPanel'
 import { recordsCatalog } from '../catalog'
@@ -221,5 +221,25 @@ describe('ProgressionPanel (release 1.2)', () => {
     // XP is a pure derivation of items + ledger — a re-render never re-credits.
     expect(screen.getByText('150 XP')).toBeInTheDocument()
     expect(screen.getByText('Crate Nerd')).toBeInTheDocument()
+  })
+
+  it('pauses the toast auto-dismiss on hover/focus so the Share can\'t be missed', () => {
+    vi.useFakeTimers()
+    try {
+      renderPanel(sleeveSleuthCrate())
+      expect(screen.getByRole('status')).toBeInTheDocument()
+
+      // Hover pauses the 6s auto-dismiss — the toast (and its Share) stays up.
+      fireEvent.mouseEnter(screen.getByRole('status'))
+      act(() => { vi.advanceTimersByTime(6000) })
+      expect(screen.getByRole('status')).toBeInTheDocument()
+
+      // Leaving resumes the timer → it dismisses after the 6s.
+      fireEvent.mouseLeave(screen.getByRole('status'))
+      act(() => { vi.advanceTimersByTime(6000) })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

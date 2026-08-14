@@ -270,6 +270,7 @@ export default function Toolbar({
           onClick={onOpenPlay}
           aria-haspopup="dialog"
           aria-label={playLabel}
+          title={playLabel}
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="12" cy="12" r="9" />

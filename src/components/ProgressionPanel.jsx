@@ -30,6 +30,7 @@ export default function ProgressionPanel({ items = [], catalog }) {
   const kind = catalog?.kind === 'books' ? 'books' : 'records'
 
   const [toast, setToast] = useState(null) // { type, title, sub }
+  const [toastPaused, setToastPaused] = useState(false) // hover/focus pauses auto-dismiss
   const [selected, setSelected] = useState(null) // { badge, stats } for share
   const [exported, setExported] = useState(false)
   const cardRef = useRef(null)
@@ -66,15 +67,17 @@ export default function ProgressionPanel({ items = [], catalog }) {
     }
   }, [prog.badges, kind])
 
-  // Auto-dismiss the unlock/level toast.
+  // Auto-dismiss the unlock/level toast — paused on hover/focus so the Share
+  // action can't be missed (the Dismiss ✕ always stays).
   useEffect(() => {
     if (!toast) return
     if (toastTimer.current) clearTimeout(toastTimer.current)
+    if (toastPaused) return
     toastTimer.current = setTimeout(() => setToast(null), 6000)
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current)
     }
-  }, [toast])
+  }, [toast, toastPaused])
 
   useEffect(() => {
     return () => {
@@ -128,7 +131,14 @@ export default function ProgressionPanel({ items = [], catalog }) {
   return (
     <div className="progression-panel">
       {toast && (
-        <div className="prog-toast" role="status">
+        <div
+          className="prog-toast"
+          role="status"
+          onMouseEnter={() => setToastPaused(true)}
+          onMouseLeave={() => setToastPaused(false)}
+          onFocus={() => setToastPaused(true)}
+          onBlur={() => setToastPaused(false)}
+        >
           <div className="prog-toast-text">
             <span className="prog-toast-kicker">{toastKicker(toast)}</span>
             {toast.sub && <span className="prog-toast-sub">{toast.sub}</span>}

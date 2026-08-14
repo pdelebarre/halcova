@@ -523,6 +523,16 @@ const en = {
   'gamif.quiz.wrongRevealNoNotes': 'Wrong — but the real answer is better: you added {title} in {date}.',
   'gamif.quiz.wrongRevealNotesOnly': 'Wrong — but your notes on {title} say: "{notes}".',
   'gamif.quiz.wrongRevealNoDate': 'Not quite. But now you\'ll never forget you own {title} again.',
+  // guessYear miss — the reveal must state the correct year in TEXT: a screen
+  // reader hears the answer, and a colour-blind user isn't left with only the
+  // gold-vs-danger border (a11y + teaching goal).
+  'gamif.quiz.wrongYearReveal': 'Wrong — it\'s actually from {year}. You added {title} in {date}. Your notes say: "{notes}".',
+  'gamif.quiz.wrongYearRevealNoNotes': 'Wrong — it\'s actually from {year}. You added {title} in {date}.',
+  'gamif.quiz.wrongYearRevealNotesOnly': 'Wrong — it\'s actually from {year}. Your notes on {title} say: "{notes}".',
+  'gamif.quiz.wrongYearRevealNoDate': 'Not quite — it\'s actually from {year}. But now you\'ll never forget you own {title} again.',
+  // Non-color correct/wrong state on options (✓/✗ glyph + accessible name).
+  'gamif.quiz.optionCorrect': 'Correct answer',
+  'gamif.quiz.optionWrong': 'Your answer — incorrect',
 
   // Shelf Stories panel (release 1.4, issue #44)
   'gamif.stories.headline': 'Your {collectionLabel}, in stories',
@@ -533,6 +543,7 @@ const en = {
   'gamif.stories.prev': 'Previous story',
   'gamif.stories.next': 'Next story',
   'gamif.stories.counter': 'Story {n} of {total}',
+  'gamif.stories.goToStory': 'Go to story {n}',
   // Story cards (deterministic facts — computed numbers are interpolated)
   'gamif.story.year-span.title': 'The long span',
   'gamif.story.year-span.body': 'Your {collectionLabel} spans {span} years — from {min} to {max} across {decades} decades.',

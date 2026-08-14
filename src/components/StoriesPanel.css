@@ -107,21 +107,36 @@
 }
 .stories-dots {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
   justify-content: center;
   flex: 1;
   min-width: 0;
 }
+/* The visual dot is a ::before on a ≥44px hit area (a11y touch target); the
+   button itself is transparent so the tap zone is generous without painting a
+   big dot. */
 .story-dot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}
+.story-dot::before {
+  content: '';
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--vinyl-groove-2);
   border: 1px solid var(--line);
-  padding: 0;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.story-dot.active {
+.story-dot.active::before {
   background: var(--runout-gold);
   transform: scale(1.25);
 }

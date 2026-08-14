@@ -97,34 +97,34 @@ describe('StoriesPanel (release 1.4)', () => {
     expect(screen.getByText('Quest-building arrives in Phase 2')).toBeInTheDocument()
   })
 
-  it('navigates via the dot indicators', () => {
+  it('navigates via the pagination dots (accessible "Go to story N" buttons)', () => {
     renderPanel(storyCrate())
-    const dots = screen.getAllByRole('tab')
+    const dots = screen.getAllByRole('button', { name: /Go to story/ })
     expect(dots.length).toBeGreaterThan(1)
     fireEvent.click(dots[1])
-    expect(dots[1]).toHaveAttribute('aria-selected', 'true')
+    expect(dots[1]).toHaveAttribute('aria-current', 'true')
   })
 
   it('steps back with the Previous story button and disables at the first card', () => {
     renderPanel(storyCrate())
-    const dots = screen.getAllByRole('tab')
+    const dots = screen.getAllByRole('button', { name: /Go to story/ })
     const prev = screen.getByRole('button', { name: 'Previous story' })
     const next = screen.getByRole('button', { name: 'Next story' })
 
     // First card: Previous is disabled.
     expect(prev).toBeDisabled()
-    expect(dots[0]).toHaveAttribute('aria-selected', 'true')
+    expect(dots[0]).toHaveAttribute('aria-current', 'true')
 
     // Advance twice, then step back one at a time.
     fireEvent.click(next)
     fireEvent.click(next)
-    expect(dots[2]).toHaveAttribute('aria-selected', 'true')
+    expect(dots[2]).toHaveAttribute('aria-current', 'true')
 
     fireEvent.click(prev)
-    expect(dots[1]).toHaveAttribute('aria-selected', 'true')
+    expect(dots[1]).toHaveAttribute('aria-current', 'true')
 
     fireEvent.click(prev)
-    expect(dots[0]).toHaveAttribute('aria-selected', 'true')
+    expect(dots[0]).toHaveAttribute('aria-current', 'true')
     expect(prev).toBeDisabled()
   })
 

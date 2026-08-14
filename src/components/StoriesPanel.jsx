@@ -76,7 +76,8 @@ export default function StoriesPanel({ items = [], catalog }) {
   }
 
   const empty = stories.length === 0
-  const counter = (n) => (typeof storiesCopy.counter === 'string' ? storiesCopy.counter.replace('{n}', String(n + 1)).replace('{total}', String(stories.length)) : '')
+  // "Go to story N" labels the pagination dots (screen-reader accessible).
+  const goToStory = (n) => (typeof storiesCopy.goToStory === 'string' ? storiesCopy.goToStory.replace('{n}', String(n + 1)) : `Go to story ${n + 1}`)
 
   return (
     <div className="stories-panel">
@@ -123,14 +124,15 @@ export default function StoriesPanel({ items = [], catalog }) {
                 aria-label={storiesCopy.prev || 'Previous story'}
               >←</button>
 
-              <div className="stories-dots" role="tablist" aria-label={storiesCopy.headline || 'Stories'}>
+              {/* Pagination dots as plain buttons (not per-dot tab stops): each
+                  carries "Go to story N" + aria-current on the active one. */}
+              <div className="stories-dots">
                 {stories.map((story, i) => (
                   <button
                     key={story.id}
                     type="button"
-                    role="tab"
-                    aria-selected={i === index}
-                    aria-label={counter(i)}
+                    aria-label={goToStory(i)}
+                    aria-current={i === index ? 'true' : undefined}
                     className={`story-dot${i === index ? ' active' : ''}`}
                     onClick={() => scrollTo(i)}
                   />

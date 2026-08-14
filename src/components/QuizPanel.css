@@ -17,6 +17,8 @@
   flex-direction: column;
   gap: 12px;
   padding: 6px 2px;
+  /* Fill the panel height so the feedback + Next action can pin to the bottom. */
+  flex: 1;
 }
 
 /* --- shared text -------------------------------------------------------- */
@@ -77,7 +79,39 @@
   font-size: 15px;
   font-weight: 600;
   text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.quiz-option-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Non-color correct/wrong state (✓/✗) — correctness is never colour-only. */
+.quiz-option-mark {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+.quiz-option.correct .quiz-option-mark {
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.16);
+  border: 1px solid var(--runout-gold);
+}
+.quiz-option.wrong .quiz-option-mark {
+  color: var(--danger-bright);
+  background: rgba(224, 105, 91, 0.14);
+  border: 1px solid var(--danger-bright);
 }
 .quiz-option:not(:disabled):hover { border-color: var(--runout-gold); }
 .quiz-option:not(:disabled):active { transform: scale(0.99); }
@@ -148,6 +182,24 @@
   justify-content: center;
 }
 
+/* Non-color ✓ on the sortShelf's correct (first) item, mirroring the rank. */
+.quiz-sort-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(201, 162, 39, 0.16);
+  color: var(--runout-gold);
+  border: 1px solid var(--runout-gold);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .quiz-sort-cover {
   width: 64px;
   height: 64px;
@@ -170,6 +222,9 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--vinyl-groove-2);
+  /* Pin the feedback (and the sticky Next below it) to the bottom when the
+     content is short — keeps the reveal + action in one glanceable spot. */
+  margin-top: auto;
 }
 .quiz-feedback.right { border-color: var(--runout-gold); }
 .quiz-feedback.wrong { border-color: var(--danger-bright); }
@@ -190,8 +245,16 @@
 }
 
 .quiz-next {
-  align-self: flex-end;
-  min-height: 44px;
+  /* Sticky bottom action: pinned to the quiz panel's visible bottom while
+     feedback is showing, so Next stays reachable without a mid-quiz scroll on
+     a 375×667 phone. The sheet already accounts for safe-area padding below
+     the panel. */
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  z-index: 1;
 }
 
 /* --- intro / locked / done ---------------------------------------------- */

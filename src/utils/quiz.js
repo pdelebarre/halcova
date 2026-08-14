@@ -192,7 +192,9 @@ function buildGuessYear(rng, pool, yearPool, used, copy) {
     cover: item.coverImage || '',
     options,
     answerIndex: options.indexOf(String(year)),
-    reveal: revealFor(item),
+    // The reveal carries the correct year so a miss can state the real answer
+    // in text — never just the gold-vs-danger border (a11y + teaching goal).
+    reveal: { ...revealFor(item), year },
   }
 }
 

@@ -217,12 +217,20 @@
   background: rgba(201, 162, 39, 0.1);
 }
 
-/* Gamification (Phase 1 § Play): the Play entry point mirrors the loans
-   button — icon-only on phone widths, gold on press. */
+/* Gamification (Phase 1 § Play): the Play entry point is the app's special
+   entry — a persistent subtle gold ring + tint marks it even before press, so
+   it reads as distinct at a glance (and stays discoverable when the toolbar
+   row scrolls at 375px). */
+.play-btn {
+  border-color: rgba(201, 162, 39, 0.5);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.08);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.3);
+}
 .play-btn:active {
   border-color: var(--runout-gold);
   color: var(--runout-gold);
-  background: rgba(201, 162, 39, 0.1);
+  background: rgba(201, 162, 39, 0.16);
 }
 
 /* On narrow screens the Loans label hides so the toolbar row doesn't crowd —

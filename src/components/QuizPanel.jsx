@@ -134,12 +134,24 @@ export default function QuizPanel({ items = [], catalog, today }) {
 
   // --- render helpers --------------------------------------------------------
 
-  /** The wrong-answer teaching reveal (never fabricates notes or dates). */
+  /** The wrong-answer teaching reveal (never fabricates notes or dates). A
+      guessYear miss must state the correct year in text — a colour-blind user
+      shouldn't be left with only the gold-vs-danger border, and a screen
+      reader should hear the answer. */
   function revealLine(question) {
     const reveal = question?.reveal || {}
     const title = reveal.title || ''
     const date = revealDate(reveal.dateAdded)
     const notes = String(reveal.notes || '').trim()
+
+    // guessYear: the engine's data sufficiency guarantees the item has a year.
+    if (question?.type === 'guessYear' && reveal.year != null && reveal.year !== '') {
+      const year = String(reveal.year)
+      if (date && notes) return interpolate(quizCopy.wrongYearReveal, { year, title, date, notes })
+      if (date) return interpolate(quizCopy.wrongYearRevealNoNotes, { year, title, date })
+      if (notes) return interpolate(quizCopy.wrongYearRevealNotesOnly, { year, title, notes })
+      return interpolate(quizCopy.wrongYearRevealNoDate, { year, title })
+    }
 
     if (date && notes) return interpolate(quizCopy.wrongReveal, { title, date, notes })
     if (date) return interpolate(quizCopy.wrongRevealNoNotes, { title, date })
@@ -201,6 +213,9 @@ export default function QuizPanel({ items = [], catalog, today }) {
           aria-pressed={pickIndex !== -1}
         >
           {pickIndex !== -1 && <span className="quiz-sort-rank" aria-hidden="true">{pickIndex + 1}</span>}
+          {feedback && option.itemId === question.answerIds[0] && (
+            <span className="quiz-sort-mark" aria-hidden="true">✓</span>
+          )}
           {option.cover && <img className="quiz-sort-cover" src={option.cover} alt="" loading="lazy" />}
           <span className="quiz-sort-title">{option.title}</span>
         </button>
@@ -209,6 +224,24 @@ export default function QuizPanel({ items = [], catalog, today }) {
 
     const label = question.options[i]
     const pressed = feedback ? i === feedback.selection : null
+
+    // Non-color correct/wrong state — correctness must never be colour-only.
+    // After an answer the correct option always carries ✓ (so the reveal
+    // teaches it even when the user picked wrong) and the user's wrong pick
+    // carries ✗. The glyph is aria-hidden; the accessible name spells the
+    // state out for screen readers.
+    let mark = null
+    let markLabel = ''
+    if (feedback) {
+      if (i === question.answerIndex) {
+        mark = '✓'
+        markLabel = quizCopy.optionCorrect || 'Correct answer'
+      } else if (i === feedback.selection && !feedback.correct) {
+        mark = '✗'
+        markLabel = quizCopy.optionWrong || 'Your answer — incorrect'
+      }
+    }
+
     return (
       <button
         key={`${question.type}-${i}`}
@@ -217,8 +250,10 @@ export default function QuizPanel({ items = [], catalog, today }) {
         onClick={() => handleChoice(i)}
         disabled={Boolean(feedback)}
         aria-pressed={Boolean(pressed)}
+        aria-label={mark ? `${label} — ${markLabel}` : undefined}
       >
-        {label}
+        <span className="quiz-option-text">{label}</span>
+        {mark && <span className="quiz-option-mark" aria-hidden="true">{mark}</span>}
       </button>
     )
   }
@@ -259,10 +294,16 @@ export default function QuizPanel({ items = [], catalog, today }) {
                 )}
               </>
             )}
-            <button type="button" className="btn btn-primary quiz-next" onClick={handleNext}>
-              {index + 1 < questions.length ? (quizCopy.next || 'Next question') : (quizCopy.done || 'Day complete!')}
-            </button>
           </div>
+        )}
+
+        {/* The Next action lives OUTSIDE the feedback box so it can anchor to the
+            bottom of the quiz panel — always reachable on a 375×667 phone instead
+            of being pushed below the fold by cover + options + feedback. */}
+        {feedback && (
+          <button type="button" className="btn btn-primary quiz-next" onClick={handleNext}>
+            {index + 1 < questions.length ? (quizCopy.next || 'Next question') : (quizCopy.done || 'Day complete!')}
+          </button>
         )}
       </div>
     )

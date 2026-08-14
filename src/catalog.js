@@ -285,6 +285,12 @@ export const recordsCatalog = {
         wrongRevealNoNotes: t('gamif.quiz.wrongRevealNoNotes'),
         wrongRevealNotesOnly: t('gamif.quiz.wrongRevealNotesOnly'),
         wrongRevealNoDate: t('gamif.quiz.wrongRevealNoDate'),
+        wrongYearReveal: t('gamif.quiz.wrongYearReveal'),
+        wrongYearRevealNoNotes: t('gamif.quiz.wrongYearRevealNoNotes'),
+        wrongYearRevealNotesOnly: t('gamif.quiz.wrongYearRevealNotesOnly'),
+        wrongYearRevealNoDate: t('gamif.quiz.wrongYearRevealNoDate'),
+        optionCorrect: t('gamif.quiz.optionCorrect'),
+        optionWrong: t('gamif.quiz.optionWrong'),
         questions: {
           guessYear: t('gamif.quiz.prompt.guessYear'),
           nameThatArtist: t('gamif.quiz.prompt.nameArtist'),
@@ -303,6 +309,7 @@ export const recordsCatalog = {
         prev: t('gamif.stories.prev'),
         next: t('gamif.stories.next'),
         counter: t('gamif.stories.counter'),
+        goToStory: t('gamif.stories.goToStory'),
         cards: {
           'year-span': { title: t('gamif.story.year-span.title'), body: t('gamif.story.year-span.body') },
           'decade-bias': { title: t('gamif.story.decade-bias.title'), body: t('gamif.story.decade-bias.body') },
@@ -616,6 +623,12 @@ export const booksCatalog = {
         wrongRevealNoNotes: t('gamif.quiz.wrongRevealNoNotes'),
         wrongRevealNotesOnly: t('gamif.quiz.wrongRevealNotesOnly'),
         wrongRevealNoDate: t('gamif.quiz.wrongRevealNoDate'),
+        wrongYearReveal: t('gamif.quiz.wrongYearReveal'),
+        wrongYearRevealNoNotes: t('gamif.quiz.wrongYearRevealNoNotes'),
+        wrongYearRevealNotesOnly: t('gamif.quiz.wrongYearRevealNotesOnly'),
+        wrongYearRevealNoDate: t('gamif.quiz.wrongYearRevealNoDate'),
+        optionCorrect: t('gamif.quiz.optionCorrect'),
+        optionWrong: t('gamif.quiz.optionWrong'),
         questions: {
           guessYear: t('gamif.quiz.prompt.guessYear'),
           nameThatArtist: t('gamif.quiz.prompt.nameArtist'),
@@ -634,6 +647,7 @@ export const booksCatalog = {
         prev: t('gamif.stories.prev'),
         next: t('gamif.stories.next'),
         counter: t('gamif.stories.counter'),
+        goToStory: t('gamif.stories.goToStory'),
         cards: {
           'year-span': { title: t('gamif.story.year-span.title'), body: t('gamif.story.year-span.body') },
           'decade-bias': { title: t('gamif.story.decade-bias.title'), body: t('gamif.story.decade-bias.body') },
