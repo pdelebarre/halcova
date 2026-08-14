@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { computeProgression } from '../utils/progression'
 import { readLedger } from '../utils/progressionLedger'
+import { deriveProfile } from '../utils/persona'
 import { track } from '../utils/track'
 import { downloadSvg } from '../utils/exportSvg'
 import { t } from '../i18n'
@@ -37,6 +38,10 @@ export default function ProgressionPanel({ items = [], catalog }) {
 
   const ledger = useMemo(() => readLedger(kind), [kind])
   const prog = useMemo(() => computeProgression(items, catalog, { ledger }), [items, catalog, ledger])
+  // The single most-collected artist/author name (persona engine) — used to
+  // interpolate {artist} into badge lines on the share card. One name only,
+  // never lists (policy).
+  const topArtist = useMemo(() => String(deriveProfile(items, kind).topArtist || ''), [items, kind])
 
   // --- one-time unlock detection (remembered per kind) -------------------
   useEffect(() => {
@@ -98,7 +103,12 @@ export default function ProgressionPanel({ items = [], catalog }) {
       { label: countLabel, value: String(prog.xp.breakdown.owned) },
       { label: progCopy.xpLabel || 'XP', value: String(prog.xp.total) },
     ]
-    setSelected({ badge, stats })
+    // L4: interpolate {artist} in the badge line with the single top
+    // artist/author name before the card renders — a raw token must never
+    // reach the exported SVG. If there's no name to interpolate, keep the
+    // line as-is.
+    const line = topArtist ? interpolate(badge.line, { artist: topArtist }) : badge.line
+    setSelected({ badge: { ...badge, line }, stats })
   }
 
   function toastKicker(toastObj) {

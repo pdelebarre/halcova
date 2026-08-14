@@ -39,7 +39,7 @@ describe('track instrumentation (default-OFF, first-party)', () => {
     expect(Number.isNaN(Date.parse(queue[0].ts))).toBe(false)
   })
 
-  it('sanitizes props — drops code/token/key/secret/barcode/isbn keys and nested objects', () => {
+  it('sanitizes props — drops code/token/key/secret/barcode/isbn/pin/cipher/credential keys and nested objects', () => {
     setTrackingEnabled(true)
     track('gamif_share_exported', {
       kind: 'records',
@@ -50,6 +50,9 @@ describe('track instrumentation (default-OFF, first-party)', () => {
       secret: 's3cr3t',
       barcode: '1234567890128',
       isbn: '9783161484100',
+      pin: '1234',
+      cipher: 'abc123',
+      authToken: 'tok',
       nested: { deep: true },
       items: [1, 2, 3],
     })

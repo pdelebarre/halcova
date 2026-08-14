@@ -146,6 +146,28 @@ describe('ProgressionPanel (release 1.2)', () => {
     expect(svg).not.toContain('SECRET-ALBUM-TITLE')
   })
 
+  it('interpolates {artist} on the exported badge share card — no raw token', async () => {
+    const getBlob = stubExport()
+    // 4 records by 4 different artists → the one-timer badge unlocks, and its
+    // line carries a {artist} token ("One {artist}. Bold. Mysterious.").
+    const items = Array.from({ length: 4 }, (_, i) => record(`ot${i}`, {
+      title: `Artist${i} - Album ${i}`,
+      dateAdded: `2026-03-${String(i + 1).padStart(2, '0')}T12:00:00`,
+    }))
+    renderPanel(items)
+
+    const tile = screen.getByText('One-Timer').closest('li')
+    fireEvent.click(within(tile).getByRole('button', { name: 'Share card' }))
+
+    const blob = getBlob()
+    expect(blob).toBeTruthy()
+    const svg = await blob.text()
+    // The single most-collected artist name is interpolated in place of the
+    // token (4 distinct artists → mode() keeps the first: "Artist0").
+    expect(svg).not.toContain('{artist}')
+    expect(svg).toContain('One Artist0. Bold. Mysterious.')
+  })
+
   it('emits gamif_share_exported with the badge id when sharing', () => {
     stubExport()
     setTrackingEnabled(true)

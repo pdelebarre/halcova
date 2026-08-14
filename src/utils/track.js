@@ -9,15 +9,15 @@
 // - Events queue in localStorage.runout.events, capped at MAX_EVENTS (oldest
 //   dropped) until a future opt-in flush endpoint exists.
 // - sanitize() drops secret-like keys (access codes, the admin key, tokens,
-//   barcodes, ISBNs) and nested objects before anything is queued — nothing
-//   secret ever leaves the client.
+//   barcodes, ISBNs, pins, ciphers, credentials) and nested objects before
+//   anything is queued — nothing secret ever leaves the client.
 
 const EVENTS_KEY = 'runout.events'
 const ENABLED_KEY = 'runout.events.enabled'
 const MAX_EVENTS = 500
 
 /** Secret-like key pattern — any matching prop key is dropped before queueing. */
-const SECRET_KEY = /code|token|key|secret|barcode|isbn/i
+const SECRET_KEY = /code|token|key|secret|barcode|isbn|pin|cipher|pass|session|credential|auth|jwt/i
 
 /** True when the user has opted in ('1' in localStorage.runout.events.enabled). */
 export function isTrackingEnabled() {

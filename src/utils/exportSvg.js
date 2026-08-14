@@ -19,6 +19,18 @@ export function serializeSvgNode(node) {
     clone.setAttribute('xmlns', SVG_NS)
     clone.setAttribute('width', String(CARD_WIDTH))
     clone.setAttribute('height', String(CARD_HEIGHT))
+    // Defense-in-depth (Security Auditor L2): strip event handlers and data-*
+    // attributes from the clone (root + descendants) so nothing rendered on a
+    // future card edit can leak an inline handler or data attribute into the
+    // downloaded SVG. XML escaping (already safe) is untouched.
+    const nodes = [clone, ...Array.from(clone.querySelectorAll('*'))]
+    for (const el of nodes) {
+      if (!el?.attributes) continue
+      const names = Array.from(el.attributes, (a) => a.name)
+      for (const name of names) {
+        if (/^on/i.test(name) || name.toLowerCase().startsWith('data-')) el.removeAttribute(name)
+      }
+    }
     return new XMLSerializer().serializeToString(clone)
   } catch {
     return ''
