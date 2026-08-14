@@ -1,7 +1,8 @@
 /* Release 1.3 "Play" — The Crate Quiz (issue #50). Body rendered inside the
-   Play hub (PlayPanel) when GAMIFICATION_ENABLED is on. Dark #16130F theme,
-   gold accents, touch-friendly 48px+ targets, readable gold-on-dark contrast.
-   Fully offline-safe — no network. */
+   Play hub (PlayPanel), which is gated by the member's admin-granted
+   `features.games` entitlement. Dark #16130F theme, gold accents,
+   touch-friendly 48px+ targets, readable gold-on-dark contrast. Fully
+   offline-safe — no network. */
 
 .quiz-panel {
   overflow-y: auto;

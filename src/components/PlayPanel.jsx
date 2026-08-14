@@ -15,8 +15,9 @@ import './PlayPanel.css'
  *   - Stories      (release 1.4 — Shelf Stories, issue #44)
  *
  * Each tab reads the same owned collection through its pure engine, so all
- * three stay consistent. Feature-flagged OFF by default — CollectionView only
- * mounts this when GAMIFICATION_ENABLED is true (catalog.js).
+ * three stay consistent. Gated per account — CollectionView only mounts this
+ * when the member has the admin-granted `features.games` entitlement (see
+ * App.jsx `gamesEnabled`).
  */
 export default function PlayPanel({ items = [], catalog, onClose }) {
   const gamifCopy = (catalog?.copy?.gamif) || {}

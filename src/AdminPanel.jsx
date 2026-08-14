@@ -45,7 +45,7 @@ export default function AdminPanel({ onClose }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [approving, setApproving] = useState(null) // request id being approved
-  const [draft, setDraft] = useState({ records: true, books: true, lending: false, plan: 'free' })
+  const [draft, setDraft] = useState({ records: true, books: true, lending: false, games: false, plan: 'free' })
   const [granted, setGranted] = useState(null) // { user, code } just approved
   const [rotating, setRotating] = useState(null) // userId with a rotate in flight (double-tap guard)
   const [rotated, setRotated] = useState(null) // { user, code } from a rotate — returned exactly once
@@ -72,12 +72,14 @@ export default function AdminPanel({ onClose }) {
       const res = await authApi.adminApprove({
         requestId: approving,
         collections: { records: draft.records, books: draft.books },
-        features: { lending: draft.lending },
+        // Full features map — the server's sanitizeFeatures rebuilds the whole
+        // map from whatever is sent, so always send both flags together.
+        features: { lending: draft.lending, games: draft.games },
         plan: draft.plan,
       })
       setGranted(res)
       setApproving(null)
-      setDraft({ records: true, books: true, lending: false, plan: 'free' })
+      setDraft({ records: true, books: true, lending: false, games: false, plan: 'free' })
       await load()
     } catch (err) {
       setError(err.message)
@@ -107,6 +109,10 @@ export default function AdminPanel({ onClose }) {
     }
   }
 
+  // Feature toggles MUST send the FULL features map: the server's
+  // sanitizeFeatures rebuilds the whole map from whatever the client sends, so
+  // sending only the flipped flag would silently wipe the other one. Toggle
+  // the target flag while preserving the current value of the other.
   async function toggleFeature(userId) {
     const user = data.users.find((u) => u.id === userId)
     if (!user) return
@@ -114,7 +120,22 @@ export default function AdminPanel({ onClose }) {
     try {
       await authApi.adminUpdateUser({
         userId,
-        features: { lending: !user.features?.lending },
+        features: { lending: !user.features?.lending, games: !!user.features?.games },
+      })
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function toggleGames(userId) {
+    const user = data.users.find((u) => u.id === userId)
+    if (!user) return
+    setError('')
+    try {
+      await authApi.adminUpdateUser({
+        userId,
+        features: { lending: !!user.features?.lending, games: !user.features?.games },
       })
       await load()
     } catch (err) {
@@ -264,6 +285,12 @@ export default function AdminPanel({ onClose }) {
                     label={t('lending.featureLabel')}
                     hint={t('lending.featureHint')}
                   />
+                  <Switch
+                    checked={!!draft.games}
+                    onChange={() => setDraft((d) => ({ ...d, games: !d.games }))}
+                    label={t('games.featureLabel')}
+                    hint={t('games.featureHint')}
+                  />
                 </div>
               </div>
               <div className="admin-features">
@@ -346,6 +373,12 @@ export default function AdminPanel({ onClose }) {
                           onChange={() => toggleFeature(u.id)}
                           label={t('lending.featureLabel')}
                           hint={t('lending.featureHint')}
+                        />
+                        <Switch
+                          checked={!!u.features?.games}
+                          onChange={() => toggleGames(u.id)}
+                          label={t('games.featureLabel')}
+                          hint={t('games.featureHint')}
                         />
                         <Switch
                           checked={u.plan === 'unlimited'}

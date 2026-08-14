@@ -11,7 +11,7 @@
 //   - approve still returns { user, code } with the code only top-level
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import handler from '../admin'
+import handler, { KNOWN_FEATURES, sanitizeFeatures } from '../admin'
 import { ADMIN_KEY } from './auth'
 
 const usersMock = vi.hoisted(() => ({
@@ -133,5 +133,35 @@ describe('auth guard & unknown actions', () => {
     const res = await handler({ ...req('POST', { action: 'nope' }), headers: { get: () => null } })
     expect(res.status).toBe(401)
     expect((await post({ action: 'nope' })).status).toBe(400)
+  })
+})
+
+describe('per-account feature flags (lending + games)', () => {
+  it('KNOWN_FEATURES contains both the lending and games flags', () => {
+    expect(KNOWN_FEATURES).toEqual(['lending', 'games'])
+  })
+
+  it('sanitizeFeatures always returns the full known map, coerced to booleans', () => {
+    expect(sanitizeFeatures({ games: true })).toEqual({ lending: false, games: true })
+    expect(sanitizeFeatures({ lending: true, games: true })).toEqual({ lending: true, games: true })
+    expect(sanitizeFeatures({})).toEqual({ lending: false, games: false })
+    expect(sanitizeFeatures(undefined)).toEqual({ lending: false, games: false })
+    // Unknown keys are dropped; truthy values coerce to true — a client can
+    // never smuggle an arbitrary feature payload onto a user record.
+    expect(sanitizeFeatures({ games: 'yes', lending: 1, evil: { x: 1 } })).toEqual({ lending: true, games: true })
+  })
+
+  it('approve persists a sanitized full features map (a games grant survives)', async () => {
+    const request = { id: 'r1', name: 'Ada', email: 'ada@example.com', status: 'pending', createdAt: '2026-08-01T09:00:00.000Z' }
+    usersMock.getRequest.mockResolvedValue(request)
+    const res = await post({
+      action: 'approve',
+      requestId: 'r1',
+      collections: { records: true, books: false },
+      features: { games: true },
+    })
+    expect(res.status).toBe(201)
+    expect(usersMock.saveUser).toHaveBeenCalledTimes(1)
+    expect(usersMock.saveUser.mock.calls[0][0].features).toEqual({ lending: false, games: true })
   })
 })

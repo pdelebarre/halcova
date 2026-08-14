@@ -41,12 +41,17 @@ function sanitizePlan(value) {
 // Only these per-account feature flags exist. Anything a client sends that
 // isn't in this list is dropped, and every value is coerced to a boolean — a
 // client can never smuggle arbitrary feature payloads onto a user record.
-const KNOWN_FEATURES = ['lending']
+// `lending` = loan-out dashboard (W3); `games` = the Play surface (persona,
+// quiz, XP, shelf stories — Phase 1 § Play).
+export const KNOWN_FEATURES = ['lending', 'games']
 
-// Accepts body.features (e.g. { lending: true }) and returns the complete
-// known-features map, every value coerced to a boolean:
-//   { lending: false }  when missing/empty or all-false.
-function sanitizeFeatures(features) {
+// Accepts body.features (e.g. { lending: true, games: true }) and returns the
+// complete known-features map, every value coerced to a boolean:
+//   { lending: false, games: false }  when missing/empty or all-false.
+// NOTE: the map is rebuilt from whatever is sent, so a client must send the
+// FULL map it wants to persist — toggling one flag must not silently drop the
+// others (see AdminPanel.toggleFeature / toggleGames, which always send both).
+export function sanitizeFeatures(features) {
   const result = {}
   for (const key of KNOWN_FEATURES) result[key] = !!features?.[key]
   return result

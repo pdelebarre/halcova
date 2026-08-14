@@ -119,8 +119,9 @@ async function profileForCode(code) {
       collections: { records: true, books: true },
       // The owner has every feature flag on by default (W3), mirroring
       // authorize() in _shared/collection-store.js — so the client can read
-      // session.user.features.lending === true for the owner too.
-      features: { lending: true },
+      // session.user.features.lending === true and
+      // session.user.features.games === true for the owner too.
+      features: { lending: true, games: true },
       role: 'admin',
       status: 'active',
     }

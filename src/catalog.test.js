@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recordsCatalog, booksCatalog, GAMIFICATION_ENABLED } from './catalog'
+import { recordsCatalog, booksCatalog } from './catalog'
 
 describe('recordsCatalog', () => {
   it('is shaped for records and the crate flow', () => {
@@ -82,9 +82,9 @@ describe('booksCatalog', () => {
 })
 
 describe('gamification (Phase 1 § Play)', () => {
-  it('is feature-flagged OFF by default so nothing ships until validated', () => {
-    expect(GAMIFICATION_ENABLED).toBe(false)
-  })
+  // The Play surface is NOT a compile-time flag anymore: it is gated per
+  // account by the admin-granted `features.games` entitlement (App.jsx reads
+  // `user.features?.games`; see App.test.jsx for the gating cases).
 
   it('exposes a Play nav label and persona copy on both catalogs', () => {
     for (const catalog of [recordsCatalog, booksCatalog]) {

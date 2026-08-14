@@ -290,6 +290,8 @@ const de = {
   'lending.historyReturned': 'Returned {date}',
   'lending.featureLabel': 'Lending',
   'lending.featureHint': 'Let this member lend items and track who has them.',
+  'games.featureLabel': 'Spiele',
+  'games.featureHint': 'Schalte den Play-Hub frei — Persona, Quiz, XP, Regalgeschichten — für dieses Mitglied.',
   'lending.notEnabled': "Lending isn't enabled for your account.",
   'lending.loans': 'Loans',
   'lending.dashboardTitle': 'On loan',

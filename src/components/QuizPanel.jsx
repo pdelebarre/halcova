@@ -22,7 +22,8 @@ import './QuizPanel.css'
  *   - Wrong answers reveal the real answer + the item's dateAdded + notes
  *     (copy-bank §3) — never fabricated when notes/date are missing.
  *
- * Rendered inside the Play hub (PlayPanel) when GAMIFICATION_ENABLED is on.
+ * Rendered inside the Play hub (PlayPanel), which is gated by the member's
+ * admin-granted `features.games` entitlement.
  * `today` is injectable for deterministic tests; it defaults to device time.
  */
 export default function QuizPanel({ items = [], catalog, today }) {

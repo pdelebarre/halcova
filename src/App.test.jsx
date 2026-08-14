@@ -60,4 +60,20 @@ describe('App auth gating', () => {
     render(<App />)
     expect(await screen.findByText(/doesn't include any collections yet/)).toBeInTheDocument()
   })
+
+  // Gamification (Phase 1 § Play): the Play entry is a per-account entitlement
+  // (`features.games`), admin-granted — not a compile-time flag.
+  it('shows the Play entry for a member with the games entitlement', async () => {
+    mockSignedIn({ id: 'u1', name: 'Ada', role: 'member', collections: { records: true, books: true }, features: { games: true } })
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Play' })).toBeInTheDocument()
+  })
+
+  it('hides the Play entry without the games entitlement', async () => {
+    // Has lending but NOT games — the Play surface must stay hidden.
+    mockSignedIn({ id: 'u1', name: 'Ada', role: 'member', collections: { records: true, books: true }, features: { lending: true } })
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Records' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument()
+  })
 })

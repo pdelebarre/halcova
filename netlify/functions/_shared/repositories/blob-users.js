@@ -7,17 +7,22 @@
 //
 // Layout inside the single "runout-identity" store:
 //   user:<id>      -> { id, name, email, code, collections:{records,books},
-//                       features:{lending},   // per-account capability flags; off by default
+//                       features:{lending,games}, // per-account capability flags; off by default
 //                       plan:'free'|'unlimited', // free-tier plan; defaults to 'free'
 //                       role:'admin'|'member', status:'active'|'disabled', createdAt }
 //   request:<id>   -> { id, name, email, status:'pending'|'approved'|'rejected', createdAt }
 //   index:users    -> ordered list of user ids
 //   index:requests -> ordered list of request ids
 //
-// `features` is a map of per-account capability flags (currently only
-// `{ lending: boolean }`). New members start without it (absent/false) — the
-// admin grants `features.lending` via approve / updateUser (see admin.js);
-// the owner always has `features: { lending: true }` (see authorize()).
+// `features` is a map of per-account capability flags (`{ lending: boolean,
+// games: boolean }`). New members start without them (absent/false) — the
+// admin grants them via approve / updateUser (see admin.js); the owner always
+// has every flag on: `features: { lending: true, games: true }` (see
+// authorize() in collection-store.js / profileForCode in auth.js).
+//
+// IMPORTANT: updateUser REPLACES the whole map with what the client sends
+// (sanitizeFeatures rebuilds it), so feature toggles must send the FULL map or
+// they silently wipe the other flag.
 //
 // `plan` is the free-tier plan: new members are stamped `'free'` on approve
 // (see admin.js) and reads default to `'free'` when the field is absent (no
