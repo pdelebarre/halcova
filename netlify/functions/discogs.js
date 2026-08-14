@@ -8,6 +8,7 @@ import { getStore } from '@netlify/blobs'
 import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
 import { findUserByCode } from './_shared/users'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { handleCover } from './_shared/cover'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 // Discogs policy requires a User-Agent header on every request.
@@ -135,17 +136,26 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
 }
 
 export default async (req) => {
-  const { user, error } = await authorize(req)
-  if (error) return error
+  const url = new URL(req.url)
+  const action = url.searchParams.get('action')
 
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
+
+  // Cover images are loaded by <img> tags, which cannot send the access-code
+  // Authorization header — so this action is deliberately PUBLIC (T6). It is
+  // safe because handleCover only ever fetches small images from an explicit
+  // host allowlist (https-only, size-capped). Every other action stays
+  // authenticated below.
+  if (action === 'cover') {
+    return handleCover(url.searchParams, getStore(CACHE_STORE))
+  }
+
+  const { user, error } = await authorize(req)
+  if (error) return error
 
   // Members/owner key provider limits by user id; the shared demo identity is
   // keyed by client IP so one demo visitor can't throttle every other.
   const identity = rateLimitIdentity(user, req)
-
-  const url = new URL(req.url)
-  const action = url.searchParams.get('action')
 
   if (action === 'searchBarcode') {
     const barcode = cleanDigits(url.searchParams.get('barcode'))

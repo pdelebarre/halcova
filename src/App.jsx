@@ -7,6 +7,7 @@ import DemoBanner from './components/DemoBanner'
 import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
+import ErrorBoundary from './components/ErrorBoundary'
 import { recordsCatalog, booksCatalog } from './catalog'
 import { useAuth } from './hooks/useAuth'
 import { t } from './i18n'
@@ -92,20 +93,25 @@ export default function App() {
           or edit. Leaving the demo signs out back to the auth screen. */}
       {isDemo && <DemoBanner onLeave={logout} />}
 
-      {/* keyed by kind so each collection remounts fresh when you switch tabs */}
-      <CollectionView
-        key={catalog.kind}
-        catalog={catalog}
-        onRequestSettings={() => setSettingsOpen(true)}
-        lendingEnabled={lendingEnabled}
-        onOpenLoans={() => setLoansOpen(true)}
-        refreshTick={refreshTick}
-        loansButtonRef={loansButtonRef}
-        plan={plan}
-        isFree={isFree}
-        isDemo={isDemo}
-        user={user}
-      />
+      {/* keyed by kind so each collection remounts fresh when you switch tabs.
+          The boundary shares the key so switching tabs also clears an error
+          state — a failure in one collection never blanks the header/nav or
+          poisons the other tab. */}
+      <ErrorBoundary key={`boundary-${catalog.kind}`}>
+        <CollectionView
+          key={catalog.kind}
+          catalog={catalog}
+          onRequestSettings={() => setSettingsOpen(true)}
+          lendingEnabled={lendingEnabled}
+          onOpenLoans={() => setLoansOpen(true)}
+          refreshTick={refreshTick}
+          loansButtonRef={loansButtonRef}
+          plan={plan}
+          isFree={isFree}
+          isDemo={isDemo}
+          user={user}
+        />
+      </ErrorBoundary>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}

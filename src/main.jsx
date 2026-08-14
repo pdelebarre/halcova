@@ -21,15 +21,22 @@ import '@fontsource/ibm-plex-mono/latin-ext-400.css'
 import '@fontsource/ibm-plex-mono/latin-ext-500.css'
 import '@fontsource/ibm-plex-mono/latin-ext-600.css'
 import App from './App.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import UpdateNotice from './components/UpdateNotice.jsx'
 import { LocaleProvider } from './i18n'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <LocaleProvider>
-      <App />
-      {/* Uses t(), so it must live inside LocaleProvider. */}
-      <UpdateNotice />
-    </LocaleProvider>
+    {/* Top-level safety net (T7): a render error anywhere below must never
+        unmount React to a dark blank screen. CollectionView gets its own
+        boundary too (App.jsx) so a collection-specific failure doesn't take
+        down the shell/nav. */}
+    <ErrorBoundary>
+      <LocaleProvider>
+        <App />
+        {/* Uses t(), so it must live inside LocaleProvider. */}
+        <UpdateNotice />
+      </LocaleProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )

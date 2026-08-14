@@ -196,6 +196,13 @@ const en = {
   'err.googleFailed': 'Google Books request failed.',
   'err.couldNotRefreshSession': 'Could not refresh session',
 
+  // §12b Error boundary (T7) — the last-resort fallback shown instead of a
+  // dark blank screen when an uncaught render error takes down a subtree.
+  'error.title': 'Something went wrong',
+  'error.message': "The app hit an unexpected error. Your collection is safe.",
+  'error.reload': 'Reload',
+  'error.reported': 'This error has been reported.',
+
   // §13 Catalog copy bridge — these are consumed by catalog.copy functions
   'catalog.emptyTitle': 'Your collection is empty',
   'catalog.emptySub': 'Scan a barcode to catalog your first item.',

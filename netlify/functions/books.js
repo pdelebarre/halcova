@@ -16,6 +16,7 @@ import { getStore } from '@netlify/blobs'
 import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
 import { findUserByCode } from './_shared/users'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { handleCover } from './_shared/cover'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -209,6 +210,16 @@ async function lookup(store, lookupSpec, ttlMs, identity) {
 export default async (req) => {
   const url = new URL(req.url)
   const action = url.searchParams.get('action')
+
+  // Cover images are loaded by <img> tags, which cannot send the access-code
+  // Authorization header — so this action is deliberately PUBLIC (T6). It is
+  // safe because handleCover only ever fetches small images from an explicit
+  // host allowlist (https-only, size-capped). Every other action stays
+  // authenticated below.
+  if (action === 'cover') {
+    if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
+    return handleCover(url.searchParams, getStore(CACHE_STORE))
+  }
 
   const { user, error } = await authorize(req)
   if (error) return error
