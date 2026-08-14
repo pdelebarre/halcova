@@ -43,14 +43,26 @@ export function bearer(req) {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : ''
 }
 
-// Strip sensitive fields (the access code AND its sha256 hash) before sending
-// a user to the client. Everything else — including the per-account `features`
-// flag map — passes through untouched, so the client can read
-// session.user.features.lending. The client only ever needs the plaintext code
-// it was issued, which it already holds in localStorage.runout.session.
+// Fields that must NEVER reach the client: the access code, its sha256 hash,
+// and the three Stripe billing ids (ADR-0003 §2.5). Everything else —
+// including the per-account `features` flag map, `plan`, and `planExpiresAt` —
+// passes through untouched, so the client can read session.user.features.lending
+// and session.user.plan. The client only ever needs the plaintext code it was
+// issued, which it already holds in localStorage.runout.session.
+const SECRET_FIELDS = new Set([
+  'code',
+  'code_hash',
+  'stripeCustomerId',
+  'stripeSubscriptionId',
+  'stripeCheckoutSessionId',
+])
+
 export function publicUser(user) {
   if (!user) return null
-  const { code: _code, code_hash: _hash, ...rest } = user
+  const rest = {}
+  for (const key of Object.keys(user)) {
+    if (!SECRET_FIELDS.has(key)) rest[key] = user[key]
+  }
   return rest
 }
 

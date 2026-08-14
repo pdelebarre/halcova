@@ -58,8 +58,18 @@ describe('saveUser / getUser / listUsers — hashed code, exact blob shape other
     await repo.saveUser(MEMBER)
     const got = await repo.getUser('u1')
     // A Postgres-backed user never carries `code` (or `code_hash`) — the
-    // client only ever holds the code it was issued.
-    expect(got).toEqual({ ...MEMBER, code: undefined })
+    // client only ever holds the code it was issued. The S2 nullable billing
+    // fields default to null (columns don't exist until S3's migration), so
+    // the read shape matches the Blobs normalizeUser exactly.
+    expect(got).toEqual({
+      ...MEMBER,
+      code: undefined,
+      planExpiresAt: null,
+      planChangedAt: null,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      stripeCheckoutSessionId: null,
+    })
     expect(got).not.toHaveProperty('code_hash')
     expect(got.plan).toBe('free')
     expect(got.features).toEqual({ lending: true })
@@ -76,6 +86,19 @@ describe('saveUser / getUser / listUsers — hashed code, exact blob shape other
     expect(got.plan).toBe('free')
     expect(got.features).toEqual({})
     expect(got.collections).toEqual({})
+  })
+
+  it('defaults the S2 nullable billing fields to null on rows without them (no migration)', async () => {
+    // The S3 columns don't exist yet — a Postgres row reads back with every
+    // new field null, exactly like the Blobs normalizeUser, so old rows read
+    // cleanly across both backends (ADR-0003 §2.3).
+    await repo.saveUser(MEMBER)
+    const got = await repo.getUser('u1')
+    expect(got.planExpiresAt).toBeNull()
+    expect(got.planChangedAt).toBeNull()
+    expect(got.stripeCustomerId).toBeNull()
+    expect(got.stripeSubscriptionId).toBeNull()
+    expect(got.stripeCheckoutSessionId).toBeNull()
   })
 
   it('lists users and returns null for a missing id', async () => {
@@ -178,5 +201,75 @@ describe('requests — save/list/get/remove/findPendingRequestByEmail', () => {
     await repo.saveRequest(REQ)
     expect(await repo.removeRequest('r1')).toBe(true)
     expect(await repo.listRequests()).toEqual([])
+  })
+})
+
+// ---- S3 billing columns + webhook idempotency (migration 003) --------------
+
+describe('S3 billing fields — round-trip, preserve-on-undefined, Stripe lookups', () => {
+  const BILLED = {
+    ...MEMBER,
+    plan: 'premium',
+    planExpiresAt: '2027-08-14T00:00:00.000Z',
+    planChangedAt: '2026-08-14T00:00:00.000Z',
+    stripeCustomerId: 'cus_123',
+    stripeSubscriptionId: 'sub_1',
+    stripeCheckoutSessionId: 'cs_test_1',
+  }
+
+  it('round-trips the billing columns through the real 003 migration', async () => {
+    await repo.saveUser(BILLED)
+    const got = await repo.getUser('u1')
+    expect(got.planExpiresAt).toBe('2027-08-14T00:00:00.000Z')
+    expect(got.planChangedAt).toBe('2026-08-14T00:00:00.000Z')
+    expect(got.stripeCustomerId).toBe('cus_123')
+    expect(got.stripeSubscriptionId).toBe('sub_1')
+    expect(got.stripeCheckoutSessionId).toBe('cs_test_1')
+    // Still never leaks the code / hash.
+    expect(got).not.toHaveProperty('code')
+    expect(got).not.toHaveProperty('code_hash')
+  })
+
+  it('preserves existing billing fields on an update that does not carry them (undefined = keep)', async () => {
+    await repo.saveUser(BILLED)
+    // An admin update touching only collections must NOT wipe the billing ids.
+    await repo.saveUser({ ...BILLED, collections: { records: true, books: false }, planExpiresAt: undefined, stripeSubscriptionId: undefined })
+    const got = await repo.getUser('u1')
+    expect(got.collections).toEqual({ records: true, books: false })
+    expect(got.stripeSubscriptionId).toBe('sub_1')
+    expect(got.stripeCustomerId).toBe('cus_123')
+    expect(got.stripeCheckoutSessionId).toBe('cs_test_1')
+    expect(got.planExpiresAt).toBe('2027-08-14T00:00:00.000Z')
+  })
+
+  it('clears a billing field on an explicit null (subscription.deleted downgrade)', async () => {
+    await repo.saveUser(BILLED)
+    await repo.saveUser({ ...BILLED, plan: 'free', planExpiresAt: null })
+    const got = await repo.getUser('u1')
+    expect(got.plan).toBe('free')
+    expect(got.planExpiresAt).toBeNull()
+    // The billing ids survive the downgrade (idempotency + the portal).
+    expect(got.stripeSubscriptionId).toBe('sub_1')
+    expect(got.stripeCustomerId).toBe('cus_123')
+  })
+
+  it('resolves a user by checkout session id (O(1) unique index)', async () => {
+    await repo.saveUser(BILLED)
+    expect(await repo.findUserByStripeSession('cs_test_1')).toMatchObject({ id: 'u1', plan: 'premium' })
+    expect(await repo.findUserByStripeSession('cs_nope')).toBeNull()
+    expect(await repo.findUserByStripeSession('')).toBeNull()
+  })
+
+  it('resolves a user by subscription id (O(1) unique index)', async () => {
+    await repo.saveUser(BILLED)
+    expect(await repo.findUserByStripeSubscription('sub_1')).toMatchObject({ id: 'u1' })
+    expect(await repo.findUserByStripeSubscription('sub_nope')).toBeNull()
+  })
+
+  it('the unique session index rejects a second user claiming the same session id', async () => {
+    await repo.saveUser(BILLED)
+    // A racing webhook delivery must not create a second account for the same
+    // checkout session — the unique index (003) makes the insert fail.
+    await expect(repo.saveUser({ ...BILLED, id: 'u2', email: 'other@example.com' })).rejects.toThrow()
   })
 })

@@ -8,7 +8,10 @@
 // Layout inside the single "runout-identity" store:
 //   user:<id>      -> { id, name, email, code, collections:{records,books},
 //                       features:{lending,games}, // per-account capability flags; off by default
-//                       plan:'free'|'unlimited', // free-tier plan; defaults to 'free'
+//                       plan:'free'|'premium'|'lifetime'|'unlimited', // defaults to 'free'
+//                       planExpiresAt?, planChangedAt?,                  // nullable billing fields (S2)
+//                       stripeCustomerId?, stripeSubscriptionId?,         // nullable billing fields (S2)
+//                       stripeCheckoutSessionId?,                        // nullable billing field (S2)
 //                       role:'admin'|'member', status:'active'|'disabled', createdAt }
 //   request:<id>   -> { id, name, email, status:'pending'|'approved'|'rejected', createdAt }
 //   index:users    -> ordered list of user ids
@@ -24,10 +27,13 @@
 // (sanitizeFeatures rebuilds it), so feature toggles must send the FULL map or
 // they silently wipe the other flag.
 //
-// `plan` is the free-tier plan: new members are stamped `'free'` on approve
-// (see admin.js) and reads default to `'free'` when the field is absent (no
-// record migration needed). The owner is implicitly unlimited (planLimitFor
-// in _shared/plans.js).
+// `plan` is the plan enum (ADR-0003 §2.3): new members are stamped `'free'` on
+// approve (see admin.js) and reads default to `'free'` when the field is
+// absent (no record migration needed). The owner is implicitly uncapped
+// (planLimitFor in _shared/plans.js). The billing/plan-expiry fields are
+// nullable and additive (S2): old records lack them and reads default them to
+// null via normalizeUser; they are written by the S3 payment webhook, never by
+// S2.
 //
 // Access codes are stored in plaintext so an admin can re-reveal a lost code
 // from the admin panel. The blob store is private to the site; this is an
@@ -42,6 +48,10 @@ const REQUEST_PREFIX = 'request:'
 const USERS_INDEX = 'index:users'
 const REQUESTS_INDEX = 'index:requests'
 const CODE_INDEX_PREFIX = 'code:'
+// S3 (ADR-0003 §2.5): O(1) webhook-idempotency indexes, mirroring the code:
+// pattern — stripe:session:<id> / stripe:subscription:<id> → userId.
+const STRIPE_SESSION_INDEX_PREFIX = 'stripe:session:'
+const STRIPE_SUBSCRIPTION_INDEX_PREFIX = 'stripe:subscription:'
 
 const identity = () => getStore(IDENTITY_STORE)
 
@@ -68,12 +78,23 @@ async function removeRecord(prefix, indexKey, id) {
 
 // ---- Users ----
 
-// Every stored user may predate the `plan` field (no migration was run), so
-// reads normalize it here — the single choke point every user read flows
-// through (listUsers feeds findUserByCode, and getUser covers direct lookups).
+// Every stored user may predate the `plan` field and the billing fields (no
+// migration was run), so reads normalize them here — the single choke point
+// every user read flows through (listUsers feeds findUserByCode, and getUser
+// covers direct lookups). `plan` defaults to 'free'; the nullable billing/
+// plan-expiry fields (ADR-0003 §2.3, S2 — written by the S3 payment webhook)
+// default to null when absent, so old Blobs records read cleanly.
 function normalizeUser(user) {
   if (!user) return null
-  return { ...user, plan: user.plan || 'free' }
+  return {
+    ...user,
+    plan: user.plan || 'free',
+    planExpiresAt: user.planExpiresAt ?? null,
+    planChangedAt: user.planChangedAt ?? null,
+    stripeCustomerId: user.stripeCustomerId ?? null,
+    stripeSubscriptionId: user.stripeSubscriptionId ?? null,
+    stripeCheckoutSessionId: user.stripeCheckoutSessionId ?? null,
+  }
 }
 
 export const listUsers = async () => (await listRecords(USER_PREFIX, USERS_INDEX)).map(normalizeUser)
@@ -101,22 +122,61 @@ async function deleteCodeIndex(code) {
   await identity().delete(`${CODE_INDEX_PREFIX}${norm}`)
 }
 
-// Save a user and keep the access-code index in sync. When a code changes
-// (approve mints a fresh code; a future rotate path re-stamps one), the old
-// `code:` key is dropped and the new one written. Users without a code (the
-// owner is never stored) skip the index entirely.
+// ---- Stripe idempotency indexes (S3, ADR-0003 §2.5) ----
+//
+// Same pattern as the code index: `stripe:session:<id>` /
+// `stripe:subscription:<id>` → userId, so the webhook's check-before-create is
+// a single blob read. Maintained by saveUser (on materialization / upgrade) and
+// removed by removeUserRecord.
+
+async function setStripeSessionIndex(userId, sessionId) {
+  if (!sessionId) return
+  await identity().setJSON(`${STRIPE_SESSION_INDEX_PREFIX}${sessionId}`, userId)
+}
+
+async function deleteStripeSessionIndex(sessionId) {
+  if (!sessionId) return
+  await identity().delete(`${STRIPE_SESSION_INDEX_PREFIX}${sessionId}`)
+}
+
+async function setStripeSubscriptionIndex(userId, subscriptionId) {
+  if (!subscriptionId) return
+  await identity().setJSON(`${STRIPE_SUBSCRIPTION_INDEX_PREFIX}${subscriptionId}`, userId)
+}
+
+async function deleteStripeSubscriptionIndex(subscriptionId) {
+  if (!subscriptionId) return
+  await identity().delete(`${STRIPE_SUBSCRIPTION_INDEX_PREFIX}${subscriptionId}`)
+}
+
+// Save a user and keep the access-code + Stripe indexes in sync. When a code
+// changes (approve mints a fresh code; a future rotate path re-stamps one), the
+// old `code:` key is dropped and the new one written. When a Stripe billing id
+// changes (a user re-purchases / a new subscription id is assigned), the old
+// `stripe:*:` key is dropped and the new one written. Users without a code
+// (the owner is never stored) skip the index entirely.
 export async function saveUser(user) {
   const existing = await getUser(user.id)
   const oldCode = normalizeCode(existing?.code)
   const newCode = normalizeCode(user?.code)
+  const oldSession = existing?.stripeCheckoutSessionId
+  const newSession = user?.stripeCheckoutSessionId
+  const oldSubscription = existing?.stripeSubscriptionId
+  const newSubscription = user?.stripeSubscriptionId
   await saveRecord(USER_PREFIX, USERS_INDEX, user)
   if (oldCode && oldCode !== newCode) await deleteCodeIndex(oldCode)
   if (newCode) await setCodeIndex(user.id, user.code)
+  if (oldSession && oldSession !== newSession) await deleteStripeSessionIndex(oldSession)
+  if (newSession) await setStripeSessionIndex(user.id, newSession)
+  if (oldSubscription && oldSubscription !== newSubscription) await deleteStripeSubscriptionIndex(oldSubscription)
+  if (newSubscription) await setStripeSubscriptionIndex(user.id, newSubscription)
 }
 
 export async function removeUserRecord(id) {
   const existing = await getUser(id)
   if (existing?.code) await deleteCodeIndex(existing.code)
+  if (existing?.stripeCheckoutSessionId) await deleteStripeSessionIndex(existing.stripeCheckoutSessionId)
+  if (existing?.stripeSubscriptionId) await deleteStripeSubscriptionIndex(existing.stripeSubscriptionId)
   await removeRecord(USER_PREFIX, USERS_INDEX, id)
 }
 
@@ -152,6 +212,41 @@ export async function findUserByCode(code) {
   }
   return match
 }
+
+// ---- Stripe idempotency lookups (S3, ADR-0003 §2.5) ----
+//
+// Resolve a member by a Stripe billing id — O(1) via the `stripe:*:` indexes
+// (single blob read), with the same lazy-backfill fallback as findUserByCode so
+// pre-S3 stores keep working. Returns the full user record via getUser (plan
+// normalized to 'free' when absent).
+
+async function findByStripeIndex(prefix, id, readValue) {
+  if (!id) return null
+  const store = identity()
+  let userId = null
+  try {
+    userId = await store.get(`${prefix}${id}`, { type: 'json' })
+  } catch {
+    userId = null
+  }
+  if (userId) {
+    const user = await getUser(userId)
+    if (user && String(readValue(user) || '') === String(id)) return user
+  }
+  const users = await listUsers()
+  const match = users.find((u) => String(readValue(u) || '') === String(id)) || null
+  if (match) {
+    try { await store.setJSON(`${prefix}${id}`, match.id) } catch { /* best-effort */ }
+  }
+  return match
+}
+
+export const findUserByStripeSession = (id) => findByStripeIndex(
+  STRIPE_SESSION_INDEX_PREFIX, id, (u) => u.stripeCheckoutSessionId,
+)
+export const findUserByStripeSubscription = (id) => findByStripeIndex(
+  STRIPE_SUBSCRIPTION_INDEX_PREFIX, id, (u) => u.stripeSubscriptionId,
+)
 
 // ---- Signup requests ----
 
