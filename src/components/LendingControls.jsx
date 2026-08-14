@@ -52,7 +52,7 @@ function buildStatus(item, lending) {
   }
 }
 
-export default function LendingControls({ item, catalog, lendingEnabled, onLend, onReturn, showToast }) {
+export default function LendingControls({ item, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, onOpenPaywall }) {
   const lending = catalog?.copy?.lending || {}
 
   const [formOpen, setFormOpen] = useState(false)
@@ -82,7 +82,25 @@ export default function LendingControls({ item, catalog, lendingEnabled, onLend,
   useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
 
   // No error boundary in this app — don't render anything when the flag is off.
-  if (!lendingEnabled) return null
+  if (!lendingEnabled) {
+    // S6 gated affordance: a free member sees a "Lending is Premium" entry
+    // that opens the paywall (reason 'feature'). Demo visitors and anyone else
+    // without the gate get nothing, exactly as before.
+    if (!lendingGate) return null
+    return (
+      <div className="lending-gate">
+        <p className="lending-gate-title">{lending.featureLabel || 'Lending'}</p>
+        <p className="lending-gate-body">{t('lending.notEnabled')}</p>
+        <button
+          type="button"
+          className="btn btn-primary btn-block"
+          onClick={() => onOpenPaywall?.({ reason: 'feature', feature: 'lending' })}
+        >
+          {t('paywall.cta')}
+        </button>
+      </div>
+    )
+  }
 
   const isOut = !!item.lending
   const status = buildStatus(item, lending)
@@ -113,8 +131,16 @@ export default function LendingControls({ item, catalog, lendingEnabled, onLend,
       setContact('')
       setDueDate('')
       setNameError(false)
-    } catch {
-      notify(t('view.couldNotSave'), 'error')
+    } catch (err) {
+      // Defensive: if the server rejects a lend because lending isn't entitled
+      // (e.g. a plan expired mid-session), surface the paywall rather than a
+      // generic save error.
+      if (err?.code === 'PAYMENT_REQUIRED') {
+        onOpenPaywall?.({ reason: 'feature', feature: 'lending' })
+        notify(t('lending.notEnabled'), 'error')
+      } else {
+        notify(t('view.couldNotSave'), 'error')
+      }
     } finally {
       setBusy(false)
     }

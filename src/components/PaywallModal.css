@@ -1,0 +1,38 @@
+/* Paywall bottom sheet (ADR-0003 S6). Reuses the shared `.sheet`/`.btn-*`
+   classes from styles/shared.css; this only styles the paywall-specific
+   body rows and the checkout error/price lines. */
+
+.paywall-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.paywall-copy {
+  color: var(--jacket-kraft);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.paywall-price {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--runout-gold);
+  letter-spacing: 0.02em;
+}
+
+/* Inline checkout error — friendly, retryable, never a dark screen. */
+.paywall-error {
+  color: var(--danger);
+  font-size: 13.5px;
+  line-height: 1.4;
+  border: 1px solid rgba(194, 75, 63, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: rgba(194, 75, 63, 0.08);
+}
+
+.paywall-actions .btn {
+  min-height: 48px; /* ≥44px touch target, thumb-reachable row */
+}

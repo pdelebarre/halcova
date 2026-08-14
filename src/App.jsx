@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
 import CreditModal from './components/CreditModal'
@@ -7,16 +7,42 @@ import DemoBanner from './components/DemoBanner'
 import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
+import PaywallModal from './components/PaywallModal'
 import ErrorBoundary from './components/ErrorBoundary'
 import { recordsCatalog, booksCatalog } from './catalog'
+import * as authApi from './api/auth'
+import * as paymentApi from './api/payment'
 import { useAuth } from './hooks/useAuth'
+import { getAccessCode } from './utils/session'
 import { t } from './i18n'
 import './App.css'
 
 const CATALOGS = { records: recordsCatalog, books: booksCatalog }
 
+// S2 entitlements (mirror of netlify/functions/_shared/entitlements.js): the
+// paid plans are uncapped and include lending. The server is authoritative;
+// this only mirrors `effectiveFeatures` so the client can gate the UI.
+const PAID_PLANS = new Set(['premium', 'lifetime', 'unlimited'])
+function isPaidPlan(user) {
+  return !!user && PAID_PLANS.has(user.plan)
+}
+
+// Remove a query param from the address bar without a reload — used to strip
+// one-time tokens (?magic-link= / ?session_id= / ?checkout=) after handling
+// so a reload doesn't re-verify or re-poll.
+function stripUrlParams(keys) {
+  const params = new URLSearchParams(window.location.search)
+  for (const key of keys) params.delete(key)
+  const qs = params.toString()
+  let url = window.location.pathname
+  if (qs) url += `?${qs}`
+  url += window.location.hash
+  window.history.replaceState({}, '', url)
+}
+function stripUrlParam(key) { stripUrlParams([key]) }
+
 export default function App() {
-  const { session, ready, login, logout, requestAccess } = useAuth()
+  const { session, ready, login, logout, requestAccess, refresh, setSession } = useAuth()
   const [tab, setTab] = useState('records')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
@@ -28,17 +54,145 @@ export default function App() {
   const [refreshTick, setRefreshTick] = useState(0)
   const loansButtonRef = useRef(null)
 
+  // S6 paywall: CollectionView reports WHY it's blocked ({ reason, kind,
+  // feature? }); App owns the modal and decides what to render.
+  const [paywall, setPaywall] = useState(null)
+  // App-level feedback for post-checkout / magic-link flows (toasts inside a
+  // collection stay local to CollectionView).
+  const [appToast, setAppToast] = useState(null)
+  const [confirmingPayment, setConfirmingPayment] = useState(false)
+  const [signingInViaLink, setSigningInViaLink] = useState(false)
+  const appToastTimer = useRef(null)
+  const pollTimerRef = useRef(null)
+  // Latest session, readable from the async paywall poll (a setState closure
+  // would go stale across the 2s polls).
+  const sessionRef = useRef(session)
+  useEffect(() => { sessionRef.current = session }, [session])
+
+  // Stable App toast: auto-dismissing feedback used by the magic-link and
+  // checkout-return flows above the collection shell.
+  const showAppToast = useCallback((msg, kind = 'add') => {
+    if (appToastTimer.current) clearTimeout(appToastTimer.current)
+    setAppToast({ msg, kind })
+    appToastTimer.current = setTimeout(() => setAppToast(null), 3200)
+  }, [])
+
   // Reset to the first collection when a different user signs in.
   useEffect(() => {
     setTab('records')
   }, [session?.user?.id])
+
+  // S1 self-serve signup (ADR-0003 §3): arriving via ?magic-link=<token> (the
+  // emailed one-time link) exchanges the token for a session — no password, no
+  // admin approval. verifyMagicLink() already persists the session to
+  // localStorage; we then sync React state so the shell mounts (equivalent to
+  // login() without a redundant server round-trip). The token is stripped from
+  // the URL so a reload doesn't re-verify.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('magic-link')
+    if (!token) return undefined
+    let cancelled = false
+    setSigningInViaLink(true)
+    authApi.verifyMagicLink({ token })
+      .then((user) => {
+        if (cancelled) return
+        stripUrlParam('magic-link')
+        setSession({ user, code: getAccessCode() })
+      })
+      .catch(() => {
+        if (cancelled) return
+        stripUrlParam('magic-link')
+        showAppToast(t('paywall.magicLinkError'), 'error')
+      })
+      .finally(() => { if (!cancelled) setSigningInViaLink(false) })
+    return () => { cancelled = true }
+  }, [setSession, showAppToast])
+
+  // S6 checkout return: Stripe's success URL lands as
+  // `?checkout=success&session_id=...` (the ?upgrade=success alias is also
+  // tolerated). Strip the params, then poll the S3 status endpoint (the
+  // self-healing path for webhook lag) — or me() when no session id is present
+  // — until the plan is paid, then success toast + refresh. Offline keeps the
+  // cached session (S5): the poll never signs the user out.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const params = new URLSearchParams(window.location.search)
+    const sessionId = params.get('session_id')
+    const isSuccess = params.get('checkout') === 'success' || params.get('upgrade') === 'success'
+    const isCancelled = params.get('checkout') === 'cancelled'
+    if (!isSuccess && !isCancelled && !sessionId) return undefined
+
+    stripUrlParams(['checkout', 'session_id', 'upgrade'])
+    if (isCancelled) return undefined
+
+    let cancelled = false
+    let attempts = 0
+    const MAX_ATTEMPTS = 15 // ~30s of 2s polls
+    const DELAY_MS = 2000
+    setConfirmingPayment(true)
+
+    const step = async () => {
+      attempts += 1
+      let paid = false
+      try {
+        if (sessionId) {
+          // S3 self-healing path: the status poll persists the session for a
+          // brand-new prospect and confirms an existing member's upgrade.
+          const data = await paymentApi.getCheckoutStatus(sessionId)
+          if (data?.status === 'complete') {
+            const nextUser = data.user || sessionRef.current?.user
+            if (nextUser) setSession({ user: nextUser, code: getAccessCode() })
+            await refresh()
+            paid = true
+          }
+        } else {
+          // No session id (?upgrade=success alone): poll me() until the plan
+          // flips to paid.
+          await refresh()
+          paid = isPaidPlan(sessionRef.current?.user)
+        }
+      } catch {
+        // Offline / transient — keep the cached session (S5) and keep polling.
+      }
+      if (cancelled) return
+      if (paid) {
+        setConfirmingPayment(false)
+        showAppToast(t('paywall.successToast'), 'add')
+        return
+      }
+      if (attempts >= MAX_ATTEMPTS) return // banner stays: "still confirming"
+      pollTimerRef.current = setTimeout(step, DELAY_MS)
+    }
+
+    step()
+    return () => {
+      cancelled = true
+      if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null }
+    }
+  }, [refresh, setSession, showAppToast])
 
   if (!ready) {
     return <div className="status-line">{t('common.loading')}</div>
   }
 
   if (!session) {
-    return <AuthScreen onLogin={login} onRequestAccess={requestAccess} />
+    // While a magic link is being verified, show a loading line instead of a
+    // flash of the auth screen. A prospect returning from a successful
+    // checkout sees the "still confirming" notice while the poll runs.
+    return (
+      <>
+        {confirmingPayment && (
+          <div className="paywall-notice" role="status" aria-live="polite">
+            <span>{t('paywall.stillPending')}</span>
+          </div>
+        )}
+        {signingInViaLink
+          ? <div className="status-line">{t('common.loading')}</div>
+          : <AuthScreen onLogin={login} onRequestAccess={requestAccess} />}
+      </>
+    )
   }
 
   const user = session.user
@@ -48,19 +202,33 @@ export default function App() {
 
   const catalog = CATALOGS[activeTab]
 
-  // Per-account capability flags (§ W6 / Phase 1 § Play): the admin grants
-  // them per member (user.features.lending / user.features.games). The owner
-  // has every flag on; demo visitors have none. Gate the lending controls and
-  // the Play surface respectively.
-  const lendingEnabled = !!user.features?.lending
-  const gamesEnabled = !!user.features?.games
-
   // Free tier & demo (ADR-0001). The owner/admin is implicitly unlimited; demo
   // visitors are read-only (no plan, no adds), so `isFree` is forced off for
   // them and only the demo banner/read-only UI applies.
   const isDemo = user.role === 'demo'
   const plan = user.role === 'admin' ? 'unlimited' : (user.plan || 'free')
-  const isFree = plan === 'free' && !isDemo
+
+  // S6 plan state. `planStatus` is derived client-side (the backend doesn't
+  // emit it): 'free' | 'active' | 'expired' | 'unlimited'. An expired premium
+  // counts as free so the cap gate still protects the server's limit, and the
+  // soft upgrade entry reads "renew". Every field is read defensively.
+  const planStatus = (() => {
+    if (!user?.plan || user.plan === 'free') return 'free'
+    if (user.role === 'admin' || user.plan === 'unlimited') return 'unlimited'
+    const exp = user.planExpiresAt ? new Date(user.planExpiresAt).getTime() : null
+    if (user.plan === 'premium' && exp && exp < Date.now()) return 'expired'
+    return 'active'
+  })()
+
+  // Per-account capability flags (§ W6 / Phase 1 § Play): lending is DERIVED
+  // from the plan (mirror of the server's effectiveFeatures) — any paid plan
+  // includes it, the admin always has it, and the admin's manual per-member
+  // `features.lending` override still works. Games stays an admin-granted
+  // per-account flag (unchanged).
+  const paidActive = isPaidPlan(user) && planStatus !== 'expired'
+  const lendingEnabled = !!(user.features?.lending || paidActive || user.role === 'admin')
+  const gamesEnabled = !!user.features?.games
+  const isFree = (plan === 'free' || planStatus === 'expired') && !isDemo
 
   if (!catalog) {
     // Signed in but no collections granted — shouldn't normally happen, but
@@ -76,6 +244,18 @@ export default function App() {
         </div>
       </div>
     )
+  }
+
+  // S6: open the paywall for the active collection. CollectionView reports the
+  // reason it's blocked; App owns the modal. The demo space (DEMO_READONLY)
+  // never upgrades, so the paywall is never reachable from the demo.
+  function openPaywall(p) {
+    if (isDemo) return
+    setPaywall({
+      reason: p?.reason || 'upgrade',
+      kind: p?.kind || activeTab,
+      feature: p?.feature,
+    })
   }
 
   return (
@@ -96,6 +276,15 @@ export default function App() {
           or edit. Leaving the demo signs out back to the auth screen. */}
       {isDemo && <DemoBanner onLeave={logout} />}
 
+      {/* S6 post-checkout notice: "still confirming" while the payment poll
+          runs — and it stays up on timeout so a slow webhook never looks lost. */}
+      {confirmingPayment && (
+        <div className="paywall-notice" role="status" aria-live="polite">
+          <span>{t('paywall.stillPending')}</span>
+          <button type="button" className="paywall-notice-close" onClick={() => setConfirmingPayment(false)} aria-label={t('common.close')}>✕</button>
+        </div>
+      )}
+
       {/* keyed by kind so each collection remounts fresh when you switch tabs.
           The boundary shares the key so switching tabs also clears an error
           state — a failure in one collection never blanks the header/nav or
@@ -107,9 +296,11 @@ export default function App() {
           onRequestSettings={() => setSettingsOpen(true)}
           lendingEnabled={lendingEnabled}
           onOpenLoans={() => setLoansOpen(true)}
+          onOpenPaywall={openPaywall}
           refreshTick={refreshTick}
           loansButtonRef={loansButtonRef}
           plan={plan}
+          planStatus={planStatus}
           isFree={isFree}
           isDemo={isDemo}
           user={user}
@@ -127,6 +318,25 @@ export default function App() {
           onLoanReturned={() => setRefreshTick((n) => n + 1)}
           returnFocusRef={loansButtonRef}
         />
+      )}
+
+      {/* S6 paywall: CollectionView reported why it's blocked — App renders the
+          bottom sheet with that reason + kind. */}
+      {paywall && (
+        <PaywallModal
+          kind={paywall.kind}
+          reason={paywall.reason}
+          feature={paywall.feature}
+          onClose={() => setPaywall(null)}
+        />
+      )}
+
+      {/* App-level toast for the magic-link / checkout-return flows. */}
+      {appToast && (
+        <div className={`toast toast-${appToast.kind}`} role="status" aria-live="polite">
+          <span className="toast-icon" aria-hidden="true">{appToast.kind === 'error' ? '✕' : '✓'}</span>
+          {appToast.msg}
+        </div>
       )}
     </>
   )
