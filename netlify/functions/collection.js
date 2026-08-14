@@ -93,6 +93,28 @@ async function handleBlobs(req, { user, collection, id, url }) {
       const existing = await store.get(`item:${id}`, { type: 'json' })
       if (!existing) return json(404, { error: 'Not found' })
       const patch = await req.json()
+
+      // S4 (#58): converting a wishlist item to owned ({ wishlist: false } on a
+      // stored wishlist item) is an ADD for cap purposes — it consumes the
+      // free-tier cap exactly like a POST. Without this a free-plan member at
+      // the cap could silently exceed it by converting wishlist items (only a
+      // client-side atLimit guard stopped it, and that can be bypassed). Count
+      // owned the same way the POST path does (ensureOwnedCount) and return
+      // 403 PLAN_LIMIT at/over the cap. Only the wishlist → owned direction is
+      // capped: owned → wishlist (delta -1) and all other edits/deletes stay
+      // uncapped, and paid plans / admin / owner are never affected
+      // (planLimitFor returns null).
+      const limit = planLimitFor(user)
+      if (limit != null && wishlistToggleDelta(patch, existing).delta === 1) {
+        const ownedCount = await ensureOwnedCount(store, readIndex)
+        if (ownedCount >= limit) {
+          return json(403, {
+            error: `You've reached the free plan limit of ${limit} items. Ask the admin to upgrade your plan.`,
+            code: 'PLAN_LIMIT',
+          })
+        }
+      }
+
       const updated = { ...existing, ...patch, id }
       await store.setJSON(`item:${id}`, updated)
       // A wishlist↔owned toggle changes the owned count; only adjust when the

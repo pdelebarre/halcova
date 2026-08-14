@@ -286,6 +286,87 @@ describe('owned-count transitions (T3)', () => {
   })
 })
 
+describe('convert-to-owned cap (S4 / #58)', () => {
+  it('blocks a free member at the cap from converting a wishlist item to owned (403 PLAN_LIMIT)', async () => {
+    seedMember({ plan: 'free' })
+    const store = collectionStore([{ id: 'w1', title: 'Wish - List', wishlist: true }])
+    store.data.set('count:owned', 10) // free plan limit
+
+    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false })
+    expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body.code).toBe('PLAN_LIMIT')
+    expect(body.error).toContain('free plan limit of 10')
+    // Nothing changed: the item stays a wishlist item, the count is untouched.
+    expect(store.data.get('item:w1').wishlist).toBe(true)
+    expect(store.data.get('count:owned')).toBe(10)
+  })
+
+  it('allows the conversion below the cap and raises the owned count', async () => {
+    seedMember({ plan: 'free' })
+    const store = collectionStore([{ id: 'w1', title: 'Wish - List', wishlist: true }])
+    store.data.set('count:owned', 9)
+
+    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false })
+    expect(res.status).toBe(200)
+    expect(store.data.get('item:w1').wishlist).toBe(false)
+    expect(store.data.get('count:owned')).toBe(10)
+  })
+
+  it('lazily backfills the owned count from the index when the key is missing', async () => {
+    seedMember({ plan: 'free' })
+    // A pre-Phase-0 store: 10 owned items (no wishlist field = owned) + 1
+    // wishlist item, and NO count:owned key yet.
+    const owned = items(Array.from({ length: 10 }, (_, i) => `r${i}`))
+    const store = collectionStore([...owned, { id: 'w1', title: 'Wish - List', wishlist: true }])
+
+    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false })
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('PLAN_LIMIT')
+    // The backfill ran from the index and persisted the count.
+    expect(store.data.get('count:owned')).toBe(10)
+  })
+
+  it('never blocks a paid plan (premium) from converting at/over the cap', async () => {
+    seedMember({ plan: 'premium' })
+    const store = collectionStore([{ id: 'w1', title: 'Wish - List', wishlist: true }])
+    store.data.set('count:owned', 25)
+
+    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false })
+    expect(res.status).toBe(200)
+    expect(store.data.get('item:w1').wishlist).toBe(false)
+  })
+
+  it('never blocks the owner (admin key) from converting', async () => {
+    const store = createStore()
+    stores['runout-collection'] = store // owner's legacy store
+    store.data.set('index', ['w1'])
+    store.data.set('item:w1', { id: 'w1', title: 'Wish - List', wishlist: true })
+    store.data.set('count:owned', 50)
+
+    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false }, `Bearer ${ADMIN_KEY}`)
+    expect(res.status).toBe(200)
+    expect(store.data.get('item:w1').wishlist).toBe(false)
+    expect(store.data.get('count:owned')).toBe(51)
+  })
+
+  it('leaves owned → wishlist and notes-only edits uncapped', async () => {
+    seedMember({ plan: 'free' })
+    const store = collectionStore([{ id: 'r1', title: 'Owned', wishlist: false }])
+    store.data.set('count:owned', 10)
+
+    // owned -> wishlist drops the count and is never blocked.
+    let res = await call('PUT', '?collection=records&id=r1', { wishlist: true })
+    expect(res.status).toBe(200)
+    expect(store.data.get('count:owned')).toBe(9)
+
+    // notes-only edit at the cap is allowed.
+    res = await call('PUT', '?collection=records&id=r1', { notes: 'reissue' })
+    expect(res.status).toBe(200)
+    expect(store.data.get('count:owned')).toBe(9)
+  })
+})
+
 describe('per-user list cache (T4)', () => {
   it('serves a fresh cached list without re-reading the index or item blobs', async () => {
     seedMember()
