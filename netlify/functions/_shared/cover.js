@@ -69,7 +69,16 @@ export async function fetchCoverImage(url) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), COVER_TIMEOUT_MS)
   try {
-    const res = await fetch(url, { signal: controller.signal })
+    // SSRF guard (H1): never follow redirects. `redirect: 'manual'` surfaces
+    // any 3xx as the raw response, which we reject below — otherwise a 3xx
+    // could point this PUBLIC proxy at an off-allowlist host. The allowlist
+    // in handleCover only ever validates the INITIAL url, so the only url we
+    // ever fetch must be that same allowlisted url. Legit CDN covers don't
+    // redirect, so there is no legitimate redirect to support.
+    const res = await fetch(url, { redirect: 'manual', signal: controller.signal })
+    if (res.status >= 300 && res.status < 400) {
+      return { error: { status: 502, body: { error: 'Cover redirect not allowed.', code: 'HTTP_ERROR' } } }
+    }
     if (!res.ok) {
       return { error: { status: 502, body: { error: 'Cover fetch failed.', code: 'HTTP_ERROR' } } }
     }

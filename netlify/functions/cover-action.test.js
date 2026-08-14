@@ -57,6 +57,17 @@ function imageResponse(contentType = 'image/jpeg', body = IMG) {
   }
 }
 
+// A 3xx upstream response (redirect: 'manual' surfaces it as the raw
+// response, so the proxy must reject it instead of following).
+function redirectResponse(location) {
+  return {
+    ok: false,
+    status: 302,
+    headers: { get: (k) => (String(k).toLowerCase() === 'location' ? location : null) },
+    arrayBuffer: async () => new ArrayBuffer(0),
+  }
+}
+
 const originalFetch = global.fetch
 
 beforeEach(() => {
@@ -187,5 +198,29 @@ describe('cover action — public proxied image (T6)', () => {
     const res = await booksHandler(coverReq(BOOKS, 'https://covers.openlibrary.org/b/isbn/123-M.jpg'))
     expect(res.status).toBe(400)
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('does NOT follow a 302 to an off-allowlist host (SSRF guard)', async () => {
+    const evilUrl = 'https://evil.com/x.jpg'
+    global.fetch.mockResolvedValue(redirectResponse(evilUrl))
+
+    const res = await discogsHandler(coverReq(DISC, 'https://i.discogs.com/hash/cover-1.jpeg'))
+    expect(res.status).toBe(502)
+    expect((await res.json()).code).toBe('HTTP_ERROR')
+    // The redirect target must never be fetched — only the initial URL.
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch.mock.calls[0][0]).toBe('https://i.discogs.com/hash/cover-1.jpeg')
+    expect(global.fetch.mock.calls.some(([url]) => url === evilUrl)).toBe(false)
+  })
+
+  it('rejects a redirect even to an allowed host — the proxy never follows 3xx', async () => {
+    const target = 'https://i.discogs.com/hash/other-2.jpeg'
+    global.fetch.mockResolvedValue(redirectResponse(target))
+
+    const res = await discogsHandler(coverReq(DISC, 'https://i.discogs.com/hash/cover-1.jpeg'))
+    expect(res.status).toBe(502)
+    expect((await res.json()).error).toContain('redirect')
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch.mock.calls.some(([url]) => url === target)).toBe(false)
   })
 })
