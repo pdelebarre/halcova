@@ -9,13 +9,17 @@ import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/au
 import { findUserByCode } from './_shared/users'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
+import { readCache, writeCache } from './_shared/lookup-cache'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 // Discogs policy requires a User-Agent header on every request.
 const USER_AGENT = 'RunoutRecordCollector/1.0 (records & books catalog)'
 
 // One shared store for every user — that's the whole point: user A's lookup
-// serves user B, so a second request never hits Discogs again.
+// serves user B, so a second request never hits Discogs again. Part B: reads go
+// DB-first (lookup_cache) when Postgres is configured and fall back to this
+// Blob store; writes go to both (see _shared/lookup-cache.js). Covers stay
+// Blobs-only. This constant still names the store for the cover action.
 const CACHE_STORE = 'discogs-cache'
 
 // Rate limiting (T5) guards the cache-MISS path only — the shared token's
@@ -78,18 +82,11 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
   const token = process.env.RUNOUT_DISCOGS_TOKEN
   if (!token) return json(500, { error: 'Discogs token not configured.', code: 'SERVER_NO_TOKEN' })
 
-  const store = getStore(CACHE_STORE)
-
-  // A failed cache read is a cache miss — never fail a valid lookup.
-  let cached
-  try {
-    cached = await store.get(key, { type: 'json' })
-  } catch {
-    cached = null
-  }
-  if (cached && cached.data !== undefined && Date.now() - cached.ts < ttl) {
-    return json(200, cached.data)
-  }
+  // DB-first read-through (Part B): lookup_cache when Postgres is configured,
+  // the legacy Blobs cache otherwise / on miss / on error. A failed read is a
+  // miss — never fail a valid lookup.
+  const cached = await readCache('discogs', key, ttl)
+  if (cached) return json(200, cached)
 
   // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
   // overall cap protects the shared token/quota even across different users.
@@ -127,11 +124,8 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
   }
 
   // Caching is best-effort — a failed write must not fail a successful lookup.
-  try {
-    await store.setJSON(key, { ts: Date.now(), data })
-  } catch {
-    // ignore
-  }
+  // Writes through to both the DB and the legacy Blob store.
+  await writeCache('discogs', key, data, ttl)
   return json(200, data)
 }
 
