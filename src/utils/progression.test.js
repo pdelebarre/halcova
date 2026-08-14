@@ -183,7 +183,19 @@ describe('computeBadges', () => {
     }
     expect(badges.some((b) => b.id === 'completist' && b.deferred)).toBe(true)
     expect(badges.some((b) => b.id === 'balanced-diet' && b.deferred)).toBe(true)
-    expect(badges.some((b) => b.id === 'quiz-whiz' && b.deferred)).toBe(true)
+    // quiz-whiz is implemented in release 1.3 — it reads the ledger, so it is
+    // present but locked (never deferred) until a perfect quiz day lands.
+    expect(badges.some((b) => b.id === 'quiz-whiz' && !b.deferred)).toBe(true)
+    expect(badges.find((b) => b.id === 'quiz-whiz').unlocked).toBe(false)
+  })
+
+  it('unlocks quiz-whiz from the ledger once a perfect quiz day is recorded (release 1.3)', () => {
+    // No perfect day → locked.
+    expect(computeBadges([record('1')], recordsCatalog, { perfectDays: [] }).find((b) => b.id === 'quiz-whiz').unlocked).toBe(false)
+    // A perfect day in the ledger (written by recordQuizResult) flips it on.
+    const withPerfect = computeBadges([record('1')], recordsCatalog, { perfectDays: ['2026-06-15'] })
+    expect(withPerfect.find((b) => b.id === 'quiz-whiz').unlocked).toBe(true)
+    expect(withPerfect.find((b) => b.id === 'quiz-whiz').deferred).toBe(false)
   })
 
   it('unlocks digger at 50 records and pageturner at 25 books', () => {

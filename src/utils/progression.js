@@ -33,10 +33,17 @@
 //   - balanced-diet   — "records AND books" needs BOTH kinds' items; the
 //                       per-kind Play surface only has the current kind
 //                       (cross-kind wiring is a Phase 2 concern). Deferred.
-//   - quiz-whiz       — "perfect quiz day" needs a perfect-day record; the
-//                       quiz is release 1.3 (not built). The ledger
-//                       (progressionLedger.js) already tracks perfectDays so
-//                       1.3 can flip this on. Deferred.
+//   - quiz-whiz       — "perfect quiz day" reads the ledger's perfectDays
+//                       (progressionLedger.recordQuizResult writes them when a
+//                       quiz day is all-correct — release 1.3). Implemented.
+//   SKIPPED / DEFERRED badges (each documented — Phase-0 data-source
+//   justification):
+//   - completist      — "full artist discography" needs an artist's full
+//                       release list, which needs the Discogs artist endpoint
+//                       (Phase 0 §3 #1 — it does not exist). Deferred.
+//   - balanced-diet   — "records AND books" needs BOTH kinds' items; the
+//                       per-kind Play surface only has the current kind
+//                       (cross-kind wiring is a Phase 2 concern). Deferred.
 //
 // GUARDS: missing year/genre/pageCount/lendingHistory/notes/dateAdded must
 // never throw. Empty collections yield level 1 + zero XP + no unlocked badges.
@@ -131,9 +138,11 @@ function hasReturnedLend(items) {
 }
 
 // Every badge the app knows about. `threshold` receives the derived profile
-// (see persona.deriveProfile). `deferred` badges are documented, honest gaps
-// (see header comment) — the grid renders them as "coming soon", never as
-// unlockable-today, so there are no impossible badges (requirements §7.3).
+// (see persona.deriveProfile) and the client-side gameplay ledger (the only
+// thing that can hold event-derived state like perfect quiz days). `deferred`
+// badges are documented, honest gaps (see header comment) — the grid renders
+// them as "coming soon", never as unlockable-today, so there are no impossible
+// badges (requirements §7.3).
 export const BADGE_DEFS = [
   { id: 'digger', kinds: ['records'], threshold: (d) => d.count >= 50 },
   { id: 'pageturner', kinds: ['books'], threshold: (d) => d.count >= 25 },
@@ -144,10 +153,12 @@ export const BADGE_DEFS = [
   { id: 'one-timer', kinds: ['records', 'books'], threshold: (d) => d.maxByArtist === 1 && d.count >= 4 },
   { id: 'variant-hoarder', kinds: ['records', 'books'], threshold: (d) => d.pressingsOfOne >= 2 },
   { id: 'friend-of-crate', kinds: ['records', 'books'], threshold: (d) => hasReturnedLend(d._items) },
+  // Perfect quiz day — reads the ledger's perfectDays (written by
+  // progressionLedger.recordQuizResult in release 1.3).
+  { id: 'quiz-whiz', kinds: ['records', 'books'], threshold: (d, ledger) => (Array.isArray(ledger?.perfectDays) ? ledger.perfectDays : []).length > 0 },
   // Deferred (documented in the header comment).
   { id: 'completist', kinds: ['records', 'books'], deferred: true, reason: 'needs the Discogs artist-discography endpoint (Phase 0 §3 #1 — does not exist)' },
   { id: 'balanced-diet', kinds: ['records', 'books'], deferred: true, reason: 'needs both kinds’ items; the per-kind Play surface has only the current kind (Phase 2 wiring)' },
-  { id: 'quiz-whiz', kinds: ['records', 'books'], deferred: true, reason: 'needs a perfect quiz day — the quiz is release 1.3 (ledger already tracks perfectDays)' },
 ]
 
 /**
@@ -157,8 +168,10 @@ export const BADGE_DEFS = [
  *
  * @param {Array<object>} items
  * @param {{kind?: string, copy?: object}} catalog
+ * @param {{perfectDays?: Array<string>, quizXp?: number}} [ledger] - the
+ *   client-side gameplay ledger (release 1.3 reads perfectDays for quiz-whiz).
  */
-export function computeBadges(items, catalog) {
+export function computeBadges(items, catalog, ledger = {}) {
   const kind = catalog?.kind === 'books' ? 'books' : 'records'
   const list = Array.isArray(items) ? items : []
   const derived = deriveProfile(list, kind)
@@ -185,7 +198,7 @@ export function computeBadges(items, catalog) {
       id: def.id,
       title: copy.name || def.id,
       line: copy.line || '',
-      unlocked: Boolean(def.threshold(derived)),
+      unlocked: Boolean(def.threshold(derived, ledger)),
       deferred: false,
     })
   }
@@ -205,6 +218,6 @@ export function computeProgression(items, catalog, opts = {}) {
   const ledger = opts.ledger || {}
   const xp = computeXp(items, catalog, ledger)
   const level = computeLevel(xp.total, progCopy)
-  const badges = computeBadges(items, catalog)
+  const badges = computeBadges(items, catalog, ledger)
   return { kind, xp, level, badges }
 }

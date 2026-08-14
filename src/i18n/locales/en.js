@@ -485,6 +485,45 @@ const en = {
   'gamif.badge.quiz-whiz.name': 'Quiz Whiz',
   'gamif.badge.quiz-whiz.line': 'Perfect quiz. The crate is officially intimidated.',
 
+  // --- Release 1.3 (Crate Quiz + streaks, issue #50) ---------------------
+  'gamif.tab.quiz': 'Quiz',
+  // Quiz panel (release 1.3) — copy-bank.md §3
+  'gamif.quiz.title': 'The Crate Quiz',
+  'gamif.quiz.intro': 'A 60-second quiz from your own {collectionLabel}. Same set all day — offline-safe, always on.',
+  'gamif.quiz.start': 'Start the quiz',
+  'gamif.quiz.lockedTitle': 'Not enough items yet',
+  'gamif.quiz.lockedSub': 'Scan a few more {entity}s first — the quiz needs at least three to read your {collectionLabel}.',
+  'gamif.quiz.questionCount': 'Question {n} of {total}',
+  'gamif.quiz.next': 'Next question',
+  'gamif.quiz.done': 'Day complete!',
+  'gamif.quiz.score': 'You got {correct} of {total} right.',
+  'gamif.quiz.perfect': 'Perfect round! That\'s a streak worth bragging about.',
+  'gamif.quiz.streak': '{n}-day streak. Don\'t make the {collectionLabel} sad tomorrow.',
+  'gamif.quiz.alreadyPlayed': 'You\'ve done today\'s quiz. Come back tomorrow for a fresh set.',
+  'gamif.quiz.revealAdded': 'You added this in {date}.',
+  'gamif.quiz.notesSay': 'Your notes say: "{notes}".',
+  'gamif.quiz.correctOrder': 'Correct order: {order}',
+  'gamif.quiz.tapOrder': 'Tap them oldest to newest',
+  'gamif.quiz.yes': 'Yes',
+  'gamif.quiz.no': 'No',
+  'gamif.quiz.teaserStreak': 'Current streak: {n} day(s)',
+  // Question prompts (copy-bank.md §3)
+  'gamif.quiz.prompt.guessYear': 'Which year is this from?',
+  'gamif.quiz.prompt.nameArtist': 'Who\'s behind this cover?',
+  'gamif.quiz.prompt.newestOldest': 'Which did you add first?',
+  'gamif.quiz.prompt.stillYours': 'Do you still own this?',
+  'gamif.quiz.prompt.sortShelf': 'Put these in year order.',
+  // Correct-answer feedback (rotating — copy-bank.md §3)
+  'gamif.quiz.correct.1': 'You remembered. The {collectionLabel} is proud.',
+  'gamif.quiz.correct.2': 'Correct. Your collection is impressed, and it\'s hard to impress.',
+  'gamif.quiz.correct.3': 'Nailed it.',
+  // Wrong-answer teaching reveal (copy-bank.md §3) — always shows the real
+  // answer + the item story; never fabricates notes or dates.
+  'gamif.quiz.wrongReveal': 'Wrong — but the real answer is better: you added {title} in {date}. Your notes say: "{notes}".',
+  'gamif.quiz.wrongRevealNoNotes': 'Wrong — but the real answer is better: you added {title} in {date}.',
+  'gamif.quiz.wrongRevealNotesOnly': 'Wrong — but your notes on {title} say: "{notes}".',
+  'gamif.quiz.wrongRevealNoDate': 'Not quite. But now you\'ll never forget you own {title} again.',
+
   // Shelf Stories panel (release 1.4, issue #44)
   'gamif.stories.headline': 'Your {collectionLabel}, in stories',
   'gamif.stories.emptyTitle': 'No stories yet',

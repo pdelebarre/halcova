@@ -201,10 +201,11 @@ export const recordsCatalog = {
           fallback: { name: t('gamif.persona.fallback'), verdict: t('gamif.persona.verdict.fallback') },
         },
       },
-      // Play surface tabs (release 1.2 / 1.4)
+      // Play surface tabs (release 1.2 / 1.3 / 1.4)
       tabs: {
         persona: t('gamif.tab.persona'),
         progression: t('gamif.tab.progression'),
+        quiz: t('gamif.tab.quiz'),
         stories: t('gamif.tab.stories'),
       },
       // Release 1.2 — XP / levels / badges panel copy (issue #45)
@@ -251,6 +252,46 @@ export const recordsCatalog = {
         'variant-hoarder': { name: t('gamif.badge.variant-hoarder.name'), line: t('gamif.badge.variant-hoarder.line') },
         'friend-of-crate': { name: t('gamif.badge.friend-of-crate.name'), line: t('gamif.badge.friend-of-crate.line') },
         'quiz-whiz': { name: t('gamif.badge.quiz-whiz.name'), line: t('gamif.badge.quiz-whiz.line') },
+      },
+      // Release 1.3 — Crate Quiz + streaks (issue #50). Copy bridges t()
+      // (EN master in the i18n locales); the engine stays pure — prompts and
+      // yes/no labels feed buildQuiz so its payloads are localized.
+      quiz: {
+        title: t('gamif.quiz.title'),
+        intro: t('gamif.quiz.intro', { collectionLabel: 'crate' }),
+        start: t('gamif.quiz.start'),
+        lockedTitle: t('gamif.quiz.lockedTitle'),
+        lockedSub: t('gamif.quiz.lockedSub', { entity: 'record', collectionLabel: 'crate' }),
+        questionCount: t('gamif.quiz.questionCount'),
+        next: t('gamif.quiz.next'),
+        done: t('gamif.quiz.done'),
+        score: t('gamif.quiz.score'),
+        perfect: t('gamif.quiz.perfect'),
+        streak: t('gamif.quiz.streak', { collectionLabel: 'crate' }),
+        alreadyPlayed: t('gamif.quiz.alreadyPlayed'),
+        revealAdded: t('gamif.quiz.revealAdded'),
+        notesSay: t('gamif.quiz.notesSay'),
+        correctOrder: t('gamif.quiz.correctOrder'),
+        tapOrder: t('gamif.quiz.tapOrder'),
+        teaserStreak: t('gamif.quiz.teaserStreak'),
+        yes: t('gamif.quiz.yes'),
+        no: t('gamif.quiz.no'),
+        correct: [
+          t('gamif.quiz.correct.1', { collectionLabel: 'crate' }),
+          t('gamif.quiz.correct.2'),
+          t('gamif.quiz.correct.3'),
+        ],
+        wrongReveal: t('gamif.quiz.wrongReveal'),
+        wrongRevealNoNotes: t('gamif.quiz.wrongRevealNoNotes'),
+        wrongRevealNotesOnly: t('gamif.quiz.wrongRevealNotesOnly'),
+        wrongRevealNoDate: t('gamif.quiz.wrongRevealNoDate'),
+        questions: {
+          guessYear: t('gamif.quiz.prompt.guessYear'),
+          nameThatArtist: t('gamif.quiz.prompt.nameArtist'),
+          newestOldest: t('gamif.quiz.prompt.newestOldest'),
+          stillYours: t('gamif.quiz.prompt.stillYours'),
+          sortShelf: t('gamif.quiz.prompt.sortShelf'),
+        },
       },
       // Release 1.4 — Shelf Stories panel copy (issue #44)
       stories: {
@@ -492,10 +533,11 @@ export const booksCatalog = {
           fallback: { name: t('gamif.persona.fallback'), verdict: t('gamif.persona.verdict.fallback') },
         },
       },
-      // Play surface tabs (release 1.2 / 1.4)
+      // Play surface tabs (release 1.2 / 1.3 / 1.4)
       tabs: {
         persona: t('gamif.tab.persona'),
         progression: t('gamif.tab.progression'),
+        quiz: t('gamif.tab.quiz'),
         stories: t('gamif.tab.stories'),
       },
       // Release 1.2 — XP / levels / badges panel copy (issue #45)
@@ -542,6 +584,45 @@ export const booksCatalog = {
         'variant-hoarder': { name: t('gamif.badge.variant-hoarder.name'), line: t('gamif.badge.variant-hoarder.line') },
         'friend-of-crate': { name: t('gamif.badge.friend-of-crate.name'), line: t('gamif.badge.friend-of-crate.line') },
         'quiz-whiz': { name: t('gamif.badge.quiz-whiz.name'), line: t('gamif.badge.quiz-whiz.line') },
+      },
+      // Release 1.3 — Crate Quiz + streaks (issue #50). See records catalog
+      // for the copy layout; the books side swaps crate→shelf, record→book.
+      quiz: {
+        title: t('gamif.quiz.title'),
+        intro: t('gamif.quiz.intro', { collectionLabel: 'shelf' }),
+        start: t('gamif.quiz.start'),
+        lockedTitle: t('gamif.quiz.lockedTitle'),
+        lockedSub: t('gamif.quiz.lockedSub', { entity: 'book', collectionLabel: 'shelf' }),
+        questionCount: t('gamif.quiz.questionCount'),
+        next: t('gamif.quiz.next'),
+        done: t('gamif.quiz.done'),
+        score: t('gamif.quiz.score'),
+        perfect: t('gamif.quiz.perfect'),
+        streak: t('gamif.quiz.streak', { collectionLabel: 'shelf' }),
+        alreadyPlayed: t('gamif.quiz.alreadyPlayed'),
+        revealAdded: t('gamif.quiz.revealAdded'),
+        notesSay: t('gamif.quiz.notesSay'),
+        correctOrder: t('gamif.quiz.correctOrder'),
+        tapOrder: t('gamif.quiz.tapOrder'),
+        teaserStreak: t('gamif.quiz.teaserStreak'),
+        yes: t('gamif.quiz.yes'),
+        no: t('gamif.quiz.no'),
+        correct: [
+          t('gamif.quiz.correct.1', { collectionLabel: 'shelf' }),
+          t('gamif.quiz.correct.2'),
+          t('gamif.quiz.correct.3'),
+        ],
+        wrongReveal: t('gamif.quiz.wrongReveal'),
+        wrongRevealNoNotes: t('gamif.quiz.wrongRevealNoNotes'),
+        wrongRevealNotesOnly: t('gamif.quiz.wrongRevealNotesOnly'),
+        wrongRevealNoDate: t('gamif.quiz.wrongRevealNoDate'),
+        questions: {
+          guessYear: t('gamif.quiz.prompt.guessYear'),
+          nameThatArtist: t('gamif.quiz.prompt.nameArtist'),
+          newestOldest: t('gamif.quiz.prompt.newestOldest'),
+          stillYours: t('gamif.quiz.prompt.stillYours'),
+          sortShelf: t('gamif.quiz.prompt.sortShelf'),
+        },
       },
       // Release 1.4 — Shelf Stories panel copy (issue #44)
       stories: {

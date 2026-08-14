@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { t } from '../i18n'
 import PersonaBody from './PersonaBody'
 import ProgressionPanel from './ProgressionPanel'
+import QuizPanel from './QuizPanel'
 import StoriesPanel from './StoriesPanel'
 import './PlayPanel.css'
 
 /**
- * The "Play" hub (Phase 1 § Play) — one sheet hosting the three gamification
+ * The "Play" hub (Phase 1 § Play) — one sheet hosting the four gamification
  * surfaces behind the feature flag:
  *   - Persona      (release 1.1 — Collection Persona + share card)
  *   - Progress     (release 1.2 — XP / levels / badges, issue #45)
+ *   - Quiz         (release 1.3 — Crate Quiz + streaks, issue #50)
  *   - Stories      (release 1.4 — Shelf Stories, issue #44)
  *
  * Each tab reads the same owned collection through its pure engine, so all
@@ -45,6 +47,7 @@ export default function PlayPanel({ items = [], catalog, onClose }) {
         <div className="play-tabs" role="tablist" aria-label={title}>
           {[
             { id: 'persona', label: tabs.persona || 'Persona' },
+            { id: 'quiz', label: tabs.quiz || 'Quiz' },
             { id: 'progression', label: tabs.progression || 'Progress' },
             { id: 'stories', label: tabs.stories || 'Stories' },
           ].map((item) => (
@@ -63,6 +66,7 @@ export default function PlayPanel({ items = [], catalog, onClose }) {
 
         <div className="play-panel-body">
           {tab === 'persona' && <PersonaBody items={items} catalog={catalog} />}
+          {tab === 'quiz' && <QuizPanel items={items} catalog={catalog} />}
           {tab === 'progression' && <ProgressionPanel items={items} catalog={catalog} />}
           {tab === 'stories' && <StoriesPanel items={items} catalog={catalog} />}
         </div>

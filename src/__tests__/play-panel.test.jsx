@@ -79,6 +79,15 @@ describe('PlayPanel (Phase 1 § Play hub)', () => {
     expect(screen.getAllByRole('article').length).toBeGreaterThan(0)
   })
 
+  it('switches to the Quiz tab (release 1.3) and shows the quiz intro', () => {
+    renderPanel(playCrate())
+    fireEvent.click(screen.getByRole('tab', { name: 'Quiz' }))
+    expect(screen.getByRole('tab', { name: 'Quiz' })).toHaveAttribute('aria-selected', 'true')
+    // 8 items is enough for the quiz (not locked) — the intro shows.
+    expect(screen.getByText('The Crate Quiz')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start the quiz' })).toBeInTheDocument()
+  })
+
   it('shows the add-first empty state for an empty collection', () => {
     renderPanel([])
     expect(screen.getByText('Add a record first')).toBeInTheDocument()
