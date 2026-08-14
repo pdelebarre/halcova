@@ -57,4 +57,48 @@ describe('useAuth.refresh', () => {
     // A resolved null (401/403 → revoked/disabled) still signs the user out.
     expect(result.current.session).toBeNull()
   })
+
+  it('keeps the cached code and updates the user when me() resolves a fresh profile (post-upgrade)', async () => {
+    saveSession(SESSION)
+    // The user just upgraded: the server now reports plan premium.
+    authApi.me.mockResolvedValue({ ...MEMBER, plan: 'premium' })
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.ready).toBe(true))
+
+    await act(async () => {
+      await result.current.refresh()
+    })
+
+    // The refreshed profile replaced the stale cached one; the code survived.
+    expect(result.current.session.user.plan).toBe('premium')
+    expect(result.current.session.code).toBe('RU-AAAA-BBBB-CCCC')
+  })
+
+  it('revalidates the cached session on mount when me() resolves a user', async () => {
+    saveSession(SESSION)
+    authApi.me.mockResolvedValue({ ...MEMBER, plan: 'lifetime' })
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.ready).toBe(true))
+
+    // The startup revalidation pulled the freshest plan into the session.
+    expect(result.current.session.user.plan).toBe('lifetime')
+    expect(result.current.session.code).toBe('RU-AAAA-BBBB-CCCC')
+  })
+
+  it('signs the user out on logout', async () => {
+    saveSession(SESSION)
+    authApi.me.mockResolvedValue({ ...MEMBER }) // keep the startup effect quiet
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.ready).toBe(true))
+
+    act(() => {
+      result.current.logout()
+    })
+
+    expect(authApi.logout).toHaveBeenCalled()
+    expect(result.current.session).toBeNull()
+  })
 })

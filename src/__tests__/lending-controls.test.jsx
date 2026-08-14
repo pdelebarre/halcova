@@ -236,3 +236,70 @@ describe('LendingControls', () => {
     })
   })
 })
+
+// ===========================================================================
+// S6 lending gate (#57): a free member with lending disabled sees a "Lending
+// is Premium" affordance whose Upgrade CTA opens the paywall with reason
+// 'feature'. A PAYMENT_REQUIRED failure mid-lend also surfaces the paywall.
+// ===========================================================================
+
+describe('S6 lending gate — paywall trigger', () => {
+  it('renders the gated affordance with an Upgrade CTA that opens the paywall (reason feature)', () => {
+    const onOpenPaywall = vi.fn()
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' }, {
+      lendingEnabled: false,
+      lendingGate: true,
+      onOpenPaywall,
+    })
+
+    // The gate title + the paywall CTA replace the normal lending controls.
+    expect(screen.getByText('Lending')).toBeInTheDocument()
+    expect(screen.getByText("Lending isn't enabled for your account.")).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Lend…' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upgrade' }))
+    expect(onOpenPaywall).toHaveBeenCalledWith({ reason: 'feature', feature: 'lending' })
+  })
+
+  it('renders nothing for a non-gated visitor with lending disabled (no paywall leak)', () => {
+    const { container } = renderControls({ id: 'r1', title: 'X' }, { lendingEnabled: false })
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('does not crash when the gate is on but onOpenPaywall is missing', () => {
+    renderControls({ id: 'r1', title: 'X' }, { lendingEnabled: false, lendingGate: true })
+    // The CTA still renders; clicking it is a safe no-op.
+    fireEvent.click(screen.getByRole('button', { name: 'Upgrade' }))
+    expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument()
+  })
+
+  it('surfaces the paywall when a lend fails with PAYMENT_REQUIRED (expired mid-session)', async () => {
+    const onOpenPaywall = vi.fn()
+    const onLend = vi.fn().mockRejectedValue(Object.assign(new Error('nope'), { code: 'PAYMENT_REQUIRED' }))
+    const showToast = vi.fn()
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' }, { onLend, showToast, onOpenPaywall })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lend…' }))
+    fireEvent.change(screen.getByLabelText('Borrower'), { target: { value: 'Alice' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Lend' }))
+
+    await waitFor(() => expect(onOpenPaywall).toHaveBeenCalledWith({ reason: 'feature', feature: 'lending' }))
+    // The user also gets a non-crashing error toast.
+    expect(showToast).toHaveBeenCalledWith("Lending isn't enabled for your account.", 'error')
+  })
+
+  it('keeps the generic save error (no paywall) for a non-entitlement failure', async () => {
+    const onOpenPaywall = vi.fn()
+    const onLend = vi.fn().mockRejectedValue(new Error('offline'))
+    const showToast = vi.fn()
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' }, { onLend, showToast, onOpenPaywall })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lend…' }))
+    fireEvent.change(screen.getByLabelText('Borrower'), { target: { value: 'Alice' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Lend' }))
+
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith('Could not save — check your connection', 'error'))
+    expect(onOpenPaywall).not.toHaveBeenCalled()
+  })
+})
