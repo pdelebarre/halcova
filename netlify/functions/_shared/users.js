@@ -24,12 +24,14 @@
 // acceptable trade-off at this scale (see docs/technical.md § Security).
 
 import { getStore } from '@netlify/blobs'
+import { normalizeCode } from './codes'
 
 const IDENTITY_STORE = 'runout-identity'
 const USER_PREFIX = 'user:'
 const REQUEST_PREFIX = 'request:'
 const USERS_INDEX = 'index:users'
 const REQUESTS_INDEX = 'index:requests'
+const CODE_INDEX_PREFIX = 'code:'
 
 const identity = () => getStore(IDENTITY_STORE)
 
@@ -65,13 +67,80 @@ function normalizeUser(user) {
 }
 
 export const listUsers = async () => (await listRecords(USER_PREFIX, USERS_INDEX)).map(normalizeUser)
-export const saveUser = (user) => saveRecord(USER_PREFIX, USERS_INDEX, user)
-export const removeUserRecord = (id) => removeRecord(USER_PREFIX, USERS_INDEX, id)
 export const getUser = async (id) => normalizeUser(await identity().get(`${USER_PREFIX}${id}`, { type: 'json' }))
 
+// ---- Access-code index (T1, ADR-0002 Phase 0) ----
+//
+// `findUserByCode` used to scan every user record on EVERY authenticated
+// request — O(n) over all users. A `code:<normalized>` → `userId` key makes it
+// a single blob read. The index is maintained by saveUser (on approve and on
+// any code change/rotation) and by removeUserRecord. A missing entry (stores
+// written before the index existed) falls back to the O(n) scan ONCE and
+// writes the entry — so no account breaks and every pre-existing account is
+// backfilled lazily on first use.
+
+async function setCodeIndex(userId, code) {
+  const norm = normalizeCode(code)
+  if (!norm) return
+  await identity().setJSON(`${CODE_INDEX_PREFIX}${norm}`, userId)
+}
+
+async function deleteCodeIndex(code) {
+  const norm = normalizeCode(code)
+  if (!norm) return
+  await identity().delete(`${CODE_INDEX_PREFIX}${norm}`)
+}
+
+// Save a user and keep the access-code index in sync. When a code changes
+// (approve mints a fresh code; a future rotate path re-stamps one), the old
+// `code:` key is dropped and the new one written. Users without a code (the
+// owner is never stored) skip the index entirely.
+export async function saveUser(user) {
+  const existing = await getUser(user.id)
+  const oldCode = normalizeCode(existing?.code)
+  const newCode = normalizeCode(user?.code)
+  await saveRecord(USER_PREFIX, USERS_INDEX, user)
+  if (oldCode && oldCode !== newCode) await deleteCodeIndex(oldCode)
+  if (newCode) await setCodeIndex(user.id, user.code)
+}
+
+export async function removeUserRecord(id) {
+  const existing = await getUser(id)
+  if (existing?.code) await deleteCodeIndex(existing.code)
+  await removeRecord(USER_PREFIX, USERS_INDEX, id)
+}
+
+// Resolve a member by access code — O(1) via the `code:<normalized>` index.
+// Normalizes INSIDE (trim + uppercase) so every caller is consistent whether
+// the bearer was pre-uppercased (auth.js) or passed raw (the
+// collection/discogs/books authorize()s) — stored codes are uppercase, so
+// existing behavior is preserved. Returns the same shape as today: the full
+// user record via getUser (plan normalized to 'free' when absent). Missing
+// index entries fall back to the O(n) scan and write the entry (lazy
+// backfill), so pre-Phase-0 stores keep working.
 export async function findUserByCode(code) {
+  const norm = normalizeCode(code)
+  if (!norm) return null
+  const store = identity()
+
+  let userId = null
+  try {
+    userId = await store.get(`${CODE_INDEX_PREFIX}${norm}`, { type: 'json' })
+  } catch {
+    userId = null
+  }
+  if (userId) {
+    const user = await getUser(userId)
+    if (user && normalizeCode(user.code) === norm) return user
+  }
+
+  // Lazy backfill — no index entry (or a stale one pointing nowhere).
   const users = await listUsers()
-  return users.find((u) => u.code === code) || null
+  const match = users.find((u) => normalizeCode(u.code) === norm) || null
+  if (match) {
+    try { await setCodeIndex(match.id, match.code) } catch { /* best-effort */ }
+  }
+  return match
 }
 
 // ---- Signup requests ----

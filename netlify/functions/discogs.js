@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
 import { findUserByCode } from './_shared/users'
+import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 // Discogs policy requires a User-Agent header on every request.
@@ -16,6 +17,14 @@ const USER_AGENT = 'RunoutRecordCollector/1.0 (records & books catalog)'
 // serves user B, so a second request never hits Discogs again.
 const CACHE_STORE = 'discogs-cache'
 
+// Rate limiting (T5) guards the cache-MISS path only — the shared token's
+// quota is protected whether or not the response cache has an entry.
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+// Discogs' documented limit is ~60 requests/min per token, so the overall cap
+// matches it; the per-user cap stops one account from exhausting it.
+const DISCOGS_USER_LIMIT = Number(process.env.RUNOUT_DISCOGS_RATE_LIMIT) || 30
+const DISCOGS_OVERALL_LIMIT = Number(process.env.RUNOUT_DISCOGS_OVERALL_RATE_LIMIT) || 60
+
 const DAY = 24 * 60 * 60 * 1000
 const TTL = {
   barcode: 30 * DAY, // scanned barcodes barely change
@@ -23,9 +32,9 @@ const TTL = {
   release: 30 * DAY, // release details are stable
 }
 
-const json = (statusCode, body) => new Response(JSON.stringify(body), {
+const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...headers },
 })
 
 // Same shape as collection.js: every request carries the caller's access code.
@@ -61,7 +70,9 @@ const cacheKey = (prefix, input) => `${prefix}:${createHash('sha256').update(Str
 // Forward one action to Discogs with a cache read on top. The token is sent in
 // an Authorization header (`Discogs token=…`) rather than a ?token= query param
 // — query strings can be captured by egress telemetry. It never leaves the server.
-async function fetchDiscogs(path, params, key, ttl) {
+// `identity` is the caller's rate-limit identity (user id, or client IP for the
+// demo); it's only used to throttle cache misses against the shared token.
+async function fetchDiscogs(path, params, key, ttl, identity) {
   // No hardcoded fallback — a missing env is a server misconfiguration.
   const token = process.env.RUNOUT_DISCOGS_TOKEN
   if (!token) return json(500, { error: 'Discogs token not configured.', code: 'SERVER_NO_TOKEN' })
@@ -77,6 +88,19 @@ async function fetchDiscogs(path, params, key, ttl) {
   }
   if (cached && cached.data !== undefined && Date.now() - cached.ts < ttl) {
     return json(200, cached.data)
+  }
+
+  // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
+  // overall cap protects the shared token/quota even across different users.
+  if (identity) {
+    const userRl = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'discogs:user', limit: DISCOGS_USER_LIMIT })(identity)
+    if (userRl.limited) {
+      return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(userRl.retryAfter) })
+    }
+  }
+  const overallRl = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'discogs:overall', limit: DISCOGS_OVERALL_LIMIT })('all')
+  if (overallRl.limited) {
+    return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(overallRl.retryAfter) })
   }
 
   const url = new URL(DISCOGS_BASE + path)
@@ -111,10 +135,14 @@ async function fetchDiscogs(path, params, key, ttl) {
 }
 
 export default async (req) => {
-  const { error } = await authorize(req)
+  const { user, error } = await authorize(req)
   if (error) return error
 
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
+
+  // Members/owner key provider limits by user id; the shared demo identity is
+  // keyed by client IP so one demo visitor can't throttle every other.
+  const identity = rateLimitIdentity(user, req)
 
   const url = new URL(req.url)
   const action = url.searchParams.get('action')
@@ -122,7 +150,7 @@ export default async (req) => {
   if (action === 'searchBarcode') {
     const barcode = cleanDigits(url.searchParams.get('barcode'))
     if (!barcode) return json(400, { error: 'Missing barcode.' })
-    return fetchDiscogs('/database/search', { barcode, type: 'release' }, `barcode:${barcode}`, TTL.barcode)
+    return fetchDiscogs('/database/search', { barcode, type: 'release' }, `barcode:${barcode}`, TTL.barcode, identity)
   }
 
   if (action === 'searchText') {
@@ -130,13 +158,13 @@ export default async (req) => {
     // outbound request.
     const q = String(url.searchParams.get('q') || '').trim().slice(0, 200)
     if (!q) return json(400, { error: 'Missing q.' })
-    return fetchDiscogs('/database/search', { q, type: 'release' }, cacheKey('q', q.toLowerCase()), TTL.q)
+    return fetchDiscogs('/database/search', { q, type: 'release' }, cacheKey('q', q.toLowerCase()), TTL.q, identity)
   }
 
   if (action === 'release') {
     const id = cleanDigits(url.searchParams.get('id'))
     if (!id) return json(400, { error: 'Missing id.' })
-    return fetchDiscogs(`/releases/${id}`, {}, `release:${id}`, TTL.release)
+    return fetchDiscogs(`/releases/${id}`, {}, `release:${id}`, TTL.release, identity)
   }
 
   return json(400, { error: 'Unknown action.' })

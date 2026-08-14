@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
 import { findUserByCode } from './_shared/users'
+import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -41,9 +42,15 @@ const TTL_MS = {
   detail: 30 * DAY_MS,
 }
 
-const json = (statusCode, body) => new Response(JSON.stringify(body), {
+// Rate limiting (T5) guards the cache-MISS path only — the shared quota is
+// protected whether or not the response cache has an entry.
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+const BOOKS_USER_LIMIT = Number(process.env.RUNOUT_BOOKS_RATE_LIMIT) || 60
+const BOOKS_OVERALL_LIMIT = Number(process.env.RUNOUT_BOOKS_OVERALL_RATE_LIMIT) || 300
+
+const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...headers },
 })
 
 // Blob keys are character/length restricted, and free-text user input can't be
@@ -149,8 +156,9 @@ export async function fetchGoogleWithRetry(url, { retries = 1, delayMs = 800 } =
 }
 
 // Serve from the shared cache when fresh; otherwise hit Google and cache the
-// response. Only successful responses are cached — never errors.
-async function lookup(store, lookupSpec, ttlMs) {
+// response. Only successful responses are cached — never errors. `identity` is
+// the caller's rate-limit identity (user id, or client IP for the demo).
+async function lookup(store, lookupSpec, ttlMs, identity) {
   // A failed cache read is a cache miss — never fail a valid lookup.
   let cached
   try {
@@ -160,6 +168,19 @@ async function lookup(store, lookupSpec, ttlMs) {
   }
   if (cached?.data && cached?.ts && Date.now() - cached.ts < ttlMs) {
     return { data: cached.data }
+  }
+
+  // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
+  // overall cap protects the shared quota even across different users.
+  if (identity) {
+    const userRl = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'books:user', limit: BOOKS_USER_LIMIT })(identity)
+    if (userRl.limited) {
+      return { error: json(429, { error: 'Google Books rate limit hit.', code: 'RATE_LIMIT' }, { 'Retry-After': String(userRl.retryAfter) }) }
+    }
+  }
+  const overallRl = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'books:overall', limit: BOOKS_OVERALL_LIMIT })('all')
+  if (overallRl.limited) {
+    return { error: json(429, { error: 'Google Books rate limit hit.', code: 'RATE_LIMIT' }, { 'Retry-After': String(overallRl.retryAfter) }) }
   }
 
   let res
@@ -189,7 +210,7 @@ export default async (req) => {
   const url = new URL(req.url)
   const action = url.searchParams.get('action')
 
-  const { error } = await authorize(req)
+  const { user, error } = await authorize(req)
   if (error) return error
 
   if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
@@ -197,8 +218,12 @@ export default async (req) => {
   const lookupSpec = buildLookup(action, url.searchParams)
   if (!lookupSpec) return json(400, { error: 'Unknown action.' })
 
+  // Members/owner key provider limits by user id; the shared demo identity is
+  // keyed by client IP so one demo visitor can't throttle every other.
+  const identity = rateLimitIdentity(user, req)
+
   const store = getStore(CACHE_STORE)
-  const result = await lookup(store, lookupSpec, TTL_MS[action])
+  const result = await lookup(store, lookupSpec, TTL_MS[action], identity)
   if (result.error) return result.error
   return json(200, result.data)
 }

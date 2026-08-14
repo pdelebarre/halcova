@@ -15,9 +15,9 @@ import { findUserByCode } from './users'
 export const COLLECTIONS = { records: true, books: true }
 export const INDEX_KEY = 'index'
 
-export const json = (statusCode, body) => new Response(JSON.stringify(body), {
+export const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...headers },
 })
 
 export async function readIndex(store) {
