@@ -43,7 +43,8 @@ describe('searchByBarcode', () => {
       discogsId: 101, title: 'Miles Davis - Kind of Blue', year: 1959,
       label: 'Columbia', catno: 'CL 1355', formatRaw: 'Vinyl, LP, Album',
       formatType: 'LP', genre: ['Jazz'], style: ['Modal'], country: 'US',
-      coverImage: 'https://img/cover.jpg', barcode: '07464405491',
+      coverImage: `${url.pathname}?action=cover&url=${encodeURIComponent('https://img/cover.jpg')}`,
+      barcode: '07464405491',
     })
   })
 
@@ -51,6 +52,19 @@ describe('searchByBarcode', () => {
     global.fetch.mockResolvedValue(okJson({}))
     const results = await discogs.searchByBarcode('123')
     expect(results).toEqual([])
+  })
+
+  it('leaves the cover empty when the raw cover URL is missing or unsafe', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      results: [
+        { id: 1, title: 'No Cover' }, // no cover_image, no thumb
+        { id: 2, title: 'Http Cover', cover_image: 'http://img/cover.jpg' }, // non-https — not proxied
+      ],
+    }))
+
+    const results = await discogs.searchByBarcode('123')
+    expect(results[0].coverImage).toBe('')
+    expect(results[1].coverImage).toBe('')
   })
 })
 

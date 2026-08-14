@@ -1,4 +1,5 @@
 import { getAccessCode } from '../utils/session'
+import { proxyCoverUrl } from '../utils/cover'
 
 // Record lookups go through the server-side Discogs proxy, which owns the
 // single Discogs token, sends the User-Agent, and caches responses in Blobs.
@@ -71,7 +72,7 @@ export async function searchByBarcode(barcode) {
     genre: r.genre || [],
     style: r.style || [],
     country: r.country || '',
-    coverImage: r.cover_image || r.thumb || '',
+    coverImage: proxyCoverUrl(FN_BASE, r.cover_image || r.thumb),
     resourceUrl: r.resource_url,
     barcode: clean,
   }))
@@ -92,7 +93,7 @@ export async function searchByText(query) {
     genre: r.genre || [],
     style: r.style || [],
     country: r.country || '',
-    coverImage: r.cover_image || r.thumb || '',
+    coverImage: proxyCoverUrl(FN_BASE, r.cover_image || r.thumb),
     resourceUrl: r.resource_url,
     barcode: '',
   }))

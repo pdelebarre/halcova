@@ -42,24 +42,28 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         runtimeCaching: [
           {
+            // Cover images are re-hosted through the lookup functions (T6,
+            // ADR-0002) so the browser never touches 3rd-party hosts. Cache
+            // them CacheFirst: immutable in practice, so serve from cache and
+            // fall back to the proxy on miss.
+            urlPattern: ({ url }) =>
+              (url.pathname.startsWith('/.netlify/functions/discogs') ||
+               url.pathname.startsWith('/.netlify/functions/books')) &&
+              url.searchParams.get('action') === 'cover',
+            handler: 'CacheFirst',
+            options: { cacheName: 'covers', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } },
+          },
+          {
             // Lookups go through the Netlify function proxies (the server-side
             // Blob cache is the primary dedup). This is just a modest client
-            // cache so repeat lookups don't re-hit the network.
+            // cache so repeat lookups don't re-hit the network. Cover requests
+            // are excluded — they're handled CacheFirst above.
             urlPattern: ({ url }) =>
-              url.pathname.startsWith('/.netlify/functions/discogs') ||
-              url.pathname.startsWith('/.netlify/functions/books'),
+              (url.pathname.startsWith('/.netlify/functions/discogs') ||
+               url.pathname.startsWith('/.netlify/functions/books')) &&
+              url.searchParams.get('action') !== 'cover',
             handler: 'NetworkFirst',
             options: { cacheName: 'lookup-api', expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 } },
-          },
-          {
-            urlPattern: ({ url }) => url.hostname.includes('discogs.com') && /\.(jpe?g|png|gif)$/i.test(url.pathname),
-            handler: 'CacheFirst',
-            options: { cacheName: 'discogs-images', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } },
-          },
-          {
-            urlPattern: ({ url }) => url.hostname === 'books.google.com' && /\.(jpe?g|png|gif|webp)$/i.test(url.pathname),
-            handler: 'CacheFirst',
-            options: { cacheName: 'google-books-images', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
         ],
       },

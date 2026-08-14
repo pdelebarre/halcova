@@ -11,6 +11,8 @@
 // them unchanged. Stable fixed ids keep re-seeding deterministic.
 
 import { INDEX_KEY } from './collection-store'
+import { OWNED_COUNT_KEY } from './counts'
+import { invalidateListCache } from './list-cache'
 
 // Records: 8 curated classics with real EAN-13 barcodes. coverImage URLs are
 // real public album-cover URLs; the UI falls back to a lettered placeholder if
@@ -337,5 +339,12 @@ export async function seedDemoStore(store, items) {
   }
   await Promise.all(items.map((item) => store.setJSON(`item:${item.id}`, item)))
   await store.setJSON(INDEX_KEY, items.map((item) => item.id))
+  // Phase 0 (T3/T4): keep the seeded store's denormalized state consistent —
+  // all demo items are owned, and any stale list cache must not survive a
+  // (re)seed. Best-effort — the count/cache are derived data.
+  try {
+    await store.setJSON(OWNED_COUNT_KEY, items.length)
+  } catch { /* ignore */ }
+  await invalidateListCache(store)
   return { skipped: false, count: items.length }
 }

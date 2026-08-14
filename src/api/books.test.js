@@ -56,11 +56,29 @@ describe('searchByBarcode', () => {
       isbn: '9780140349434',
       barcode: '9780140349434',
       genre: ['Fantasy'],
-      coverImage: 'https://books.google.com/thumb.jpg', // http -> https
+      coverImage: `${url.pathname}?action=cover&url=${encodeURIComponent('https://books.google.com/thumb.jpg')}`, // http -> https -> proxied
       description: 'First book.',
       pageCount: 205,
       language: 'en',
     })
+  })
+
+  it('leaves the cover empty when there is no thumbnail', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-nocover', volumeInfo: { title: 'Plain', authors: ['A. Author'] } }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0].coverImage).toBe('')
+  })
+
+  it('drops a malformed thumbnail instead of crashing', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-bad', volumeInfo: { title: 'Bad', imageLinks: { thumbnail: 'not a url' } } }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0].coverImage).toBe('')
   })
 
   it('falls back to ISBN_10 when no ISBN_13 is present', async () => {

@@ -1,4 +1,5 @@
 import { getAccessCode } from '../utils/session'
+import { proxyCoverUrl } from '../utils/cover'
 
 // Books are looked up through the server-side Google Books proxy, which owns
 // request building (country, etc.) and caches responses in Blobs. The browser
@@ -81,7 +82,7 @@ function toBookItem(volume, scannedIsbn) {
     genre: v.categories || [],
     style: [],
     country: '',
-    coverImage: httpsUrl(v.imageLinks?.thumbnail || ''),
+    coverImage: proxyCoverUrl(FN_BASE, httpsUrl(v.imageLinks?.thumbnail || '')),
     barcode: isbn,
     description: v.description || '',
     pageCount: v.pageCount || '',
