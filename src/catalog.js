@@ -20,6 +20,11 @@ import BookGrid from './components/BookGrid'
 import BookDetail from './components/BookDetail'
 import BookManualAddModal from './components/BookManualAddModal'
 
+// Feature flag for the gamification suite (Phase 1 § Play — rollout-plan.md §1):
+// OFF by default, so nothing ships until validated. Flip to true to preview
+// release 1.1 (Collection Persona + share card) behind the "Play" entry point.
+export const GAMIFICATION_ENABLED = false
+
 export const recordsCatalog = {
   kind: 'records',
   entity: 'record',
@@ -150,6 +155,52 @@ export const recordsCatalog = {
       byGenre: 'By genre',
       byDecade: 'By decade',
       empty: 'Nothing to count yet — add some items first.',
+    },
+    // Gamification (Phase 1 § Play): release 1.1 Collection Persona + share
+    // card. Copy bridges t() (EN master in the i18n locales; other locales
+    // inherit via fallback until the native-speaker pass lands — copy-bank §11).
+    gamif: {
+      nav: t('gamif.nav'),
+      hint: t('gamif.hint', { collectionLabel: 'crate' }),
+      persona: {
+        title: t('gamif.persona.title'),
+        headline: t('gamif.persona.headline', { collectionLabel: 'crate' }),
+        emptyTitle: t('gamif.persona.emptyTitle', { entity: 'record' }),
+        emptySub: t('gamif.persona.emptySub', { entity: 'record' }),
+        loading: t('gamif.persona.loading', { collectionLabel: 'crate' }),
+        share: t('gamif.persona.share'),
+        shared: t('gamif.persona.shared'),
+        hashtag: t('gamif.persona.hashtag'),
+        tagline: t('gamif.persona.tagline'),
+        stats: {
+          count: t('gamif.persona.stat.count'),
+          genres: t('gamif.persona.stat.genres'),
+          artists: t('gamif.persona.stat.artists'),
+          topDecade: t('gamif.persona.stat.topDecade'),
+          topDecadePct: t('gamif.persona.stat.topDecadePct'),
+          decades: t('gamif.persona.stat.decades'),
+          labels: t('gamif.persona.stat.labels'),
+          countries: t('gamif.persona.stat.countries'),
+          artistAlbums: t('gamif.persona.stat.artistAlbums'),
+          pressingsOfOne: t('gamif.persona.stat.pressingsOfOne'),
+          albumsTwice: t('gamif.persona.stat.albumsTwice'),
+          notesCount: t('gamif.persona.stat.notesCount'),
+          oneDayBurst: t('gamif.persona.stat.oneDayBurst'),
+          busiestMonth: t('gamif.persona.stat.busiestMonth'),
+          jazzPct: t('gamif.persona.stat.jazzPct'),
+        },
+        archetypes: {
+          'crate-digger': { name: t('gamif.persona.crateDigger'), verdict: t('gamif.persona.verdict.crateDigger') },
+          'time-traveler': { name: t('gamif.persona.timeTraveler'), verdict: t('gamif.persona.verdict.timeTraveler') },
+          'genre-tourist': { name: t('gamif.persona.genreTourist'), verdict: t('gamif.persona.verdict.genreTourist') },
+          completist: { name: t('gamif.persona.completist'), verdict: t('gamif.persona.verdict.completist') },
+          'impulse-buyer': { name: t('gamif.persona.impulseBuyer'), verdict: t('gamif.persona.verdict.impulseBuyer') },
+          'one-timer': { name: t('gamif.persona.oneTimer'), verdict: t('gamif.persona.verdict.oneTimer') },
+          'variant-collector': { name: t('gamif.persona.variantCollector'), verdict: t('gamif.persona.verdict.variantCollector') },
+          'sophisticate': { name: t('gamif.persona.sophisticate'), verdict: t('gamif.persona.verdict.sophisticate') },
+          fallback: { name: t('gamif.persona.fallback'), verdict: t('gamif.persona.verdict.fallback') },
+        },
+      },
     },
     views: {
       title: 'Saved views',
@@ -332,6 +383,43 @@ export const booksCatalog = {
       title: 'Browse your shelf',
       clear: 'Clear browse',
       empty: 'Nothing to show here yet.',
+    },
+    // Gamification (Phase 1 § Play): release 1.1 Collection Persona + share
+    // card. Copy bridges t() (EN master in the i18n locales; other locales
+    // inherit via fallback until the native-speaker pass lands — copy-bank §11).
+    gamif: {
+      nav: t('gamif.nav'),
+      hint: t('gamif.hint', { collectionLabel: 'shelf' }),
+      persona: {
+        title: t('gamif.persona.title'),
+        headline: t('gamif.persona.headline', { collectionLabel: 'shelf' }),
+        emptyTitle: t('gamif.persona.emptyTitle', { entity: 'book' }),
+        emptySub: t('gamif.persona.emptySub', { entity: 'book' }),
+        loading: t('gamif.persona.loading', { collectionLabel: 'shelf' }),
+        share: t('gamif.persona.share'),
+        shared: t('gamif.persona.shared'),
+        hashtag: t('gamif.persona.hashtag'),
+        tagline: t('gamif.persona.tagline'),
+        stats: {
+          count: t('gamif.persona.stat.countBooks'),
+          genres: t('gamif.persona.stat.genresBooks'),
+          artists: t('gamif.persona.stat.artistsBooks'),
+          pages: t('gamif.persona.stat.pages'),
+          longestBook: t('gamif.persona.stat.longestBook'),
+          publishers: t('gamif.persona.stat.publishers'),
+          unfinishedSeries: t('gamif.persona.stat.unfinishedSeries'),
+          topAuthorPct: t('gamif.persona.stat.topAuthorPct'),
+        },
+        archetypes: {
+          'couch-intellectual': { name: t('gamif.persona.couchIntellectual'), verdict: t('gamif.persona.verdict.couchIntellectual') },
+          'series-starter': { name: t('gamif.persona.seriesStarter'), verdict: t('gamif.persona.verdict.seriesStarter') },
+          'genre-hedonist': { name: t('gamif.persona.genreHedonist'), verdict: t('gamif.persona.verdict.genreHedonist') },
+          'page-counter': { name: t('gamif.persona.pageCounter'), verdict: t('gamif.persona.verdict.pageCounter') },
+          'one-series-wonder': { name: t('gamif.persona.oneSeriesWonder'), verdict: t('gamif.persona.verdict.oneSeriesWonder') },
+          'first-edition-idealist': { name: t('gamif.persona.firstEditionIdealist'), verdict: t('gamif.persona.verdict.firstEditionIdealist') },
+          fallback: { name: t('gamif.persona.fallback'), verdict: t('gamif.persona.verdict.fallback') },
+        },
+      },
     },
     search: {
       results: (n, q) => `${n} ${n === 1 ? 'match' : 'matches'} for “${q}”`,

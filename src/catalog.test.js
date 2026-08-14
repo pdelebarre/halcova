@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recordsCatalog, booksCatalog } from './catalog'
+import { recordsCatalog, booksCatalog, GAMIFICATION_ENABLED } from './catalog'
 
 describe('recordsCatalog', () => {
   it('is shaped for records and the crate flow', () => {
@@ -78,5 +78,31 @@ describe('booksCatalog', () => {
     const year = booksCatalog.browseAxes.find((a) => a.id === 'year')
     expect(year.value({ year: 1969 })).toEqual(['1969'])
     expect(year.value({})).toEqual([])
+  })
+})
+
+describe('gamification (Phase 1 § Play)', () => {
+  it('is feature-flagged OFF by default so nothing ships until validated', () => {
+    expect(GAMIFICATION_ENABLED).toBe(false)
+  })
+
+  it('exposes a Play nav label and persona copy on both catalogs', () => {
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      expect(catalog.copy.gamif.nav).toBe('Play')
+      expect(catalog.copy.gamif.persona.title).toBe('Your persona')
+      expect(typeof catalog.copy.gamif.persona.headline).toBe('string')
+      expect(catalog.copy.gamif.persona.hashtag).toBe('#WhatsInYourHalcova')
+      expect(catalog.copy.gamif.persona.share).toBe('Export card')
+      // Fallback archetype is present for every kind.
+      expect(catalog.copy.gamif.persona.archetypes.fallback.name).toBe('A Young Collection')
+      expect(catalog.copy.gamif.persona.archetypes.fallback.verdict).toMatch(/young/i)
+    }
+  })
+
+  it('keeps records and books persona archetypes separate', () => {
+    const recordNames = Object.keys(recordsCatalog.copy.gamif.persona.archetypes)
+    const bookNames = Object.keys(booksCatalog.copy.gamif.persona.archetypes)
+    expect(recordNames).toEqual(expect.arrayContaining(['crate-digger', 'time-traveler', 'genre-tourist', 'completist', 'impulse-buyer', 'one-timer', 'variant-collector', 'sophisticate', 'fallback']))
+    expect(bookNames).toEqual(expect.arrayContaining(['couch-intellectual', 'series-starter', 'genre-hedonist', 'page-counter', 'one-series-wonder', 'first-edition-idealist', 'fallback']))
   })
 })

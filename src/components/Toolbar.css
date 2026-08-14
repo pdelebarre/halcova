@@ -217,6 +217,14 @@
   background: rgba(201, 162, 39, 0.1);
 }
 
+/* Gamification (Phase 1 § Play): the Play entry point mirrors the loans
+   button — icon-only on phone widths, gold on press. */
+.play-btn:active {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.1);
+}
+
 /* On narrow screens the Loans label hides so the toolbar row doesn't crowd —
    icon stays. The Filter label hides too (parity with the other collapsed
    labels), so the search pill keeps a usable width at 375px. */
@@ -225,10 +233,13 @@
   .browse-label { display: none; }
   .loans-btn { padding: 0 10px; gap: 4px; }
   .loans-label { display: none; }
+  .play-btn { padding: 0 10px; gap: 4px; }
+  .play-label { display: none; }
 }
 /* Tighten the Loans button to a compact icon-only pill on phone widths. */
 @media (max-width: 479px) {
   .loans-btn { padding: 0 8px; }
+  .play-btn { padding: 0 8px; }
 }
 
 .filter-badge {

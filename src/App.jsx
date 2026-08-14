@@ -8,7 +8,7 @@ import CollectionView from './CollectionView'
 import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
 import ErrorBoundary from './components/ErrorBoundary'
-import { recordsCatalog, booksCatalog } from './catalog'
+import { recordsCatalog, booksCatalog, GAMIFICATION_ENABLED } from './catalog'
 import { useAuth } from './hooks/useAuth'
 import { t } from './i18n'
 import './App.css'
@@ -110,6 +110,7 @@ export default function App() {
           isFree={isFree}
           isDemo={isDemo}
           user={user}
+          gamificationEnabled={GAMIFICATION_ENABLED}
         />
       </ErrorBoundary>
 

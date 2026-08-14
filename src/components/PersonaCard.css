@@ -1,0 +1,10 @@
+/* Release 1.1 persona share card — the inline SVG scales to fit the sheet. */
+
+.persona-card-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-md);
+  background: var(--sleeve-black);
+  box-shadow: var(--shadow-card);
+}

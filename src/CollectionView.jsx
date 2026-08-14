@@ -9,6 +9,7 @@ import ScanResult from './components/ScanResult'
 import AisleSheet from './components/AisleSheet'
 import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
+import PersonaModal from './components/PersonaModal'
 import { useCollection } from './hooks/useCollection'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { extractSearchQuery } from './utils/ocrText'
@@ -54,7 +55,7 @@ const NEW_ARRIVALS_COUNT = 5
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, isFree = false, isDemo = false }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, isFree = false, isDemo = false, gamificationEnabled = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   // Partition (§ Fix): wishlist items are UNOWNED wants — they never count as
@@ -129,6 +130,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // and the Wishlist sheet (§ Fix — unowned wants).
   const [wishlistOpen, setWishlistOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  // Gamification (Phase 1 § Play): the "Play" entry point is feature-flagged
+  // OFF by default (GAMIFICATION_ENABLED in catalog.js) — the modal only
+  // mounts when the flag is on.
+  const [playOpen, setPlayOpen] = useState(false)
   const [savedViews, setSavedViews] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`runout.views.${catalog.kind}`) || '[]') } catch { return [] }
   })
@@ -765,6 +770,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onSearchCommit={handleSearchCommit}
           onOpenStats={() => setStatsOpen(true)}
           statsOpen={statsOpen}
+          onOpenPlay={gamificationEnabled ? () => setPlayOpen(true) : undefined}
+          playLabel={copy.gamif?.nav || 'Play'}
           onOpenWishlist={() => setWishlistOpen(true)}
           wishlistOpen={wishlistOpen}
           wishlistCount={wishlistItems.length}
@@ -1109,6 +1116,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           copy={copy}
           isDemo={isDemo}
         />
+      )}
+
+      {status === 'ready' && gamificationEnabled && playOpen && (
+        <PersonaModal items={ownedItems} catalog={catalog} onClose={() => setPlayOpen(false)} />
       )}
     </>
   )
