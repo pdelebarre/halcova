@@ -60,6 +60,12 @@
     right: 0;
     bottom: 0;
     top: auto;
+    /* Cap the height so a long option list scrolls instead of clipping past
+       the top edge on short phone screens. */
+    max-height: 60vh;
+    max-height: min(60dvh, 480px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     border-bottom: none;
     padding: 8px 12px calc(var(--safe-bottom) + 12px);

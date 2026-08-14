@@ -64,8 +64,9 @@
 .sheet {
   width: 100%;
   max-width: 560px;
-  /* vh fallback for iOS < 15.4 (supports min(), not dvh). */
-  max-height: 720px;
+  /* vh fallback for iOS < 15.4 (supports min(), not dvh). A fixed 720px cap
+     can exceed the viewport on small iPhones and clip the sheet header. */
+  max-height: 84vh;
   max-height: min(84dvh, 720px);
   background: var(--vinyl-groove);
   box-shadow: var(--shadow-card);

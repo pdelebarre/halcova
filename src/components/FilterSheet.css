@@ -1,11 +1,16 @@
 .filter-sheet {
   /* vh fallback, then dvh (iOS < 15.4). */
-  max-height: 720px;
+  max-height: 84vh;
   max-height: min(84dvh, 720px);
 }
 
 .filter-body {
+  /* Flex-fill so the body scrolls inside the sheet and the footer stays
+     visible on short screens (no error boundary → don't clip the footer). */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding-right: 2px;
   display: flex;
   flex-direction: column;
