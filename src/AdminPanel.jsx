@@ -47,7 +47,8 @@ export default function AdminPanel({ onClose }) {
   const [approving, setApproving] = useState(null) // request id being approved
   const [draft, setDraft] = useState({ records: true, books: true, lending: false, plan: 'free' })
   const [granted, setGranted] = useState(null) // { user, code } just approved
-  const [revealed, setRevealed] = useState({}) // userId -> show code?
+  const [rotating, setRotating] = useState(null) // userId with a rotate in flight (double-tap guard)
+  const [rotated, setRotated] = useState(null) // { user, code } from a rotate — returned exactly once
   const [copied, setCopied] = useState(null) // which code was just copied
 
   const load = useCallback(async () => {
@@ -159,6 +160,25 @@ export default function AdminPanel({ onClose }) {
       await load()
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  // Rotate a member's (lost) code. Scaling Phase 1 hashes codes server-side,
+  // so "show the stored code" is impossible — rotating mints a NEW code and
+  // returns the plaintext exactly once. The in-flight guard prevents a
+  // double-tap from rotating twice (the button is also disabled while busy).
+  async function rotateCode(userId) {
+    if (rotating) return
+    setError('')
+    setRotating(userId)
+    try {
+      const res = await authApi.adminRotate({ userId })
+      setRotated(res)
+      await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setRotating(null)
     }
   }
 
@@ -284,6 +304,20 @@ export default function AdminPanel({ onClose }) {
             </section>
           )}
 
+          {rotated && (
+            <section className="admin-code">
+              <h3 className="admin-h3">{t('admin.newCodeFor', { name: rotated.user.name })}</h3>
+              <p className="admin-sub">{t('admin.rotatedHint')}</p>
+              <div className="admin-code-box">
+                <code className="admin-code-text">{rotated.code}</code>
+                <button className="btn btn-ghost btn-sm" onClick={() => copyText(rotated.code, `rotate-${rotated.user.id}`)}>
+                  {copied === `rotate-${rotated.user.id}` ? t('admin.copied') : t('common.copy')}
+                </button>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setRotated(null)}>{t('common.done')}</button>
+            </section>
+          )}
+
           <section>
             <h3 className="admin-h3">{t('admin.members')}{members.length ? ` (${members.length})` : ''}</h3>
             {members.length === 0 ? (
@@ -319,18 +353,14 @@ export default function AdminPanel({ onClose }) {
                           label={`${t('admin.plan')}: ${u.plan === 'unlimited' ? t('admin.planUnlimited') : t('admin.planFree')}`}
                         />
                       </div>
-                      {revealed[u.id] && (
-                        <div className="admin-code-box inline">
-                          <code className="admin-code-text">{u.code}</code>
-                          <button className="btn btn-ghost btn-sm" onClick={() => copyText(u.code, `member-${u.id}`)}>
-                            {copied === `member-${u.id}` ? t('admin.copied') : t('common.copy')}
-                          </button>
-                        </div>
-                      )}
                     </div>
                     <div className="admin-row-actions">
-                      <button className="btn btn-ghost btn-sm" onClick={() => setRevealed((prev) => ({ ...prev, [u.id]: !prev[u.id] }))}>
-                        {revealed[u.id] ? t('admin.hideCode') : t('admin.showCode')}
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => rotateCode(u.id)}
+                        disabled={rotating === u.id}
+                      >
+                        {t('admin.rotateCode')}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(u.id)}>
                         {u.status === 'active' ? t('admin.disable') : t('admin.enable')}
