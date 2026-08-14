@@ -89,4 +89,15 @@ describe('auth API', () => {
       collections: { records: true, books: false },
     })
   })
+
+  it('adminRotate mints a new code for a member and sends it with the admin key', async () => {
+    saveSession({ user: { id: 'owner', role: 'admin' }, code: 'super-secret-admin' })
+    global.fetch.mockResolvedValue(res(200, { user: MEMBER, code: 'RU-7777-6666-5555' }))
+    const out = await auth.adminRotate({ userId: 'u1' })
+    expect(out.code).toBe('RU-7777-6666-5555')
+    const [url, init] = global.fetch.mock.calls[0]
+    expect(url).toContain('/.netlify/functions/admin')
+    expect(init.headers.Authorization).toBe('Bearer super-secret-admin')
+    expect(JSON.parse(init.body)).toEqual({ action: 'rotate', userId: 'u1' })
+  })
 })

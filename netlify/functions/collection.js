@@ -8,51 +8,16 @@ import { parsePagination, sliceIds, isDefaultPage } from './_shared/pagination'
 import { ensureOwnedCount, adjustOwnedCount, wishlistToggleDelta } from './_shared/counts'
 import { readListCache, writeListCache, invalidateListCache } from './_shared/list-cache'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { isPostgresConfigured } from './_shared/postgres'
+import { handlePostgres } from './_shared/collection-postgres'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity fixed-window limit for collection reads/writes (T5).
 const COLLECTION_RATE_LIMIT = Number(process.env.RUNOUT_COLLECTION_RATE_LIMIT) || 60
 
-export default async (req) => {
-  const url = new URL(req.url)
-  const collection = url.searchParams.get('collection') || 'records'
-  const id = url.searchParams.get('id')
-
-  const { user, error } = await authorize(req)
-  if (error) return error
-
-  if (!COLLECTIONS[collection]) return json(400, { error: 'Unknown collection.' })
-  if (!user.collections?.[collection]) {
-    return json(403, { error: `Your plan doesn't include the ${collection} collection.` })
-  }
-
-  // Per-user rate limit (T5): a runaway client or a stuck loop can't hammer
-  // the blob store. Members/owner are keyed by user id; the shared demo
-  // identity is keyed by client IP so one demo visitor never throttles the
-  // whole demo. Skipped when there's no identity to key on (e.g. a demo
-  // visitor with no forwarded IP header).
-  const identity = rateLimitIdentity(user, req)
-  if (identity) {
-    const limiter = createRateLimiter({
-      store: getStore(RATE_LIMITS_STORE),
-      scope: `collection:${collection}`,
-      limit: COLLECTION_RATE_LIMIT,
-    })
-    const rl = await limiter(identity)
-    if (rl.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-    }
-  }
-
-  // The demo space is read-only, enforced server-side. GET stays open so demo
-  // visitors can browse, scan and search; every write is rejected.
-  if (req.method !== 'GET' && user.role === 'demo') {
-    return json(403, {
-      error: 'The demo collection is read-only. Sign in to add your own items.',
-      code: 'DEMO_READONLY',
-    })
-  }
-
+// The Blobs-backed handler — the pre-Phase-1 behavior, unchanged. Reached when
+// DATABASE_URL is absent, or as the read-through fallback when Postgres errors.
+async function handleBlobs(req, { user, collection, id, url }) {
   // Owner → legacy stores (existing data preserved); members → their own
   // isolated store per kind.
   const store = getStore(storeNameFor(user.id, collection))
@@ -156,4 +121,60 @@ export default async (req) => {
   } catch (err) {
     return json(500, { error: err.message || 'Internal error' })
   }
+}
+
+export default async (req) => {
+  const url = new URL(req.url)
+  const collection = url.searchParams.get('collection') || 'records'
+  const id = url.searchParams.get('id')
+
+  const { user, error } = await authorize(req)
+  if (error) return error
+
+  if (!COLLECTIONS[collection]) return json(400, { error: 'Unknown collection.' })
+  if (!user.collections?.[collection]) {
+    return json(403, { error: `Your plan doesn't include the ${collection} collection.` })
+  }
+
+  // Per-user rate limit (T5): a runaway client or a stuck loop can't hammer
+  // the blob store. Members/owner are keyed by user id; the shared demo
+  // identity is keyed by client IP so one demo visitor never throttles the
+  // whole demo. Skipped when there's no identity to key on (e.g. a demo
+  // visitor with no forwarded IP header).
+  const identity = rateLimitIdentity(user, req)
+  if (identity) {
+    const limiter = createRateLimiter({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: `collection:${collection}`,
+      limit: COLLECTION_RATE_LIMIT,
+    })
+    const rl = await limiter(identity)
+    if (rl.limited) {
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+    }
+  }
+
+  // The demo space is read-only, enforced server-side. GET stays open so demo
+  // visitors can browse, scan and search; every write is rejected.
+  if (req.method !== 'GET' && user.role === 'demo') {
+    return json(403, {
+      error: 'The demo collection is read-only. Sign in to add your own items.',
+      code: 'DEMO_READONLY',
+    })
+  }
+
+  // Phase 1 (ADR-0002): when DATABASE_URL is configured, serve from Postgres
+  // (read DB first, fall back to Blobs on miss/error). If Postgres is
+  // unreachable, the whole request degrades to the Blobs path — a Postgres
+  // outage behaves exactly like today instead of 500ing.
+  if (isPostgresConfigured()) {
+    try {
+      return await handlePostgres(req, { user, collection, id, url })
+    } catch (err) {
+      console.error('collection: Postgres path failed, falling back to Blobs:', err?.message || err)
+      return handleBlobs(req, { user, collection, id, url })
+    }
+  }
+
+  return handleBlobs(req, { user, collection, id, url })
 }

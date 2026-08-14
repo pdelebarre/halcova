@@ -91,3 +91,11 @@ export async function adminUpdateUser({ userId, collections, status, features, p
 export async function adminDeleteUser({ userId }) {
   return postJson(ADMIN_URL, { action: 'deleteUser', userId }, getAccessCode())
 }
+
+// Rotate a member's code (Scaling Phase 1): the backend only keeps a sha256
+// hash, so it mints a NEW code, stores its hash, and returns the new plaintext
+// exactly once ({ user, code } — same shape as approve). The old code stops
+// working immediately.
+export async function adminRotate({ userId }) {
+  return postJson(ADMIN_URL, { action: 'rotate', userId }, getAccessCode())
+}

@@ -50,14 +50,19 @@ whole auth subsystem.
   collections; uses the legacy blob stores.
 - **Member**: `user:{ id, name, email, code, collections: {records, books},
   role: 'member', status: 'active'|'disabled' }`. Their collection access is
-  the per-collection plan. Access codes are stored in plaintext so an admin can
-  re-reveal a lost code — a documented trade-off (see `docs/technical.md`).
+  the per-collection plan. Since Scaling Phase 1 (ADR-0002), Postgres stores
+  only `code_hash` (sha256 of the normalized code); the admin "re-reveal a lost
+  code" is now **rotate** (POST `rotate` mints a NEW code and returns the new
+  plaintext exactly once). The legacy Blobs identity store keeps plaintext
+  during read-through so the cutover is reversible (see `docs/technical.md`
+  and `db/README.md`).
 - **Plan enforcement**: `collection.js` returns 403 when a member's
   `collections` doesn't include the requested kind.
 
 ## Security Rules (non-negotiable)
 - NEVER log or return access codes or the admin key.
-- Always send users to the client through `publicUser` (strips `code`).
+- Always send users to the client through `publicUser` (strips `code` AND
+  `code_hash`).
 - `RUNOUT_ADMIN_KEY` comes from the Netlify env (or `.env` for `netlify dev`).
   The dev fallback `runout-dev-admin-key` must NEVER reach production.
 - The owner account cannot be edited or deleted via the admin API.
@@ -80,8 +85,11 @@ index:requests  -> ordered list of request ids
 - **Disable a member**: `adminUpdateUser({ userId, status: 'disabled' })`
   (their code stops working — `me`/`login` return 403).
 - **Delete a member**: `adminDeleteUser({ userId })` — also wipes their stores.
-- **Reveal a lost code**: read the member record from the identity store
-  (codes are stored in plaintext by design).
+- **Rotate a lost code**: `POST { action: 'rotate', userId }` to the admin
+  function (admin key as Bearer) — it mints a NEW `RU-…` code, stores its
+  hash, and returns the new plaintext once so you can hand it to the member.
+  The old code stops working immediately. (Pre-Phase-1, this was "re-reveal"
+  from plaintext — no longer possible with hashing.)
 - **Change code format**: edit `generateAccessCode()` in `_shared/auth.js`
   (keep `RU-` prefix and the no-ambiguous-chars alphabet).
 

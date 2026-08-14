@@ -17,6 +17,7 @@ import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/au
 import { findUserByCode } from './_shared/users'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
+import { readCache, writeCache } from './_shared/lookup-cache'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -33,7 +34,9 @@ let warnedKeyless = false
 
 // One shared store for ALL users: user A's lookup serves user B. Keys are
 // namespaced per action and hold { ts, data } so we can enforce a TTL (Netlify
-// Blobs has no native expiry).
+// Blobs has no native expiry). Part B: reads go DB-first (lookup_cache) when
+// Postgres is configured and fall back to this Blob store; writes go to both
+// (see _shared/lookup-cache.js). Covers stay Blobs-only.
 const CACHE_STORE = 'books-cache'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -159,17 +162,12 @@ export async function fetchGoogleWithRetry(url, { retries = 1, delayMs = 800 } =
 // Serve from the shared cache when fresh; otherwise hit Google and cache the
 // response. Only successful responses are cached — never errors. `identity` is
 // the caller's rate-limit identity (user id, or client IP for the demo).
-async function lookup(store, lookupSpec, ttlMs, identity) {
-  // A failed cache read is a cache miss — never fail a valid lookup.
-  let cached
-  try {
-    cached = await store.get(lookupSpec.cacheKey, { type: 'json' })
-  } catch {
-    cached = null
-  }
-  if (cached?.data && cached?.ts && Date.now() - cached.ts < ttlMs) {
-    return { data: cached.data }
-  }
+async function lookup(lookupSpec, ttlMs, identity) {
+  // DB-first read-through (Part B): lookup_cache when Postgres is configured,
+  // the legacy Blobs cache otherwise / on miss / on error. A failed read is a
+  // miss — never fail a valid lookup.
+  const cached = await readCache('books', lookupSpec.cacheKey, ttlMs)
+  if (cached) return { data: cached }
 
   // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
   // overall cap protects the shared quota even across different users.
@@ -199,11 +197,9 @@ async function lookup(store, lookupSpec, ttlMs, identity) {
   }
 
   const data = await res.json()
-  try {
-    await store.setJSON(lookupSpec.cacheKey, { ts: Date.now(), data })
-  } catch {
-    // Caching is best-effort — a failed write must not fail a successful lookup.
-  }
+  // Caching is best-effort — a failed write must not fail a successful lookup.
+  // Writes through to both the DB and the legacy Blob store.
+  await writeCache('books', lookupSpec.cacheKey, data, ttlMs)
   return { data }
 }
 
@@ -233,8 +229,7 @@ export default async (req) => {
   // keyed by client IP so one demo visitor can't throttle every other.
   const identity = rateLimitIdentity(user, req)
 
-  const store = getStore(CACHE_STORE)
-  const result = await lookup(store, lookupSpec, TTL_MS[action], identity)
+  const result = await lookup(lookupSpec, TTL_MS[action], identity)
   if (result.error) return result.error
   return json(200, result.data)
 }
