@@ -36,8 +36,14 @@ export function useAuth() {
   const requestAccess = useCallback((payload) => authApi.requestAccess(payload), [])
 
   const refresh = useCallback(async () => {
-    const user = await authApi.me().catch(() => null)
-    setSession(user ? { user, code: getAccessCode() } : null)
+    try {
+      const user = await authApi.me()
+      setSession(user ? { user, code: getAccessCode() } : null)
+    } catch {
+      // Offline / server error — keep the cached session so the shell still
+      // works. Only a resolved `null` from me() (revoked/disabled, 401/403)
+      // signs the user out (S5, #53).
+    }
   }, [])
 
   const logout = useCallback(() => {

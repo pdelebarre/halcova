@@ -28,7 +28,7 @@ import { planLimitFor } from './plans'
 import { storeNameFor } from './users'
 import { parsePagination, sliceIds } from './pagination'
 import { DEMO_SEED, seedDemoStore } from './demo-data'
-import { adjustOwnedCount, ensureOwnedCount } from './counts'
+import { adjustOwnedCount, ensureOwnedCount, wishlistToggleDelta } from './counts'
 import { invalidateListCache } from './list-cache'
 import { getRepository } from './repository'
 
@@ -176,10 +176,42 @@ async function handlePut(req, { user, collection, id }) {
   if (!existing) return json(404, { error: 'Not found' })
 
   const patch = await req.json()
+  const convertingToOwned = wishlistToggleDelta(patch, existing).delta === 1
+  const limit = planLimitFor(user)
+
+  // S4 (#58): converting a wishlist item to owned consumes the free-tier cap
+  // like an add — the same backfill-aware guard as handlePost (M2). For an
+  // un-backfilled store the SQL owned count reads 0, so count owned against
+  // the Blobs mirror until any row exists; once backfilled the SQL count
+  // inside the transaction is authoritative. Only the wishlist → owned
+  // direction is capped; all other edits stay uncapped, and paid plans /
+  // admin / owner are never affected (planLimitFor returns null).
+  if (limit != null && convertingToOwned) {
+    const sqlOwned = await repo.items.countOwned(user.id, collection)
+    if (sqlOwned === 0) {
+      const store = getStore(storeNameFor(user.id, collection))
+      const blobOwned = await ensureOwnedCount(store, readIndex)
+      if (blobOwned >= limit) {
+        return json(403, { error: planLimitError(limit).message, code: 'PLAN_LIMIT' })
+      }
+    }
+  }
+
   const updated = { ...existing, ...patch, id }
-  await repo.items.transaction(async (tx) => {
-    await tx.updateItem(user.id, collection, id, updated)
-  })
+  try {
+    await repo.items.transaction(async (tx) => {
+      // The cap check and the update share one transaction so the SQL owned
+      // count can't drift between the check and the write (parity with POST).
+      if (limit != null && convertingToOwned) {
+        const owned = await tx.countOwned(user.id, collection)
+        if (owned >= limit) throw planLimitError(limit)
+      }
+      await tx.updateItem(user.id, collection, id, updated)
+    })
+  } catch (err) {
+    if (err?.code === 'PLAN_LIMIT') return json(403, { error: err.message, code: 'PLAN_LIMIT' })
+    throw err // DB-level error -> the Blobs fallback in collection.js handles it
+  }
   await mirrorUpdate(user.id, collection, id, updated, existing)
   return json(200, updated)
 }

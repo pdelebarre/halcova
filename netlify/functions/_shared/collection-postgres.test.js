@@ -288,6 +288,88 @@ describe('PUT / DELETE', () => {
   })
 })
 
+describe('S4 — convert-to-owned cap (#58)', () => {
+  it('blocks a free member at the SQL cap from converting a wishlist item to owned (403 PLAN_LIMIT)', async () => {
+    // 10 owned items + one wishlist item in Postgres (backfilled store).
+    for (let i = 1; i <= 10; i += 1) await repo.items.insertItem(MEMBER.id, 'records', item(i))
+    const wish = { ...item(99), wishlist: true }
+    await repo.items.insertItem(MEMBER.id, 'records', wish)
+
+    const res = await call('PUT', `?collection=records&id=${wish.id}`, { wishlist: false })
+    expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body.code).toBe('PLAN_LIMIT')
+    expect(body.error).toContain('free plan limit of 10')
+    // The wishlist item is untouched (the cap check + update share the transaction).
+    const stored = await repo.items.getItem(MEMBER.id, 'records', wish.id)
+    expect(stored.wishlist).toBe(true)
+  })
+
+  it('allows the conversion below the cap and raises the owned count', async () => {
+    for (let i = 1; i <= 9; i += 1) await repo.items.insertItem(MEMBER.id, 'records', item(i))
+    const wish = { ...item(99), wishlist: true }
+    await repo.items.insertItem(MEMBER.id, 'records', wish)
+
+    const res = await call('PUT', `?collection=records&id=${wish.id}`, { wishlist: false })
+    expect(res.status).toBe(200)
+    expect((await repo.items.getItem(MEMBER.id, 'records', wish.id)).wishlist).toBe(false)
+    expect(await repo.items.countOwned(MEMBER.id, 'records')).toBe(10)
+  })
+
+  it('enforces the cap against the Blobs mirror for an un-backfilled store (M2)', async () => {
+    // Postgres has NO rows for this member; 10 owned + 1 wishlist item live in
+    // Blobs, so the SQL owned count reads 0 and the Blobs count governs.
+    const store = createStore()
+    stores[`collection-${MEMBER.id}-records`] = store
+    const ids = []
+    for (let i = 1; i <= 10; i += 1) {
+      const it = item(i)
+      store.data.set(`item:${it.id}`, it)
+      ids.push(it.id)
+    }
+    const wish = { ...item(99), wishlist: true }
+    store.data.set(`item:${wish.id}`, wish)
+    ids.push(wish.id)
+    store.data.set('index', ids)
+    store.data.set('count:owned', 10)
+
+    const res = await call('PUT', `?collection=records&id=${wish.id}`, { wishlist: false })
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('PLAN_LIMIT')
+  })
+
+  it('never blocks a paid plan (premium) from converting at/over the cap', async () => {
+    for (let i = 1; i <= 20; i += 1) await repo.items.insertItem(MEMBER.id, 'records', item(i))
+    const wish = { ...item(99), wishlist: true }
+    await repo.items.insertItem(MEMBER.id, 'records', wish)
+
+    const res = await call('PUT', `?collection=records&id=${wish.id}`, { wishlist: false }, { ...MEMBER, plan: 'premium' })
+    expect(res.status).toBe(200)
+    expect((await repo.items.getItem(MEMBER.id, 'records', wish.id)).wishlist).toBe(false)
+  })
+
+  it('never blocks the owner (admin) from converting', async () => {
+    const wish = { ...item(98), wishlist: true }
+    await repo.items.insertItem(OWNER.id, 'records', wish)
+
+    const res = await call('PUT', `?collection=records&id=${wish.id}`, { wishlist: false }, OWNER)
+    expect(res.status).toBe(200)
+  })
+
+  it('leaves owned → wishlist and notes-only edits uncapped', async () => {
+    for (let i = 1; i <= 10; i += 1) await repo.items.insertItem(MEMBER.id, 'records', item(i))
+
+    // notes-only edit at the cap is allowed.
+    const res = await call('PUT', `?collection=records&id=${item(1).id}`, { notes: 'reissue' })
+    expect(res.status).toBe(200)
+
+    // owned -> wishlist drops the count and is never blocked.
+    const res2 = await call('PUT', `?collection=records&id=${item(1).id}`, { wishlist: true })
+    expect(res2.status).toBe(200)
+    expect(await repo.items.countOwned(MEMBER.id, 'records')).toBe(9)
+  })
+})
+
 describe('demo space stays on Blobs', () => {
   it('self-seeds and serves the curated demo items from Blobs', async () => {
     const res = await call('GET', '?collection=records', undefined, DEMO)
