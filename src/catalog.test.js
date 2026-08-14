@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recordsCatalog, booksCatalog } from './catalog'
+import { recordsCatalog, booksCatalog, GAMIFICATION_ENABLED } from './catalog'
 
 describe('recordsCatalog', () => {
   it('is shaped for records and the crate flow', () => {
@@ -78,5 +78,78 @@ describe('booksCatalog', () => {
     const year = booksCatalog.browseAxes.find((a) => a.id === 'year')
     expect(year.value({ year: 1969 })).toEqual(['1969'])
     expect(year.value({})).toEqual([])
+  })
+})
+
+describe('gamification (Phase 1 § Play)', () => {
+  it('is feature-flagged OFF by default so nothing ships until validated', () => {
+    expect(GAMIFICATION_ENABLED).toBe(false)
+  })
+
+  it('exposes a Play nav label and persona copy on both catalogs', () => {
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      expect(catalog.copy.gamif.nav).toBe('Play')
+      expect(catalog.copy.gamif.persona.title).toBe('Your persona')
+      expect(typeof catalog.copy.gamif.persona.headline).toBe('string')
+      expect(catalog.copy.gamif.persona.hashtag).toBe('#WhatsInYourHalcova')
+      expect(catalog.copy.gamif.persona.share).toBe('Export card')
+      // Fallback archetype is present for every kind.
+      expect(catalog.copy.gamif.persona.archetypes.fallback.name).toBe('A Young Collection')
+      expect(catalog.copy.gamif.persona.archetypes.fallback.verdict).toMatch(/young/i)
+    }
+  })
+
+  it('keeps records and books persona archetypes separate', () => {
+    const recordNames = Object.keys(recordsCatalog.copy.gamif.persona.archetypes)
+    const bookNames = Object.keys(booksCatalog.copy.gamif.persona.archetypes)
+    expect(recordNames).toEqual(expect.arrayContaining(['crate-digger', 'time-traveler', 'genre-tourist', 'completist', 'impulse-buyer', 'one-timer', 'variant-collector', 'sophisticate', 'fallback']))
+    expect(bookNames).toEqual(expect.arrayContaining(['couch-intellectual', 'series-starter', 'genre-hedonist', 'page-counter', 'one-series-wonder', 'first-edition-idealist', 'fallback']))
+  })
+
+  it('exposes the Play hub tabs on both catalogs', () => {
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      expect(catalog.copy.gamif.tabs.persona).toBe('Persona')
+      expect(catalog.copy.gamif.tabs.progression).toBe('Progress')
+      expect(catalog.copy.gamif.tabs.stories).toBe('Stories')
+    }
+  })
+
+  it('exposes per-kind level ladders (copy-bank.md §4)', () => {
+    expect(recordsCatalog.copy.gamif.progression.levels.map((l) => l.title)).toEqual([
+      'Crate Sprout', 'Crate Nerd', 'Crate Digger', 'Vinyl Sage', 'Crate Deity',
+    ])
+    expect(booksCatalog.copy.gamif.progression.levels.map((l) => l.title)).toEqual([
+      'Page Turner', 'Shelf Stacker', 'Bookworm', 'Literary Cartographer', 'Shelf Sovereign',
+    ])
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      expect(catalog.copy.gamif.progression.levels).toHaveLength(5)
+      for (const level of catalog.copy.gamif.progression.levels) {
+        expect(level.toast).toBeTypeOf('string')
+      }
+    }
+  })
+
+  it('exposes the badge copy bank for every badge id the engine knows', () => {
+    const ids = ['digger', 'pageturner', 'genre-tourist', 'time-traveler', 'completist', 'impulse-buyer', 'sleeve-sleuth', 'balanced-diet', 'one-timer', 'variant-hoarder', 'friend-of-crate', 'quiz-whiz']
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      for (const id of ids) {
+        expect(catalog.copy.gamif.badges[id]).toBeDefined()
+        expect(catalog.copy.gamif.badges[id].name).toBeTypeOf('string')
+        expect(catalog.copy.gamif.badges[id].line).toBeTypeOf('string')
+      }
+    }
+  })
+
+  it('exposes Shelf Stories copy with cards for every story id', () => {
+    const ids = ['year-span', 'decade-bias', 'era-lesson', 'country-mix', 'series', 'one-timer', 'notes-coverage', 'total-pages']
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      expect(catalog.copy.gamif.stories.headline).toMatch(/stories/i)
+      expect(catalog.copy.gamif.stories.quest).toBe('Turn into a quest')
+      for (const id of ids) {
+        expect(catalog.copy.gamif.stories.cards[id]).toBeDefined()
+        expect(catalog.copy.gamif.stories.cards[id].title).toBeTypeOf('string')
+        expect(catalog.copy.gamif.stories.cards[id].body).toBeTypeOf('string')
+      }
+    }
   })
 })

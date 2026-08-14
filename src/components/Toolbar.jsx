@@ -45,6 +45,8 @@ export default function Toolbar({
   onOpenWishlist,
   wishlistOpen = false,
   wishlistCount = 0,
+  onOpenPlay,
+  playLabel = 'Play',
   savedViews = [],
   onSaveView,
   onApplyView,
@@ -257,6 +259,26 @@ export default function Toolbar({
         </svg>
         {wishlistCount > 0 && <span className="filter-badge">{wishlistCount}</span>}
       </button>
+
+      {/* Gamification (Phase 1 § Play): release 1.1 Persona entry point.
+          Rendered only when the feature flag is on (CollectionView passes
+          onOpenPlay); absent by default. */}
+      {typeof onOpenPlay === 'function' && (
+        <button
+          type="button"
+          className="toolbar-btn play-btn"
+          onClick={onOpenPlay}
+          aria-haspopup="dialog"
+          aria-label={playLabel}
+          title={playLabel}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor" stroke="none" />
+          </svg>
+          <span className="play-label">{playLabel}</span>
+        </button>
+      )}
 
       {/* W7: global loans dashboard — only when lending is enabled. */}
       {renderLoansButton()}

@@ -593,7 +593,10 @@ skips functions), or Git-connected import.
 - All lookups go through the Netlify function proxies and are cached in shared
   Blob stores (`discogs-cache` / `books-cache`); the browser never calls
   `api.discogs.com` or `www.googleapis.com` directly.
-- No tracking, no third-party analytics.
+- No tracking by default, no third-party analytics. (The gamification
+  instrument `src/utils/track.js` is first-party and **opt-in only** — it
+  queues `gamif_*` events in `localStorage` (capped, sanitized) and does
+  nothing unless a user enables it; see `docs/gamification-phase0.md` §4.)
 - Camera frames are decoded entirely client-side in WASM — no images are
   uploaded anywhere.
 - All traffic is HTTPS in production; camera access additionally requires a
