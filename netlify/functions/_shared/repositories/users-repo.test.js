@@ -58,8 +58,18 @@ describe('saveUser / getUser / listUsers — hashed code, exact blob shape other
     await repo.saveUser(MEMBER)
     const got = await repo.getUser('u1')
     // A Postgres-backed user never carries `code` (or `code_hash`) — the
-    // client only ever holds the code it was issued.
-    expect(got).toEqual({ ...MEMBER, code: undefined })
+    // client only ever holds the code it was issued. The S2 nullable billing
+    // fields default to null (columns don't exist until S3's migration), so
+    // the read shape matches the Blobs normalizeUser exactly.
+    expect(got).toEqual({
+      ...MEMBER,
+      code: undefined,
+      planExpiresAt: null,
+      planChangedAt: null,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      stripeCheckoutSessionId: null,
+    })
     expect(got).not.toHaveProperty('code_hash')
     expect(got.plan).toBe('free')
     expect(got.features).toEqual({ lending: true })
@@ -76,6 +86,19 @@ describe('saveUser / getUser / listUsers — hashed code, exact blob shape other
     expect(got.plan).toBe('free')
     expect(got.features).toEqual({})
     expect(got.collections).toEqual({})
+  })
+
+  it('defaults the S2 nullable billing fields to null on rows without them (no migration)', async () => {
+    // The S3 columns don't exist yet — a Postgres row reads back with every
+    // new field null, exactly like the Blobs normalizeUser, so old rows read
+    // cleanly across both backends (ADR-0003 §2.3).
+    await repo.saveUser(MEMBER)
+    const got = await repo.getUser('u1')
+    expect(got.planExpiresAt).toBeNull()
+    expect(got.planChangedAt).toBeNull()
+    expect(got.stripeCustomerId).toBeNull()
+    expect(got.stripeSubscriptionId).toBeNull()
+    expect(got.stripeCheckoutSessionId).toBeNull()
   })
 
   it('lists users and returns null for a missing id', async () => {

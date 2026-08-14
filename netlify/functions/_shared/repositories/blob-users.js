@@ -8,7 +8,10 @@
 // Layout inside the single "runout-identity" store:
 //   user:<id>      -> { id, name, email, code, collections:{records,books},
 //                       features:{lending,games}, // per-account capability flags; off by default
-//                       plan:'free'|'unlimited', // free-tier plan; defaults to 'free'
+//                       plan:'free'|'premium'|'lifetime'|'unlimited', // defaults to 'free'
+//                       planExpiresAt?, planChangedAt?,                  // nullable billing fields (S2)
+//                       stripeCustomerId?, stripeSubscriptionId?,         // nullable billing fields (S2)
+//                       stripeCheckoutSessionId?,                        // nullable billing field (S2)
 //                       role:'admin'|'member', status:'active'|'disabled', createdAt }
 //   request:<id>   -> { id, name, email, status:'pending'|'approved'|'rejected', createdAt }
 //   index:users    -> ordered list of user ids
@@ -24,10 +27,13 @@
 // (sanitizeFeatures rebuilds it), so feature toggles must send the FULL map or
 // they silently wipe the other flag.
 //
-// `plan` is the free-tier plan: new members are stamped `'free'` on approve
-// (see admin.js) and reads default to `'free'` when the field is absent (no
-// record migration needed). The owner is implicitly unlimited (planLimitFor
-// in _shared/plans.js).
+// `plan` is the plan enum (ADR-0003 §2.3): new members are stamped `'free'` on
+// approve (see admin.js) and reads default to `'free'` when the field is
+// absent (no record migration needed). The owner is implicitly uncapped
+// (planLimitFor in _shared/plans.js). The billing/plan-expiry fields are
+// nullable and additive (S2): old records lack them and reads default them to
+// null via normalizeUser; they are written by the S3 payment webhook, never by
+// S2.
 //
 // Access codes are stored in plaintext so an admin can re-reveal a lost code
 // from the admin panel. The blob store is private to the site; this is an
@@ -68,12 +74,23 @@ async function removeRecord(prefix, indexKey, id) {
 
 // ---- Users ----
 
-// Every stored user may predate the `plan` field (no migration was run), so
-// reads normalize it here — the single choke point every user read flows
-// through (listUsers feeds findUserByCode, and getUser covers direct lookups).
+// Every stored user may predate the `plan` field and the billing fields (no
+// migration was run), so reads normalize them here — the single choke point
+// every user read flows through (listUsers feeds findUserByCode, and getUser
+// covers direct lookups). `plan` defaults to 'free'; the nullable billing/
+// plan-expiry fields (ADR-0003 §2.3, S2 — written by the S3 payment webhook)
+// default to null when absent, so old Blobs records read cleanly.
 function normalizeUser(user) {
   if (!user) return null
-  return { ...user, plan: user.plan || 'free' }
+  return {
+    ...user,
+    plan: user.plan || 'free',
+    planExpiresAt: user.planExpiresAt ?? null,
+    planChangedAt: user.planChangedAt ?? null,
+    stripeCustomerId: user.stripeCustomerId ?? null,
+    stripeSubscriptionId: user.stripeSubscriptionId ?? null,
+    stripeCheckoutSessionId: user.stripeCheckoutSessionId ?? null,
+  }
 }
 
 export const listUsers = async () => (await listRecords(USER_PREFIX, USERS_INDEX)).map(normalizeUser)

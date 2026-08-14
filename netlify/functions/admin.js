@@ -33,8 +33,12 @@ function sanitizeCollections(collections) {
 
 // Only these plan values exist. Anything else is rejected (returns null) — an
 // unknown plan must never be silently accepted onto a user record.
+// S2 (ADR-0003 §2.3): `premium` (subscription) and `lifetime` (one-time) join
+// the enum; `unlimited` is the grandfathered private-test value; `free` is the
+// only capped plan. The billing fields are NOT settable here — the S3 payment
+// webhook materializes them; the admin only ever picks the plan.
 function sanitizePlan(value) {
-  if (value === 'free' || value === 'unlimited') return value
+  if (value === 'free' || value === 'premium' || value === 'lifetime' || value === 'unlimited') return value
   return null
 }
 

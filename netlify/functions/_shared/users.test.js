@@ -133,6 +133,51 @@ describe('findUserByCode — O(1) code index (T1)', () => {
   })
 })
 
+describe('normalizeUser — S2 plan enum + nullable billing defaults (ADR-0003 §2.3)', () => {
+  it('defaults the nullable billing/plan fields to null on a legacy record (no migration)', async () => {
+    // A pre-S2 record: no billing fields, no plan. Every read must expose the
+    // full shape so the S3 webhook and the client never see undefined.
+    seedUser({ ...MEMBER, plan: undefined })
+    const user = await findUserByCode('RU-AAAA-BBBB-CCCC')
+    expect(user.plan).toBe('free')
+    expect(user.planExpiresAt).toBeNull()
+    expect(user.planChangedAt).toBeNull()
+    expect(user.stripeCustomerId).toBeNull()
+    expect(user.stripeSubscriptionId).toBeNull()
+    expect(user.stripeCheckoutSessionId).toBeNull()
+  })
+
+  it('defaults the same fields via getUser', async () => {
+    seedUser({ ...MEMBER, plan: undefined })
+    const user = await getUser('u1')
+    expect(user.plan).toBe('free')
+    expect(user.planExpiresAt).toBeNull()
+    expect(user.stripeCustomerId).toBeNull()
+    expect(user.stripeSubscriptionId).toBeNull()
+    expect(user.stripeCheckoutSessionId).toBeNull()
+  })
+
+  it('preserves explicitly-set billing fields and paid plans on read', async () => {
+    const paid = {
+      ...MEMBER,
+      plan: 'premium',
+      planExpiresAt: '2027-08-14T00:00:00.000Z',
+      planChangedAt: '2026-08-14T00:00:00.000Z',
+      stripeCustomerId: 'cus_123',
+      stripeSubscriptionId: 'sub_123',
+      stripeCheckoutSessionId: 'cs_test_123',
+    }
+    seedUser(paid)
+    const user = await getUser('u1')
+    expect(user.plan).toBe('premium')
+    expect(user.planExpiresAt).toBe('2027-08-14T00:00:00.000Z')
+    expect(user.planChangedAt).toBe('2026-08-14T00:00:00.000Z')
+    expect(user.stripeCustomerId).toBe('cus_123')
+    expect(user.stripeSubscriptionId).toBe('sub_123')
+    expect(user.stripeCheckoutSessionId).toBe('cs_test_123')
+  })
+})
+
 describe('saveUser — keeps the code index in sync', () => {
   it('writes the code index and user-list index when creating a user with a code', async () => {
     const store = identity()

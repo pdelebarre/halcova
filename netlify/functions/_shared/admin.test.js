@@ -136,6 +136,32 @@ describe('auth guard & unknown actions', () => {
   })
 })
 
+describe('plan enum (S2 — premium / lifetime / unlimited / free)', () => {
+  it('updateUser accepts the full plan enum', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    for (const plan of ['premium', 'lifetime', 'unlimited', 'free']) {
+      usersMock.saveUser.mockClear()
+      const res = await post({ action: 'updateUser', userId: 'u1', plan })
+      expect(res.status).toBe(200)
+      expect(usersMock.saveUser).toHaveBeenCalledTimes(1)
+      expect(usersMock.saveUser.mock.calls[0][0].plan).toBe(plan)
+    }
+  })
+
+  it('updateUser rejects an unknown plan (400) and never persists it', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    const res = await post({ action: 'updateUser', userId: 'u1', plan: 'platinum' })
+    expect(res.status).toBe(400)
+    expect(usersMock.saveUser).not.toHaveBeenCalled()
+  })
+
+  it('still refuses to edit the owner account', async () => {
+    const res = await post({ action: 'updateUser', userId: 'owner', plan: 'premium' })
+    expect(res.status).toBe(400)
+    expect(usersMock.saveUser).not.toHaveBeenCalled()
+  })
+})
+
 describe('per-account feature flags (lending + games)', () => {
   it('KNOWN_FEATURES contains both the lending and games flags', () => {
     expect(KNOWN_FEATURES).toEqual(['lending', 'games'])

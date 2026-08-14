@@ -4,8 +4,15 @@
 // collection-store.js keep working unchanged.
 //
 // User blob shape  -> { id, name, email, collections:{records,books},
-//                        features:{lending}, plan, role, status, createdAt }
+//                        features:{lending,games}, plan, planExpiresAt?, planChangedAt?,
+//                        stripeCustomerId?, stripeSubscriptionId?, stripeCheckoutSessionId?,
+//                        role, status, createdAt }
 // Request blob shape -> { id, name, email, status, createdAt, approvedAt?, rejectedAt? }
+//
+// S2 (ADR-0003 §2.3): the nullable billing/plan-expiry fields are returned by
+// toUser as null when the column is absent — the columns do NOT exist yet (no
+// S2 migration). Reads stay clean on both backends; the S3 payment webhook
+// adds the columns (003_*.sql) and extends USER_COLUMNS / userRowValues.
 //
 // Part B (auth hashing + admin rotation): the plaintext `code` column is DROPPED
 // (migration 002_hash_codes.sql). `code_hash` = sha256(normalize(code)) is the
@@ -58,6 +65,14 @@ function toUser(row) {
     collections: row.collections || {},
     features: row.features || {},
     plan: row.plan || 'free',          // normalized exactly like the blob read
+    // Nullable billing fields (S2): read from their (future, S3) columns and
+    // default to null when absent — old rows read cleanly, and once the S3
+    // migration adds the columns and extends USER_COLUMNS these light up.
+    planExpiresAt: toIso(row.plan_expires_at) || null,
+    planChangedAt: toIso(row.plan_changed_at) || null,
+    stripeCustomerId: row.stripe_customer_id || null,
+    stripeSubscriptionId: row.stripe_subscription_id || null,
+    stripeCheckoutSessionId: row.stripe_checkout_session_id || null,
     role: row.role,
     status: row.status,
     createdAt: toIso(row.created_at),

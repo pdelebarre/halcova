@@ -15,6 +15,7 @@
 
 import { getStore } from '@netlify/blobs'
 import { COLLECTIONS, authorize, json } from './_shared/collection-store'
+import { effectiveFeatures } from './_shared/entitlements'
 import { storeNameFor } from './_shared/users'
 
 const FEATURE_OFF_MSG = "Lending isn't enabled for your account."
@@ -90,11 +91,13 @@ function validateAction(body) {
 }
 
 // Plan + feature gate. Both 403 cases share the exact contract message.
-// The owner carries `features: { lending: true }` from authorize() (W3), so
-// owner and member are gated on the same flag — no special-casing the owner.
+// Lending is derived (ADR-0003 §2.3, S2): any paid plan (premium/lifetime/
+// unlimited) includes it, the admin/owner role is always entitled, and the
+// admin can still grant `features.lending` to a free member. `effectiveFeatures`
+// resolves all three — no special-casing the owner.
 function featureGate(user, collection) {
   if (!user.collections?.[collection]) return json(403, { error: FEATURE_OFF_MSG })
-  if (user.features?.lending !== true) return json(403, { error: FEATURE_OFF_MSG })
+  if (!effectiveFeatures(user).lending) return json(403, { error: FEATURE_OFF_MSG })
   return null
 }
 
