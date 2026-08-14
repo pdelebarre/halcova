@@ -273,3 +273,31 @@ describe('S3 billing fields — round-trip, preserve-on-undefined, Stripe lookup
     await expect(repo.saveUser({ ...BILLED, id: 'u2', email: 'other@example.com' })).rejects.toThrow()
   })
 })
+
+// ---- S8 one-time code delivery (migration 004) ------------------------------
+
+describe('codeDelivered — one-time access-code delivery flag (S8, #54)', () => {
+  it('round-trips false (pending) -> true (delivered) and preserves it on unrelated updates', async () => {
+    // A brand-new prospect is materialized with codeDelivered: false — the
+    // status poll delivers the code exactly once, then flips it to true.
+    await repo.saveUser({ ...MEMBER, codeDelivered: false })
+    expect((await repo.getUser('u1')).codeDelivered).toBe(false)
+
+    await repo.saveUser({ ...(await repo.getUser('u1')), codeDelivered: true })
+    expect((await repo.getUser('u1')).codeDelivered).toBe(true)
+
+    // Preserve-on-undefined: an unrelated update must not wipe the marker.
+    await repo.saveUser({ ...(await repo.getUser('u1')), codeDelivered: undefined, collections: { records: true, books: false } })
+    const got = await repo.getUser('u1')
+    expect(got.codeDelivered).toBe(true)
+    expect(got.collections).toEqual({ records: true, books: false })
+  })
+
+  it('reads a row with no code_delivered as undefined (not-yet-delivered)', async () => {
+    // MEMBER carries no codeDelivered -> the column stays NULL (migration 004
+    // is nullable + additive), and the read treats it as "not yet delivered"
+    // so a pre-004 row still delivers its code once.
+    await repo.saveUser(MEMBER)
+    expect((await repo.getUser('u1')).codeDelivered).toBeUndefined()
+  })
+})

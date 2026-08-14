@@ -90,14 +90,16 @@ function validateAction(body) {
   return null
 }
 
-// Plan + feature gate. Both 403 cases share the exact contract message.
-// Lending is derived (ADR-0003 §2.3, S2): any paid plan (premium/lifetime/
-// unlimited) includes it, the admin/owner role is always entitled, and the
-// admin can still grant `features.lending` to a free member. `effectiveFeatures`
-// resolves all three — no special-casing the owner.
+// Plan + feature gate. Both 403 cases share the exact contract message and a
+// machine-readable `code: 'FEATURE_OFF'` (parity with PLAN_LIMIT / RATE_LIMIT /
+// DEMO_READONLY) so the client can branch on it instead of string-matching the
+// error. Lending is derived (ADR-0003 §2.3, S2): any paid plan (premium/
+// lifetime/unlimited) includes it, the admin/owner role is always entitled, and
+// the admin can still grant `features.lending` to a free member.
+// `effectiveFeatures` resolves all three — no special-casing the owner.
 function featureGate(user, collection) {
-  if (!user.collections?.[collection]) return json(403, { error: FEATURE_OFF_MSG })
-  if (!effectiveFeatures(user).lending) return json(403, { error: FEATURE_OFF_MSG })
+  if (!user.collections?.[collection]) return json(403, { error: FEATURE_OFF_MSG, code: 'FEATURE_OFF' })
+  if (!effectiveFeatures(user).lending) return json(403, { error: FEATURE_OFF_MSG, code: 'FEATURE_OFF' })
   return null
 }
 

@@ -1,0 +1,21 @@
+-- 004_code_delivered.sql — S8 (#54, M2): one-time access-code delivery flag on
+-- `users`.
+--
+-- The S3 `status` poll returns the freshly-issued RU- access code to the
+-- session owner exactly once (the sessionId is a capability token — whoever
+-- holds the `?session_id=…` URL can poll it). This column records whether that
+-- delivery has happened, so a leaked URL can read the member's code at most
+-- once instead of permanently.
+--
+-- Semantics (mirrored by toUser / normalizeUser):
+--   - NULL (never set)  -> treated as "not yet delivered" by the status poll,
+--                          so a pre-004 row (or a row materialized on the
+--                          Blobs path) still delivers its code once.
+--   - false             -> a brand-new prospect's code is pending delivery.
+--   - true              -> already delivered (or the member already holds it).
+--
+-- Nullable + additive like 003: old rows read cleanly (undefined on the client
+-- shape until the first poll marks it) and no backfill is required. Plain DDL
+-- only (pg-mem compatible, like 001-003) so the repo unit tests exercise it.
+
+ALTER TABLE users ADD COLUMN code_delivered boolean;

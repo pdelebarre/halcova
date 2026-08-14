@@ -17,13 +17,18 @@
 // the same surface (ADR-0003 §4.3).
 //
 // Security rules (non-negotiable):
-//   - The generated access code is returned ONCE, over HTTPS, to the session
-//     owner via the `status` poll (they hold the sessionId — a capability
-//     token). The webhook never echoes it; publicUser strips billing ids.
+//   - The generated access code is returned EXACTLY ONCE, over HTTPS, to the
+//     session owner via the first `status` poll (they hold the sessionId — a
+//     capability token). The webhook never echoes it; publicUser strips
+//     billing ids. A signed-in member never sees a code via `status` (M2).
 //   - owner / demo identities can never create checkout sessions (403).
+//   - `checkout` and `status` are rate-limited (M1): both are pre-auth or
+//     unauthenticated surfaces, so a flood can't create unlimited pending
+//     requests or fire unbounded Stripe API calls (cost/quota).
 //   - STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET never leave the server.
 
 import { randomUUID } from 'node:crypto'
+import { getStore } from '@netlify/blobs'
 import {
   ADMIN_KEY,
   bearer,
@@ -47,12 +52,29 @@ import {
   priceIdForPlan,
   retrieveSession,
 } from './_shared/stripe'
+import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { materializeCheckoutSession } from './_shared/entitlements'
 
-const json = (statusCode, body) => new Response(JSON.stringify(body), {
+const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...headers },
 })
+
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+// M1 (S8, #54): `checkout` is pre-auth (a prospect checks out with just an
+// email) and `status` is unauthenticated (anyone with the sessionId polls it).
+// Per-IP bounds a flood from one source; per-email bounds one inbox being
+// spammed with pending requests + Stripe Checkout sessions (cost/quota).
+// Mirrors the auth.js fixed-window pattern (same Blob store, `RATE_LIMIT` code).
+const CHECKOUT_IP_LIMIT = Number(process.env.RUNOUT_PAYMENT_CHECKOUT_IP_RATE_LIMIT) || 20
+const CHECKOUT_EMAIL_LIMIT = Number(process.env.RUNOUT_PAYMENT_CHECKOUT_RATE_LIMIT) || 5
+const STATUS_IP_LIMIT = Number(process.env.RUNOUT_PAYMENT_STATUS_IP_RATE_LIMIT) || 60
+
+// The shared 429 for both limited surfaces — same `{ error, code }` + Retry-After
+// contract as auth.js (RATE_LIMIT).
+function rateLimited(rl) {
+  return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+}
 
 // A thrown helper error carrying its own HTTP status + `{ error, code }` body —
 // caught once in the default export and formatted there.
@@ -86,9 +108,17 @@ function nameFromEmail(email) {
 // Where the post-checkout redirect should land. STRIPE_SITE_URL is the S3 env
 // for success/cancel + portal return URLs (falls back to RUNOUT_SITE_URL, then
 // the request origin so `netlify dev` works with no env).
+//
+// m2 (S8, #54): production must be EXPLICITLY configured — never trust the
+// request Host/Origin headers there (host-header injection could point the
+// post-checkout / portal return URL at an attacker's origin). Fail closed with
+// a 503 instead; the header fallback is dev/test-only.
 function siteUrl(req) {
   const configured = process.env.STRIPE_SITE_URL || process.env.RUNOUT_SITE_URL
   if (configured) return configured.trimEnd('/')
+  if (process.env.NODE_ENV === 'production') {
+    throw httpError(503, { error: "Payments aren't configured for this site yet.", code: 'CHECKOUT_FAILED' })
+  }
   const origin = req?.headers?.get('origin')
   if (origin) return origin
   const host = req?.headers?.get('host')
@@ -137,7 +167,23 @@ const materializeDeps = {
 }
 
 async function handleCheckout(body, req) {
+  // M1: `checkout` is pre-auth (a prospect checks out with email alone) — rate
+  // limit before any identity/Stripe work. Per-IP bounds a flood from one
+  // source; per-email bounds one inbox being spammed into unbounded pending
+  // requests + Checkout sessions (Stripe cost/quota).
+  const ip = clientIp(req)
+  if (ip) {
+    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'payment:checkout:ip', limit: CHECKOUT_IP_LIMIT })(ip)
+    if (byIp.limited) return rateLimited(byIp)
+  }
+
   const identity = await resolveIdentity(req, body)
+  const email = identity.kind === 'member' ? cleanEmail(identity.user.email) : cleanEmail(identity.email)
+  if (email) {
+    const byEmail = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'payment:checkout:email', limit: CHECKOUT_EMAIL_LIMIT })(email)
+    if (byEmail.limited) return rateLimited(byEmail)
+  }
+
   const plan = String(body.plan || '').trim()
   if (plan !== 'premium' && plan !== 'lifetime') {
     return json(400, { error: "Choose a plan to buy (premium or lifetime).", code: 'PRICE_UNKNOWN' })
@@ -147,7 +193,6 @@ async function handleCheckout(body, req) {
     return json(400, { error: "That plan isn't available yet.", code: 'PRICE_UNKNOWN' })
   }
 
-  const email = identity.kind === 'member' ? cleanEmail(identity.user.email) : identity.email
   if (!email) throw httpError(400, { error: 'Your account has no email on file — sign in again.' })
 
   // Get-or-create the pending `request:<id>` (deduped by email, S1 helpers) —
@@ -188,15 +233,63 @@ async function handleCheckout(body, req) {
   return json(200, { url: session.url, sessionId: session.id })
 }
 
-async function handleStatus(body) {
+async function handleStatus(body, req) {
   const sessionId = String(body.sessionId || '').trim()
   if (!sessionId) return json(400, { error: 'Missing sessionId.' })
+
+  // M1: `status` is unauthenticated (anyone who ever sees `?session_id=…` can
+  // poll it) — per-IP limit so one source can't hammer Stripe retrieve calls
+  // (cost/quota) and can't brute-force a session id.
+  const ip = clientIp(req)
+  if (ip) {
+    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'payment:status:ip', limit: STATUS_IP_LIMIT })(ip)
+    if (byIp.limited) return rateLimited(byIp)
+  }
+
+  // M2: a signed-in member ALREADY holds their access code in their session —
+  // `status` must never hand it back out over the wire. If a Bearer is
+  // present, require it to be valid (401/403 on an unknown/disabled account,
+  // 403 for the owner/demo who have no code to collect) and suppress the code
+  // from the response entirely.
+  const bearerCode = bearer(req)
+  let member = null
+  if (bearerCode) {
+    if (bearerCode === ADMIN_KEY || isDemoCode(bearerCode)) {
+      throw httpError(403, { error: "This account doesn't collect a checkout code.", code: 'PAYMENT_REQUIRED' })
+    }
+    member = await findUserByCode(bearerCode)
+    if (!member) throw httpError(401, { error: "That access code isn't recognized." })
+    if (member.status !== 'active') throw httpError(403, { error: 'This account is disabled.' })
+  }
+
+  // Deliver the completion response. The access code goes out ONLY to a
+  // non-member caller (a brand-new prospect who just paid) and ONLY on the
+  // first successful poll (`codeDelivered`), so a leaked sessionId is a
+  // one-time capability, not a permanent backdoor to the member's code. Both
+  // the webhook fast-path and the reconcile path funnel through here so the
+  // once-delivery guarantee can never drift.
+  const respondComplete = async (user, code) => {
+    const notYetDelivered = user.codeDelivered !== true
+    let deliverCode = null
+    if (!member && notYetDelivered) {
+      deliverCode = code || await plaintextCodeFor(user.id)
+    }
+    if (deliverCode) {
+      // Persist the delivery marker so the NEXT poll (or anyone with the URL)
+      // can never read the code again.
+      await saveUser({ ...user, codeDelivered: true })
+    }
+    return json(200, {
+      status: 'complete',
+      user: publicUser(user),
+      ...(deliverCode ? { code: deliverCode } : {}),
+    })
+  }
 
   // Fast path: the webhook already landed and materialized the entitlement.
   const materialized = await findUserByStripeSession(sessionId)
   if (materialized) {
-    const code = await plaintextCodeFor(materialized.id)
-    return json(200, { status: 'complete', user: publicUser(materialized), code })
+    return respondComplete(materialized, null)
   }
 
   // Reconcile path (self-healing for webhook lag / missed delivery): retrieve
@@ -226,15 +319,12 @@ async function handleStatus(body) {
 
   try {
     const { user, code } = await materializeCheckoutSession(session, materializeDeps)
-    return json(200, { status: 'complete', user: publicUser(user), code })
+    return respondComplete(user, code)
   } catch {
     // A concurrent webhook delivery may have materialized in the meantime —
     // re-check before surfacing a failure (idempotent either way).
     const again = await findUserByStripeSession(sessionId)
-    if (again) {
-      const code = await plaintextCodeFor(again.id)
-      return json(200, { status: 'complete', user: publicUser(again), code })
-    }
+    if (again) return respondComplete(again, null)
     return json(500, { error: 'Could not finalize your payment.' })
   }
 }
@@ -266,7 +356,7 @@ export default async (req) => {
     // are AWAITED so the try/catch below formats them instead of letting the
     // rejection escape the function.
     if (body.action === 'checkout') return await handleCheckout(body, req)
-    if (body.action === 'status') return await handleStatus(body)
+    if (body.action === 'status') return await handleStatus(body, req)
     if (body.action === 'portal') return await handlePortal(body, req)
     return json(400, { error: 'Unknown action.' })
   } catch (err) {
