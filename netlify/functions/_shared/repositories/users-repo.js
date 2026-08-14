@@ -204,6 +204,21 @@ export function createUsersRepo(db) {
     return rows.length ? rows[0].data : null
   }
 
+  // Member lookup by email (case/whitespace-insensitive) for the self-serve
+  // magic-link flow (ADR-0003 S1) — mirrors blob-users.findUserByEmail so a
+  // returning visitor is recognized and never gets a duplicate account.
+  async function findUserByEmail(email) {
+    const norm = String(email || '').trim().toLowerCase()
+    if (!norm) return null
+    const { rows } = await db.query(
+      `SELECT ${USER_COLUMNS} FROM users
+       WHERE lower(btrim(email)) = $1
+       ORDER BY created_at ASC, id ASC LIMIT 1`,
+      [norm],
+    )
+    return rows.length ? toUser(rows[0]) : null
+  }
+
   return {
     findUserByCode,
     getUser,
@@ -215,5 +230,6 @@ export function createUsersRepo(db) {
     saveRequest,
     removeRequest,
     findPendingRequestByEmail,
+    findUserByEmail,
   }
 }

@@ -164,6 +164,18 @@ export async function findPendingRequestByEmail(email) {
   ) || null
 }
 
+// Resolve an existing member by email (case/whitespace-insensitive). Used by
+// the self-serve magic-link flow (ADR-0003 S1) so a returning visitor is
+// recognized and never gets a duplicate account. O(n) scan over members — the
+// same trade-off as the pre-Phase-0 code lookup (signup is low-frequency; this
+// is only hit on magic-link click, not on every authenticated request).
+export async function findUserByEmail(email) {
+  const norm = String(email || '').trim().toLowerCase()
+  if (!norm) return null
+  const users = await listUsers()
+  return users.find((u) => String(u.email || '').trim().toLowerCase() === norm) || null
+}
+
 // ---- Per-member collection stores ----
 
 const STORE_NAMES = { records: 'runout-collection', books: 'runout-library' }

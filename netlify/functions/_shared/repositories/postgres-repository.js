@@ -159,6 +159,7 @@ export function createPostgresRepository({ db = postgresDb } = {}) {
     listRequests: readThrough(usersPg.listRequests, blobUsers.listRequests),
     getRequest: readThrough(usersPg.getRequest, blobUsers.getRequest),
     findPendingRequestByEmail: readThrough(usersPg.findPendingRequestByEmail, blobUsers.findPendingRequestByEmail),
+    findUserByEmail: readThrough(usersPg.findUserByEmail, blobUsers.findUserByEmail),
     // Auth-relevant writes — FAIL CLOSED: both-or-neither across Postgres + the
     // Blobs mirror (rotate / disable-enable / delete / approve).
     saveUser: authWriteFailClosed(db, 'saveUser', blobUsers.saveUser, (user) => user?.id),

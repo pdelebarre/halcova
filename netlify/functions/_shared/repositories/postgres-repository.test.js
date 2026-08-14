@@ -22,6 +22,7 @@ const { blob } = vi.hoisted(() => {
     saveRequest: vi.fn(),
     removeRequest: vi.fn(),
     findPendingRequestByEmail: vi.fn(),
+    findUserByEmail: vi.fn(),
     deleteUserCollections: vi.fn(),
     storeNameFor: vi.fn(),
   }

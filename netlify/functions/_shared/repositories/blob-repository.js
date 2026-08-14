@@ -20,6 +20,7 @@ export function createBlobRepository() {
       saveRequest: blobUsers.saveRequest,
       removeRequest: blobUsers.removeRequest,
       findPendingRequestByEmail: blobUsers.findPendingRequestByEmail,
+      findUserByEmail: blobUsers.findUserByEmail,
     },
     items: null,
     lookupCache: null,
