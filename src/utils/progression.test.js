@@ -291,4 +291,15 @@ describe('computeProgression', () => {
     expect(() => computeProgression([], recordsCatalog)).not.toThrow()
     expect(computeProgression([], recordsCatalog).level.level).toBe(1)
   })
+
+  it('is idempotent — identical XP, level, and badges on every call (no double-count)', () => {
+    const items = notedCrate(10)
+    const a = computeProgression(items, recordsCatalog)
+    const b = computeProgression(items, recordsCatalog)
+    expect(a.xp.total).toBe(b.xp.total)
+    expect(a.xp).toEqual(b.xp)
+    expect(a.level).toEqual(b.level)
+    expect(a.badges).toEqual(b.badges)
+    expect(a).toEqual(b)
+  })
 })

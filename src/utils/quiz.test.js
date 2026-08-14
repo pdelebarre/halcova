@@ -81,6 +81,22 @@ describe('buildQuiz', () => {
     expect(a.questions).toEqual(b.questions)
   })
 
+  it('sweeps determinism — the same day is identical across many builds, another day differs', () => {
+    const items = fullCrate()
+    const base = buildQuiz(items, { day: DAY, catalog: recordsCatalog })
+
+    // The same local day re-derives the same seeded PRNG every time — 25
+    // independent builds must all deal the exact same questions (no external
+    // randomness anywhere in the pipeline).
+    for (let i = 0; i < 25; i += 1) {
+      expect(buildQuiz(items, { day: DAY, catalog: recordsCatalog }).questions).toEqual(base.questions)
+    }
+
+    // A different local day re-seeds the PRNG → a different question set.
+    const tomorrow = buildQuiz(items, { day: '2026-06-16', catalog: recordsCatalog })
+    expect(JSON.stringify(tomorrow.questions)).not.toBe(JSON.stringify(base.questions))
+  })
+
   it('deals 3–5 questions', () => {
     const quiz = buildQuiz(fullCrate(), { day: DAY, catalog: recordsCatalog })
     expect(quiz.questions.length).toBeGreaterThanOrEqual(3)

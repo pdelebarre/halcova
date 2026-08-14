@@ -156,4 +156,48 @@ describe('ProgressionPanel (release 1.2)', () => {
     const events = JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]')
     expect(events.some((e) => e.event === 'gamif_share_exported' && e.props.cardType === 'badge' && e.props.badgeId === 'sleeve-sleuth')).toBe(true)
   })
+
+  it('fires the level-up toast once on a level unlock, then never re-toasts', () => {
+    // 10 items, no notes, 2 artists / 2 genres / 2 decades / ≤2 per day →
+    // exactly Level 2 (100 XP) and NO badge unlocks, so only the level toast.
+    const items = Array.from({ length: 10 }, (_, i) => record(`l${i}`, {
+      title: `${i % 2 === 0 ? 'Artist A' : 'Artist B'} - Album ${i}`,
+      genre: [i % 2 === 0 ? 'Rock' : 'Jazz'],
+      year: 1980 + (i % 2) * 10,
+      dateAdded: `2026-03-${String((i % 5) + 1).padStart(2, '0')}T12:00:00`,
+    }))
+    const first = renderPanel(items)
+
+    // The level toast carries the level title + the kind's tail copy.
+    expect(screen.getByText('Level up: Crate Nerd')).toBeInTheDocument()
+    expect(screen.getByText('Your crate salutes you.')).toBeInTheDocument()
+
+    first.unmount()
+
+    // Unlock-once: re-mounting with the same state never re-toasts the level-up.
+    renderPanel(items)
+    expect(screen.queryByText('Level up: Crate Nerd')).not.toBeInTheDocument()
+  })
+
+  it('re-rendering yields identical XP/level/badges — no double-counting', () => {
+    const items = sleeveSleuthCrate()
+    const { rerender } = render(
+      <LocaleProvider>
+        <ProgressionPanel items={items} catalog={recordsCatalog} />
+      </LocaleProvider>
+    )
+
+    expect(screen.getByText('150 XP')).toBeInTheDocument()
+    expect(screen.getByText('Crate Nerd')).toBeInTheDocument()
+
+    rerender(
+      <LocaleProvider>
+        <ProgressionPanel items={items} catalog={recordsCatalog} />
+      </LocaleProvider>
+    )
+
+    // XP is a pure derivation of items + ledger — a re-render never re-credits.
+    expect(screen.getByText('150 XP')).toBeInTheDocument()
+    expect(screen.getByText('Crate Nerd')).toBeInTheDocument()
+  })
 })

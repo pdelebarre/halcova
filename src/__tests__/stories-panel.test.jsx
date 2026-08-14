@@ -104,4 +104,45 @@ describe('StoriesPanel (release 1.4)', () => {
     fireEvent.click(dots[1])
     expect(dots[1]).toHaveAttribute('aria-selected', 'true')
   })
+
+  it('steps back with the Previous story button and disables at the first card', () => {
+    renderPanel(storyCrate())
+    const dots = screen.getAllByRole('tab')
+    const prev = screen.getByRole('button', { name: 'Previous story' })
+    const next = screen.getByRole('button', { name: 'Next story' })
+
+    // First card: Previous is disabled.
+    expect(prev).toBeDisabled()
+    expect(dots[0]).toHaveAttribute('aria-selected', 'true')
+
+    // Advance twice, then step back one at a time.
+    fireEvent.click(next)
+    fireEvent.click(next)
+    expect(dots[2]).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(prev)
+    expect(dots[1]).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(prev)
+    expect(dots[0]).toHaveAttribute('aria-selected', 'true')
+    expect(prev).toBeDisabled()
+  })
+
+  it('shows only the facts tier for a small collection (<4 items) — no era lesson', () => {
+    // 3 items, all 1980s → facts (span + decade bias) but no recommendations.
+    const tiny = [
+      record('t1', { title: 'Nina Simone - Pastel Blues', year: 1980, genre: ['Jazz'], country: 'US' }),
+      record('t2', { title: 'Miles Davis - Kind of Blue', year: 1983, genre: ['Jazz'], country: 'US' }),
+      record('t3', { title: 'The Clash - Sandinista!', year: 1985, genre: ['Rock'], country: 'UK' }),
+    ]
+    renderPanel(tiny)
+
+    // Facts tier present.
+    expect(screen.getAllByRole('article').length).toBeGreaterThan(0)
+    expect(screen.getByText('The 1980s are your era')).toBeInTheDocument()
+
+    // Recommendations tier suppressed below 4 items (era-lesson + one-timer).
+    expect(screen.queryByText(/Era lesson:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/teaser/i)).not.toBeInTheDocument()
+  })
 })

@@ -226,4 +226,74 @@ describe('QuizPanel (release 1.3 — Crate Quiz)', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
   })
+
+  it('reveals the correct order on a sortShelf miss through the panel', () => {
+    const items = fullCrate()
+    const quiz = buildQuiz(items, { day: TODAY, catalog: recordsCatalog })
+    const sortIdx = quiz.questions.findIndex((q) => q.type === 'sortShelf')
+    expect(sortIdx).toBeGreaterThanOrEqual(0)
+
+    renderPanel(items)
+    fireEvent.click(screen.getByRole('button', { name: 'Start the quiz' }))
+
+    // Answer every question before the sortShelf correctly.
+    for (let i = 0; i < sortIdx; i += 1) {
+      const q = quiz.questions[i]
+      fireEvent.click(screen.getByRole('button', { name: q.options[q.answerIndex] }))
+      fireEvent.click(screen.getByRole('button', { name: /Next question|Day complete!/ }))
+    }
+
+    // Miss the sortShelf: tap the options in REVERSE order.
+    const q = quiz.questions[sortIdx]
+    for (const id of [...q.answerIds].reverse()) {
+      const opt = q.options.find((o) => o.itemId === id)
+      fireEvent.click(screen.getByRole('button', { name: opt.title }))
+    }
+
+    // The teaching reveal spells out the correct year order.
+    const order = q.reveal.ordered.map((o) => `${o.title} (${o.year})`).join(' · ')
+    expect(screen.getByText(`Correct order: ${order}`)).toBeInTheDocument()
+    expect(screen.getByText(/Wrong/)).toBeInTheDocument()
+  })
+
+  it('resets the streak after two missed days — the next play starts a fresh 1-day streak', () => {
+    // Last played 3 days ago (two+ missed days) → the old run has reset.
+    recordQuizResult('records', { day: '2026-06-12', correct: 2, total: 3 })
+    const quiz = buildQuiz(fullCrate(), { day: TODAY, catalog: recordsCatalog })
+
+    renderPanel(fullCrate())
+    fireEvent.click(screen.getByRole('button', { name: 'Start the quiz' }))
+    answerAllCorrect(quiz)
+
+    // A fresh 1-day streak — the two-day gap broke the old one.
+    expect(screen.getByText(/1-day streak/)).toBeInTheDocument()
+    expect(screen.queryByText(/2-day streak|3-day streak/)).not.toBeInTheDocument()
+  })
+
+  it('never renders barcodes, ISBNs, access codes, or admin keys anywhere in the quiz UI', () => {
+    const items = fullCrate().map((it) => ({
+      ...it,
+      barcode: `01234567890${it.id}`,
+      isbn: `978-3-16-148410-${it.id}`,
+      accessCode: 'RU-1234-5678-9012',
+      adminKey: 'hunter2',
+      notes: `note-${it.id}`,
+    }))
+    const quiz = buildQuiz(items, { day: TODAY, catalog: recordsCatalog })
+
+    renderPanel(items)
+    fireEvent.click(screen.getByRole('button', { name: 'Start the quiz' }))
+    answerFirstWrong(quiz)
+
+    // The teaching reveal shows the item's own notes (allowed)…
+    const reveal = quiz.questions[0].reveal
+    expect(screen.getByText(/Wrong/).textContent).toContain(`note-${reveal.itemId}`)
+
+    // …but planted secrets never appear anywhere in the rendered quiz.
+    const body = document.body.textContent
+    expect(body).not.toContain('RU-1234-5678-9012')
+    expect(body).not.toContain('hunter2')
+    expect(body).not.toContain('978-3-16-148410-')
+    expect(body).not.toContain('01234567890')
+  })
 })
