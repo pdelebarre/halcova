@@ -6,7 +6,8 @@ catalog into a daily habit loop that helps members discover **what they like**,
 their collection.
 
 **Status:** concept + requirements elaboration, ready for product validation and
-a dev estimate. Work lives on the `feat/gamification` branch.
+a dev estimate. The PM-owned phased rollout plan is in `rollout-plan.md`. Work
+lives on the `feat/gamification` branch.
 
 ## Authoritative files (use these)
 
@@ -15,6 +16,7 @@ a dev estimate. Work lives on the `feat/gamification` branch.
 | `concept.md` | **The creative concept** — insight, the four discovery pillars, core loop, six game ideas, phasing, anti-patterns |
 | `requirements.md` | **Elaborated requirements** — goals/KPIs, design rules, per-feature mechanics, edge cases, acceptance criteria, funnel events, `[VALIDATE]` list, dev handoff |
 | `copy-bank.md` | **Copy bank** — umbrella taglines, persona archetypes, quiz copy, quests, badges, levels, share cards, translation notes |
+| `rollout-plan.md` | **Phased rollout plan** — PM-owned: phase slicing (0, 1.1–1.4, 2, 3), owners, gates, and open decisions |
 
 ## The pitch in one line
 
