@@ -43,12 +43,14 @@ export function bearer(req) {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : ''
 }
 
-// Strip sensitive fields (the access code) before sending a user to the client.
-// Everything else — including the per-account `features` flag map — passes
-// through untouched, so the client can read session.user.features.lending.
+// Strip sensitive fields (the access code AND its sha256 hash) before sending
+// a user to the client. Everything else — including the per-account `features`
+// flag map — passes through untouched, so the client can read
+// session.user.features.lending. The client only ever needs the plaintext code
+// it was issued, which it already holds in localStorage.runout.session.
 export function publicUser(user) {
   if (!user) return null
-  const { code: _code, ...rest } = user
+  const { code: _code, code_hash: _hash, ...rest } = user
   return rest
 }
 

@@ -48,7 +48,9 @@ describe('applyMigrations (scripts/db-migrate.mjs)', () => {
     expect(second).toEqual([])
     expect(first.length).toBeGreaterThan(0)
     // Data written after the first run survives a second run (no re-apply).
-    await pool.query('INSERT INTO users (id, name) VALUES ($1, $2)', ['u1', 'Ada'])
+    // 002_hash_codes drops the plaintext `code` column and makes `code_hash`
+    // NOT NULL, so inserts must carry a hash.
+    await pool.query('INSERT INTO users (id, name, code_hash) VALUES ($1, $2, $3)', ['u1', 'Ada', 'abc123'])
     await applyMigrations(pool, MIGRATIONS_DIR)
     const { rows } = await pool.query('SELECT count(*)::int AS c FROM users')
     expect(rows[0].c).toBe(1)

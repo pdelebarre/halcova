@@ -116,17 +116,23 @@ async function handleLogin(body, req) {
   const user = await profileForCode(code)
   if (!user) return json(401, { error: "That access code isn't recognized. Check it and try again." })
   if (user.status !== 'active') return json(403, { error: 'This account is disabled. Ask the admin to re-enable it.' })
-  return json(200, sessionPayload(user))
+  return json(200, sessionPayload(user, normalizeCode(code)))
 }
 
 // The canonical code for a session: the admin key for the owner, the public
 // demo code for the demo identity, or the member's stored (uppercase) code.
 // Storing this client-side means every later API call authenticates no matter
 // how the code was typed at sign-in.
-function sessionPayload(user) {
+//
+// `fallbackCode` covers the Postgres path: since Part B stores only the sha256
+// hash, a Postgres-backed user has no plaintext `code` to return. The client
+// already typed/holds the code, so we hand back the normalized (trim+uppercase)
+// form of what it sent — byte-identical to the Blobs path for real codes.
+function sessionPayload(user, fallbackCode) {
+  const code = user.role === 'admin' ? ADMIN_KEY : (user.role === 'demo' ? DEMO_CODE : (user.code || fallbackCode))
   return {
     user: publicUser(user),
-    code: user.role === 'admin' ? ADMIN_KEY : (user.role === 'demo' ? DEMO_CODE : user.code),
+    code,
   }
 }
 
@@ -144,7 +150,7 @@ async function handleMe(req) {
   const user = await profileForCode(code)
   if (!user) return json(401, { error: 'Not signed in.' })
   if (user.status !== 'active') return json(403, { error: 'This account is disabled.' })
-  return json(200, sessionPayload(user))
+  return json(200, sessionPayload(user, normalizeCode(code)))
 }
 
 export default async (req) => {

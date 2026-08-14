@@ -1,21 +1,25 @@
 // Test helper for the Phase 1 Postgres repositories: builds a pg-mem
 // in-memory Postgres with the REAL migration SQL applied, and exposes a
 // node-postgres-shaped `db` ({ query, connect }) that the repos accept.
-// Because every repo test boots the schema from db/migrations/001_init.sql,
-// the migration itself is exercised on every test run (no live DB in the
-// sandbox — see the report).
-import { readFile } from 'node:fs/promises'
+// Because every repo test boots the schema from db/migrations/*.sql (001 + 002
+// in order, exactly like production), the migrations themselves are exercised
+// on every test run (no live DB in the sandbox — see the report).
+import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DataType, newDb } from 'pg-mem'
 
-const MIGRATION_PATH = path.join(
-  fileURLToPath(new URL('../../../../db/migrations/001_init.sql', import.meta.url)),
+const MIGRATIONS_DIR = path.join(
+  fileURLToPath(new URL('../../../../db/migrations', import.meta.url)),
 )
 
 let cachedSql = null
 async function migrationSql() {
-  if (!cachedSql) cachedSql = await readFile(MIGRATION_PATH, 'utf8')
+  if (!cachedSql) {
+    const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith('.sql')).sort()
+    const chunks = await Promise.all(files.map((f) => readFile(path.join(MIGRATIONS_DIR, f), 'utf8')))
+    cachedSql = chunks.join('\n')
+  }
   return cachedSql
 }
 

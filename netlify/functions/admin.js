@@ -95,6 +95,25 @@ async function handleReject(body) {
   return json(200, { ok: true })
 }
 
+// Part B: the admin "re-reveal a lost code" becomes ROTATION. The member's
+// stored code is unrecoverable (only the sha256 hash is kept), so the admin
+// mints a brand-new code, stores its hash, and returns the new plaintext in
+// this response exactly once — the admin hands it to the member out of band.
+// The response shape matches approve ({ user, code }) so the client's existing
+// "here is the code" box can reuse it.
+async function handleRotate(body) {
+  if (!body.userId) return json(400, { error: 'Missing userId.' })
+  if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be edited here.' })
+  const user = await getUser(body.userId)
+  if (!user) return json(404, { error: 'User not found.' })
+
+  const newCode = generateAccessCode()
+  // saveUser hashes the code on the Postgres path (sole authority) and keeps
+  // the plaintext Blobs mirror in sync during read-through.
+  await saveUser({ ...user, code: newCode })
+  return json(200, { user: publicUser(user), code: newCode })
+}
+
 async function handleUpdateUser(body) {
   if (!body.userId) return json(400, { error: 'Missing userId.' })
   if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be edited here.' })
@@ -139,7 +158,12 @@ export default async (req) => {
 
     if (req.method === 'GET') {
       const [requests, users] = await Promise.all([listRequests(), listUsers()])
-      return json(200, { requests, users })
+      // Part B: codes are hashed. The admin list no longer carries plaintext
+      // codes (nor their hashes) — re-reveal is replaced by the `rotate` action,
+      // which mints a NEW code and returns it exactly once. publicUser strips
+      // both `code` and `code_hash`, so the list never leaks either, regardless
+      // of which backend served it (the Blobs fallback still holds plaintext).
+      return json(200, { requests, users: users.map(publicUser) })
     }
 
     if (req.method === 'POST') {
@@ -149,6 +173,7 @@ export default async (req) => {
         case 'reject': return handleReject(body)
         case 'updateUser': return handleUpdateUser(body)
         case 'deleteUser': return handleDeleteUser(body)
+        case 'rotate': return handleRotate(body)
         default: return json(400, { error: 'Unknown action.' })
       }
     }
