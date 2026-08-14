@@ -1,0 +1,127 @@
+/* Release 1.4 "Play" — Shelf Stories feed (issue #44).
+   A swipeable, snap-scrolling carousel (no new dependency — scroll-snap). */
+
+.stories-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.stories-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 2px;
+}
+.stories-empty-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+  margin: 0;
+}
+.stories-empty-sub {
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
+  margin: 0;
+}
+
+/* Carousel track */
+.stories-scroller {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-radius: var(--radius-lg);
+}
+.stories-scroller::-webkit-scrollbar {
+  display: none;
+}
+.stories-track {
+  display: flex;
+}
+.story-card {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--vinyl-groove);
+  min-height: 220px;
+  justify-content: center;
+}
+.story-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--runout-gold);
+  margin: 0;
+}
+.story-body {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--jacket-kraft);
+  margin: 0;
+}
+.story-quest {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+.story-hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--static-grey);
+  margin: 0;
+}
+
+/* Controls */
+.stories-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.story-nav {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--vinyl-groove-2);
+  color: var(--jacket-kraft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.story-nav:disabled {
+  opacity: 0.4;
+}
+.stories-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+.story-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  padding: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.story-dot.active {
+  background: var(--runout-gold);
+  transform: scale(1.25);
+}

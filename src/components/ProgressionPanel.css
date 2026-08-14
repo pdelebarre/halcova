@@ -1,0 +1,197 @@
+/* Release 1.2 "Play" — XP / levels / badges panel (issue #45).
+   Rendered inside the Play hub sheet; the panel itself is the scroll area. */
+
+.progression-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+
+/* Unlock / level-up toast (dismissible banner at the top of the panel) */
+.prog-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--runout-gold);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.14), rgba(201, 162, 39, 0.05));
+  animation: sheet-rise 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.prog-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.prog-toast-kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--runout-gold);
+}
+.prog-toast-sub {
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
+}
+.prog-toast-share {
+  flex-shrink: 0;
+}
+.prog-toast-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--jacket-kraft-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Level card */
+.prog-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 2px;
+}
+.prog-empty-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+  margin: 0;
+}
+.prog-empty-sub {
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
+  margin: 0;
+}
+
+.prog-level-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--vinyl-groove);
+}
+.prog-level-kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--static-grey);
+  margin: 0;
+}
+.prog-level-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--runout-gold);
+  margin: 0;
+}
+
+.prog-xp-bar {
+  height: 12px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--vinyl-groove-2);
+  overflow: hidden;
+}
+.prog-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--runout-gold), #E4C466);
+  transition: width 0.4s ease;
+}
+.prog-xp-caption {
+  font-size: 12.5px;
+  color: var(--jacket-kraft-dim);
+  margin: 0;
+}
+.prog-xp-total {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--jacket-kraft);
+  margin: 0;
+}
+
+/* Badge grid */
+.prog-badges-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+  margin: 0;
+}
+.prog-badge-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.prog-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--vinyl-groove);
+  opacity: 0.62;
+}
+.prog-badge.unlocked {
+  opacity: 1;
+  border-color: rgba(201, 162, 39, 0.55);
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.1), var(--vinyl-groove));
+}
+.prog-badge.deferred {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.prog-badge-mark {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--static-grey);
+}
+.prog-badge.unlocked .prog-badge-mark {
+  color: var(--runout-gold);
+}
+.prog-badge-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+}
+.prog-badge-line {
+  font-size: 12px;
+  color: var(--jacket-kraft-dim);
+}
+.prog-badge-share {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--runout-gold);
+  text-decoration: underline;
+  padding: 2px 0;
+}
+.prog-exported {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--success);
+  margin: 0;
+  text-align: center;
+}

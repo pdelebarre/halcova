@@ -9,7 +9,7 @@ import ScanResult from './components/ScanResult'
 import AisleSheet from './components/AisleSheet'
 import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
-import PersonaModal from './components/PersonaModal'
+import PlayPanel from './components/PlayPanel'
 import { useCollection } from './hooks/useCollection'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { extractSearchQuery } from './utils/ocrText'
@@ -1119,7 +1119,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       )}
 
       {status === 'ready' && gamificationEnabled && playOpen && (
-        <PersonaModal items={ownedItems} catalog={catalog} onClose={() => setPlayOpen(false)} />
+        <PlayPanel items={ownedItems} catalog={catalog} onClose={() => setPlayOpen(false)} />
       )}
     </>
   )

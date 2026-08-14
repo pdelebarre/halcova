@@ -126,11 +126,15 @@ function buildProfile(items, kind) {
       p.decades.set(decade, (p.decades.get(decade) || 0) + 1)
     }
 
-    for (const g of it.genre || []) {
+    // Defensive: genre/style are arrays on the item model, but a malformed
+    // (non-array) value must never crash the no-error-boundary app.
+    const genres = Array.isArray(it.genre) ? it.genre : []
+    const styles = Array.isArray(it.style) ? it.style : []
+    for (const g of genres) {
       const c = clean(g)
       if (c) p.genres.add(c)
     }
-    for (const s of it.style || []) {
+    for (const s of styles) {
       const c = clean(s)
       if (c) p.styles.add(c)
     }
@@ -142,7 +146,7 @@ function buildProfile(items, kind) {
     const country = clean(it.country)
     if (country) p.countries.add(country)
     if (clean(it.notes)) p.notesCount += 1
-    if ((it.genre || []).some((g) => /jazz/i.test(g))) p.jazz += 1
+    if (genres.some((g) => /jazz/i.test(g))) p.jazz += 1
 
     const day = dayKey(it.dateAdded)
     if (day) p.days.set(day, (p.days.get(day) || 0) + 1)
@@ -175,7 +179,7 @@ function buildProfile(items, kind) {
   return p
 }
 
-function deriveProfile(items, kind) {
+export function deriveProfile(items, kind) {
   const p = buildProfile(items, kind)
   const topArtist = mode(p.artists)
   const topDecade = mode(p.decades)
@@ -207,6 +211,7 @@ function deriveProfile(items, kind) {
     styleCount: p.styles.size,
     decadeCount: p.decades.size,
     topDecade: topDecade.value || '',
+    topDecadeCount: topDecade.count,
     topDecadePct,
     decadeYear,
     labelCount: p.labels.size,
