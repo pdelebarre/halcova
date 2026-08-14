@@ -91,6 +91,12 @@ function userRowValues(user) {
     features: JSON.stringify(user.features || {}),
     collections: JSON.stringify(user.collections || {}),
     created_at: asDate(user.createdAt) || new Date(),
+    // S3 billing columns (migration 003_billing_fields.sql).
+    plan_expires_at: asDate(user.planExpiresAt),
+    plan_changed_at: asDate(user.planChangedAt),
+    stripe_customer_id: user.stripeCustomerId ?? null,
+    stripe_subscription_id: user.stripeSubscriptionId ?? null,
+    stripe_checkout_session_id: user.stripeCheckoutSessionId ?? null,
   }
 }
 
@@ -110,7 +116,10 @@ export function requestRowValues(request) {
   }
 }
 
-const USER_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at`
+// S3 (ADR-0003 §2.3): the billing columns now EXIST (migration 003) and are
+// part of every read/write. toUser lights them up from the row; old rows that
+// predate the migration read as null.
+const USER_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id`
 
 export function createUsersRepo(db) {
   // O(1) member lookup by access code — the unique-indexed `code_hash` lookup
@@ -148,21 +157,46 @@ export function createUsersRepo(db) {
   // when none is (an update that only touches collections/status/plan) the
   // existing hash is preserved so the member keeps signing in. The existing hash
   // is read straight from the row (toUser deliberately never surfaces it).
+  //
+  // Preserve-on-undefined (S3): an update that doesn't carry a billing field
+  // must not wipe it — the same rule as code_hash. `undefined` means "keep the
+  // existing value"; an explicit `null` means "clear it" (e.g. the webhook's
+  // subscription.deleted downgrade sets planExpiresAt to null). The existing
+  // row is read once only when something needs preserving.
   async function saveUser(user) {
     const v = userRowValues(user)
     let codeHash = v.code_hash
-    if (!codeHash) {
-      const { rows } = await db.query('SELECT code_hash FROM users WHERE id = $1 LIMIT 1', [user.id])
-      codeHash = rows.length ? rows[0].code_hash : null
+    const preserveBilling = ['planExpiresAt', 'planChangedAt', 'stripeCustomerId', 'stripeSubscriptionId', 'stripeCheckoutSessionId']
+      .some((key) => user[key] === undefined)
+    let existing = null
+    if (!codeHash || preserveBilling) {
+      const { rows } = await db.query(
+        `SELECT code_hash, plan_expires_at, plan_changed_at, stripe_customer_id, stripe_subscription_id, stripe_checkout_session_id
+         FROM users WHERE id = $1 LIMIT 1`,
+        [user.id],
+      )
+      existing = rows[0] || null
     }
+    if (!codeHash) codeHash = existing?.code_hash || null
+    const planExpiresAt = user.planExpiresAt === undefined ? (existing?.plan_expires_at ?? null) : asDate(user.planExpiresAt)
+    const planChangedAt = user.planChangedAt === undefined ? (existing?.plan_changed_at ?? null) : asDate(user.planChangedAt)
+    const stripeCustomerId = user.stripeCustomerId === undefined ? (existing?.stripe_customer_id ?? null) : (user.stripeCustomerId ?? null)
+    const stripeSubscriptionId = user.stripeSubscriptionId === undefined ? (existing?.stripe_subscription_id ?? null) : (user.stripeSubscriptionId ?? null)
+    const stripeCheckoutSessionId = user.stripeCheckoutSessionId === undefined ? (existing?.stripe_checkout_session_id ?? null) : (user.stripeCheckoutSessionId ?? null)
+
     await db.query(
-      `INSERT INTO users (${USER_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `INSERT INTO users (${USER_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name, email = EXCLUDED.email, code_hash = EXCLUDED.code_hash,
          role = EXCLUDED.role, status = EXCLUDED.status, plan = EXCLUDED.plan,
-         features = EXCLUDED.features, collections = EXCLUDED.collections
+         features = EXCLUDED.features, collections = EXCLUDED.collections,
+         plan_expires_at = EXCLUDED.plan_expires_at, plan_changed_at = EXCLUDED.plan_changed_at,
+         stripe_customer_id = EXCLUDED.stripe_customer_id,
+         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+         stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id
        `,
-      [user.id, v.name, v.email, codeHash, v.role, v.status, v.plan, v.features, v.collections, v.created_at],
+      [user.id, v.name, v.email, codeHash, v.role, v.status, v.plan, v.features, v.collections, v.created_at,
+        planExpiresAt, planChangedAt, stripeCustomerId, stripeSubscriptionId, stripeCheckoutSessionId],
     )
     return user
   }
@@ -234,6 +268,29 @@ export function createUsersRepo(db) {
     return rows.length ? toUser(rows[0]) : null
   }
 
+  // S3 (ADR-0003 §2.5): O(1) webhook-idempotency lookups keyed on the Stripe
+  // billing ids (the unique indexes from 003_billing_fields.sql). A replayed
+  // webhook event resolves the already-materialized user in one read instead of
+  // re-creating it. A DB error propagates to the repository's read-through
+  // wrapper, which degrades to the Blobs lookup.
+  async function findUserByStripeSession(sessionId) {
+    if (!sessionId) return null
+    const { rows } = await db.query(
+      `SELECT ${USER_COLUMNS} FROM users WHERE stripe_checkout_session_id = $1 LIMIT 1`,
+      [sessionId],
+    )
+    return rows.length ? toUser(rows[0]) : null
+  }
+
+  async function findUserByStripeSubscription(subscriptionId) {
+    if (!subscriptionId) return null
+    const { rows } = await db.query(
+      `SELECT ${USER_COLUMNS} FROM users WHERE stripe_subscription_id = $1 LIMIT 1`,
+      [subscriptionId],
+    )
+    return rows.length ? toUser(rows[0]) : null
+  }
+
   return {
     findUserByCode,
     getUser,
@@ -246,5 +303,7 @@ export function createUsersRepo(db) {
     removeRequest,
     findPendingRequestByEmail,
     findUserByEmail,
+    findUserByStripeSession,
+    findUserByStripeSubscription,
   }
 }

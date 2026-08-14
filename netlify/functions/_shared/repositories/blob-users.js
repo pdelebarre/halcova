@@ -48,6 +48,10 @@ const REQUEST_PREFIX = 'request:'
 const USERS_INDEX = 'index:users'
 const REQUESTS_INDEX = 'index:requests'
 const CODE_INDEX_PREFIX = 'code:'
+// S3 (ADR-0003 §2.5): O(1) webhook-idempotency indexes, mirroring the code:
+// pattern — stripe:session:<id> / stripe:subscription:<id> → userId.
+const STRIPE_SESSION_INDEX_PREFIX = 'stripe:session:'
+const STRIPE_SUBSCRIPTION_INDEX_PREFIX = 'stripe:subscription:'
 
 const identity = () => getStore(IDENTITY_STORE)
 
@@ -118,22 +122,61 @@ async function deleteCodeIndex(code) {
   await identity().delete(`${CODE_INDEX_PREFIX}${norm}`)
 }
 
-// Save a user and keep the access-code index in sync. When a code changes
-// (approve mints a fresh code; a future rotate path re-stamps one), the old
-// `code:` key is dropped and the new one written. Users without a code (the
-// owner is never stored) skip the index entirely.
+// ---- Stripe idempotency indexes (S3, ADR-0003 §2.5) ----
+//
+// Same pattern as the code index: `stripe:session:<id>` /
+// `stripe:subscription:<id>` → userId, so the webhook's check-before-create is
+// a single blob read. Maintained by saveUser (on materialization / upgrade) and
+// removed by removeUserRecord.
+
+async function setStripeSessionIndex(userId, sessionId) {
+  if (!sessionId) return
+  await identity().setJSON(`${STRIPE_SESSION_INDEX_PREFIX}${sessionId}`, userId)
+}
+
+async function deleteStripeSessionIndex(sessionId) {
+  if (!sessionId) return
+  await identity().delete(`${STRIPE_SESSION_INDEX_PREFIX}${sessionId}`)
+}
+
+async function setStripeSubscriptionIndex(userId, subscriptionId) {
+  if (!subscriptionId) return
+  await identity().setJSON(`${STRIPE_SUBSCRIPTION_INDEX_PREFIX}${subscriptionId}`, userId)
+}
+
+async function deleteStripeSubscriptionIndex(subscriptionId) {
+  if (!subscriptionId) return
+  await identity().delete(`${STRIPE_SUBSCRIPTION_INDEX_PREFIX}${subscriptionId}`)
+}
+
+// Save a user and keep the access-code + Stripe indexes in sync. When a code
+// changes (approve mints a fresh code; a future rotate path re-stamps one), the
+// old `code:` key is dropped and the new one written. When a Stripe billing id
+// changes (a user re-purchases / a new subscription id is assigned), the old
+// `stripe:*:` key is dropped and the new one written. Users without a code
+// (the owner is never stored) skip the index entirely.
 export async function saveUser(user) {
   const existing = await getUser(user.id)
   const oldCode = normalizeCode(existing?.code)
   const newCode = normalizeCode(user?.code)
+  const oldSession = existing?.stripeCheckoutSessionId
+  const newSession = user?.stripeCheckoutSessionId
+  const oldSubscription = existing?.stripeSubscriptionId
+  const newSubscription = user?.stripeSubscriptionId
   await saveRecord(USER_PREFIX, USERS_INDEX, user)
   if (oldCode && oldCode !== newCode) await deleteCodeIndex(oldCode)
   if (newCode) await setCodeIndex(user.id, user.code)
+  if (oldSession && oldSession !== newSession) await deleteStripeSessionIndex(oldSession)
+  if (newSession) await setStripeSessionIndex(user.id, newSession)
+  if (oldSubscription && oldSubscription !== newSubscription) await deleteStripeSubscriptionIndex(oldSubscription)
+  if (newSubscription) await setStripeSubscriptionIndex(user.id, newSubscription)
 }
 
 export async function removeUserRecord(id) {
   const existing = await getUser(id)
   if (existing?.code) await deleteCodeIndex(existing.code)
+  if (existing?.stripeCheckoutSessionId) await deleteStripeSessionIndex(existing.stripeCheckoutSessionId)
+  if (existing?.stripeSubscriptionId) await deleteStripeSubscriptionIndex(existing.stripeSubscriptionId)
   await removeRecord(USER_PREFIX, USERS_INDEX, id)
 }
 
@@ -169,6 +212,41 @@ export async function findUserByCode(code) {
   }
   return match
 }
+
+// ---- Stripe idempotency lookups (S3, ADR-0003 §2.5) ----
+//
+// Resolve a member by a Stripe billing id — O(1) via the `stripe:*:` indexes
+// (single blob read), with the same lazy-backfill fallback as findUserByCode so
+// pre-S3 stores keep working. Returns the full user record via getUser (plan
+// normalized to 'free' when absent).
+
+async function findByStripeIndex(prefix, id, readValue) {
+  if (!id) return null
+  const store = identity()
+  let userId = null
+  try {
+    userId = await store.get(`${prefix}${id}`, { type: 'json' })
+  } catch {
+    userId = null
+  }
+  if (userId) {
+    const user = await getUser(userId)
+    if (user && String(readValue(user) || '') === String(id)) return user
+  }
+  const users = await listUsers()
+  const match = users.find((u) => String(readValue(u) || '') === String(id)) || null
+  if (match) {
+    try { await store.setJSON(`${prefix}${id}`, match.id) } catch { /* best-effort */ }
+  }
+  return match
+}
+
+export const findUserByStripeSession = (id) => findByStripeIndex(
+  STRIPE_SESSION_INDEX_PREFIX, id, (u) => u.stripeCheckoutSessionId,
+)
+export const findUserByStripeSubscription = (id) => findByStripeIndex(
+  STRIPE_SUBSCRIPTION_INDEX_PREFIX, id, (u) => u.stripeSubscriptionId,
+)
 
 // ---- Signup requests ----
 

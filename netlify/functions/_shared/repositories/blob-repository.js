@@ -15,6 +15,8 @@ export function createBlobRepository() {
       saveUser: blobUsers.saveUser,
       removeUserRecord: blobUsers.removeUserRecord,
       findUserByCode: blobUsers.findUserByCode,
+      findUserByStripeSession: blobUsers.findUserByStripeSession,
+      findUserByStripeSubscription: blobUsers.findUserByStripeSubscription,
       listRequests: blobUsers.listRequests,
       getRequest: blobUsers.getRequest,
       saveRequest: blobUsers.saveRequest,
