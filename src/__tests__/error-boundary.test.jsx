@@ -47,4 +47,31 @@ describe('ErrorBoundary — no more dark blank screen (T7)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
     expect(reload).toHaveBeenCalledTimes(1)
   })
+
+  it('clears the error state when remounted with a new key — the kind-switch reset', () => {
+    // App.jsx keys the boundary by catalog.kind (`key={boundary-${kind}}`), so
+    // switching records -> books remounts a fresh boundary. A failure in one
+    // collection must not poison the other tab: the new instance starts clean.
+    const { rerender } = render(
+      <ErrorBoundary key="boundary-records"><Bomb /></ErrorBoundary>,
+    )
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+
+    rerender(
+      <ErrorBoundary key="boundary-books"><Calm /></ErrorBoundary>,
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByText('all good')).toBeInTheDocument()
+  })
+
+  it('stays in the error state on a plain re-render (no key change) until reload', () => {
+    // Without a remount the boundary keeps the fallback up — the safety net
+    // does not silently retry a still-broken subtree.
+    const { rerender } = render(<ErrorBoundary><Bomb /></ErrorBoundary>)
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+
+    rerender(<ErrorBoundary><Bomb /></ErrorBoundary>)
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
+  })
 })

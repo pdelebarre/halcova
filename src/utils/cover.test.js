@@ -29,4 +29,16 @@ describe('proxyCoverUrl', () => {
     // http:// covers (mixed content) are not proxied — never crash on them.
     expect(proxyCoverUrl(DISC, 'http://i.discogs.com/hash/image-1.jpeg')).toBe('')
   })
+
+  it('drops other non-https schemes — data:, ftp: and protocol-relative URLs', () => {
+    expect(proxyCoverUrl(DISC, 'data:text/html,<script>alert(1)</script>')).toBe('')
+    expect(proxyCoverUrl(DISC, 'ftp://i.discogs.com/hash/image-1.jpeg')).toBe('')
+    // Protocol-relative (scheme-less) has no https protocol to vouch for.
+    expect(proxyCoverUrl(DISC, '//i.discogs.com/hash/image-1.jpeg')).toBe('')
+  })
+
+  it('drops a non-string truthy cover without throwing', () => {
+    expect(proxyCoverUrl(DISC, 42)).toBe('')
+    expect(proxyCoverUrl(DISC, { url: 'https://i.discogs.com/x.jpeg' })).toBe('')
+  })
 })
