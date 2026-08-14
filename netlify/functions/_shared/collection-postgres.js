@@ -9,6 +9,11 @@
 //     count inside the same transaction. Each write is ALSO mirrored to the
 //     legacy Blob store best-effort so the migration stays reversible (nothing
 //     orphans; Blob stores are never renamed/deleted).
+//   - M2 (security hardening): the free-tier cap is backfill-aware. Until a
+//     member's store has been backfilled to Postgres (0 rows for that
+//     owner+kind) the SQL owned count reads 0 and would never bite, so the
+//     cap is computed against the Blobs owned count until the store has any
+//     Postgres row — an un-backfilled store can't add past the cap.
 //   - The demo space is a read-only, curated dataset and stays in Blobs
 //     (self-seeded) even when Postgres is configured.
 //
@@ -23,7 +28,7 @@ import { planLimitFor } from './plans'
 import { storeNameFor } from './users'
 import { parsePagination, sliceIds } from './pagination'
 import { DEMO_SEED, seedDemoStore } from './demo-data'
-import { adjustOwnedCount } from './counts'
+import { adjustOwnedCount, ensureOwnedCount } from './counts'
 import { invalidateListCache } from './list-cache'
 import { getRepository } from './repository'
 
@@ -110,6 +115,26 @@ async function handlePost(req, { user, collection }) {
   const limit = planLimitFor(user)
   const newId = randomUUID()
   const item = { ...body, id: newId, dateAdded: body.dateAdded || new Date().toISOString() }
+
+  // M2 (backfill-aware plan limit): a member store that predates the backfill
+  // has 0 rows in Postgres, so the SQL owned count would read 0 and never bite
+  // (every add allowed, mirroring to Blobs, growing past the cap). When Postgres
+  // has NO rows for this member+kind, count owned against the Blobs store (the
+  // legacy/mirror source) so an un-backfilled store still enforces the cap. Once
+  // any row exists (the store was backfilled) the SQL count inside the
+  // transaction below is authoritative — this is only a pre-check for the
+  // un-backfilled case. A DB error here propagates to the Blobs fallback in
+  // collection.js, which enforces the same cap on the Blobs path.
+  if (limit != null) {
+    const sqlOwned = await repo.items.countOwned(user.id, collection)
+    if (sqlOwned === 0) {
+      const store = getStore(storeNameFor(user.id, collection))
+      const blobOwned = await ensureOwnedCount(store, readIndex)
+      if (blobOwned >= limit) {
+        return json(403, { error: planLimitError(limit).message, code: 'PLAN_LIMIT' })
+      }
+    }
+  }
 
   // The plan-limit check and the insert share one transaction so the SQL owned
   // count can't drift between the check and the write.

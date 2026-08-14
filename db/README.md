@@ -104,6 +104,38 @@ Properties:
    already read `lookup_cache` first and fall back to Blobs — no extra step.
 6. **Deploy with `netlify deploy --build`** (never drag-and-drop `dist`).
 
+### Fail-closed auth writes + auth-prefers-Postgres reads (M1) & backfill-aware plan limit (M2)
+
+Security hardening that changes the transition-window behavior — read before
+you cut over:
+
+- **Auth-relevant user writes fail closed.** Rotate, disable/enable, delete
+  (and approve — user creation) are **both-or-neither** across Postgres and the
+  Blobs mirror: the Postgres write is snapshotted, then mirrored; if the mirror
+  fails the pre-write Postgres row is restored (a compensating write, so it
+  works everywhere) and the admin call returns a **5xx** (the change is NOT
+  applied). A Postgres failure also throws (auth writes never degrade to a
+  Blobs-only write). A revocation/disable can never be half-applied, and the
+  legacy Blob store can never keep a stale plaintext code / active status that
+  outlives the Postgres record. Non-auth writes (requests, items) stay
+  best-effort / reversible. **Cutover consequence:** keep the `runout-identity`
+  Blob store writable during the transition — admin actions (rotate / disable /
+  delete / approve) fail with a 5xx if that mirror is unavailable, rather than
+  silently proceeding.
+- **Auth reads prefer Postgres.** With `DATABASE_URL` set, `findUserByCode`
+  treats a Postgres **record-miss as authoritative** (a code Postgres doesn't
+  have is revoked/unknown) and falls back to the Blobs mirror **only on a true
+  DB unavailability** — so a stale mirror can never re-validate a rotated,
+  disabled or deleted member. **Cutover consequence:** a member whose identity
+  has NOT been backfilled to Postgres cannot sign in, so backfill
+  `runout-identity` (step 3) *before* flipping auth reads on. An outage still
+  resolves members through the mirror, so nobody is locked out.
+- **The free-tier plan limit is backfill-aware.** Until a member's
+  `collection-<id>-<kind>` store has any row in Postgres (0 rows = not
+  backfilled), the SQL owned count reads 0 and would never bite — so the cap is
+  computed against the Blobs owned-count until the store is backfilled. Once
+  the store has rows, the SQL count governs (the transaction still checks it).
+
 ### What stays on Blobs (documented decision)
 
 - `runout-rate-limits` (rate limiting) and the `cache:list` list-cache —

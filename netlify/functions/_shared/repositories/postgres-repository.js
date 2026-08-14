@@ -11,6 +11,15 @@
 // (nothing orphans; legacy stores are never renamed/deleted). If Postgres is
 // unreachable a write degrades to Blobs so it never fails.
 //
+// M1 security hardening (auth): AUTH-relevant user writes (rotate, disable/
+// enable, delete, approve) FAIL CLOSED — the Postgres write and the Blobs
+// mirror are both-or-neither (snapshot → mirror → restore on mirror failure,
+// no blob-only degrade on a Postgres failure). And the AUTH READ
+// (findUserByCode) treats a Postgres record-miss as authoritative, falling
+// back to the Blobs mirror ONLY on a true DB unavailability, so a stale mirror
+// can never re-validate a revoked/disabled/deleted code. Non-auth writes
+// (requests, items) keep the reversible best-effort semantics.
+//
 // See the report for the backfill-timing caveat: DB-first reads assume a store
 // has been backfilled (Part B) before it serves live traffic.
 
@@ -39,6 +48,8 @@ function readThrough(fn, fallback) {
 
 // Wrap a write: Postgres first, mirrored to Blobs best-effort; on a Postgres
 // failure, fall back to a Blobs-only write so the operation still succeeds.
+// Used ONLY for non-auth writes (requests, items) — auth writes fail closed
+// (see authWriteFailClosed below).
 function writeThrough(postgresFn, blobFn) {
   return async (...args) => {
     try {
@@ -51,23 +62,109 @@ function writeThrough(postgresFn, blobFn) {
   }
 }
 
+// AUTH read: the Postgres record is authoritative. A record-miss (null) is
+// returned as-is — the code was rotated / the user disabled or deleted in the
+// system of record, and the Blobs mirror may still hold a stale plaintext
+// code. Falling back on a miss would re-validate a revoked code (M1), so we
+// fall back to Blobs ONLY on a true DB unavailability — an outage still
+// resolves members through the mirror so nobody is locked out.
+function authFindUserByCode(postgresFn, blobFn) {
+  return async (code) => {
+    try {
+      return await postgresFn(code)
+    } catch {
+      return blobFn(code)
+    }
+  }
+}
+
+// Snapshot/restore helpers for the users table, used to ROLL BACK an
+// auth-relevant write if the Blobs mirror fails (both-or-neither). The raw
+// row snapshot preserves the code_hash — the sole authority — which the public
+// user shape (toUser) deliberately hides. We compensate with an explicit
+// restore write instead of relying on a SQL transaction: it works on every
+// backend (pg-mem included, whose ROLLBACK is a no-op), and it avoids holding
+// a long-lived connection open during the Blobs write.
+const USER_ROW_COLUMNS = `id, name, email, code_hash, role, status, plan, features, collections, created_at`
+
+async function readUserRow(db, id) {
+  const { rows } = await db.query(`SELECT ${USER_ROW_COLUMNS} FROM users WHERE id = $1 LIMIT 1`, [id])
+  return rows[0] || null
+}
+
+async function writeUserRow(db, row) {
+  const values = [row.id, row.name, row.email, row.code_hash, row.role, row.status, row.plan,
+    JSON.stringify(row.features ?? {}), JSON.stringify(row.collections ?? {}), row.created_at]
+  await db.query(
+    `INSERT INTO users (${USER_ROW_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name, email = EXCLUDED.email, code_hash = EXCLUDED.code_hash,
+       role = EXCLUDED.role, status = EXCLUDED.status, plan = EXCLUDED.plan,
+       features = EXCLUDED.features, collections = EXCLUDED.collections`,
+    values,
+  )
+}
+
+async function deleteUserRow(db, id) {
+  await db.query(`DELETE FROM users WHERE id = $1`, [id])
+}
+
+// Fail-closed write for AUTH-relevant records (rotate, disable/enable, delete,
+// approve): the Postgres write and the Blobs mirror are both-or-neither. A
+// mirror failure restores the pre-write Postgres row (snapshot → restore) and
+// the whole operation throws (the caller surfaces a 5xx), so a revocation/
+// disable is never half-applied across the two stores. A Postgres failure also
+// throws: auth writes never degrade to a Blobs-only write, so a code/status
+// change can't silently split while Postgres is down. `idOf` extracts the user
+// id from the repo call's args (saveUser(user) vs removeUserRecord(id)).
+function authWriteFailClosed(db, method, blobFn, idOf) {
+  return async (...args) => {
+    const id = idOf(...args)
+    const before = await readUserRow(db, id)
+    // The Postgres write itself: if it throws, auth writes never degrade to a
+    // Blobs-only write — the error propagates (5xx) so a code/status change
+    // can't silently split across the two stores while Postgres is down.
+    const result = await createUsersRepo(db)[method](...args)
+    try {
+      await blobFn(...args)
+    } catch (err) {
+      // Mirror failed — restore the pre-write Postgres state so the old code /
+      // status stays consistent, then fail loudly.
+      try {
+        if (before) await writeUserRow(db, before)
+        else await deleteUserRow(db, id)
+      } catch (restoreErr) {
+        err.restoreError = restoreErr // best effort; keep the original failure
+      }
+      const wrapped = new Error(`Auth write failed (change not applied): ${err?.message || err}`)
+      wrapped.cause = err
+      throw wrapped
+    }
+    return result
+  }
+}
+
 export function createPostgresRepository({ db = postgresDb } = {}) {
   const usersPg = createUsersRepo(db)
   const items = createItemsRepo(db)
   const lookupCache = createLookupCacheRepo(db)
 
   const users = {
-    // Reads — DB first, Blobs fallback on miss/error.
-    findUserByCode: readThrough(usersPg.findUserByCode, blobUsers.findUserByCode),
+    // Reads — DB first, Blobs fallback on miss/error, EXCEPT findUserByCode:
+    // auth is Postgres-authoritative (miss = revoked/unknown, fallback only on
+    // a true DB unavailability) — see authFindUserByCode.
+    findUserByCode: authFindUserByCode(usersPg.findUserByCode, blobUsers.findUserByCode),
     getUser: readThrough(usersPg.getUser, blobUsers.getUser),
     listUsers: readThrough(usersPg.listUsers, blobUsers.listUsers),
     listRequests: readThrough(usersPg.listRequests, blobUsers.listRequests),
     getRequest: readThrough(usersPg.getRequest, blobUsers.getRequest),
     findPendingRequestByEmail: readThrough(usersPg.findPendingRequestByEmail, blobUsers.findPendingRequestByEmail),
-    // Writes — Postgres primary + Blobs mirror (reversible).
-    saveUser: writeThrough(usersPg.saveUser, blobUsers.saveUser),
+    // Auth-relevant writes — FAIL CLOSED: both-or-neither across Postgres + the
+    // Blobs mirror (rotate / disable-enable / delete / approve).
+    saveUser: authWriteFailClosed(db, 'saveUser', blobUsers.saveUser, (user) => user?.id),
+    removeUserRecord: authWriteFailClosed(db, 'removeUserRecord', blobUsers.removeUserRecord, (id) => id),
+    // Non-auth writes — Postgres primary + Blobs mirror (reversible).
     saveRequest: writeThrough(usersPg.saveRequest, blobUsers.saveRequest),
-    removeUserRecord: writeThrough(usersPg.removeUserRecord, blobUsers.removeUserRecord),
     removeRequest: writeThrough(usersPg.removeRequest, blobUsers.removeRequest),
   }
 

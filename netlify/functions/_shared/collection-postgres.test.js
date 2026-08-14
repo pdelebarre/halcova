@@ -148,6 +148,73 @@ describe('POST — create (transactional, SQL plan-limit count)', () => {
   })
 })
 
+describe('M2 — backfill-aware plan limit (un-backfilled member stores)', () => {
+  // Seed a member's Blobs store with `count` owned items — legacy items that
+  // predate the backfill, so Postgres has NO rows for this owner+kind and the
+  // SQL owned count would read 0 (the M2 gap the guard closes).
+  function seedBlobsStore(count) {
+    const store = createStore()
+    stores[`collection-${MEMBER.id}-records`] = store
+    const ids = []
+    for (let i = 1; i <= count; i += 1) {
+      const it = item(i)
+      store.data.set(`item:${it.id}`, it)
+      ids.push(it.id)
+    }
+    store.data.set('index', ids)
+    store.data.set('count:owned', count)
+    return store
+  }
+
+  it('enforces the 10-item cap for an un-backfilled store by counting owned in Blobs (403 PLAN_LIMIT at 10)', async () => {
+    seedBlobsStore(10)
+    const res = await call('POST', '?collection=records', { title: 'Over - The Limit' })
+    expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body.code).toBe('PLAN_LIMIT')
+    expect(body.error).toContain('free plan limit of 10')
+    // Nothing was written to Postgres (the guard short-circuits before insert).
+    expect(await repo.items.listItems(MEMBER.id, 'records')).toHaveLength(0)
+  })
+
+  it('allows adds below the cap for an un-backfilled store (counted against Blobs)', async () => {
+    seedBlobsStore(9)
+    const res = await call('POST', '?collection=records', { title: 'Tenth - Allowed' })
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    // Persisted to Postgres (now partially backfilled) AND mirrored to Blobs.
+    expect(await repo.items.countOwned(MEMBER.id, 'records')).toBe(1)
+    expect(stores[`collection-${MEMBER.id}-records`].data.get(`item:${body.id}`)).toMatchObject({ title: 'Tenth - Allowed' })
+  })
+
+  it('does not cap a wishlist-only un-backfilled store (wishlist never counts toward the cap)', async () => {
+    // No `count:owned` key — exercises ensureOwnedCount's lazy backfill, which
+    // counts OWNED items only, so a wishlist-only store is not capped.
+    const store = createStore()
+    stores[`collection-${MEMBER.id}-records`] = store
+    const ids = []
+    for (let i = 1; i <= 10; i += 1) {
+      const it = { ...item(i), wishlist: true }
+      store.data.set(`item:${it.id}`, it)
+      ids.push(it.id)
+    }
+    store.data.set('index', ids)
+    const res = await call('POST', '?collection=records', { title: 'Wish - More' })
+    expect(res.status).toBe(201)
+  })
+
+  it('uses the SQL owned count once the store is backfilled (SQL governs over a lower Blobs count)', async () => {
+    // Backfilled store: 10 owned rows in Postgres.
+    for (let i = 1; i <= 10; i += 1) await repo.items.insertItem(MEMBER.id, 'records', item(i))
+    // The Blobs mirror is behind (only 5) — but once backfilled, SQL governs.
+    seedBlobsStore(5)
+    const res = await call('POST', '?collection=records', { title: 'Over - The Limit' })
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('PLAN_LIMIT')
+    expect(await repo.items.listItems(MEMBER.id, 'records')).toHaveLength(10)
+  })
+})
+
 describe('GET — DB-first read-through', () => {
   it('serves Postgres items newest-first', async () => {
     await repo.items.insertItem(MEMBER.id, 'records', item(1))

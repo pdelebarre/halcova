@@ -112,18 +112,108 @@ describe('reversible write-through (Postgres primary + Blobs mirror)', () => {
     expect((await repo.users.getUser('u1')).id).toBe('u1')
   })
 
-  it('degrades to a Blobs-only write when Postgres is unreachable (writes never fail)', async () => {
+  it('still degrades a NON-auth write (requests) to a Blobs-only write when Postgres is unreachable', async () => {
+    // Auth writes now fail closed (see the M1 block below); reversible
+    // non-auth writes (requests, items) keep degrading so they never fail.
     const broken = createPostgresRepository({
       db: { query: vi.fn(async () => { throw new Error('db down') }), connect: vi.fn() },
     })
-    blob.saveUser.mockResolvedValue(undefined)
-    await expect(broken.users.saveUser(USER)).resolves.toBeUndefined()
-    expect(blob.saveUser).toHaveBeenCalledWith(USER)
+    const req = { id: 'r1', name: 'Ada', email: 'ada@example.com', status: 'pending', createdAt: '2026-08-01T00:00:00.000Z' }
+    blob.saveRequest.mockResolvedValue(undefined)
+    await expect(broken.users.saveRequest(req)).resolves.toBeUndefined()
+    expect(blob.saveRequest).toHaveBeenCalledWith(req)
   })
 
   it('mirrors a request save to Blobs', async () => {
     const req = { id: 'r1', name: 'Ada', email: 'ada@example.com', status: 'pending', createdAt: '2026-08-01T00:00:00.000Z' }
     await repo.users.saveRequest(req)
     expect(blob.saveRequest).toHaveBeenCalledWith(req)
+  })
+})
+
+describe('M1 — fail-closed auth writes + auth-prefers-Postgres reads', () => {
+  it('fail-closes a rotate when the Blobs mirror fails: the new code is NOT stored, nothing is half-applied', async () => {
+    await repo.users.saveUser(USER)
+    blob.saveUser.mockRejectedValue(new Error('blobs unavailable'))
+    await expect(repo.users.saveUser({ ...USER, code: 'RU-NEWW-NEWW-NEWW' })).rejects.toThrow(/Auth write failed/)
+
+    // Postgres was rolled back — the NEW code must not authenticate…
+    expect(await repo.users.findUserByCode('RU-NEWW-NEWW-NEWW')).toBeNull()
+    // …and the OLD code still does (the rotation never took effect; the admin
+    // was told with a 5xx and can retry). Status quo, never a half-apply.
+    expect(await repo.users.findUserByCode(USER.code)).toMatchObject({ id: 'u1' })
+  })
+
+  it('after a successful rotate the OLD code is dead for auth even if the Blobs mirror is stale', async () => {
+    await repo.users.saveUser(USER)
+    await repo.users.saveUser({ ...USER, code: 'RU-NEWW-NEWW-NEWW' })
+
+    // Simulate the M1 hazard: the mirror still answers with the OLD (revoked)
+    // code as if the rotation never happened.
+    blob.findUserByCode.mockResolvedValue({ ...USER, code: USER.code })
+
+    // Auth is Postgres-authoritative: the old code is a record-miss → rejected,
+    // and the stale mirror is never consulted (regardless of mirror state).
+    expect(await repo.users.findUserByCode(USER.code)).toBeNull()
+    expect(blob.findUserByCode).not.toHaveBeenCalled()
+    // The NEW code still resolves from Postgres.
+    expect(await repo.users.findUserByCode('RU-NEWW-NEWW-NEWW')).toMatchObject({ id: 'u1' })
+  })
+
+  it('fail-closes a disable when the Blobs mirror fails: the status change is rolled back', async () => {
+    await repo.users.saveUser(USER)
+    blob.saveUser.mockRejectedValue(new Error('blobs unavailable'))
+    await expect(repo.users.saveUser({ ...USER, status: 'disabled' })).rejects.toThrow(/Auth write failed/)
+
+    // Rolled back — the member is still ACTIVE in Postgres (the disable did not
+    // take effect; the admin saw a 5xx and can retry). No half-applied disable.
+    expect(await repo.users.findUserByCode(USER.code)).toMatchObject({ id: 'u1', status: 'active' })
+  })
+
+  it('a disabled member cannot authenticate even when the Blobs mirror is stale-active', async () => {
+    await repo.users.saveUser(USER)
+    await repo.users.saveUser({ ...USER, status: 'disabled' })
+
+    // Poison the mirror: it still answers with an ACTIVE member holding the code.
+    blob.findUserByCode.mockResolvedValue({ ...USER, status: 'active', code: USER.code })
+
+    // Postgres is authoritative: the DISABLED record is served — the caller
+    // (authorize) rejects status !== 'active'. The stale-active mirror is
+    // never consulted.
+    const found = await repo.users.findUserByCode(USER.code)
+    expect(found).toMatchObject({ id: 'u1', status: 'disabled' })
+    expect(blob.findUserByCode).not.toHaveBeenCalled()
+  })
+
+  it('fail-closes deleteUser when the Blobs mirror delete fails', async () => {
+    await repo.users.saveUser(USER)
+    blob.removeUserRecord.mockRejectedValue(new Error('blobs unavailable'))
+    await expect(repo.users.removeUserRecord('u1')).rejects.toThrow(/Auth write failed/)
+
+    // Rolled back — the member still exists and can still authenticate.
+    expect(await repo.users.findUserByCode(USER.code)).toMatchObject({ id: 'u1' })
+  })
+
+  it('fail-closes an auth write when Postgres is unreachable (never degrades to a Blobs-only write)', async () => {
+    const broken = createPostgresRepository({
+      db: {
+        query: vi.fn(async () => { throw new Error('db down') }),
+        connect: vi.fn(async () => { throw new Error('db down') }),
+      },
+    })
+    blob.saveUser.mockResolvedValue(undefined)
+    await expect(broken.users.saveUser(USER)).rejects.toThrow()
+    // No Blobs-only fallback — a code/status change can't split across stores
+    // while Postgres is down.
+    expect(blob.saveUser).not.toHaveBeenCalled()
+  })
+
+  it('still falls back to the Blobs mirror on a true DB unavailability during auth (outage never locks members out)', async () => {
+    const broken = createPostgresRepository({
+      db: { query: vi.fn(async () => { throw new Error('db down') }), connect: vi.fn() },
+    })
+    blob.findUserByCode.mockResolvedValue({ id: 'u1', name: 'Ada' })
+    expect(await broken.users.findUserByCode('RU-AAAA-BBBB-CCCC')).toMatchObject({ id: 'u1' })
+    expect(blob.findUserByCode).toHaveBeenCalledWith('RU-AAAA-BBBB-CCCC')
   })
 })
