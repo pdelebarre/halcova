@@ -202,11 +202,14 @@ A single `runout-identity` blob store holds users and signup requests:
 - `index:users` / `index:requests` — ordered id lists.
 
 **Access codes** are `RU-XXXX-XXXX-XXXX` strings (generated with `node:crypto`,
-no ambiguous chars) stored in plaintext so an admin can re-reveal a lost code;
-they are stripped with `publicUser` before anything reaches the client. The
-**admin key** comes from `RUNOUT_ADMIN_KEY` (dev fallback
-`runout-dev-admin-key` — never ship that). The owner's identity is the constant
-`owner`.
+no ambiguous chars). Phase 1 (ADR-0002) stores only `sha256(normalize(code))` in
+Postgres (`code_hash`, unique index); the legacy Blobs identity store keeps
+plaintext during read-through so the migration is reversible. The admin
+"re-reveal a lost code" is now **rotate**: mint a NEW code and hand it to the
+member — the old code is unrecoverable. Codes/hashes are stripped with
+`publicUser` before anything reaches the client. The **admin key** comes from
+`RUNOUT_ADMIN_KEY` (dev fallback `runout-dev-admin-key` — never ship that). The
+owner's identity is the constant `owner`.
 
 ### Collection stores (per user)
 
@@ -246,10 +249,12 @@ collection kinds.
 | `POST { action:'login', code }` | Resolve code → user profile (member or admin); 401 unknown, 403 disabled |
 | `GET` (Bearer) | `me` — revalidate a cached session on app start |
 
-**`admin`** (admin key required): `GET` lists requests + users; `POST` actions
-`approve` (returns the generated access code), `reject`, `updateUser`
-(collections / status), `deleteUser` (removes the record + their collection
-stores). The owner account can't be edited or deleted.
+**`admin`** (admin key required): `GET` lists requests + users (codes and
+hashes are stripped); `POST` actions `approve` (returns the generated access
+code), `reject`, `updateUser` (collections / status / plan / features),
+`rotate` (mints a NEW access code, stores its hash, returns the new plaintext
+once), `deleteUser` (removes the record + their collection stores). The owner
+account can't be edited or deleted.
 
 Responses are always JSON via a small `json()` helper; unexpected errors return
 `500` with the message.
@@ -572,10 +577,12 @@ skips functions), or Git-connected import.
   data. Collection access is additionally gated by the member's granted
   collections (Records / Books).
 - **The admin key and access codes are secrets** — `publicUser` strips the
-  `code` field before any user object reaches the client; functions never log
-  them. Access codes are stored in plaintext in the private `runout-identity`
-  blob store so the admin can re-reveal a lost code — a deliberate trade-off
-  at this scale (rotate codes by deleting + recreating a member if needed).
+  `code` field (and its `code_hash`) before any user object reaches the client;
+  functions never log them. On Postgres (Phase 1) only `sha256(normalize(code))`
+  is stored — a lost code can't be re-revealed, only **rotated** (mint a new
+  one via the admin `rotate` action). The legacy Blobs identity store keeps
+  plaintext during read-through (reversible cutover), and codes are stripped by
+  `publicUser` before any response.
 - The **Discogs token is server-only** — the single `RUNOUT_DISCOGS_TOKEN` env
   var lives on the `discogs` lookup proxy and never reaches the browser.
 - The **Google Books API key is server-only too** — `GOOGLE_BOOKS_API_KEY`
