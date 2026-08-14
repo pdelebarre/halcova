@@ -141,6 +141,41 @@ export const recordsCatalog = {
       clear: 'Clear browse',
       empty: 'Nothing to show here yet.',
     },
+    // Paywall (ADR-0003 S6): self-serve upgrade copy for the shared paywall
+    // bottom sheet. Crate wording via `{collectionLabel}`; the generic
+    // billing/legal copy lives in i18n (`paywall.*`) as the fallback. The
+    // modal reads these with optional chaining and falls back to t().
+    paywall: {
+      title: t('paywall.title', { collectionLabel: 'crate' }),
+      body: t('paywall.body', { collectionLabel: 'crate', cap: '10' }),
+      cta: t('paywall.cta'),
+      secondary: t('paywall.secondary'),
+      priceLine: t('paywall.priceLine'),
+      creating: t('paywall.creating'),
+      checkoutError: t('paywall.checkoutError'),
+      offline: t('paywall.offline'),
+      stillPending: t('paywall.stillPending'),
+      successToast: t('paywall.successToast', { collectionLabel: 'crate' }),
+      plan: 'lifetime',
+      reason: {
+        cap: {
+          title: t('paywall.reason.cap.title', { collectionLabel: 'crate' }),
+          body: t('paywall.reason.cap.body', { collectionLabel: 'crate', cap: '10' }),
+        },
+        feature: {
+          title: t('paywall.reason.feature.title'),
+          body: t('paywall.reason.feature.body'),
+        },
+        upgrade: {
+          title: t('paywall.reason.upgrade.title'),
+          body: t('paywall.reason.upgrade.body'),
+        },
+        expired: {
+          title: t('paywall.reason.expired.title'),
+          body: t('paywall.reason.expired.body'),
+        },
+      },
+    },
     search: {
       results: (n, q) => `${n} ${n === 1 ? 'match' : 'matches'} for “${q}”`,
       clear: 'Clear search results',
@@ -504,6 +539,41 @@ export const booksCatalog = {
       title: 'Browse your shelf',
       clear: 'Clear browse',
       empty: 'Nothing to show here yet.',
+    },
+    // Paywall (ADR-0003 S6): self-serve upgrade copy for the shared paywall
+    // bottom sheet. Shelf wording via `{collectionLabel}`; the generic
+    // billing/legal copy lives in i18n (`paywall.*`) as the fallback. The
+    // modal reads these with optional chaining and falls back to t().
+    paywall: {
+      title: t('paywall.title', { collectionLabel: 'shelf' }),
+      body: t('paywall.body', { collectionLabel: 'shelf', cap: '10' }),
+      cta: t('paywall.cta'),
+      secondary: t('paywall.secondary'),
+      priceLine: t('paywall.priceLine'),
+      creating: t('paywall.creating'),
+      checkoutError: t('paywall.checkoutError'),
+      offline: t('paywall.offline'),
+      stillPending: t('paywall.stillPending'),
+      successToast: t('paywall.successToast', { collectionLabel: 'shelf' }),
+      plan: 'lifetime',
+      reason: {
+        cap: {
+          title: t('paywall.reason.cap.title', { collectionLabel: 'shelf' }),
+          body: t('paywall.reason.cap.body', { collectionLabel: 'shelf', cap: '10' }),
+        },
+        feature: {
+          title: t('paywall.reason.feature.title'),
+          body: t('paywall.reason.feature.body'),
+        },
+        upgrade: {
+          title: t('paywall.reason.upgrade.title'),
+          body: t('paywall.reason.upgrade.body'),
+        },
+        expired: {
+          title: t('paywall.reason.expired.title'),
+          body: t('paywall.reason.expired.body'),
+        },
+      },
     },
     // Gamification (Phase 1 § Play): release 1.1 Collection Persona + share
     // card. Copy bridges t() (EN master in the i18n locales; other locales

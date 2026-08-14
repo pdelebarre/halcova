@@ -42,6 +42,55 @@
 
 .plan-banner-hint { color: var(--danger); }
 
+/* S6 soft upgrade entry — "Upgrade" link in the free-plan banner. */
+.plan-banner-upgrade {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--runout-gold);
+  color: var(--runout-gold);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 32px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.plan-banner-upgrade:hover { background: rgba(201, 162, 39, 0.12); }
+.plan-banner-upgrade:active { transform: scale(0.97); }
+
+/* S6 post-checkout notice — "still confirming your payment". Sticky inline
+   banner so a slow webhook never looks like the payment failed. */
+.paywall-notice {
+  width: 100%;
+  max-width: 1280px;
+  margin: 10px auto 0;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.1);
+  border: 1px solid var(--runout-gold);
+  border-radius: var(--radius-sm);
+}
+.paywall-notice-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--runout-gold);
+  font-size: 14px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.paywall-notice-close:hover { background: rgba(201, 162, 39, 0.12); }
+
 /* Active aisle chip (§ Phase 2): shows the current browse bin and clears it. */
 .aisle-chip-row {
   display: flex;

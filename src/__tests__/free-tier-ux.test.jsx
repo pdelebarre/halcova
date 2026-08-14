@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 // Mutable user so each test can pick a plan/role. Held in vi.hoisted because
 // the useAuth mock factory below is hoisted above module-level `let`s.
@@ -119,9 +119,13 @@ describe('Free-tier UX', () => {
     const fab = screen.getByRole('button', { name: /Free plan full/ })
     fireEvent.click(fab)
 
-    // No add menu opens, and the upgrade hint toast appears instead.
+    // No add menu opens; instead the S6 paywall bottom sheet appears (the old
+    // "ask the admin" toast is replaced by the self-serve upgrade path, #57).
     expect(screen.queryByRole('menu', { name: 'Add options' })).not.toBeInTheDocument()
-    expect(await screen.findByText(/Free-plan limit reached/)).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: 'Your crate is full' })
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Upgrade' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Maybe later' })).toBeInTheDocument()
   })
 
   it('shows the upgrade prompt when the server rejects an add with PLAN_LIMIT', async () => {

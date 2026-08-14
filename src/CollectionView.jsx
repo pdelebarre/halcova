@@ -56,7 +56,7 @@ const NEW_ARRIVALS_COUNT = 5
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, refreshTick, loansButtonRef, isFree = false, isDemo = false, gamificationEnabled = false }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   // Partition (§ Fix): wishlist items are UNOWNED wants — they never count as
@@ -112,6 +112,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // are gated once the cap is reached so a free user never attempts an add the
   // server will reject with PLAN_LIMIT.
   const atLimit = isFree && ownedItems.length >= FREE_PLAN_CAP
+
+  // S6 lending gate: a free member sees a gated "Lending" affordance in the
+  // detail sheet that opens the paywall (reason 'feature'). Never for demo
+  // visitors (read-only, no paywall) — LendingControls renders null for them.
+  const lendingGate = !lendingEnabled && isFree && !isDemo
+
+  // S6: report WHY the collection is blocked. CollectionView never decides
+  // what to render — App owns the paywall modal.
+  function openPaywall(reason, feature) {
+    onOpenPaywall?.({ reason, kind: catalog.kind, ...(feature ? { feature } : {}) })
+  }
 
   // Grid vs List, remembered per kind (§4.6).
   const [view, setView] = useState(() => {
@@ -362,15 +373,23 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       setScanCandidate(null)
       showToast(copy.wishlist?.addedToast || 'Added to your wishlist', 'add')
     } catch (err) {
-      if (err?.code === 'PLAN_LIMIT') showToast(t('plan.limitToast'), 'error')
-      else if (err?.code === 'DEMO_READONLY') showToast(t('demo.readOnlyToast'), 'error')
+      if (err?.code === 'PLAN_LIMIT') {
+        showToast(t('plan.limitToast'), 'error')
+        openPaywall('cap')
+      } else if (err?.code === 'DEMO_READONLY') showToast(t('demo.readOnlyToast'), 'error')
       else showToast(t('view.couldNotSave'), 'error')
     }
   }
 
   async function handleConvertToOwned(item) {
     if (!item) return
-    if (atLimit) { showToast(t('plan.limitToast'), 'error'); return }
+    // Wishlist → owned grows the owned count: gate the convert at the cap (the
+    // server caps `{ wishlist: false }` too — this keeps the UI honest).
+    if (atLimit) {
+      showToast(t('plan.limitToast'), 'error')
+      openPaywall('cap')
+      return
+    }
     try {
       await update(item.id, { wishlist: false })
       setWishlistOpen(false)
@@ -379,7 +398,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       setSelectedItem(null)
       showToast(copy.wishlist?.addToCrateToast || 'Added to your crate', 'add')
     } catch (err) {
-      if (err?.code === 'DEMO_READONLY') showToast(t('demo.readOnlyToast'), 'error')
+      if (err?.code === 'PLAN_LIMIT') {
+        showToast(t('plan.limitToast'), 'error')
+        openPaywall('cap')
+      } else if (err?.code === 'DEMO_READONLY') showToast(t('demo.readOnlyToast'), 'error')
       else showToast(t('view.couldNotSave'), 'error')
     }
   }
@@ -574,6 +596,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     // empty-state entries are gated — but guard anyway so no doomed POST fires.
     if (atLimit) {
       showToast(t('plan.limitToast'), 'error')
+      openPaywall('cap')
       return
     }
     // Strip anything carried over from an already-owned item (id, dateAdded,
@@ -599,6 +622,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       // space get clear upgrade/sign-in prompts instead of a generic save error.
       if (err?.code === 'PLAN_LIMIT') {
         showToast(t('plan.limitToast'), 'error')
+        openPaywall('cap')
       } else if (err?.code === 'DEMO_READONLY') {
         showToast(t('demo.readOnlyToast'), 'error')
       } else {
@@ -742,12 +766,23 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           + the at-cap hint. Shown only for free-plan members — absent for
           owner/unlimited and demo visitors. */}
       {status === 'ready' && isFree && (
-        <div className="plan-banner" role="status">
-          <span className="plan-banner-counter">
-            {t('plan.freeCounter', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
-          </span>
-          {atLimit && (
-            <span className="plan-banner-hint">{t('plan.atLimitHint', { cap: FREE_PLAN_CAP })}</span>
+        <div className="plan-banner">
+          <div className="plan-banner-status" role="status">
+            <span className="plan-banner-counter">
+              {t('plan.freeCounter', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
+            </span>
+            {atLimit && (
+              <span className="plan-banner-hint">{t('plan.atLimitHint', { cap: FREE_PLAN_CAP })}</span>
+            )}
+          </div>
+          {!isDemo && (
+            <button
+              type="button"
+              className="plan-banner-upgrade"
+              onClick={() => openPaywall(planStatus === 'expired' ? 'expired' : 'upgrade')}
+            >
+              {t('paywall.cta')}
+            </button>
           )}
         </div>
       )}
@@ -999,7 +1034,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
             aria-expanded={fabOpen}
             aria-disabled={atLimit || undefined}
             onClick={atLimit
-              ? () => showToast(t('plan.limitToast'), 'error')
+              ? () => openPaywall('cap')
               : () => setFabOpen((s) => !s)}
             aria-label={atLimit ? t('plan.limitFab') : t('common.scan')}
           >
@@ -1096,10 +1131,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onSaveNotes={handleSaveNotes}
           onTogglePinned={() => handleTogglePinned(selectedItem)}
           lendingEnabled={lendingEnabled}
+          lendingGate={lendingGate}
           onLend={handleLend}
           onReturn={handleReturn}
           showToast={showToast}
           isDemo={isDemo}
+          onOpenPaywall={(p) => onOpenPaywall?.({ ...p, kind: catalog.kind })}
         />
       )}
 

@@ -5,7 +5,7 @@ import LendingControls from './LendingControls'
 import './AlbumDetail.css'
 import './BookDetail.css'
 
-export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, onLend, onReturn, showToast, isDemo = false }) {
+export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
@@ -155,9 +155,11 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
             item={item}
             catalog={catalog}
             lendingEnabled={lendingEnabled}
+            lendingGate={lendingGate}
             onLend={onLend}
             onReturn={onReturn}
             showToast={showToast}
+            onOpenPaywall={onOpenPaywall}
           />
         </div>
 

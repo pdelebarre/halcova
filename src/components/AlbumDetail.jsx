@@ -5,7 +5,7 @@ import { t } from '../i18n'
 import LendingControls from './LendingControls'
 import './AlbumDetail.css'
 
-export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, onLend, onReturn, showToast, isDemo = false }) {
+export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall }) {
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
@@ -158,9 +158,11 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
             item={item}
             catalog={catalog}
             lendingEnabled={lendingEnabled}
+            lendingGate={lendingGate}
             onLend={onLend}
             onReturn={onReturn}
             showToast={showToast}
+            onOpenPaywall={onOpenPaywall}
           />
         </div>
 

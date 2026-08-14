@@ -40,6 +40,14 @@ const en = {
   'auth.requesting': 'Requesting…',
   'auth.requestSent': 'Request sent ✉️',
   'auth.requestSentBody': 'The admin will review it and send you an access code. Once you have it, come back and sign in.',
+  // Self-serve signup via email magic link (ADR-0003 S1).
+  'auth.signUpEmail': 'Sign up with email',
+  'auth.enterEmail': 'Enter your email and we\'ll send you a one-time sign-in link.',
+  'auth.emailPlaceholder': 'you@example.com',
+  'auth.sendLink': 'Send me the link',
+  'auth.sendingLink': 'Sending…',
+  'auth.magicSent': 'Check your inbox ✉️',
+  'auth.magicSentBody': 'We sent a one-time sign-in link to your email. Tap it to sign in — no password, no admin approval.',
   'auth.noCollections': 'Hi {name} — your account doesn\'t include any collections yet. Ask the admin to grant you Records and/or Books.',
 
   // §4 Header
@@ -331,9 +339,33 @@ const en = {
 
   // §17 Free plan & demo
   'plan.freeCounter': '{count} of {cap} items added',
-  'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Ask the admin to upgrade your plan to keep adding.",
-  'plan.limitToast': 'Free-plan limit reached. Ask the admin to upgrade your plan to add more.',
+  'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Upgrade to keep adding.",
+  'plan.limitToast': 'Free-plan limit reached — upgrade to add more.',
   'plan.limitFab': 'Free plan full — upgrade to add more',
+
+  // §17b Paywall (ADR-0003 S6) — self-serve upgrade + Stripe checkout.
+  // EN master only; other locales inherit via fallback until the native-speaker
+  // pass lands (same pattern as §18 gamification). `{collectionLabel}` and
+  // `{cap}` are interpolated at render (crate/shelf, 10).
+  'paywall.title': 'Unlock unlimited {collectionLabel}',
+  'paywall.body': 'The free plan holds {cap} items per collection. Go Premium for unlimited cataloging, lending, and everything else.',
+  'paywall.cta': 'Upgrade',
+  'paywall.secondary': 'Maybe later',
+  'paywall.priceLine': 'One-time purchase · yours forever',
+  'paywall.creating': 'Starting checkout…',
+  'paywall.checkoutError': "Couldn't start checkout — check your connection and try again.",
+  'paywall.offline': "You're offline — checkout needs a connection. Try again when you're back online.",
+  'paywall.stillPending': "We're still confirming your payment — it can take a moment.",
+  'paywall.successToast': 'Premium unlocked — happy cataloging!',
+  'paywall.magicLinkError': "That sign-in link didn't work — it may have expired. Request a new one.",
+  'paywall.reason.cap.title': 'Your {collectionLabel} is full',
+  'paywall.reason.cap.body': 'The free plan holds {cap} items. Upgrade to keep adding without limits.',
+  'paywall.reason.feature.title': 'Unlock lending',
+  'paywall.reason.feature.body': 'Lending is part of Premium — track who borrowed what, due dates, and history.',
+  'paywall.reason.upgrade.title': 'Go Premium',
+  'paywall.reason.upgrade.body': 'Unlimited cataloging, lending, and everything else — one payment, yours forever.',
+  'paywall.reason.expired.title': 'Your plan has expired',
+  'paywall.reason.expired.body': 'Renew to keep adding and lending without limits.',
   'admin.plan': 'Plan',
   'admin.planFree': 'Free',
   'admin.planUnlimited': 'Unlimited',
