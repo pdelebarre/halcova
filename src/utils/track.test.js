@@ -1,0 +1,97 @@
+import { describe, expect, it, beforeEach } from 'vitest'
+import { isTrackingEnabled, setTrackingEnabled, track, flushEvents, clearEvents } from './track'
+
+const EVENTS_KEY = 'runout.events'
+const ENABLED_KEY = 'runout.events.enabled'
+
+function readQueue() {
+  return JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]')
+}
+
+describe('track instrumentation (default-OFF, first-party)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('is disabled by default and only turns on via setTrackingEnabled(true)', () => {
+    expect(isTrackingEnabled()).toBe(false)
+    expect(localStorage.getItem(ENABLED_KEY)).toBeNull()
+    setTrackingEnabled(true)
+    expect(isTrackingEnabled()).toBe(true)
+    expect(localStorage.getItem(ENABLED_KEY)).toBe('1')
+    setTrackingEnabled(false)
+    expect(isTrackingEnabled()).toBe(false)
+  })
+
+  it('is a no-op while tracking is off — nothing is queued', () => {
+    track('gamif_persona_generated', { kind: 'records' })
+    expect(localStorage.getItem(EVENTS_KEY)).toBeNull()
+  })
+
+  it('queues an event with a timestamp once enabled', () => {
+    setTrackingEnabled(true)
+    track('gamif_persona_generated', { kind: 'records', shared: false })
+    const queue = readQueue()
+    expect(queue).toHaveLength(1)
+    expect(queue[0].event).toBe('gamif_persona_generated')
+    expect(queue[0].props).toEqual({ kind: 'records', shared: false })
+    expect(typeof queue[0].ts).toBe('string')
+    expect(Number.isNaN(Date.parse(queue[0].ts))).toBe(false)
+  })
+
+  it('sanitizes props — drops code/token/key/secret/barcode/isbn keys and nested objects', () => {
+    setTrackingEnabled(true)
+    track('gamif_share_exported', {
+      kind: 'records',
+      code: 'RU-1234-5678-9012',
+      accessCode: 'secret',
+      token: 'abc',
+      apiKey: 'key',
+      secret: 's3cr3t',
+      barcode: '1234567890128',
+      isbn: '9783161484100',
+      nested: { deep: true },
+      items: [1, 2, 3],
+    })
+    const props = readQueue()[0].props
+    expect(props).toEqual({ kind: 'records' })
+  })
+
+  it('caps the queue at 500 events, dropping the oldest', () => {
+    setTrackingEnabled(true)
+    for (let i = 0; i < 505; i += 1) track('e', { i })
+    const queue = readQueue()
+    expect(queue).toHaveLength(500)
+    expect(queue[0].props.i).toBe(5) // first 5 dropped
+    expect(queue[queue.length - 1].props.i).toBe(504)
+  })
+
+  it('never throws on corrupt stored JSON and recovers with a fresh queue', () => {
+    setTrackingEnabled(true)
+    localStorage.setItem(EVENTS_KEY, '{not valid json')
+    expect(() => track('e', { a: 1 })).not.toThrow()
+    expect(readQueue()).toHaveLength(1)
+  })
+
+  it('treats a non-array stored queue as empty', () => {
+    setTrackingEnabled(true)
+    localStorage.setItem(EVENTS_KEY, '"a string"')
+    expect(() => track('e', { a: 1 })).not.toThrow()
+  })
+
+  it('ignores a missing or non-string event name', () => {
+    setTrackingEnabled(true)
+    track()
+    track(42)
+    expect(readQueue()).toHaveLength(0)
+  })
+
+  it('flushEvents is a safe no-op placeholder and clearEvents empties the queue', () => {
+    setTrackingEnabled(true)
+    track('a', { x: 1 })
+    expect(() => flushEvents()).not.toThrow()
+    expect(readQueue()).toHaveLength(1)
+    clearEvents()
+    expect(localStorage.getItem(EVENTS_KEY)).toBeNull()
+  })
+})
