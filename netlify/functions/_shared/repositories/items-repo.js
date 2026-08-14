@@ -42,7 +42,9 @@ function asDate(value) {
 
 // Derive the mirror-column values from the exact client item object. (ownerId
 // and kind are not part of the item JSON — they're separate WHERE/INSERT keys.)
-function itemRowValues(item) {
+// Exported so the backfill script (scripts/backfill.mjs) upserts Blobs items
+// with the exact same mirror columns — no drift between the two writers.
+export function itemRowValues(item) {
   const data = item && typeof item === 'object' ? item : {}
   const dateAdded = asDate(data.dateAdded) || new Date()
   return {
