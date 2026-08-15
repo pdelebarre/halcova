@@ -36,6 +36,14 @@ export default defineConfig({
         'src/test/**',
         'netlify/**/*.test.js',
       ],
+      // The team's coverage gate: `npm run test:coverage` fails if any metric
+      // drops below 70%. Keep the agents/skills in sync with these numbers.
+      thresholds: {
+        statements: 70,
+        branches: 70,
+        functions: 70,
+        lines: 70,
+      },
     },
   },
 })

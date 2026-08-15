@@ -75,7 +75,8 @@ npm run dev        # frontend on :5173 (functions proxied to :8888)
 netlify dev        # frontend + functions together, usually :8888
 npm run lint       # oxlint
 npm test           # vitest run
-npm run test:watch / test:coverage
+npm run test:watch # vitest watch
+npm run test:coverage # coverage; must clear the 70% threshold (vitest.config.js)
 npm run build      # vite build (PWA precaches the scanner wasm)
 ```
 
