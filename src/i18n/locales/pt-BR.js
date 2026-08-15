@@ -321,6 +321,15 @@ const ptBR = {
 
   // §17 Plano gratuito e demo
   'plan.freeCounter': '{count} de {cap} itens adicionados',
+  // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only
+  // (free-tier-guidance.md #143/#144). Native-tester sign-off pending per
+  // localization-plan.md — do NOT ship before the pass. "spot" is colloquial:
+  // gloss as a natural collector equivalent (e.g. "vaga"), not a literal
+  // translation. "no card, no expiry" must stay conversational, not a legal
+  // payment promise.
+  'plan.onboardNote': 'Free plan: up to 10 per collection — no card, no expiry.',
+  'plan.nearLimitHint': '{remaining} spots left on the free plan',
+  'plan.counterLabel': 'Free plan: {count} of {cap} items added',
   'plan.atLimitHint': 'Você adicionou {cap} itens — o limite do plano gratuito. Peça ao admin para fazer upgrade para continuar adicionando.',
   'plan.limitToast': 'Limite do plano gratuito atingido. Peça ao admin para fazer upgrade para adicionar mais.',
   'plan.limitFab': 'Plano gratuito cheio — faça upgrade para adicionar mais',
