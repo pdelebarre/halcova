@@ -13,6 +13,7 @@
 | `private-test-invite.md` | **Invite copy** — EN master + FR/NL/PT-BR/DE/ES/IT drafts, with personal-code placeholders |
 | `localization-plan.md` | **Localization plan** — 7 languages, per-user preference + switcher, architecture, rollout |
 | `localization-dictionary.md` | **Translation dictionary (v1)** — EN/FR/NL/PT-BR/DE/ES/IT content for every key, `[VALIDATE]` |
+| `localization-dictionary-addendum.md` | **Dictionary addendum (v1.1)** — new keys from `specs/` (C1/C2 + A5/B5 Phase 1), EN master + 6 translations, `[VALIDATE]` |
 | `ticket-localization.md` | **Dev implementation ticket** — exact file/string scope for `feat/localization`, non-string fixes, tests, DoD |
 | `rename-Halcova.md` | *Superseded* — earlier "rename to Halcova" plan (kept for reference) |
 | `copy-kit-Halcova.md` | *Superseded* — earlier "Halcova" copy kit (kept for reference) |
@@ -43,6 +44,13 @@ curiosity-first progressive reveal, video produced in **PicsArt**. Brand: **Halc
 > self-deprecating collector humor voice. Benefit bank + joke bank:
 > `review-benefits-humor.md`.
 
+## Product specs (drafts — for review, not implemented)
+
+| File | What it is |
+| --- | --- |
+| `specs/activation-scan-and-onboarding.md` | C1 "Add & scan next" loop + C2 empty-state onboarding — copy keys + component touchpoints for the Front End Developer |
+| `specs/lending-polish-and-reminders.md` | A5 lending polish + B5 reminders (Phase 1 device-native only) — copy keys + touchpoints, B5 Phase 2/3 flagged as future ADR |
+
 ## Iteration history (drafts — superseded, kept for reference)
 
 | File | Round | Proposal |
@@ -57,8 +65,12 @@ curiosity-first progressive reveal, video produced in **PicsArt**. Brand: **Halc
 
 ## Open items `[VALIDATE]`
 
+> **Backlog grooming (2026-08-15):** launch gates now tracked as GitHub tickets —
+> **#119** icon, **#120** legal/domain/handles, **#121** landing page + Request access +
+> UTM/analytics. Full prioritized backlog + PM handoff: `backlog-grooming-launch-handoff.md`.
+
 1. Native-speaker pronunciation/meaning check for **Halcova** (a coined word) across EN/FR/PT/NL/DE/ES/IT.
-2. Trademark + domain + social-handle check for "Halcova".
-3. Halcova icon **with a barcode element** — approved by Marketing, PNGs in `public/` (`brief-halcova-icon.md`).
-4. Hokan→Halcova code rename on a `chore/rename-halcova` branch (new dev ticket).
+2. Trademark + domain + social-handle check for "Halcova" → **GitHub #120**.
+3. Halcova icon **with a barcode element** — approved by Marketing, PNGs in `public/` (`brief-halcova-icon.md`) → **GitHub #119**.
+4. ~~Hokan→Halcova code rename~~ — **DONE: code is already fully renamed to Halcova** (index.html, vite.config.js, wordmarks, 8 locales); "Runout"/"Hokan" survive only as internal env/store names. No rename ticket needed.
 5. Localization dictionaries validated by native testers (FR/NL/PT-BR/DE/ES/IT) before the `feat/localization` branch ships.
