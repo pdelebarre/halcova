@@ -85,6 +85,12 @@ export const recordsCatalog = {
     nothingElseBy: (name) => `Nothing else by ${name} in your crate`,
     moreRelated: (n) => `and ${n} more`,
     scanNext: 'Scan next',
+    // C1.1: scan-sourced results offer "Add & scan next" as the primary; the
+    // plain "Add" demotes to a ghost slot so the scanning burst continues.
+    addAndScanNext: 'Add & scan next',
+    // C1.4: momentum toast — a factual per-session "added today" count (no
+    // XP/badges). Function override; i18n `catalog.addedCount` is the fallback.
+    addedCount: (n) => `Added — ${n} today`,
     add: 'Add to crate',
     manualTitleRequired: 'Add a title — give this record a name first.',
     fabMenu: { label: 'Add options', scan: 'Scan barcode', searchTitle: 'Search by title', manual: 'Enter manually', scanCover: 'Scan cover' },
@@ -502,6 +508,12 @@ export const booksCatalog = {
     nothingElseBy: (name) => `Nothing else by ${name} on your shelf`,
     moreRelated: (n) => `and ${n} more`,
     scanNext: 'Scan next',
+    // C1.1: scan-sourced results offer "Add & scan next" as the primary; the
+    // plain "Add" demotes to a ghost slot so the scanning burst continues.
+    addAndScanNext: 'Add & scan next',
+    // C1.4: momentum toast — a factual per-session "added today" count (no
+    // XP/badges). Function override; i18n `catalog.addedCount` is the fallback.
+    addedCount: (n) => `Added — ${n} today`,
     add: 'Add to shelf',
     manualTitleRequired: 'Add a title — give this book a name first.',
     fabMenu: { label: 'Add options', scan: 'Scan barcode', searchTitle: 'Search by title', manual: 'Enter manually', scanCover: 'Scan cover' },

@@ -29,6 +29,12 @@ describe('recordsCatalog', () => {
     expect(recordsCatalog.copy.resultGood.label).toBe('Not in your crate yet')
   })
 
+  it('exposes the C1 scan-loop copy keys (Add & scan next + momentum toast)', () => {
+    expect(recordsCatalog.copy.addAndScanNext).toBe('Add & scan next')
+    expect(recordsCatalog.copy.addedCount(3)).toBe('Added — 3 today')
+    expect(recordsCatalog.copy.scanNext).toBe('Scan next')
+  })
+
   it('exposes browse axes (Genre · Artist · Decade · Format · Label)', () => {
     expect(recordsCatalog.browseAxes.map((a) => a.id)).toEqual(['genre', 'artist', 'decade', 'format', 'label'])
     for (const axis of recordsCatalog.browseAxes) {
@@ -69,6 +75,12 @@ describe('booksCatalog', () => {
     expect(booksCatalog.copy.emptyTitle).toBe('Your shelf is empty')
     expect(booksCatalog.copy.addToast).toBe('Added to your shelf')
     expect(booksCatalog.copy.moreBy('Le Guin', 2)).toBe('More by Le Guin on your shelf (2)')
+  })
+
+  it('exposes the C1 scan-loop copy keys on the books catalog too', () => {
+    expect(booksCatalog.copy.addAndScanNext).toBe('Add & scan next')
+    expect(booksCatalog.copy.addedCount(2)).toBe('Added — 2 today')
+    expect(booksCatalog.copy.scanNext).toBe('Scan next')
   })
 
   it('exposes browse axes (Category · Author · Year)', () => {
