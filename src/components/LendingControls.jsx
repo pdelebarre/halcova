@@ -53,7 +53,7 @@ function buildStatus(item, lending) {
   }
 }
 
-export default function LendingControls({ item, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, onOpenPaywall }) {
+export default function LendingControls({ item, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, onOpenPaywall, wrapperRef }) {
   const lending = catalog?.copy?.lending || {}
 
   const [formOpen, setFormOpen] = useState(false)
@@ -89,7 +89,7 @@ export default function LendingControls({ item, catalog, lendingEnabled, lending
     // without the gate get nothing, exactly as before.
     if (!lendingGate) return null
     return (
-      <div className="lending-gate">
+      <div className="lending-gate" ref={wrapperRef}>
         <p className="lending-gate-title">{lending.featureLabel || 'Lending'}</p>
         <p className="lending-gate-body">{t('lending.notEnabled')}</p>
         <button
@@ -203,7 +203,9 @@ export default function LendingControls({ item, catalog, lendingEnabled, lending
   }
 
   return (
-    <section className="lending">
+    // A5.6 (#117): the section is the deep-link anchor — tabIndex={-1} lets
+    // the card icon focus it programmatically (it never enters the tab order).
+    <section className="lending" ref={wrapperRef} tabIndex={-1}>
       <p className="detail-section-label">{lending.section}</p>
 
       {isOut ? (

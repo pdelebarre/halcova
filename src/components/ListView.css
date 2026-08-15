@@ -104,26 +104,47 @@
   color: var(--static-grey);
 }
 
-/* W7: On-loan / Overdue badge (list view). Inline, next to the format badge —
-   same palette as the grid's `.lending-badge` but non-absolute so it sits in
-   the row flow without breaking the 56px row layout. */
-.list-lending-badge {
+/* A5.6 (#117): on-loan icon (list view). Inline, next to the format badge —
+   same palette as the grid's `.loan-icon` but position:relative so it sits in
+   the row flow without breaking the 56px layout (44px hit area fits: the row
+   is 56px tall). The full visual set is redeclared here so the list style
+   doesn't depend on the card CSS being loaded. */
+.list-row .loan-icon {
+  position: relative;
   flex-shrink: 0;
-  padding: 3px 8px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  white-space: nowrap;
   color: var(--success);
   background: var(--vinyl-groove-2);
   border: 1px solid rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.list-lending-badge.overdue {
+.list-row .loan-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.list-row .loan-icon:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: 2px;
+}
+.list-row .loan-icon.overdue {
   color: var(--danger-bright);
   border-color: rgba(224, 105, 91, 0.6);
+}
+.list-row .loan-icon-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger-bright);
+  border: 2px solid var(--vinyl-groove-2);
 }
 
 /* Decorative hover only — never on touch. */

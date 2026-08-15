@@ -75,6 +75,9 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const [coverState, setCoverState] = useState({ busy: false, error: '' })
   const [scanCandidate, setScanCandidate] = useState(null) // { candidate, ownedExact, wishlistExact, sameAlbum, otherArtist }
   const [selectedItem, setSelectedItem] = useState(null)
+  // A5.6 (#117): the deep-link hint for the detail sheet — 'lending' scrolls
+  // + focuses the LendingControls section when the on-loan icon is tapped.
+  const [detailFocus, setDetailFocus] = useState(null)
   const [toast, setToast] = useState(null) // { msg, kind: 'add' | 'remove' | 'error' }
   const toastTimer = useRef(null)
   // C2.4 (issue #88): records token availability, learned from the server.
@@ -350,8 +353,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     !hasActiveFilters &&
     floorSections.length > 0
 
-  function openItem(item) {
+  // A5.6 (#117): onOpen gains an optional hint — { focus: 'lending' } deep-
+  // links straight to the item's lend card (detail sheet scrolled + focused on
+  // LendingControls). Without a hint this is a normal detail open.
+  function openItem(item, hint) {
     setSelectedItem(item)
+    setDetailFocus(hint?.focus || null)
     setModal('detail')
   }
 
@@ -360,8 +367,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   function handleCrateDive() {
     if (!ownedItems.length) return
     const pick = ownedItems[Math.floor(Math.random() * ownedItems.length)]
-    setSelectedItem(pick)
-    setModal('detail')
+    openItem(pick)
   }
 
   // Pin/unpin (§ Phase 1): `pinned` is an additive item field (the collection
@@ -686,8 +692,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }
 
   function handleOpenFromResult(item) {
-    setSelectedItem(item)
-    setModal('detail')
+    openItem(item)
   }
 
   // C1.1: add the scanned item, then immediately re-open the warm scanner so
@@ -1225,6 +1230,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         <Detail
           item={selectedItem}
           catalog={catalog}
+          focusSection={detailFocus}
           onClose={() => { setModal(null); setSelectedItem(null) }}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}

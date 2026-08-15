@@ -5,6 +5,13 @@
   margin-bottom: 16px;
 }
 
+/* A5.6 (#117): the section is a programmatic focus target for the on-loan
+   card icon's deep-link — hide the default focus ring (we scroll to it and
+   focus it only as an anchor; the actual controls get their own focus). */
+.lending:focus {
+  outline: none;
+}
+
 /* Not on loan — status + the "Lend…" action. */
 .lending-idle {
   display: flex;
