@@ -644,9 +644,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   async function handleDelete(id) {
     navigator.vibrate?.(40)
     await remove(id)
+    // A wishlist want deleted from its Detail sheet runs the same remove path
+    // (it deletes the want), but the success toast says "wishlist", not crate.
+    const wasWant = !!selectedItem?.wishlist
     setModal(null)
     setSelectedItem(null)
-    showToast(copy.removedToast || t('catalog.removedToast'), 'remove')
+    showToast(wasWant
+      ? (copy.wishlist?.removeToast || 'Removed from your wishlist')
+      : (copy.removedToast || t('catalog.removedToast')), 'remove')
   }
 
   async function handleSaveNotes(notes) {
@@ -1162,6 +1167,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onConvert={handleConvertToOwned}
           onRemove={handleRemoveFromWishlist}
           onClose={() => setWishlistOpen(false)}
+          // Tapping a wishlist row opens the full Detail sheet. Close the
+          // wishlist first — both sheets share the same overlay z-index and
+          // the wishlist renders later in the DOM, so it would cover the
+          // detail otherwise.
+          onOpenItem={(item) => { setWishlistOpen(false); openItem(item) }}
           copy={copy}
           isDemo={isDemo}
         />

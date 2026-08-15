@@ -56,7 +56,11 @@ async function readItemsFromBlobs(req, { user, collection, url }) {
 }
 
 // DB-first read-through: serve Postgres when it has rows, otherwise fall back
-// to Blobs (pre-backfill or DB error).
+// to Blobs (pre-backfill or DB error). When Postgres has rows the store has
+// been (at least partially) backfilled, so it could be missing items that live
+// only in Blobs — wishlist wants added before or in between backfills would
+// otherwise be silently invisible to GET (the "disappeared items" bug). We
+// lazily reconcile that drift, then serve the complete Postgres rows.
 async function readItems(req, { user, collection, url }) {
   const repo = getRepository()
   const { offset, limit } = parsePagination(url.searchParams)
@@ -69,7 +73,40 @@ async function readItems(req, { user, collection, url }) {
   if (items === null || items.length === 0) {
     return readItemsFromBlobs(req, { user, collection, url })
   }
+  await reconcileFromBlobs(repo, user.id, collection)
+  items = await repo.items.listItems(user.id, collection, { limit, offset })
   return json(200, { items })
+}
+
+// Lazy, self-healing read-through (ADR-0002 Phase 1, epic #38): a store that
+// has ANY Postgres row is served DB-first, but the backfill snapshot may have
+// missed items that exist only in Blobs (wishlist wants added before or in
+// between backfills). On GET we read the Blobs index, find which ids are still
+// missing from Postgres, and upsert those items — reusing the exact
+// `itemRowValues` mirror derivation + `ON CONFLICT (id) DO NOTHING` upsert from
+// items-repo (the same writer the backfill uses), so there's zero drift between
+// writers. Best-effort: a Blobs read or upsert failure never fails the request;
+// it degrades to serving the Postgres rows as-is. Once converged the reconcile
+// is a no-op (index read + id query only, no per-item work), so there's no
+// permanent read cost on the hot path.
+async function reconcileFromBlobs(repo, userId, collection) {
+  try {
+    const store = getStore(storeNameFor(userId, collection))
+    const blobIds = await readIndex(store)
+    if (!Array.isArray(blobIds) || blobIds.length === 0) return
+    const pgIds = await repo.items.listItemIds(userId, collection)
+    const pgIdSet = new Set(pgIds)
+    const missing = blobIds.filter((id) => !pgIdSet.has(id))
+    if (missing.length === 0) return
+    const items = (await Promise.all(
+      missing.map((itemId) => store.get(`item:${itemId}`, { type: 'json' })),
+    )).filter(Boolean)
+    for (const item of items) {
+      await repo.items.insertItem(userId, collection, item)
+    }
+  } catch {
+    /* best-effort — serve the Postgres rows as-is */
+  }
 }
 
 // --- Reversible Blob mirrors (best-effort — Postgres is the source of truth) ---

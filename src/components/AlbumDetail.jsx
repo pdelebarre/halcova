@@ -9,6 +9,21 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
+  // A wishlist "want" is unowned: it gets none of the owned-only affordances
+  // (pin, lending) and its remove copy says "wishlist", not crate.
+  const isWant = !!item.wishlist
+  const closeRef = useRef(null)
+
+  // Focus into the sheet on open; Esc closes (same pattern as WishlistSheet).
+  useEffect(() => {
+    closeRef.current?.focus()
+    function onKey(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const [tracklist, setTracklist] = useState(null)
   const [trackError, setTrackError] = useState('')
   const [notes, setNotes] = useState(item.notes || '')
@@ -30,6 +45,15 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
   useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
 
   const notesDirty = notes !== (item.notes || '')
+
+  // Remove labels: a wishlist want gets wishlist copy ("Remove from wishlist"),
+  // an owned item keeps the catalog's crate/shelf remove copy.
+  const removeLabel = isWant
+    ? (copy.wishlist?.remove || 'Remove from wishlist')
+    : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))
+  const removeConfirmLabel = isWant
+    ? (copy.wishlist?.removeConfirm || 'Remove from wishlist?')
+    : (copy.removeConfirm || t('catalog.removeConfirm'))
 
   // Explicit Save button — no silent save-on-blur (§4.13). Persists via the
   // existing onSaveNotes prop and shows a brief confirm state.
@@ -63,7 +87,7 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
           <h2 className="visually-hidden">{albumTitle}</h2>
           <span />
           <div className="detail-header-actions">
-            {!isDemo && onTogglePinned && (
+            {!isDemo && !isWant && onTogglePinned && (
               <button
                 type="button"
                 className={`icon-btn detail-pin${item.pinned ? ' pinned' : ''}`}
@@ -76,7 +100,7 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
                 </svg>
               </button>
             )}
-            <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
+            <button ref={closeRef} className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
           </div>
         </div>
 
@@ -154,16 +178,18 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
             )}
           </div>
 
-          <LendingControls
-            item={item}
-            catalog={catalog}
-            lendingEnabled={lendingEnabled}
-            lendingGate={lendingGate}
-            onLend={onLend}
-            onReturn={onReturn}
-            showToast={showToast}
-            onOpenPaywall={onOpenPaywall}
-          />
+          {!isWant && (
+            <LendingControls
+              item={item}
+              catalog={catalog}
+              lendingEnabled={lendingEnabled}
+              lendingGate={lendingGate}
+              onLend={onLend}
+              onReturn={onReturn}
+              showToast={showToast}
+              onOpenPaywall={onOpenPaywall}
+            />
+          )}
         </div>
 
         <div className="sheet-actions detail-actions">
@@ -183,7 +209,7 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
               className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
               onClick={handleRemove}
             >
-              {confirmDelete ? (copy.removeConfirm || t('catalog.removeConfirm')) : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))}
+              {confirmDelete ? removeConfirmLabel : removeLabel}
             </button>
           )}
         </div>

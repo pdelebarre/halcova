@@ -183,6 +183,25 @@ export default function Toolbar({
         {doneLabel}
       </button>
 
+      {/* Wishlist (§ Fix): UNOWNED wants — opens the Wishlist sheet, with a
+          badge when there are items to convert to owned. Sits right after the
+          search pill so it's discoverable on phones (the toolbar row scrolls
+          horizontally and the heart was ~6th in line, i.e. effectively gone). */}
+      <button
+        type="button"
+        className="toolbar-btn wishlist-btn"
+        onClick={onOpenWishlist}
+        tabIndex={searchActive ? -1 : 0}
+        aria-haspopup="dialog"
+        aria-expanded={wishlistOpen}
+        aria-label={copy.wishlist?.button || 'Wishlist'}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 20s-7-4.5-9.2-8.6C1.2 8.4 2.9 5 6.4 5c2 0 3.2 1.2 3.6 1.8C10.4 5 13 4.4 15 5.6 17 7 18 10 16.4 12.4 15.2 14.2 12 20 12 20z" />
+        </svg>
+        {wishlistCount > 0 && <span className="filter-badge">{wishlistCount}</span>}
+      </button>
+
       <button
         type="button"
         className="toolbar-btn browse-btn"
@@ -243,22 +262,6 @@ export default function Toolbar({
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <path d="M4 20V10M10 20V4M16 20v-6M22 20H2" />
         </svg>
-      </button>
-
-      {/* Wishlist (§ Fix): UNOWNED wants — opens the Wishlist sheet, with a
-          badge when there are items to convert to owned. */}
-      <button
-        type="button"
-        className="toolbar-btn wishlist-btn"
-        onClick={onOpenWishlist}
-        aria-haspopup="dialog"
-        aria-expanded={wishlistOpen}
-        aria-label={copy.wishlist?.button || 'Wishlist'}
-      >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 20s-7-4.5-9.2-8.6C1.2 8.4 2.9 5 6.4 5c2 0 3.2 1.2 3.6 1.8C10.4 5 13 4.4 15 5.6 17 7 18 10 16.4 12.4 15.2 14.2 12 20 12 20z" />
-        </svg>
-        {wishlistCount > 0 && <span className="filter-badge">{wishlistCount}</span>}
       </button>
 
       {/* Gamification (Phase 1 § Play): release 1.1 Persona entry point.
