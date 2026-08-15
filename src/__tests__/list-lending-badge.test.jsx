@@ -70,6 +70,10 @@ describe('list on-loan icon (A5.6 #117)', () => {
     const icon = container.querySelector('.loan-icon')
     expect(icon).toHaveClass('overdue')
     expect(icon).toHaveAccessibleName('Overdue — on loan to Alice — manage')
+    // P1-1: the overdue affordance includes the alert dot (the filled-pill
+    // styling lives in CSS — this class gates it, so overdue differs by
+    // fill/area as well as hue, not hue alone).
+    expect(container.querySelector('.loan-icon-dot')).toBeInTheDocument()
   })
 
   it('renders no icon when lending is disabled', () => {

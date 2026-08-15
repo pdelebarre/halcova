@@ -6,10 +6,16 @@
 // element with role="button" (button-in-button is invalid HTML — hard a11y
 // requirement). It is reachable by Tab, activates on Enter/Space, and
 // stopPropagation/preventDefault keep the parent card from double-firing.
-// Overdue loans get a danger dot + ring so urgency stays visible without text.
+//
+// P1-1 (color-blind safe): overdue is NOT hue-only. The `.overdue` class fills
+// the pill with --danger-bright and drops a dark glyph on it (mirrors
+// .btn-confirm's dark-on-gold), plus a 12px danger dot — so on-loan (green
+// glyph, dark chip) and overdue (dark glyph, filled danger chip) differ by
+// area/fill as well as hue. The isOverdue NaN guard lives in the callers
+// (AlbumCard / BookCard / ListView via src/utils/lending.js).
 //
 // Props:
-//   overdue    – bool: render the overdue affordance (danger dot + ring).
+//   overdue    – bool: render the overdue affordance (filled pill + dot).
 //   label      – the accessible name (catalog.copy.lending.manageLoan*).
 //   onActivate – callback fired on click / Enter / Space.
 

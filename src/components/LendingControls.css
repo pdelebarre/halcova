@@ -140,7 +140,8 @@
 .lending-preset {
   flex: 1;
   min-width: 72px;
-  height: 40px;
+  /* P2-8: 44px meets the touch-target bar (was 40px). */
+  height: 44px;
   padding: 0 12px;
   border-radius: 999px;
   background: var(--vinyl-groove);

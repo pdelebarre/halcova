@@ -118,8 +118,11 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+  /* P2-7: same dark chip as the grid card (rgba(18,15,11,0.92) + border) —
+     --vinyl-groove-2 (#2B251E) on the #16130F page was ~1.22:1, near
+     invisible; the bordered chip reads as a button. */
   color: var(--success);
-  background: var(--vinyl-groove-2);
+  background: rgba(18, 15, 11, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.16);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -132,19 +135,24 @@
   outline: 2px solid var(--runout-gold);
   outline-offset: 2px;
 }
+/* P1-1 (color-blind safe): overdue fills the pill with --danger-bright and a
+   dark glyph (mirrors .btn-confirm's dark-on-gold), so on-loan and overdue
+   differ by area/fill as well as hue. Dot grows to 12px; its dark border
+   matches the (new) dark chip so it reads on the filled danger pill. */
 .list-row .loan-icon.overdue {
-  color: var(--danger-bright);
-  border-color: rgba(224, 105, 91, 0.6);
+  color: var(--sleeve-black);
+  background: var(--danger-bright);
+  border-color: var(--danger-bright);
 }
 .list-row .loan-icon-dot {
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--danger-bright);
-  border: 2px solid var(--vinyl-groove-2);
+  border: 2px solid rgba(18, 15, 11, 0.92);
 }
 
 /* Decorative hover only — never on touch. */
