@@ -121,6 +121,16 @@ describe('Toolbar (single-row redesign)', () => {
     expect(container.querySelector('.loans-badge')).not.toBeInTheDocument()
   })
 
+  it('announces the overdue count in the Loans button aria-label (P1-3)', () => {
+    renderToolbar({ lendingEnabled: true, overdueCount: 3 })
+
+    // The visual badge is a plain number span (not announced), so the count is
+    // composed into the aria-label for screen readers.
+    expect(screen.getByRole('button', { name: 'Loans — 3 overdue' })).toBeInTheDocument()
+    // The visual badge still renders for sighted users.
+    expect(screen.getByText('3')).toBeInTheDocument()
+  })
+
   it('hides the Loans button when lending is disabled', () => {
     renderToolbar({ lendingEnabled: false })
 
