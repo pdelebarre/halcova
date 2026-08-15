@@ -129,11 +129,14 @@ export const recordsCatalog = {
       addToCrate: 'Add to crate',
       addToCrateToast: 'Added to your crate',
       remove: 'Remove from wishlist',
+      removeConfirm: 'Remove from wishlist?',
       removeToast: 'Removed from your wishlist',
       ownIt: 'Own it',
       addedToast: 'Added to your wishlist',
       addToWishlist: 'Add to wishlist',
       resultWishlisted: { label: 'In your wishlist', sub: 'Add it to your crate when you own it.' },
+      // Whole-card rows: tapping a wishlist row opens the full Detail sheet.
+      openDetailAria: 'Open details for {title}',
     },
     browse: {
       label: 'Browse',
@@ -528,11 +531,14 @@ export const booksCatalog = {
       addToCrate: 'Add to shelf',
       addToCrateToast: 'Added to your shelf',
       remove: 'Remove from wishlist',
+      removeConfirm: 'Remove from wishlist?',
       removeToast: 'Removed from your wishlist',
       ownIt: 'Own it',
       addedToast: 'Added to your wishlist',
       addToWishlist: 'Add to wishlist',
       resultWishlisted: { label: 'On your wishlist', sub: 'Add it to your shelf when you own it.' },
+      // Whole-card rows: tapping a wishlist row opens the full Detail sheet.
+      openDetailAria: 'Open details for {title}',
     },
     browse: {
       label: 'Browse',

@@ -249,6 +249,63 @@ describe('GET — DB-first read-through', () => {
   })
 })
 
+describe('GET — lazy self-healing read-through (Blobs drift)', () => {
+  // Seed the member's Blobs store with `items` — Blobs is the legacy/mirror
+  // source; Postgres may hold only a subset (a backfill snapshot that missed
+  // wishlist wants added before/in between backfills).
+  function seedBlobsStoreWith(items) {
+    const store = createStore()
+    stores[`collection-${MEMBER.id}-records`] = store
+    for (const it of items) store.data.set(`item:${it.id}`, it)
+    store.data.set('index', items.map((it) => it.id))
+    return store
+  }
+
+  it('reconciles a Blobs-only wishlist item into Postgres and returns BOTH items', async () => {
+    // Postgres has one owned row; Blobs holds that same row PLUS a wishlist
+    // item that only exists in Blobs (never backfilled).
+    await repo.items.insertItem(MEMBER.id, 'records', item(1))
+    const wish = { ...item(2), wishlist: true }
+    seedBlobsStoreWith([item(1), wish])
+
+    const res = await call('GET', '?collection=records')
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Both items returned, Postgres order (date_added DESC).
+    expect(body.items.map((i) => i.title)).toEqual(['Title 2', 'Title 1'])
+    expect(body.items.find((i) => i.title === 'Title 2').wishlist).toBe(true)
+
+    // The missing wishlist item was upserted into Postgres (self-healed).
+    const stored = await repo.items.getItem(MEMBER.id, 'records', wish.id)
+    expect(stored).toMatchObject({ id: wish.id, title: 'Title 2', wishlist: true })
+  })
+
+  it('leaves the response unchanged when Postgres and Blobs agree (no drift, no upsert)', async () => {
+    await repo.items.insertItem(MEMBER.id, 'records', item(1))
+    seedBlobsStoreWith([item(1)])
+    const spy = vi.spyOn(repo.items, 'insertItem')
+
+    const res = await call('GET', '?collection=records')
+    expect(res.status).toBe(200)
+    expect((await res.json()).items.map((i) => i.title)).toEqual(['Title 1'])
+    // No drift detected — no reconcile writes.
+    expect(spy).not.toHaveBeenCalled()
+    expect(await repo.items.listItems(MEMBER.id, 'records')).toHaveLength(1)
+  })
+
+  it('falls back to Blobs when Postgres is empty (no reconcile into an un-backfilled store)', async () => {
+    seedBlobsStoreWith([{ id: 'blob-item', title: 'From Blobs', year: 1999 }])
+    const spy = vi.spyOn(repo.items, 'insertItem')
+
+    const res = await call('GET', '?collection=records')
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([{ id: 'blob-item', title: 'From Blobs', year: 1999 }])
+    // The Blobs fallback never writes to Postgres.
+    expect(spy).not.toHaveBeenCalled()
+    expect(await repo.items.listItems(MEMBER.id, 'records')).toEqual([])
+  })
+})
+
 describe('PUT / DELETE', () => {
   it('updates an existing item (read-through get + transactional update)', async () => {
     await repo.items.insertItem(MEMBER.id, 'records', item(1))

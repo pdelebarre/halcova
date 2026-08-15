@@ -23,34 +23,74 @@
   flex-direction: column;
 }
 
+/* Whole-card rows: the cover + info block is one tappable "main" area (a
+   <button> when onOpenItem is wired; a plain span otherwise), with the
+   convert/remove actions beside it. */
 .wishlist-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 2px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 12px 2px;
   border-bottom: 1px solid var(--line);
 }
 
+.wishlist-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.wishlist-main:active {
+  background: var(--vinyl-groove-2);
+}
+
+/* Larger cover (~88px). The .record-peek disc peeks out behind it, reusing the
+   record/badge visual language; `.wishlist-cover` must NOT clip it, so the
+   rounded clipping lives on the image/placeholder themselves. */
 .wishlist-cover {
-  flex: 0 0 52px;
-  width: 52px;
-  height: 52px;
-  border-radius: 6px;
-  overflow: hidden;
+  position: relative;
+  flex: 0 0 88px;
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
   background: var(--vinyl-groove);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.wishlist-cover img {
+.wishlist-cover .record-peek {
+  top: -6px;
+  width: 82%;
+}
+.wishlist-cover img,
+.wishlist-cover-placeholder {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.wishlist-cover img {
   object-fit: cover;
   display: block;
 }
 .wishlist-cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 28px;
   color: var(--runout-gold);
 }
 
@@ -59,11 +99,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 .wishlist-title {
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--jacket-kraft);
   overflow: hidden;
@@ -71,16 +111,25 @@
   white-space: nowrap;
 }
 .wishlist-artist {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--jacket-kraft-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .wishlist-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--static-grey);
+}
+.wishlist-meta > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wishlist-actions {
@@ -94,10 +143,19 @@
   font-size: 13px;
 }
 .wishlist-remove {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Phones: drop the actions to their own line so the card data keeps its width
+   and the meta block stays readable. */
+@media (max-width: 479px) {
+  .wishlist-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }

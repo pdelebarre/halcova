@@ -9,6 +9,21 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
+  // A wishlist "want" is unowned: it gets none of the owned-only affordances
+  // (pin, lending) and its remove copy says "wishlist", not shelf/crate.
+  const isWant = !!item.wishlist
+  const closeRef = useRef(null)
+
+  // Focus into the sheet on open; Esc closes (same pattern as WishlistSheet).
+  useEffect(() => {
+    closeRef.current?.focus()
+    function onKey(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const [description, setDescription] = useState(item.description || '')
   const [pageCount, setPageCount] = useState(item.pageCount || '')
   const [descError, setDescError] = useState('')
@@ -38,6 +53,15 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
   useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
 
   const notesDirty = notes !== (item.notes || '')
+
+  // Remove labels: a wishlist want gets wishlist copy ("Remove from wishlist"),
+  // an owned item keeps the catalog's crate/shelf remove copy.
+  const removeLabel = isWant
+    ? (copy.wishlist?.remove || 'Remove from wishlist')
+    : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))
+  const removeConfirmLabel = isWant
+    ? (copy.wishlist?.removeConfirm || 'Remove from wishlist?')
+    : (copy.removeConfirm || t('catalog.removeConfirm'))
 
   // Explicit Save button — no silent save-on-blur (§4.13).
   async function saveNotes() {
@@ -72,7 +96,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
           <h2 className="visually-hidden">{bookTitle}</h2>
           <span />
           <div className="detail-header-actions">
-            {!isDemo && onTogglePinned && (
+            {!isDemo && !isWant && onTogglePinned && (
               <button
                 type="button"
                 className={`icon-btn detail-pin${item.pinned ? ' pinned' : ''}`}
@@ -85,7 +109,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
                 </svg>
               </button>
             )}
-            <button className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
+            <button ref={closeRef} className="sheet-close" onClick={onClose} aria-label={t('common.close')}>✕</button>
           </div>
         </div>
 
@@ -151,16 +175,18 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
             )}
           </div>
 
-          <LendingControls
-            item={item}
-            catalog={catalog}
-            lendingEnabled={lendingEnabled}
-            lendingGate={lendingGate}
-            onLend={onLend}
-            onReturn={onReturn}
-            showToast={showToast}
-            onOpenPaywall={onOpenPaywall}
-          />
+          {!isWant && (
+            <LendingControls
+              item={item}
+              catalog={catalog}
+              lendingEnabled={lendingEnabled}
+              lendingGate={lendingGate}
+              onLend={onLend}
+              onReturn={onReturn}
+              showToast={showToast}
+              onOpenPaywall={onOpenPaywall}
+            />
+          )}
         </div>
 
         <div className="sheet-actions detail-actions">
@@ -180,7 +206,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
               className={`btn ${confirmDelete ? 'btn-danger-filled' : 'btn-danger'}`}
               onClick={handleRemove}
             >
-              {confirmDelete ? (copy.removeConfirm || t('catalog.removeConfirm')) : (copy.removeLabel || t('catalog.removeLabel', { collectionLabel: catalog.collectionLabel }))}
+              {confirmDelete ? removeConfirmLabel : removeLabel}
             </button>
           )}
         </div>

@@ -113,6 +113,18 @@ export function createItemsRepo(db) {
     return rows.map((r) => r.data)
   }
 
+  // The full set of item ids for an owner+kind (no pagination) — used by the
+  // lazy read-through reconcile (collection-postgres.js) to detect which Blobs
+  // items are still missing from Postgres. Ids only, so it stays cheap on the
+  // hot GET path.
+  async function listItemIds(ownerId, kind) {
+    const { rows } = await db.query(
+      `SELECT id FROM items WHERE owner_id = $1 AND kind = $2`,
+      [ownerId, kind],
+    )
+    return rows.map((r) => r.id)
+  }
+
   async function getItem(ownerId, kind, id) {
     if (!isUuid(id)) return null
     const { rows } = await db.query(
@@ -188,6 +200,7 @@ export function createItemsRepo(db) {
 
   return {
     listItems,
+    listItemIds,
     getItem,
     insertItem,
     updateItem,

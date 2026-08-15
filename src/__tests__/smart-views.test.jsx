@@ -11,6 +11,11 @@ vi.mock('../api/collection', () => ({
   deleteItem: vi.fn(),
 }))
 
+// Opening an item's Detail sheet fetches its tracklist — stub it out.
+vi.mock('../api/discogs', () => ({
+  getReleaseDetail: vi.fn().mockResolvedValue({ tracklist: [] }),
+}))
+
 import * as api from '../api/collection'
 
 function makeItems(n) {
@@ -82,6 +87,46 @@ describe('CollectionView — Smart views & stats (§ Phase 5)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove from wishlist' }))
 
     await waitFor(() => expect(api.deleteItem).toHaveBeenCalledWith(items[0].id, 'records'))
+  })
+
+  it('opens the full detail sheet when a wishlist row is tapped', async () => {
+    const items = makeItems(13)
+    items[0].wishlist = true
+    renderCollection(items)
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Browse all' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Wishlist' }))
+    const dialog = screen.getByRole('dialog', { name: 'Your wishlist' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Open details for/ }))
+
+    // The tapped want's Detail sheet replaces the wishlist sheet on top.
+    const detail = await screen.findByRole('dialog', { name: 'Album 0' })
+    expect(detail).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Your wishlist' })).not.toBeInTheDocument()
+  })
+
+  it('opens a want\'s detail without owned-only affordances and with wishlist remove copy', async () => {
+    const items = makeItems(13)
+    items[0].wishlist = true
+    items[0].pinned = true // even a pinned want gets no pin control
+    renderCollection(items, { lendingEnabled: true })
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Browse all' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Wishlist' }))
+    const dialog = screen.getByRole('dialog', { name: 'Your wishlist' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Open details for/ }))
+
+    const detail = await screen.findByRole('dialog', { name: 'Album 0' })
+
+    // Owned-only affordances are hidden for a want: no pin, no lending entry.
+    expect(within(detail).queryByRole('button', { name: 'Pin to top' })).not.toBeInTheDocument()
+    expect(within(detail).queryByRole('button', { name: 'Unpin' })).not.toBeInTheDocument()
+    expect(within(detail).queryByRole('button', { name: 'Lend…' })).not.toBeInTheDocument()
+    expect(within(detail).queryByText('Lending')).not.toBeInTheDocument()
+
+    // The remove label is the wishlist one, not the owned "Remove from crate".
+    expect(within(detail).getByRole('button', { name: 'Remove from wishlist' })).toBeInTheDocument()
+    expect(within(detail).queryByRole('button', { name: 'Remove from crate' })).not.toBeInTheDocument()
   })
 
   it('saves a view, persists it, resets, and re-applies it', async () => {
