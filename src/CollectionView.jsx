@@ -78,6 +78,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // A5.6 (#117): the deep-link hint for the detail sheet — 'lending' scrolls
   // + focuses the LendingControls section when the on-loan icon is tapped.
   const [detailFocus, setDetailFocus] = useState(null)
+  // P2-5: the element that initiated a 'lending' deep-link (the loan icon on
+  // the originating card/list row), so closing the sheet can return focus to
+  // it rather than dropping to <body>. Replaced on every open.
+  const detailSourceRef = useRef(null)
   const [toast, setToast] = useState(null) // { msg, kind: 'add' | 'remove' | 'error' }
   const toastTimer = useRef(null)
   // C2.4 (issue #88): records token availability, learned from the server.
@@ -357,6 +361,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // links straight to the item's lend card (detail sheet scrolled + focused on
   // LendingControls). Without a hint this is a normal detail open.
   function openItem(item, hint) {
+    // P2-5: remember who asked. A 'lending' deep-link originates from the loan
+    // icon (role="button" span on the card/list row) — document.activeElement
+    // is that icon at click time (a real click on a tabIndex=0 element focuses
+    // it), so we can return focus there when the sheet closes.
+    detailSourceRef.current = hint?.focus === 'lending' ? document.activeElement : null
     setSelectedItem(item)
     setDetailFocus(hint?.focus || null)
     setModal('detail')
@@ -1231,7 +1240,20 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           item={selectedItem}
           catalog={catalog}
           focusSection={detailFocus}
-          onClose={() => { setModal(null); setSelectedItem(null) }}
+          onClose={() => {
+            setModal(null)
+            setSelectedItem(null)
+            setDetailFocus(null)
+            // P2-5: after a 'lending' deep-link, return focus to the
+            // originating loan icon (not <body>). Guard: the source may have
+            // been filtered out / unmounted while the sheet was open — and
+            // never throw (no error boundary → dark-screen safety).
+            const source = detailSourceRef.current
+            detailSourceRef.current = null
+            if (source && typeof source.focus === 'function' && source.isConnected) {
+              try { source.focus({ preventScroll: true }) } catch { /* never throw */ }
+            }
+          }}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
           onTogglePinned={() => handleTogglePinned(selectedItem)}

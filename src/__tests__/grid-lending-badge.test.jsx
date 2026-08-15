@@ -103,6 +103,10 @@ describe('grid on-loan icon (A5.6 #117)', () => {
     const icon = container.querySelector('.loan-icon')
     expect(icon).toHaveClass('overdue')
     expect(icon).toHaveAccessibleName('Overdue — on loan to Alice — manage')
+    // P1-1: the overdue affordance includes the alert dot (the filled-pill
+    // styling lives in CSS — this class gates it, so overdue differs by
+    // fill/area as well as hue, not hue alone).
+    expect(container.querySelector('.loan-icon-dot')).toBeInTheDocument()
   })
 
   it('renders no icon when lending is disabled', () => {
@@ -233,5 +237,46 @@ describe('loan icon deep-link to the lend card (A5.6 #117)', () => {
     expect(sheet).toBeInTheDocument()
     // Normal open focuses the sheet's close button (existing pattern).
     await waitFor(() => expect(sheet.querySelector('.sheet-close')).toHaveFocus())
+  })
+
+  it('self-corrects the deep-link scroll once async content settles (P2-4)', async () => {
+    const scrollIntoView = vi.fn()
+    const orig = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      const { container } = render(
+        <CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} lendingEnabled />,
+      )
+      await waitFor(() => expect(container.querySelectorAll('.album-card')).toHaveLength(2))
+
+      fireEvent.click(container.querySelector('.loan-icon'))
+
+      await waitFor(() => expect(container.querySelector('.lending')).toBeInTheDocument())
+      // The browser-native self-correction scrolls the lending section into
+      // view (block: start) — from the RAF and again when async content
+      // (tracklist / reviews) settles above LendingControls.
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' })))
+    } finally {
+      Element.prototype.scrollIntoView = orig
+    }
+  })
+
+  it('returns focus to the originating loan icon when the deep-linked sheet closes (P2-5)', async () => {
+    const { container } = render(
+      <CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} lendingEnabled />,
+    )
+    await waitFor(() => expect(container.querySelectorAll('.album-card')).toHaveLength(2))
+
+    const icon = container.querySelector('.loan-icon')
+    // A real click on a tabIndex=0 element focuses it (fireEvent doesn't) —
+    // that focused element is what CollectionView restores focus to on close.
+    icon.focus()
+    fireEvent.click(icon)
+
+    await waitFor(() => expect(container.querySelector('.lending')).toHaveFocus())
+
+    // Close the sheet (✕) — focus returns to the loan icon, not <body>.
+    fireEvent.click(container.querySelector('.sheet-close'))
+    await waitFor(() => expect(icon).toHaveFocus())
   })
 })

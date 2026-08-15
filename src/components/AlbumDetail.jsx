@@ -55,9 +55,15 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
         if (typeof scrollEl.scrollTo === 'function') {
           scrollEl.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' })
         }
+        // P2-4: self-correcting — redundant with the manual math above, but the
+        // browser resolves the true position (async content may have shifted
+        // the section between the RAF capture and now).
+        if (typeof target.scrollIntoView === 'function') {
+          target.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
+        }
       } catch {
-        // jsdom / older engines without scrollTo — scroll position is a
-        // progressive enhancement; never throw from here.
+        // jsdom / older engines without scrollTo/scrollIntoView — scroll
+        // position is a progressive enhancement; never throw from here.
       }
       target.focus({ preventScroll: true })
     })
@@ -81,6 +87,27 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
     }
     return () => { cancelled = true }
   }, [item.discogsId])
+
+  // P2-4: async content (Discogs tracklist, ReviewsSection) renders ABOVE
+  // LendingControls and can shift the section after the one-shot RAF above
+  // lands. Whenever that async state settles, re-run the browser-native
+  // scrollIntoView — redundant with the manual math but self-correcting.
+  // Null-guarded + try/catch (no error boundary → dark-screen safety).
+  useEffect(() => {
+    if (focusSection !== 'lending') return undefined
+    const target = lendingRef.current
+    if (!target) return undefined
+    const reduceMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+    try {
+      if (typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
+      }
+    } catch {
+      // progressive enhancement — never throw from here.
+    }
+    return undefined
+  }, [focusSection, tracklist, trackError])
 
   useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
 
