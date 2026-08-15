@@ -238,6 +238,8 @@ const en = {
   'catalog.nothingElseBy': 'Nothing else by {name} in your {collectionLabel}',
   'catalog.moreRelated': 'and {n} more',
   'catalog.scanNext': 'Scan next',
+  'catalog.addAndScanNext': 'Add & scan next',
+  'catalog.addedCount': 'Added — {n} today',
   'catalog.add': 'Add to {collectionLabel}',
   'catalog.addAnyway': 'Add anyway',
   'catalog.manualTitleRequired': 'Add a title — give this record a name first.',

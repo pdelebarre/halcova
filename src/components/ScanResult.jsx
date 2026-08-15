@@ -64,7 +64,7 @@ function RelatedSection({ heading, items, onOpen, moreLabel }) {
   )
 }
 
-export default function ScanResult({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist, onAdd, onAddToWishlist, onOwnWishlist, onOpenItem, onScanNext, onClose, copy, isDemo = false }) {
+export default function ScanResult({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist, onAdd, onAddToWishlist, onOwnWishlist, onOpenItem, onScanNext, onClose, copy, isDemo = false, source = 'manual', onAddAndScanNext }) {
   const { artist, album } = splitArtistTitle(candidate.title)
   const [adding, setAdding] = useState(false)
   const [wishlistAdding, setWishlistAdding] = useState(false)
@@ -78,6 +78,12 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
     }
   }, [])
 
+  // C1.1: only scan-sourced results get the "Add & scan next" primary — and
+  // only when the parent actually wired the handler (defensive: never render a
+  // primary that would silently no-op — there's no error boundary).
+  const isScanSourced = source === 'scan'
+  const canAddAndScanNext = isScanSourced && typeof onAddAndScanNext === 'function'
+
   let banner = { tone: 'good', ...copy.resultGood }
   if (ownedExact) {
     banner = { tone: 'owned', ...copy.resultOwned }
@@ -87,22 +93,50 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
     banner = { tone: 'caution', ...copy.resultSame }
   }
 
-  // Primary action label: owned → "Add anyway"; wishlisted → "Own it"
-  // (convert); otherwise the plain add.
+  // Primary action. Priority: already-owned → "Scan next" (C1.2 — you already
+  // own this, so don't force an extra tap); wishlisted → "Own it" (existing
+  // convert); scan-sourced → "Add & scan next" (C1.1); otherwise the plain add
+  // (manual/search entry — no stack to scan).
   let primaryLabel = copy.add || t('catalog.add', { collectionLabel: '' })
-  if (ownedExact) primaryLabel = copy.addAnyway || t('catalog.addAnyway')
-  else if (wishlistExact) primaryLabel = copy.wishlist?.ownIt || 'Own it'
+  let primaryMode = 'add' // 'add' | 'addAndScanNext' | 'scanNext' | 'own'
+  if (ownedExact) {
+    primaryLabel = copy.scanNext || t('catalog.scanNext')
+    primaryMode = 'scanNext'
+  } else if (wishlistExact) {
+    primaryLabel = copy.wishlist?.ownIt || 'Own it'
+    primaryMode = 'own'
+  } else if (canAddAndScanNext) {
+    primaryLabel = copy.addAndScanNext || t('catalog.addAndScanNext')
+    primaryMode = 'addAndScanNext'
+  }
 
-  // On add: brief spinning-disc "Added" state (~0.8s) with a haptic + visual
-  // pulse, then the parent's add() runs and fires the toast (§4.10, §6).
-  function handleAdd() {
+  // On any add: brief spinning-disc "Added" state (~0.8s) with a haptic +
+  // visual pulse, then the parent's callback runs and fires the toast
+  // (§4.10, §6). Shared by the plain add, "Add anyway" and "Add & scan next".
+  function runAddPulse(cb) {
     if (adding) return
     setAdding(true)
     navigator.vibrate?.(30)
     addTimer.current = setTimeout(() => {
       setAdding(false)
-      onAdd(candidate)
+      cb()
     }, 800)
+  }
+
+  function handleAdd() {
+    runAddPulse(() => onAdd(candidate))
+  }
+
+  // C1.1: add this item, then continue scanning (the parent runs add() then
+  // re-opens the warm scanner).
+  function handleAddAndScanNext() {
+    runAddPulse(() => onAddAndScanNext?.(candidate))
+  }
+
+  // C1.2: "Scan next" as the primary for an already-owned item — no add, just
+  // move on to the next barcode.
+  function handleScanNextPrimary() {
+    onScanNext()
   }
 
   // Same pulse for "Add to wishlist" (a want) and "Own it" (convert).
@@ -117,13 +151,14 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
   }
 
   function handleOwn() {
-    if (adding) return
-    setAdding(true)
-    navigator.vibrate?.(30)
-    addTimer.current = setTimeout(() => {
-      setAdding(false)
-      onOwnWishlist?.(candidate)
-    }, 800)
+    runAddPulse(() => onOwnWishlist?.(candidate))
+  }
+
+  const primaryHandlers = {
+    add: handleAdd,
+    addAndScanNext: handleAddAndScanNext,
+    scanNext: handleScanNextPrimary,
+    own: handleOwn,
   }
 
   return (
@@ -177,13 +212,45 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
         </div>
 
         <div className="sheet-actions">
-          <button className="btn btn-ghost" onClick={onScanNext}>{copy.scanNext}</button>
+          {/* C1.2: for an already-owned item "Scan next" moves up to the
+              primary slot, so it no longer appears as a ghost here. */}
+          {!ownedExact && (
+            <button type="button" className="btn btn-ghost" onClick={onScanNext}>{copy.scanNext}</button>
+          )}
+
           {isDemo ? (
             // Read-only demo space (ADR-0001): there is no Add action — just a
             // notice pointing visitors at signing in with their own account.
             <p className="demo-readonly-notice">{t('demo.readOnlyNotice')}</p>
           ) : (
             <>
+              {/* C1.1: on a scan-sourced result the plain "Add" demotes into
+                  the ghost slot next to "Scan next". */}
+              {primaryMode === 'addAndScanNext' && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={handleAdd}
+                  disabled={adding}
+                  aria-busy={adding}
+                >
+                  {copy.add || t('catalog.add', { collectionLabel: '' })}
+                </button>
+              )}
+
+              {/* C1.2: for an already-owned item "Add anyway" is the ghost action. */}
+              {primaryMode === 'scanNext' && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={handleAdd}
+                  disabled={adding}
+                  aria-busy={adding}
+                >
+                  {copy.addAnyway || t('catalog.addAnyway')}
+                </button>
+              )}
+
               {!ownedExact && !wishlistExact && (
                 <button
                   type="button"
@@ -198,10 +265,11 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
                   {copy.wishlist?.addToWishlist || 'Add to wishlist'}
                 </button>
               )}
+
               <button
                 type="button"
                 className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
-                onClick={wishlistExact ? handleOwn : handleAdd}
+                onClick={primaryHandlers[primaryMode] || handleAdd}
                 disabled={adding}
                 aria-busy={adding}
               >

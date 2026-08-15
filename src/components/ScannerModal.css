@@ -9,6 +9,13 @@
   overflow: hidden;
 }
 
+/* C1.3 warm camera: the scanner stays MOUNTED but hidden while the result
+   sheet is up. The `hidden` attribute must win over the flex above — a plain
+   class rule would override the UA [hidden] display:none. */
+.scanner-overlay[hidden] {
+  display: none;
+}
+
 .scanner-video {
   position: absolute;
   inset: 0;
