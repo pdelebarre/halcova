@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import {
   t,
   setLocale,
@@ -154,6 +154,61 @@ describe('t()', () => {
         expect(counted).not.toContain('{n}')
         expect(t('catalog.addedCount', {})).toBe(template)
       }
+    })
+  })
+
+  describe('A5 lending polish keys (issue #90/#92)', () => {
+    it('ships every new lending key in all 8 locales (no raw-key fallback)', () => {
+      const required = [
+        'lending.remind',
+        'lending.remindMessage.base',
+        'lending.remindMessage.due',
+        'lending.remindCopied',
+        'lending.due1w',
+        'lending.due2w',
+        'lending.due1m',
+        'lending.overdueCount',
+        'lending.historyCapNote',
+        'lending.contactCall',
+        'lending.contactEmail',
+        'lending.contactMessage',
+      ]
+      for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
+        setLocale(locale)
+        for (const key of required) {
+          // t() returns the key itself only when the key is missing everywhere.
+          expect(t(key)).not.toBe(key)
+        }
+      }
+    })
+
+    it('uses the addendum translations (not English) for the 6 non-EN locales', () => {
+      const samples = {
+        fr: { 'lending.remind': 'Rappeler', 'lending.due1m': '1 mois', 'lending.historyCapNote': 'L\'historique conserve les 10 derniers prêts.' },
+        nl: { 'lending.remind': 'Herinner', 'lending.due1m': '1 maand', 'lending.contactCall': 'Bellen' },
+        'pt-BR': { 'lending.remind': 'Lembrar', 'lending.due1m': '1 mês', 'lending.overdueCount': '{n} em atraso' },
+        de: { 'lending.remind': 'Erinnern', 'lending.due1m': '1 Monat', 'lending.contactEmail': 'E-Mail' },
+        es: { 'lending.remind': 'Recordar', 'lending.due1m': '1 mes', 'lending.overdueCount': 'Atrasados: {n}' },
+        it: { 'lending.remind': 'Ricorda', 'lending.due1m': '1 mese', 'lending.contactMessage': 'Messaggio' },
+      }
+      for (const [locale, entries] of Object.entries(samples)) {
+        setLocale(locale)
+        for (const [key, expected] of Object.entries(entries)) {
+          expect(t(key)).toBe(expected)
+        }
+      }
+    })
+
+    it('assembles the remind message from base + optional due clause (EN master)', () => {
+      setLocale('en')
+      const base = t('lending.remindMessage.base', { name: 'Alice', title: 'Kind of Blue' })
+      expect(base).toContain('Alice')
+      expect(base).toContain('Kind of Blue')
+      const due = t('lending.remindMessage.due', { date: '8/15/2026' })
+      // The due clause carries a leading space so it can be appended verbatim.
+      expect(due.startsWith(' ')).toBe(true)
+      expect(due).toContain('8/15/2026')
+      expect(`${base}${due}`).toMatch(/😊/)
     })
   })
 

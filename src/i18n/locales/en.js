@@ -389,6 +389,19 @@ const en = {
   'lending.sortTitle': 'Title A–Z',
   'lending.dashboardDue': 'Due {date}',
   'lending.dashboardOverdue': 'Overdue since {date}',
+  // A5 lending polish — Remind, presets, overdue count, history cap.
+  'lending.remind': 'Remind',
+  'lending.remindMessage.base': 'Hey {name} — just checking in on “{title}” I lent you. 😊',
+  'lending.remindMessage.due': ' It was due {date}.',
+  'lending.remindCopied': 'Message copied — send it to {name}',
+  'lending.due1w': '1 week',
+  'lending.due2w': '2 weeks',
+  'lending.due1m': '1 month',
+  'lending.overdueCount': '{n} overdue',
+  'lending.historyCapNote': 'History keeps the last 10 loans.',
+  'lending.contactCall': 'Call',
+  'lending.contactEmail': 'Email',
+  'lending.contactMessage': 'Message',
 
   // §16 Update
   'update.newVersion': 'New version available',

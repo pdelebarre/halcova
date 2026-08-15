@@ -314,6 +314,19 @@ const ptBR = {
   'lending.sortTitle': 'Title A–Z',
   'lending.dashboardDue': 'Due {date}',
   'lending.dashboardOverdue': 'Overdue since {date}',
+  // A5 lending polish — Remind, presets, overdue count, history cap.
+  'lending.remind': 'Lembrar',
+  'lending.remindMessage.base': 'Oi {name} — só passando para lembrar do “{title}” que te emprestei. 😊',
+  'lending.remindMessage.due': ' A devolução era para {date}.',
+  'lending.remindCopied': 'Mensagem copiada — envie para {name}',
+  'lending.due1w': '1 semana',
+  'lending.due2w': '2 semanas',
+  'lending.due1m': '1 mês',
+  'lending.overdueCount': '{n} em atraso',
+  'lending.historyCapNote': 'O histórico mantém os últimos 10 empréstimos.',
+  'lending.contactCall': 'Ligar',
+  'lending.contactEmail': 'E-mail',
+  'lending.contactMessage': 'Mensagem',
 
   // §16 Update
   'update.newVersion': 'New version available',
