@@ -131,6 +131,16 @@ describe('Toolbar (single-row redesign)', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
   })
 
+  it('announces a single overdue loan without a pluralization error (n=1)', () => {
+    renderToolbar({ lendingEnabled: true, overdueCount: 1 })
+
+    // overdueCount(n) is an invariant template ({n} overdue) in EN — the n=1
+    // case must read "1 overdue", not fall through to a broken pluralization.
+    expect(screen.getByRole('button', { name: 'Loans — 1 overdue' })).toBeInTheDocument()
+    // The visual badge still renders a single count for sighted users.
+    expect(screen.getByText('1')).toBeInTheDocument()
+  })
+
   it('hides the Loans button when lending is disabled', () => {
     renderToolbar({ lendingEnabled: false })
 

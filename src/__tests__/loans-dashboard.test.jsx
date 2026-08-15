@@ -384,3 +384,35 @@ describe('LoansDashboard — A5.2 Remind on each row', () => {
     expect(text).toMatch(/due/)
   })
 })
+
+// A5.1 contact-less loans on the dashboard row: a loan with NO borrower.contact
+// (or no borrower at all) must render no Call/Email/Message action and never
+// crash — `lending.borrower || {}` + classifyContact(undefined) are the guards.
+describe('LoansDashboard — A5.1 contact-less loans (dark-screen safety)', () => {
+  it('renders no contact action when the borrower has no stored contact', async () => {
+    // Borrower present, but no `contact` field stored.
+    const item = loanedRecord({}, { borrower: { name: 'Alice' } })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [item] : []))
+
+    renderDashboard()
+    await screen.findByRole('button', { name: 'Remind' })
+
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
+  })
+
+  it('does not crash when a loan has no borrower object at all', async () => {
+    const item = loanedRecord({}, { borrower: undefined })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [item] : []))
+
+    renderDashboard()
+
+    // The row still renders with Remind + return; no contact link, no crash.
+    expect(await screen.findByRole('button', { name: 'Remind' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Mark returned' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
+  })
+})

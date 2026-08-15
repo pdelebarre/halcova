@@ -126,6 +126,10 @@ describe('LendingControls', () => {
   it('does not crash when lending is present without a borrower', () => {
     renderControls({ id: 'r1', title: 'X', lending: { lentOn: '2026-08-01T00:00:00Z' } })
     expect(screen.getByRole('button', { name: 'Mark returned' })).toBeInTheDocument()
+    // A5.1: no borrower → nothing to classify → no Call/Email/Message link.
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
   })
 
   describe('lending history', () => {

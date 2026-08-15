@@ -280,3 +280,36 @@ describe('loan icon deep-link to the lend card (A5.6 #117)', () => {
     await waitFor(() => expect(icon).toHaveFocus())
   })
 })
+
+// A5.4 empty-collection flow: an empty collection + lending enabled must keep
+// the Loans button reachable (the global dashboard) via CollectionView's
+// minimal toolbar — with the overdue badge/aria-label still wired up.
+describe('empty collection + lending (W7 / A5.4)', () => {
+  beforeEach(() => {
+    api.listItems.mockResolvedValue([])
+  })
+
+  it('keeps the Loans button (with its overdue badge) reachable from an empty collection', async () => {
+    const { container } = render(
+      <CollectionView
+        catalog={recordsCatalog}
+        onRequestSettings={() => {}}
+        lendingEnabled
+        overdueCount={2}
+      />,
+    )
+
+    // The empty state renders…
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try a sample' })).toBeInTheDocument())
+    // …and the minimal toolbar still exposes the Loans button + overdue badge.
+    expect(screen.getByRole('button', { name: 'Loans — 2 overdue' })).toBeInTheDocument()
+    expect(container.querySelector('.loans-overdue-badge')).toHaveTextContent('2')
+  })
+
+  it('renders no Loans button on an empty collection when lending is disabled', async () => {
+    render(<CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try a sample' })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Loans' })).not.toBeInTheDocument()
+  })
+})

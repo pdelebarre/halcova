@@ -17,7 +17,7 @@ const DEFAULT_SORTS = [
  * Format/genre/artist filters live in the filter sheet (§4.3, §5).
  */
 export default function Toolbar({
-  query, setQuery,
+  query = '', setQuery,
   placeholder = 'Search your collection…',
   formats = [], activeFormats = [], toggleFormat,
   genres = [], activeGenres = [], toggleGenre,
@@ -69,8 +69,10 @@ export default function Toolbar({
   const doneLabel = copy.search?.done || 'Done'
 
   // The search pill grows taller + glows while the field is focused or a
-  // search is active (§ Phase 3 — "bigger when I search").
-  const searchActive = searchFocused || query.trim() !== ''
+  // search is active (§ Phase 3 — "bigger when I search"). Guard the
+  // dereference: the minimal toolbar renders without a query prop, so query
+  // defaults to '' and trim() must never throw (dark-screen failure mode).
+  const searchActive = searchFocused || (query || '').trim() !== ''
 
   // Exit search mode without clearing the query — blur + handlers (CollectionView
   // decides whether to clear). Shared by Escape and the Done pill.
