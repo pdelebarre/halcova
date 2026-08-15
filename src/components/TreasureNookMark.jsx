@@ -39,12 +39,23 @@ export default function TreasureNookMark({ size = 104, className = '' }) {
         strokeWidth="16"
         strokeLinecap="round"
       />
-      {/* The treasured object — a tilted card resting in the nook */}
-      <rect
-        x="-50" y="-70" width="100" height="140" rx="12" ry="12"
-        fill="var(--jacket-kraft)"
-        transform="translate(256, 302) rotate(10)"
-      />
+      {/* The treasured object — a tilted card resting in the nook. Its face is
+          a barcode (gold bars on the dark field, kraft border) so the mark
+          reads "scan to catalog" like the app icon. */}
+      <g transform="translate(256, 302) rotate(10)">
+        <rect
+          x="-50" y="-70" width="100" height="140" rx="12" ry="12"
+          fill="var(--sleeve-black)"
+          stroke="var(--jacket-kraft)"
+          strokeWidth="6"
+        />
+        <g fill="var(--runout-gold)">
+          <rect x="-40" y="-58" width="18" height="116" />
+          <rect x="-14" y="-58" width="10" height="116" />
+          <rect x="4"   y="-58" width="10" height="116" />
+          <rect x="22"  y="-58" width="18" height="116" />
+        </g>
+      </g>
     </svg>
   )
 }
