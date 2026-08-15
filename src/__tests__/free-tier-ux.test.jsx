@@ -157,28 +157,28 @@ describe('Free-tier UX', () => {
     collectionApi.listItems.mockResolvedValue(makeItems(8))
     render(<App />)
     expect(await screen.findByText('8 of 10 items added')).toBeInTheDocument()
-    expect(screen.getByText('2 spots left on the free plan')).toBeInTheDocument()
+    expect(screen.getByText('2 spots left')).toBeInTheDocument()
   })
 
   it('shows the singular near-limit hint at 9 of 10 (cap − 1)', async () => {
     collectionApi.listItems.mockResolvedValue(makeItems(9))
     render(<App />)
     expect(await screen.findByText('9 of 10 items added')).toBeInTheDocument()
-    expect(screen.getByText('1 spot left on the free plan')).toBeInTheDocument()
+    expect(screen.getByText('1 spot left')).toBeInTheDocument()
   })
 
   it('hides the near-limit hint at 7 of 10 and at the cap', async () => {
     collectionApi.listItems.mockResolvedValue(makeItems(7))
     const first = render(<App />)
     await screen.findByText('7 of 10 items added')
-    expect(screen.queryByText(/spots left on the free plan/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/spots left/)).not.toBeInTheDocument()
     first.unmount()
 
     // At the cap the at-limit hint owns the slot — no near-limit line.
     collectionApi.listItems.mockResolvedValue(makeItems(10))
     render(<App />)
     await screen.findByText('10 of 10 items added')
-    expect(screen.queryByText(/spots left on the free plan/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/spots left/)).not.toBeInTheDocument()
     expect(screen.getByText(/free-plan limit/)).toBeInTheDocument()
   })
 
@@ -203,12 +203,17 @@ describe('Free-tier UX', () => {
   })
 
   // D-1 (free-tier-guidance.md, #143/#144): the free-plan counter carries an
-  // accessible aria-label (plan.counterLabel) for free members.
+  // accessible aria-label (plan.counterLabel) for free members. Per P1-2 the
+  // label moved off the bare counter <span> (implicit `generic` role — can't
+  // carry an accessible name; NVDA/VoiceOver drop it) onto the role="status"
+  // container, which supports naming. Assert the container's accessible name
+  // — what screen readers actually announce.
   it('labels the free-plan counter accessibly', async () => {
     collectionApi.listItems.mockResolvedValue(makeItems(3))
     render(<App />)
     await screen.findByText('3 of 10 items added')
-    expect(screen.getByLabelText('Free plan: 3 of 10 items added')).toBeInTheDocument()
+    const status = screen.getByRole('status', { name: 'Free plan: 3 of 10 items added' })
+    expect(status).toHaveAccessibleName('Free plan: 3 of 10 items added')
   })
 
   it('omits the counter aria-label for owner, paid and demo visitors', async () => {

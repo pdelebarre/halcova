@@ -405,7 +405,10 @@ const en = {
   // Near-limit hint — fallback string; the pluralization-safe FUNCTION
   // override lives in catalog.js (`copy.plan.nearLimitHint`). Non-EN locales
   // inherit via fallback until the native-speaker pass lands.
-  'plan.nearLimitHint': '{remaining} spots left on the free plan',
+  // P2-4: "on the free plan" dropped — the banner is already free-plan
+  // context, and the shorter hint keeps the Upgrade button on the same row at
+  // 320–390px.
+  'plan.nearLimitHint': '{remaining} spots left',
   // Accessible aria-label for the free-plan counter (D-1).
   'plan.counterLabel': 'Free plan: {count} of {cap} items added',
   'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Upgrade to keep adding.",

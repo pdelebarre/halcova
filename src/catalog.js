@@ -217,7 +217,7 @@ export const recordsCatalog = {
     // src/CollectionView.jsx when the owner decides.
     plan: {
       nearLimitHint: (remaining) =>
-        remaining === 1 ? '1 spot left on the free plan' : `${remaining} spots left on the free plan`,
+        remaining === 1 ? '1 spot left' : `${remaining} spots left`,
     },
     search: {
       results: (n, q) => `${n} ${n === 1 ? 'match' : 'matches'} for “${q}”`,
@@ -665,7 +665,7 @@ export const booksCatalog = {
     // thresholds (8/9 of 10) are pending owner confirmation on ticket #139.
     plan: {
       nearLimitHint: (remaining) =>
-        remaining === 1 ? '1 spot left on the free plan' : `${remaining} spots left on the free plan`,
+        remaining === 1 ? '1 spot left' : `${remaining} spots left`,
     },
     // Gamification (Phase 1 § Play): release 1.1 Collection Persona + share
     // card. Copy bridges t() (EN master in the i18n locales; other locales

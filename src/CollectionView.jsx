@@ -873,15 +873,16 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           owner/unlimited and demo visitors. */}
       {status === 'ready' && isFree && (
         <div className="plan-banner">
-          <div className="plan-banner-status" role="status">
-            <span
-              className="plan-banner-counter"
-              aria-label={t('plan.counterLabel', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
-            >
+          <div
+            className="plan-banner-status"
+            role="status"
+            aria-label={t('plan.counterLabel', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
+          >
+            <span className="plan-banner-counter">
               {t('plan.freeCounter', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
             </span>
             {nearLimit && (
-              <span className="plan-banner-hint">{nearLimitMsg(remaining)}</span>
+              <span className="plan-banner-hint plan-banner-hint--near">{nearLimitMsg(remaining)}</span>
             )}
             {atLimit && (
               <span className="plan-banner-hint">{t('plan.atLimitHint', { cap: FREE_PLAN_CAP })}</span>

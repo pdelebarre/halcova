@@ -45,8 +45,8 @@ describe('recordsCatalog', () => {
   // Free-tier guidance (free-tier-guidance.md D-2, #143/#144): the near-limit
   // hint is a pluralization-safe FUNCTION override on `.copy.plan`.
   it('exposes the near-limit hint copy function on the records catalog', () => {
-    expect(recordsCatalog.copy.plan.nearLimitHint(1)).toBe('1 spot left on the free plan')
-    expect(recordsCatalog.copy.plan.nearLimitHint(2)).toBe('2 spots left on the free plan')
+    expect(recordsCatalog.copy.plan.nearLimitHint(1)).toBe('1 spot left')
+    expect(recordsCatalog.copy.plan.nearLimitHint(2)).toBe('2 spots left')
   })
 
   it('exposes the C2.3 try-a-sample copy keys (issue #85)', () => {
@@ -113,8 +113,8 @@ describe('booksCatalog', () => {
   })
 
   it('exposes the near-limit hint copy function on the books catalog too', () => {
-    expect(booksCatalog.copy.plan.nearLimitHint(1)).toBe('1 spot left on the free plan')
-    expect(booksCatalog.copy.plan.nearLimitHint(2)).toBe('2 spots left on the free plan')
+    expect(booksCatalog.copy.plan.nearLimitHint(1)).toBe('1 spot left')
+    expect(booksCatalog.copy.plan.nearLimitHint(2)).toBe('2 spots left')
   })
 
   it('exposes the C2.3 try-a-sample copy keys on the books catalog too (issue #85)', () => {
