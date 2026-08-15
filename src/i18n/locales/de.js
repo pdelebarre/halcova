@@ -190,6 +190,11 @@ const de = {
   'catalog.emptyTagline': 'dein {collectionLabel}, katalogisiert',
   'catalog.emptyBtn': 'Einen Artikel scannen',
   'catalog.emptyManualBtn': 'Nach Titel hinzufügen',
+  // C2 onboarding (issue #88) — emptySteps is assembled from these three.
+  'catalog.emptyStep1': 'Barcode scannen',
+  'catalog.emptyStep2': 'Treffer bestätigen',
+  'catalog.emptyStep3': 'Fertig — es steht in deiner Sammlung',
+  'catalog.noTokenHint': 'Für Platten wird ein Discogs-Token benötigt — füge deins in den Einstellungen hinzu.',
   'catalog.clearFilters': 'Filter löschen',
   'catalog.loading': 'Lade dein {collectionLabel}…',
   'catalog.addToast': 'Zu deinem {collectionLabel} hinzugefügt',

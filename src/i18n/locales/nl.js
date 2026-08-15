@@ -190,6 +190,11 @@ const nl = {
   'catalog.emptyTagline': 'je {collectionLabel}, gecatalogiseerd',
   'catalog.emptyBtn': 'Scan een item',
   'catalog.emptyManualBtn': 'Toevoegen op titel',
+  // C2 onboarding (issue #88) — emptySteps is assembled from these three.
+  'catalog.emptyStep1': 'Scan de streepjescode',
+  'catalog.emptyStep2': 'Bevestig het resultaat',
+  'catalog.emptyStep3': 'Klaar — het staat in je collectie',
+  'catalog.noTokenHint': 'Voor platen heb je een Discogs-token nodig — voeg de jouwe toe in Instellingen.',
   'catalog.clearFilters': 'Filters wissen',
   'catalog.loading': 'Je {collectionLabel} laden…',
   'catalog.addToast': 'Toegevoegd aan je {collectionLabel}',

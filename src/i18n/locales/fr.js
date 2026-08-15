@@ -190,6 +190,11 @@ const fr = {
   'catalog.emptyTagline': 'votre {collectionLabel}, répertorié',
   'catalog.emptyBtn': 'Scanner un article',
   'catalog.emptyManualBtn': 'Ajouter par titre',
+  // C2 onboarding (issue #88) — emptySteps is assembled from these three.
+  'catalog.emptyStep1': 'Scanner le code-barres',
+  'catalog.emptyStep2': 'Confirmer le résultat',
+  'catalog.emptyStep3': 'Terminé — c\'est dans votre collection',
+  'catalog.noTokenHint': 'La recherche de disques nécessite un jeton Discogs — ajoutez le vôtre dans Réglages.',
   'catalog.clearFilters': 'Effacer les filtres',
   'catalog.loading': 'Chargement de votre {collectionLabel}…',
   'catalog.addToast': 'Ajouté à votre {collectionLabel}',

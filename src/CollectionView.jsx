@@ -76,6 +76,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const [selectedItem, setSelectedItem] = useState(null)
   const [toast, setToast] = useState(null) // { msg, kind: 'add' | 'remove' | 'error' }
   const toastTimer = useRef(null)
+  // C2.4 (issue #88): records token availability, learned from the server.
+  // Defaults to off (no hint). The Discogs proxy reports SERVER_NO_TOKEN when
+  // no token is configured; we keep a persistent, non-blocking hint in the
+  // empty state after that signal and clear it once lookups succeed.
+  const [recordsNoToken, setRecordsNoToken] = useState(false)
   // C1.4: per-session "added today" counter (factual — no XP/badges). A ref is
   // enough: it only drives the momentum toast, resets on reload, and avoids
   // double-increment under StrictMode.
@@ -529,6 +534,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     setPickerState({ matches: null, loading: true, errorMsg: '' })
     try {
       const results = await catalog.api.searchByBarcode(clean)
+      // A successful lookup means a token is configured — drop any hint.
+      setRecordsNoToken(false)
       if (results.length === 1) {
         presentCandidate(results[0], 'scan')
       } else {
@@ -536,6 +543,9 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       }
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
+        // C2.4 (issue #88): remember the missing token so the empty state can
+        // show a persistent hint (the toast below stays as-is).
+        setRecordsNoToken(true)
         onRequestSettings()
         showToast(`${catalog.lookupName} ${t('view.lookupsNotConfigured', { lookupName: catalog.lookupName })}`, 'error')
         return
@@ -569,6 +579,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         throw new Error(copy.coverScan?.noText || t('coverScan.noText'))
       }
       const safeResults = Array.isArray(results) ? results : []
+      // A successful lookup means a token is configured — drop any hint.
+      setRecordsNoToken(false)
       setCoverState({ busy: false, error: '' })
       if (safeResults.length === 0) {
         setModal('pick')
@@ -581,6 +593,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       }
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
+        // C2.4 (issue #88): remember the missing token for the empty-state hint.
+        setRecordsNoToken(true)
         onRequestSettings()
         showToast(`${catalog.lookupName} ${t('view.lookupsNotConfigured', { lookupName: catalog.lookupName })}`, 'error')
         setCoverState({ busy: false, error: '' })
@@ -910,6 +924,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         {status === 'ready' && ownedItems.length === 0 && (
           <EmptyState
             copy={copy}
+            noToken={catalog.kind === 'records' && recordsNoToken}
             onScan={isDemo ? undefined : () => setModal('scan')}
             onScanCover={isDemo ? undefined : openCoverScan}
             onManualAdd={isDemo ? undefined : () => setModal('manual')}

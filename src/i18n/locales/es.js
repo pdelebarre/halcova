@@ -190,6 +190,11 @@ const es = {
   'catalog.emptyTagline': 'tu {collectionLabel}, catalogado',
   'catalog.emptyBtn': 'Escanear un artículo',
   'catalog.emptyManualBtn': 'Añadir por título',
+  // C2 onboarding (issue #88) — emptySteps is assembled from these three.
+  'catalog.emptyStep1': 'Escanea el código de barras',
+  'catalog.emptyStep2': 'Confirma la coincidencia',
+  'catalog.emptyStep3': 'Listo — está en tu colección',
+  'catalog.noTokenHint': 'La búsqueda de discos requiere un token de Discogs — añade el tuyo en Ajustes.',
   'catalog.clearFilters': 'Borrar filtros',
   'catalog.loading': 'Cargando tu {collectionLabel}…',
   'catalog.addToast': 'Añadido a tu {collectionLabel}',
