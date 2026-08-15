@@ -327,6 +327,10 @@ const es = {
   'lending.contactCall': 'Llamar',
   'lending.contactEmail': 'Correo',
   'lending.contactMessage': 'Mensaje',
+  // A5.6 (#117): EN master — native ES translation pending (see
+  // marketing/localization-dictionary-addendum.md).
+  'lending.manageLoan': 'On loan to {name} — manage',
+  'lending.manageLoanOverdue': 'Overdue — on loan to {name} — manage',
 
   // §16 Update
   'update.newVersion': 'New version available',

@@ -330,6 +330,9 @@ const enGB = {
   'lending.contactCall': 'Call',
   'lending.contactEmail': 'Email',
   'lending.contactMessage': 'Message',
+  // A5.6 (#117): on-loan icon aria-labels — en-GB inherits en (no GB variant).
+  'lending.manageLoan': 'On loan to {name} — manage',
+  'lending.manageLoanOverdue': 'Overdue — on loan to {name} — manage',
 
   // §16 Update
   'update.newVersion': 'New version available',

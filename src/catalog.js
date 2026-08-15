@@ -417,6 +417,10 @@ export const recordsCatalog = {
       returnedToast: t('lending.returnedToast'),
       badge: t('lending.badge'),
       badgeOverdue: t('lending.badgeOverdue'),
+      // A5.6 (#117): aria-labels for the on-loan card icon (deep-links to the
+      // lend card). badge/badgeOverdue above stay as tooltip/fallback text.
+      manageLoan: (name) => t('lending.manageLoan', { name }),
+      manageLoanOverdue: (name) => t('lending.manageLoanOverdue', { name }),
       filter: t('lending.filter'),
       filterHint: t('lending.filterHint'),
       history: t('lending.history'),
@@ -517,6 +521,10 @@ export const booksCatalog = {
       returnedToast: t('lending.returnedToast'),
       badge: t('lending.badge'),
       badgeOverdue: t('lending.badgeOverdue'),
+      // A5.6 (#117): aria-labels for the on-loan card icon (deep-links to the
+      // lend card). badge/badgeOverdue above stay as tooltip/fallback text.
+      manageLoan: (name) => t('lending.manageLoan', { name }),
+      manageLoanOverdue: (name) => t('lending.manageLoanOverdue', { name }),
       filter: t('lending.filter'),
       filterHint: t('lending.filterHint'),
       history: t('lending.history'),

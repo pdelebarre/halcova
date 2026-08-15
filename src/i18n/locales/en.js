@@ -402,6 +402,10 @@ const en = {
   'lending.contactCall': 'Call',
   'lending.contactEmail': 'Email',
   'lending.contactMessage': 'Message',
+  // A5.6 (#117): on-loan icon aria-labels (grid + list cards). badge /
+  // badgeOverdue stay as tooltip/fallback text.
+  'lending.manageLoan': 'On loan to {name} — manage',
+  'lending.manageLoanOverdue': 'Overdue — on loan to {name} — manage',
 
   // §16 Update
   'update.newVersion': 'New version available',
