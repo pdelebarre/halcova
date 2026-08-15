@@ -36,6 +36,12 @@ describe('recordsCatalog', () => {
     expect(recordsCatalog.copy.noTokenHint).toMatch(/Discogs token/)
   })
 
+  it('exposes the C1 scan-loop copy keys (Add & scan next + momentum toast)', () => {
+    expect(recordsCatalog.copy.addAndScanNext).toBe('Add & scan next')
+    expect(recordsCatalog.copy.addedCount(3)).toBe('Added — 3 today')
+    expect(recordsCatalog.copy.scanNext).toBe('Scan next')
+  })
+
   it('exposes browse axes (Genre · Artist · Decade · Format · Label)', () => {
     expect(recordsCatalog.browseAxes.map((a) => a.id)).toEqual(['genre', 'artist', 'decade', 'format', 'label'])
     for (const axis of recordsCatalog.browseAxes) {
@@ -86,6 +92,12 @@ describe('booksCatalog', () => {
     expect(booksCatalog.copy.noTokenHint).toMatch(/Discogs token/)
   })
 
+  it('exposes the C1 scan-loop copy keys on the books catalog too', () => {
+    expect(booksCatalog.copy.addAndScanNext).toBe('Add & scan next')
+    expect(booksCatalog.copy.addedCount(2)).toBe('Added — 2 today')
+    expect(booksCatalog.copy.scanNext).toBe('Scan next')
+  })
+
   it('exposes browse axes (Category · Author · Year)', () => {
     expect(booksCatalog.browseAxes.map((a) => a.id)).toEqual(['category', 'author', 'year'])
     const author = booksCatalog.browseAxes.find((a) => a.id === 'author')
@@ -93,6 +105,25 @@ describe('booksCatalog', () => {
     const year = booksCatalog.browseAxes.find((a) => a.id === 'year')
     expect(year.value({ year: 1969 })).toEqual(['1969'])
     expect(year.value({})).toEqual([])
+  })
+})
+
+describe('community reviews contract (feat/reviews)', () => {
+  it('anchors a review thread via reviewKey on both catalogs', () => {
+    expect(recordsCatalog.reviewKey({ discogsId: 372469 })).toBe(372469)
+    expect(recordsCatalog.reviewKey({ discogsId: undefined })).toBeUndefined()
+    expect(booksCatalog.reviewKey({ googleBooksId: 'abc123' })).toBe('abc123')
+    expect(booksCatalog.reviewKey({ googleBooksId: undefined })).toBeUndefined()
+  })
+
+  it('exposes the shared ReviewsSection copy on both catalogs', () => {
+    for (const catalog of [recordsCatalog, booksCatalog]) {
+      expect(catalog.copy.reviews.section).toBe('Community reviews')
+      expect(catalog.copy.reviews.save).toBe('Post review')
+      expect(catalog.copy.reviews.update).toBe('Update review')
+      expect(catalog.copy.reviews.postedToast).toBe('Review posted')
+      expect(catalog.copy.reviews.updatedToast).toBe('Review updated')
+    }
   })
 })
 

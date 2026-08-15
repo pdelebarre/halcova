@@ -1,0 +1,142 @@
+/* Community reviews (Task 6) — shared section rendered by BOTH detail sheets.
+   Mirrors the detail-sheet dark theme (AlbumDetail.css / index.css tokens).
+   Touch targets stay >= 44px; text keeps readable contrast on #16130F. */
+
+.reviews-section { margin-bottom: 16px; }
+
+/* Quiet fallback while the thread loads or when the load fails — never
+   throws, never dark-screens. The error line gains a Retry button (retry
+   needs the list to come back, but a member can still write a review
+   without it). */
+.reviews-load-error,
+.reviews-loading {
+  font-size: 13px;
+  color: var(--static-grey);
+  margin: 0;
+}
+.reviews-load-error-block {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.reviews-load-error-block .btn { min-height: 44px; }
+
+.reviews-aggregate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.reviews-aggregate-text {
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
+}
+
+/* Read-only star row (aggregate + per-review ratings). */
+.reviews-stars { display: inline-flex; gap: 2px; }
+.reviews-star { color: var(--static-grey); font-size: 15px; line-height: 1; }
+.reviews-star.on { color: var(--runout-gold); }
+
+.reviews-empty { padding: 4px 0 12px; }
+.reviews-empty-title { font-size: 14px; color: var(--jacket-kraft); margin: 0 0 2px; }
+.reviews-empty-body { font-size: 13px; color: var(--static-grey); margin: 0; }
+
+.reviews-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.review-item {
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+/* The caller's own review gets a gold outline so Edit/Delete read as one unit. */
+.review-item.owned { border-color: var(--runout-gold); }
+
+.review-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.review-author { font-size: 13px; font-weight: 600; color: var(--jacket-kraft); }
+.review-date { font-family: var(--font-mono); font-size: 11px; color: var(--static-grey); }
+
+.review-stars-line { margin-bottom: 4px; }
+.review-body { font-size: 13.5px; color: var(--jacket-kraft-dim); margin: 0 0 8px; line-height: 1.45; }
+
+.review-actions { display: flex; gap: 8px; }
+.review-actions .btn { min-height: 44px; }
+
+/* Composer — signed-in members only. */
+.reviews-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.reviews-rating-field { border: none; margin: 0; padding: 0; }
+.reviews-rating-field legend {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--static-grey);
+  margin-bottom: 6px;
+  padding: 0;
+}
+.reviews-stars-input { display: flex; gap: 6px; }
+.reviews-star-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--static-grey);
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+}
+.reviews-star-btn.selected {
+  color: var(--runout-gold);
+  border-color: var(--runout-gold);
+}
+.reviews-star-btn:active { transform: scale(0.95); }
+
+.reviews-composer textarea {
+  width: 100%;
+  min-height: 44px;
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: var(--jacket-kraft);
+  resize: vertical;
+}
+
+.reviews-composer-actions { display: flex; justify-content: flex-end; }
+.reviews-composer-actions .btn { min-height: 44px; padding: 10px 20px; }
+
+.reviews-error {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--danger-bright); /* >= 4.5:1 on --vinyl-groove-2 (small text AA) */
+  margin: 0;
+}

@@ -1,0 +1,292 @@
+// netlify/functions/reviews.js — community reviews API (feat/reviews, Task 4).
+//
+// Reviews are SHARED across ALL users: a release's reviews are public, so
+// unlike collections/items there is NO per-user store — one shared
+// `runout-reviews` blob store, or the `reviews` Postgres table when
+// DATABASE_URL is set (chosen via isPostgresConfigured(), with a read-through
+// Blobs fallback when Postgres errors — parity with collection.js).
+//
+// Auth on every request (Bearer access code / admin key — `authorize` from
+// _shared/collection-store), a per-kind plan gate for members (a member
+// without the kind's plan is 403 PLAN_FORBIDDEN), and per-identity rate
+// limiting on WRITES (POST/DELETE). Reads (GET) stay open to any
+// authenticated caller.
+//
+// Route surface:
+//   GET    /reviews?kind=<records|books>&sourceId=<id>
+//          -> 200 { reviews: [published, newest first], aggregate: { avg,
+//             count }, mine: <caller's own review (any status) | null> }
+//   POST   /reviews  body { kind, sourceId, rating (int 1..5), body (<=2000) }
+//          -> 201 { review } on create / 200 { review } on update (upsert —
+//             one review per member per release, never a duplicate)
+//   DELETE /reviews?id=<reviewId> (kind/sourceId optional)
+//          -> 200 { ok: true }; 404 not found; 403 someone else's review
+//   *      any other method -> 405 (collection.js has no OPTIONS/CORS handling
+//          either, so neither do we)
+
+import { getStore } from '@netlify/blobs'
+import { COLLECTIONS, authorize, json } from './_shared/collection-store'
+import { consumeDistinct, createRateLimiter, rateLimitIdentity, rateLimitKey } from './_shared/rate-limit'
+import { isPostgresConfigured, db } from './_shared/postgres'
+import { createReviewsRepo } from './_shared/repositories/reviews-repo'
+import { createReviewsBlobStore } from './_shared/reviews-blob'
+import { isValidSourceId, sourceIdError } from './_shared/reviews-shared'
+
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+// Per-identity fixed-window limit for review WRITES (POST/DELETE); GET stays
+// open (the list + aggregate are public once you're authenticated).
+const REVIEWS_RATE_LIMIT = Number(process.env.RUNOUT_REVIEWS_RATE_LIMIT) || 30
+// M3 — per-release write limiting: how many DISTINCT sourceIds one identity can
+// open a review thread on per kind per window (see writeGuardError). Bounds
+// new-thread creation across arbitrary releases; editing releases you already
+// reviewed stays free. Exported so the handler tests can seed the counter.
+export const REVIEWS_DISTINCT_LIMIT = Number(process.env.RUNOUT_REVIEWS_DISTINCT_LIMIT) || 10
+
+const BODY_MAX_LENGTH = 2000
+const RATINGS = new Set([1, 2, 3, 4, 5])
+const REVIEW_STATUS_PUBLISHED = 'published'
+
+// The public display name stamped on a review. NEVER the access code or email
+// (those are separate secret fields — see publicUser in _shared/auth.js). The
+// owner has no stored name (authorize resolves them as a constant), so fall
+// back to a fixed label like auth.js's profileForCode ('Admin').
+function authorNameFor(user) {
+  const name = String(user?.name || '').trim()
+  if (name) return name.slice(0, 80)
+  return user?.role === 'admin' ? 'Admin' : 'A Runout member'
+}
+
+// Validate the POST body. Returns { rating, body } on success, or
+// { error: <Response> } carrying a 400 on the first problem.
+function validateReview(body, { kind, sourceId }) {
+  if (!kind || !COLLECTIONS[kind]) {
+    return { error: json(400, { error: 'Unknown collection.', code: 'INVALID_KIND' }) }
+  }
+  if (!sourceId) {
+    return { error: json(400, { error: 'Missing sourceId', code: 'MISSING_SOURCE_ID' }) }
+  }
+  // M1 — server-side sourceId validation BEFORE any store write: the Blobs
+  // release key is `release:<kind>:<sourceId>` (split on `:`), so a `:` or
+  // control char inside the id breaks the key split, and unbounded ids pollute
+  // the shared store / the unbounded `source_id text` rows in Postgres.
+  const srcErr = sourceIdError(sourceId, kind)
+  if (srcErr) {
+    return { error: json(400, { error: srcErr.message, code: srcErr.code }) }
+  }
+  const rating = Number(body?.rating)
+  if (!Number.isInteger(rating) || !RATINGS.has(rating)) {
+    return { error: json(400, { error: 'Rating must be an integer from 1 to 5.', code: 'INVALID_RATING' }) }
+  }
+  const trimmed = String(body?.body ?? '').trim()
+  if (trimmed.length > BODY_MAX_LENGTH) {
+    return { error: json(400, { error: `Review is too long (max ${BODY_MAX_LENGTH} characters).`, code: 'BODY_TOO_LONG' }) }
+  }
+  return { rating, body: trimmed }
+}
+
+// Store-agnostic route logic. `store` is any object with the reviews ops
+// (listReviews / getByAuthor / upsertReview / getReview / deleteReview) — both
+// the Postgres repo (createReviewsRepo) and the Blobs store
+// (createReviewsBlobStore) expose them (Task 3), so one dispatcher serves both
+// backends and the read-through fallback.
+async function handleStore(req, store, ctx) {
+  if (req.method === 'GET') return handleGet(store, ctx)
+  if (req.method === 'POST') return handlePost(store, ctx)
+  if (req.method === 'DELETE') return handleDelete(store, ctx)
+  return json(405, { error: 'Method not allowed' })
+}
+
+// GET — a release's published reviews (newest first) + the aggregate, plus
+// "mine": the caller's own review, ANY status, so the composer can prefill a
+// pending/hidden draft too (getByAuthor in both repos).
+async function handleGet(store, { user, kind, sourceId }) {
+  if (!sourceId) return json(400, { error: 'Missing sourceId', code: 'MISSING_SOURCE_ID' })
+  const srcErr = sourceIdError(sourceId, kind)
+  if (srcErr) return json(400, { error: srcErr.message, code: srcErr.code })
+  const { reviews, aggregate } = await store.listReviews(kind, sourceId, { status: REVIEW_STATUS_PUBLISHED })
+  const mine = await store.getByAuthor(kind, sourceId, user.id)
+  // L1 — the list is PUBLIC: strip other reviewers' internal authorId. Only the
+  // caller's own entry keeps it (so the client can dedupe against `mine`, which
+  // always carries the caller's id). The aggregate is unaffected (it only reads
+  // rating).
+  const visible = reviews.map((r) => (r.authorId === user.id ? r : withoutAuthorId(r)))
+  return json(200, { reviews: visible, aggregate, mine })
+}
+
+// L1 — drop the internal authorId from a review before it leaves the server
+// (applied to OTHER reviewers' entries in the public list; the caller's own is
+// kept).
+function withoutAuthorId(review) {
+  const { authorId: _authorId, ...rest } = review
+  return rest
+}
+
+// POST — upsert the CALLER's review. A pre-existing review by this author is
+// an EDIT (200); otherwise it's a CREATE (201). The upsert itself is atomic in
+// both backends (ON CONFLICT in Postgres / last-write-wins merge on authorId
+// in Blobs), so a concurrent duplicate can never be written.
+async function handlePost(store, { user, kind, sourceId, body }) {
+  const validated = validateReview(body, { kind, sourceId })
+  if (validated.error) return validated.error
+  const existing = await store.getByAuthor(kind, sourceId, user.id)
+  const review = await store.upsertReview({
+    kind,
+    sourceId,
+    authorId: user.id,
+    authorName: authorNameFor(user),
+    rating: validated.rating,
+    body: validated.body,
+    // No `status`: a new review defaults to 'published'; an edit keeps the
+    // existing status (preserve-on-undefined in both repos — an admin's
+    // 'hidden'/'pending' is never silently reset).
+  })
+  return json(existing ? 200 : 201, { review })
+}
+
+// DELETE — only the author, or the owner (admin key holder), may delete a
+// review. 404 when the id is unknown; 400 when it's missing.
+async function handleDelete(store, { user, id }) {
+  if (!id) return json(400, { error: 'Missing id', code: 'MISSING_ID' })
+  const review = await store.getReview(id)
+  if (!review) return json(404, { error: 'Not found' })
+  if (review.authorId !== user.id && user.role !== 'admin') {
+    return json(403, { error: 'You can only delete your own review.', code: 'FORBIDDEN' })
+  }
+  await store.deleteReview(id)
+  return json(200, { ok: true })
+}
+
+// The Blobs-backed handler — reached when DATABASE_URL is absent, or as the
+// read-through fallback when the Postgres path errors (parity with
+// collection.js's handleBlobs).
+async function handleBlobs(req, ctx) {
+  try {
+    return await handleStore(req, createReviewsBlobStore(), ctx)
+  } catch (err) {
+    return json(500, { error: err.message || 'Internal error' })
+  }
+}
+
+// Postgres-backed handler. DB-level errors are deliberately NOT caught here —
+// they propagate to the default export, which degrades the whole request to
+// the Blobs path (a Postgres outage behaves exactly like today instead of
+// 500ing — parity with collection-postgres.js).
+//
+// Exported (in addition to the default) so the pg path can be exercised
+// directly in tests with an injected pg-mem `db`, mirroring how
+// collection-postgres.js is tested.
+export async function handlePostgres(req, ctx) {
+  return handleStore(req, createReviewsRepo(db), ctx)
+}
+
+// POST carries kind/sourceId in the BODY (the route contract); GET/DELETE take
+// them from the query string. Parse the body once so the plan gate + rate-limit
+// scope can read the kind before the store handler runs.
+async function parseRequest(req) {
+  const url = new URL(req.url)
+  const queryKind = url.searchParams.get('kind')
+  const querySourceId = url.searchParams.get('sourceId')
+  const id = url.searchParams.get('id')
+  const isPost = req.method === 'POST'
+  const body = isPost ? await readBody(req) : null
+  const kind = isPost ? (body?.kind || queryKind) : queryKind
+  const sourceId = isPost ? (body?.sourceId || querySourceId) : querySourceId
+  return { kind, sourceId, id, body }
+}
+
+async function readBody(req) {
+  try {
+    return await req.json()
+  } catch {
+    return {}
+  }
+}
+
+// Kind gate: required + known for GET/POST; only validated (when present) on
+// DELETE, which keys off `id` alone.
+function kindError(req, kind) {
+  if (req.method === 'DELETE' && (!kind || COLLECTIONS[kind])) return null
+  if (!kind) return json(400, { error: 'Missing kind.', code: 'INVALID_KIND' })
+  if (!COLLECTIONS[kind]) return json(400, { error: 'Unknown collection.', code: 'INVALID_KIND' })
+  return null
+}
+
+// Plan gate: a member without the kind's plan can't read or write reviews for
+// it (mirrors collection.js's per-collection check, plus a code).
+function planError(user, kind) {
+  if (kind && !user.collections?.[kind]) {
+    return json(403, { error: `Your plan doesn't include the ${kind} collection.`, code: 'PLAN_FORBIDDEN' })
+  }
+  return null
+}
+
+// Writes are rate-limited per identity and blocked for the read-only demo (the
+// SHARED reviews store must never be polluted by the constant demo identity).
+// Order mirrors collection.js: rate limit, then demo guard.
+async function writeGuardError(req, user, kind, sourceId) {
+  const identity = rateLimitIdentity(user, req)
+  if (identity) {
+    const limiter = createRateLimiter({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: `reviews:${kind}`,
+      limit: REVIEWS_RATE_LIMIT,
+    })
+    const rl = await limiter(identity)
+    if (rl.limited) {
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMITED' }, { 'Retry-After': String(rl.retryAfter) })
+    }
+    // M3 — per-release write limiting: the limiter above counts every write
+    // (edits included) per identity per kind, so one member could open
+    // REVIEWS_RATE_LIMIT new threads/min across arbitrary releases. This cap
+    // counts DISTINCT sourceIds written per identity per kind per window —
+    // editing a release you already touched this window stays free. A junk id
+    // is skipped (validateReview rejects it downstream anyway) so garbage never
+    // pollutes the counter.
+    if (req.method === 'POST' && isValidSourceId(sourceId, kind)) {
+      const distinct = await consumeDistinct(
+        getStore(RATE_LIMITS_STORE),
+        rateLimitKey(`reviews-distinct:${kind}`, identity),
+        sourceId,
+        REVIEWS_DISTINCT_LIMIT,
+      )
+      if (distinct.limited) {
+        return json(429, { error: 'Too many new releases reviewed — try again shortly.', code: 'RATE_LIMITED' }, { 'Retry-After': String(distinct.retryAfter) })
+      }
+    }
+  }
+  if (user.role === 'demo') {
+    return json(403, { error: 'The demo space is read-only. Sign in to write reviews.', code: 'DEMO_READONLY' })
+  }
+  return null
+}
+
+export default async function reviewsHandler(req) {
+  const { user, error } = await authorize(req)
+  if (error) return error
+
+  const { kind, sourceId, id, body } = await parseRequest(req)
+
+  const kindErr = kindError(req, kind)
+  if (kindErr) return kindErr
+
+  const planErr = planError(user, kind)
+  if (planErr) return planErr
+
+  if (req.method === 'POST' || req.method === 'DELETE') {
+    const guardErr = await writeGuardError(req, user, kind, sourceId)
+    if (guardErr) return guardErr
+  }
+
+  const ctx = { user, kind, sourceId, id, body }
+  // Postgres when configured (DB first, Blobs fallback on error); Blobs
+  // otherwise.
+  if (isPostgresConfigured()) {
+    try {
+      return await handlePostgres(req, ctx)
+    } catch (err) {
+      console.error('reviews: Postgres path failed, falling back to Blobs:', err?.message || err)
+      return handleBlobs(req, ctx)
+    }
+  }
+  return handleBlobs(req, ctx)
+}

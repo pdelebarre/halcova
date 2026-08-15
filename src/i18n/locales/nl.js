@@ -215,6 +215,8 @@ const nl = {
   'catalog.nothingElseBy': 'Niets anders van {name} in je {collectionLabel}',
   'catalog.moreRelated': 'en {n} meer',
   'catalog.scanNext': 'Volgende scannen',
+  'catalog.addAndScanNext': 'Toevoegen & doorgaan met scannen',
+  'catalog.addedCount': 'Toegevoegd — {n} vandaag',
   'catalog.add': 'Toevoegen aan {collectionLabel}',
   'catalog.addAnyway': 'Toch toevoegen',
   'catalog.manualTitleRequired': 'Voeg een titel toe — geef dit item eerst een naam.',

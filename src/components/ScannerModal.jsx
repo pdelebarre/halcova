@@ -27,10 +27,19 @@ const DECODE_INTERVAL_MS = 180 // ~5 decode attempts per second
 // on mid-range phones while staying sharp enough for small barcodes.
 const MAX_DECODE_WIDTH = 640
 
-export default function ScannerModal({ onDetected, onClose }) {
+export default function ScannerModal({ onDetected, onClose, active = true }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const torchTrackRef = useRef(null)
+
+  // C1.3 warm camera: keep the latest onDetected in a ref so the camera effect
+  // only re-runs on `active`/`retryKey`. A CollectionView re-render must never
+  // tear down and restart the stream (it stays mounted through the result sheet).
+  const onDetectedRef = useRef(onDetected)
+  useEffect(() => {
+    onDetectedRef.current = onDetected
+  }, [onDetected])
+
   const [statusMsg, setStatusMsg] = useState(t('scan.startingCamera'))
   const [errorMsg, setErrorMsg] = useState('')
   const [retryKey, setRetryKey] = useState(0)
@@ -39,6 +48,12 @@ export default function ScannerModal({ onDetected, onClose }) {
   const [justDecoded, setJustDecoded] = useState(false)
 
   useEffect(() => {
+    // C1.3: when hidden (e.g. the result sheet is up) the scanner stays MOUNTED
+    // but idle — no camera, no decode loop, no battery/LED drain. Re-activating
+    // re-requests getUserMedia; the permission is already granted for the page,
+    // so iOS doesn't re-prompt (the #87 device gate validates this).
+    if (!active) return undefined
+
     let cancelled = false
     let mediaStream = null
     let rafId = 0
@@ -71,7 +86,7 @@ export default function ScannerModal({ onDetected, onClose }) {
           setTimeout(() => {
             cancelAnimationFrame(rafId)
             mediaStream?.getTracks().forEach((track) => track.stop())
-            onDetected(text)
+            onDetectedRef.current(text)
           }, 320)
         }
       } catch {
@@ -80,6 +95,12 @@ export default function ScannerModal({ onDetected, onClose }) {
     }
 
     async function start() {
+      // On re-activation (Add & scan next) reset the scan pulse, torch and any
+      // stale status so the camera looks freshly armed (the previous track —
+      // and its torch — was stopped while hidden).
+      setJustDecoded(false)
+      setTorchOn(false)
+      setStatusMsg(t('scan.startingCamera'))
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
@@ -146,7 +167,7 @@ export default function ScannerModal({ onDetected, onClose }) {
       cancelAnimationFrame(rafId)
       mediaStream?.getTracks().forEach((track) => track.stop())
     }
-  }, [onDetected, retryKey])
+  }, [active, retryKey])
 
   // Toggle torch if supported. Try applyConstraints first, fall back to ImageCapture.
   const toggleTorch = async () => {
@@ -177,7 +198,7 @@ export default function ScannerModal({ onDetected, onClose }) {
   }
 
   return (
-    <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label={t('scan.scanBarcode')}>
+    <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label={t('scan.scanBarcode')} hidden={!active}>
       <div className="scanner-video">
         <video ref={videoRef} autoPlay muted playsInline />
         <canvas ref={canvasRef} className="scanner-canvas" />

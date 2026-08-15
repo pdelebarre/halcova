@@ -215,6 +215,8 @@ const ptBR = {
   'catalog.nothingElseBy': 'Nada mais de {name} no seu {collectionLabel}',
   'catalog.moreRelated': 'e mais {n}',
   'catalog.scanNext': 'Escanear próximo',
+  'catalog.addAndScanNext': 'Adicionar & escanear o próximo',
+  'catalog.addedCount': 'Adicionado — {n} hoje',
   'catalog.add': 'Adicionar ao {collectionLabel}',
   'catalog.addAnyway': 'Adicionar mesmo assim',
   'catalog.manualTitleRequired': 'Adicione um título — dê um nome a este item primeiro.',

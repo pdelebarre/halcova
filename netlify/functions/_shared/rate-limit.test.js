@@ -7,6 +7,7 @@ import {
   retryAfterSeconds,
   nextCounter,
   consume,
+  consumeDistinct,
   createRateLimiter,
   clientIp,
   rateLimitIdentity,
@@ -71,6 +72,39 @@ describe('consume', () => {
       async setJSON() { throw new Error('boom') },
     }
     await expect(consume(broken, 'k', 5)).resolves.toEqual({ limited: false })
+  })
+})
+
+describe('consumeDistinct', () => {
+  const memStore = (data = {}) => ({
+    data,
+    async get(k) { return this.data[k] },
+    async setJSON(k, v) { this.data[k] = v },
+  })
+
+  it('counts DISTINCT items and never advances on a repeat within the window', async () => {
+    const store = memStore()
+    const key = rateLimitKey('reviews-distinct:records', 'u1')
+    expect(await consumeDistinct(store, key, 'a', 2, 10_000)).toEqual({ limited: false })
+    expect(await consumeDistinct(store, key, 'a', 2, 10_000)).toEqual({ limited: false }) // repeat — no advance
+    expect(await consumeDistinct(store, key, 'b', 2, 10_000)).toEqual({ limited: false })
+    const third = await consumeDistinct(store, key, 'c', 2, 10_000)
+    expect(third.limited).toBe(true)
+    expect(third.retryAfter).toBeGreaterThanOrEqual(1)
+  })
+
+  it('resets when the window rolls over, so the distinct cap self-heals each window', async () => {
+    const store = memStore({ [rateLimitKey('s', 'u1')]: { w: 0, items: ['a', 'b'] } })
+    const next = await consumeDistinct(store, rateLimitKey('s', 'u1'), 'c', 2, RATE_LIMIT_WINDOW_MS + 1_000)
+    expect(next).toEqual({ limited: false }) // stale window resets to just ['c']
+  })
+
+  it('never throws when the store read or write fails — degrades to allowing the request', async () => {
+    const broken = {
+      async get() { throw new Error('boom') },
+      async setJSON() { throw new Error('boom') },
+    }
+    await expect(consumeDistinct(broken, 'k', 'a', 5)).resolves.toEqual({ limited: false })
   })
 })
 

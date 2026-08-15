@@ -81,6 +81,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // no token is configured; we keep a persistent, non-blocking hint in the
   // empty state after that signal and clear it once lookups succeed.
   const [recordsNoToken, setRecordsNoToken] = useState(false)
+  // C1.4: per-session "added today" counter (factual — no XP/badges). A ref is
+  // enough: it only drives the momentum toast, resets on reload, and avoids
+  // double-increment under StrictMode.
+  const addedTodayRef = useRef(0)
 
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -223,6 +227,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast({ msg, kind })
     toastTimer.current = setTimeout(() => setToast(null), 2400)
+  }
+
+  // C1.4: the momentum toast copy — the catalog override is a function (EN
+  // baseline); non-EN falls back to the i18n `catalog.addedCount` string.
+  function addedCountMsg(n) {
+    return typeof copy.addedCount === 'function'
+      ? copy.addedCount(n)
+      : t('catalog.addedCount', { n: String(n) })
   }
 
   function toggleFormat(f) {
@@ -605,7 +617,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     else setModal(null)
   }
 
-  async function handleAddCandidate(candidate) {
+  async function handleAddCandidate(candidate, { scanNext = false } = {}) {
     // Defensive: a free user at the cap should never reach here — the FAB and
     // empty-state entries are gated — but guard anyway so no doomed POST fires.
     if (atLimit) {
@@ -619,6 +631,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     delete payload.id
     delete payload.dateAdded
     delete payload.notes
+    const source = scanCandidate?.source === 'scan' ? 'scan' : 'manual'
     try {
       await add({ ...payload, notes: '' })
       // G-2 funnel join key (Phase 0 §4): every owned add emits
@@ -626,11 +639,21 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       // is default-off — harmless today, joinable later.
       track('gamif_item_added', {
         kind: catalog.kind === 'books' ? 'books' : 'records',
-        source: scanCandidate?.source === 'scan' ? 'scan' : 'manual',
+        source,
       })
-      setModal(null)
+      // C1.4 momentum toast: a factual per-session "added today" count for
+      // scan-sourced adds only (no XP/badges). Manual/search adds keep the
+      // plain add toast.
+      if (source === 'scan') {
+        addedTodayRef.current += 1
+        showToast(addedCountMsg(addedTodayRef.current), 'add')
+      } else {
+        showToast(copy.addToast, 'add')
+      }
       setScanCandidate(null)
-      showToast(copy.addToast, 'add')
+      // C1.1/C1.3: "Add & scan next" re-opens the already-warm scanner (still
+      // mounted, just toggled visible) instead of dropping back to the grid.
+      setModal(scanNext ? 'scan' : null)
     } catch (err) {
       // Server branchable codes (T3): the free-tier cap and the read-only demo
       // space get clear upgrade/sign-in prompts instead of a generic save error.
@@ -648,6 +671,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   function handleOpenFromResult(item) {
     setSelectedItem(item)
     setModal('detail')
+  }
+
+  // C1.1: add the scanned item, then immediately re-open the warm scanner so
+  // the user can keep scanning a stack without the extra Add → Scan tap.
+  function handleAddAndScanNext(candidate) {
+    return handleAddCandidate(candidate, { scanNext: true })
   }
 
   function handleScanNext() {
@@ -1087,9 +1116,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         </div>
       )}
 
-      {modal === 'scan' && (
+      {/* C1.3: the barcode scanner stays MOUNTED through a scan-sourced result
+          sheet (hidden + camera-off while it's up), so "Add & scan next" and
+          "Scan next" resume without tearing down / re-requesting getUserMedia.
+          It only unmounts when the flow truly leaves the scan session. */}
+      {(modal === 'scan' || (modal === 'result' && scanCandidate?.source === 'scan')) && (
         <Suspense fallback={<div className="scanner-loading">Starting camera…</div>}>
-          <ScannerModal onDetected={handleBarcodeDetected} onClose={handleScannerClose} />
+          <ScannerModal
+            onDetected={handleBarcodeDetected}
+            onClose={handleScannerClose}
+            active={modal === 'scan'}
+          />
         </Suspense>
       )}
 
@@ -1132,6 +1169,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           sameAlbum={scanCandidate.sameAlbum}
           otherArtist={scanCandidate.otherArtist}
           onAdd={handleAddCandidate}
+          onAddAndScanNext={handleAddAndScanNext}
+          source={scanCandidate.source}
           onAddToWishlist={handleAddToWishlist}
           onOwnWishlist={() => handleConvertToOwned(scanCandidate.wishlistExact)}
           onOpenItem={handleOpenFromResult}

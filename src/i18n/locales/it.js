@@ -215,6 +215,8 @@ const it = {
   'catalog.nothingElseBy': "Nient'altro di {name} nel tuo {collectionLabel}",
   'catalog.moreRelated': 'e altri {n}',
   'catalog.scanNext': 'Scansiona prossimo',
+  'catalog.addAndScanNext': 'Aggiungi & scansiona il prossimo',
+  'catalog.addedCount': 'Aggiunto — {n} oggi',
   'catalog.add': 'Aggiungi a {collectionLabel}',
   'catalog.addAnyway': 'Aggiungi comunque',
   'catalog.manualTitleRequired': 'Aggiungi un titolo — dai un nome a questo articolo prima.',

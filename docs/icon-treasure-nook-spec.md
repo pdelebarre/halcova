@@ -1,8 +1,10 @@
 # The Treasure Nook — App Icon Specification
 
-**Concept 2 · Selected 2026-08-12**
+**Concept 2 · Selected 2026-08-12 · barcode element added 2026-08-15**
 A recessed Gothic pointed-arch alcove with a tilted card resting inside —
 a "treasure nook" that is unmistakably different from the current vinyl-record icon.
+The tilted card now carries a **barcode face** (the required "scan to catalog"
+element, per `marketing/brief-halcova-icon.md`) — see §3.5.
 
 ---
 
@@ -101,19 +103,21 @@ Rendered with:
 
 ---
 
-## 3. The Inner Item — The "Treasured Object"
+## 3. The Inner Item — The "Barcode Card"
 
 ### 3.1 Geometry
 
-A rounded rectangle representing a card, case, or book resting inside the alcove. It has a slight perspective tilt — like a treasured object leaning casually in its nook.
+A rounded rectangle representing a card, case, or book resting inside the alcove. It has a slight perspective tilt — like a treasured object leaning casually in its nook. **Its face is a barcode** — a gold code bar on the dark field inside a thin kraft border: "treasure + scan in one shape" (brief §3, direction 1).
 
 | Parameter | Value |
 |---|---|
-| Shape | Rounded rectangle |
+| Shape | Rounded rectangle (kraft-bordered, dark face) |
 | Width | 100 px |
 | Height | 140 px |
 | Corner radius | 12 px (all four corners, `rx="12" ry="12"`) |
-| Fill | `#EFE6D8` (kraft) |
+| Face fill | `#16130F` (`--sleeve-black` — same as canvas, so the gold bars pop) |
+| Border | `#EFE6D8` (`--jacket-kraft`), 6 px stroke |
+| Face content | 4 gold bars — the barcode (see §3.5) |
 | Rotation | 10° clockwise around its own center |
 | Transform origin | Center of the rectangle |
 
@@ -137,17 +141,17 @@ This places the card's bottom edge essentially touching the base line at y = 380
 
 ```svg
 <g transform="translate(256, 302) rotate(10)">
+  <!-- card body: kraft border, dark face -->
   <rect x="-50" y="-70" width="100" height="140" rx="12" ry="12"
-        fill="#EFE6D8" />
+        fill="#16130F" stroke="#EFE6D8" stroke-width="6" />
+  <!-- barcode bars: gold on the dark face -->
+  <g fill="#C9A227">
+    <rect x="-40" y="-58" width="18" height="116" />
+    <rect x="-14" y="-58" width="10" height="116" />
+    <rect x="4"   y="-58" width="10" height="116" />
+    <rect x="22"  y="-58" width="18" height="116" />
+  </g>
 </g>
-```
-
-Alternatively, as a single `<rect>` with explicit transform:
-
-```svg
-<rect x="-50" y="-70" width="100" height="140" rx="12" ry="12"
-      fill="#EFE6D8"
-      transform="translate(256, 302) rotate(10)" />
 ```
 
 ### 3.4 Relationship to the Arch
@@ -166,7 +170,24 @@ Alternatively, as a single `<rect>` with explicit transform:
   ██████████████████████████
 ```
 
-The card sits centered horizontally in the arch. Its bottom nearly touches the base line (≈0.4 px gap). Its top reaches approximately y ≈ 302 − 70·cos(10°) + 50·sin(10°) ≈ 302 − 68.94 + 8.68 ≈ 241.7 px — about 104 px below the apex. This leaves generous breathing room above and on both sides of the card.
+The card sits centered horizontally in the arch. Its bottom nearly touches the base line (≈0.4 px gap). Its top reaches approximately y ≈ 302 − 70·cos(10°) + 50·sin(10°) ≈ 302 − 68.94 + 8.68 ≈ 241.7 px — about 104 px below the apex. This leaves generous breathing room above and on both sides of the card. The barcode bars span x −40..40 and y −58..58 within the card — fully inside the kraft border, with ~6 px side clearance and ~12 px top/bottom clearance.
+
+### 3.5 The Barcode (Code Bar) — Required Element
+
+Per `marketing/brief-halcova-icon.md`, a visible barcode is a **required** element: the mark must read "scan to catalog" at a glance. Chosen direction: **barcode card** (brief §3, option 1) — the tilted card *is* the barcode. This satisfies the brief's hard constraints: bold bars (not fine lines), flat shapes, real brand tokens, and legibility at 32 px via a programmatic simplification (§6.4).
+
+| Parameter | Value |
+|---|---|
+| Bar count | 4 (2 wide, 2 narrow) |
+| Bar rhythm | wide–narrow–narrow–wide (symmetric about card centre) |
+| Bar widths | 18 px (wide) / 10 px (narrow) |
+| Bar height | 116 px (y −58 → +58) |
+| Bar X (card-local) | −40, −14, +4, +22 |
+| Bar fill | `#C9A227` (`--runout-gold`) |
+| Bar background | `#16130F` (card's dark face) |
+| Border clearance | 6 px sides · 12 px top/bottom |
+
+**Why bold bars:** at 32 px (favicon) the 4-bar master would alias into mush, so `scripts/generate-icons.mjs` swaps in a **3-bar simplification** — 24 px bars, 10 px gaps (≈1.5 px bars at 32 px; "fewer, thicker bars", brief §6.4) — applied to the `favicon.png` export only. The 512 / 192 / 180 px exports keep the full 4-bar master.
 
 ---
 
@@ -201,7 +222,8 @@ This draws the bottom half of an ellipse from (156, 330) to (356, 330) — the a
 2. Warm glow half-ellipse
 3. Arch path (stroked)
 4. Base line (stroked)
-5. Card (filled rounded rect, rotated)
+5. Card body (kraft border + dark face, rotated)
+6. Barcode bars (gold, on the card face)
 
 ---
 
@@ -216,6 +238,7 @@ The core motif already sits **entirely within the 80% safe zone**:
 | Arch | 116–396 | 137.5–380 | ✅ X: 116 ≥ 51.2, 396 ≤ 460.8 · Y: 137.5 ≥ 51.2, 380 ≤ 460.8 |
 | Base line | 108–404 | 380 | ✅ |
 | Card | ≈ 166–346 (after rot.) | ≈ 242–380 | ✅ |
+| Barcode bars | ≈ 216–296 (after rot.) | ≈ 244–360 | ✅ |
 | Glow | 156–356 | 300–390 | ✅ |
 
 The arch occupies roughly the center-bottom portion of the safe zone, with:
@@ -246,6 +269,7 @@ Render the maskable icon with a circular mask at 83.33% of the canvas diameter (
 | Card width | 100 px | 37.5 px | ✅ Recognizable rectangle |
 | Card height | 140 px | 52.5 px | ✅ |
 | Card corner radius | 12 px | 4.5 px | ✅ Rounded corners visible |
+| Barcode bars | 18/10 px | 6.75/3.75 px | ✅ Wide–narrow rhythm visible |
 | Glow | 200 × 60 px | 75 × 22.5 px | ✅ Subtle but present |
 
 **Silhouette at 192 px:** A gold pointed arch with a visible light rectangle inside. Clearly not a circle.
@@ -257,6 +281,7 @@ Render the maskable icon with a circular mask at 83.33% of the canvas diameter (
 | Arch stroke | 16 px | ~1.5 px |
 | Card width | 100 px | ~9.4 px |
 | Card height | 140 px | ~13.1 px |
+| Barcode bars | 18/10 px | ~1.1/0.6 px | 4 bars still visible |
 
 **Silhouette at 48 px:** The gold pointed arch dominates. The card is a small light rectangle inside. The warm glow is effectively invisible — drop it.
 
@@ -267,11 +292,12 @@ Render the maskable icon with a circular mask at 83.33% of the canvas diameter (
 | Arch stroke | 16 px | 1.0 px |
 | Card width | 100 px | 6.25 px |
 | Card height | 140 px | 8.75 px |
+| Barcode bars | 4 bars (master) | 3 bars × 1.5 px (favicon simplification) |
 
 **What remains as the recognizable silhouette:**
 - The **gold pointed arch** — the strongest single shape. At 1 px stroke it is thin but still human-readable.
-- The **kraft card** — a small light block inside the arch, ~6 × 9 px.
-- Combined, the silhouette reads as "a doorway/alcove shape with something inside" — completely distinct from a solid circle (vinyl record icon).
+- The **barcode card** — a small kraft-outlined dark card with **3 bold gold bars** (~1.5 px each) inside the arch.
+- Combined, the silhouette reads as "a doorway/alcove shape with a barcode inside" — the "scan to catalog" identity, completely distinct from a solid circle (vinyl record icon).
 
 ### 6.4 Recommended Small-Size Adjustments
 
@@ -281,10 +307,11 @@ For exports at 48 px and below, apply these tweaks **programmatically** (do not 
 |---|---|---|
 | Arch stroke | 2 px (bump from 1.5) | 2 px (bump from 1.0) |
 | Card corner radius | 3 px | 2 px (or square — remove rounding) |
+| Barcode bars | Keep 4-bar master | 3 bars × 24 px, 10 px gaps (replaces 4-bar master) |
 | Warm glow | Remove | Remove |
 | Base line | Merge with arch visually (no separate stroke) | Same |
 
-**Rationale:** At 1 px, the arch stroke is fragile and may anti-alias into near-invisibility on some displays. Thickening to 2 px at 32 px (~3.1 px equivalent at 512) ensures the arch remains a confident silhouette. The card can lose its corner radius entirely at 32 px — it becomes a simple small rectangle, which is perfectly readable.
+**Rationale:** At 1 px, the arch stroke is fragile and may anti-alias into near-invisibility on some displays. Thickening to 2 px at 32 px (~3.1 px equivalent at 512) ensures the arch remains a confident silhouette. The card can lose its corner radius entirely at 32 px — it becomes a simple small rectangle, which is perfectly readable. Likewise, the 4-bar barcode would alias into mush at 32 px, so the favicon export swaps in 3 bolder, wider bars — implemented in `scripts/generate-icons.mjs`.
 
 ---
 
@@ -355,10 +382,17 @@ The icon works equally well without the wordmark. The arch + card composition is
   <line x1="108" y1="380" x2="404" y2="380"
         stroke="#C9A227" stroke-width="16" stroke-linecap="round" />
 
-  <!-- 5. Inner card (tilted rounded rectangle) -->
-  <rect x="-50" y="-70" width="100" height="140" rx="12" ry="12"
-        fill="#EFE6D8"
-        transform="translate(256, 302) rotate(10)" />
+  <!-- 5. Barcode card (tilted; treasure + scan in one shape) -->
+  <g transform="translate(256, 302) rotate(10)">
+    <rect x="-50" y="-70" width="100" height="140" rx="12" ry="12"
+          fill="#16130F" stroke="#EFE6D8" stroke-width="6" />
+    <g fill="#C9A227">
+      <rect x="-40" y="-58" width="18" height="116" />
+      <rect x="-14" y="-58" width="10" height="116" />
+      <rect x="4"   y="-58" width="10" height="116" />
+      <rect x="22"  y="-58" width="18" height="116" />
+    </g>
+  </g>
 
   <!-- 6. Wordmark (non-maskable only) -->
   <text x="256" y="460"
@@ -389,7 +423,7 @@ The icon works equally well without the wordmark. The arch + card composition is
 | Attribute | Current Icon | Treasure Nook |
 |---|---|---|
 | Dominant shape | Circle (vinyl record) | Pointed arch |
-| Interior | Concentric rings + center label | Single tilted rectangle |
+| Interior | Concentric rings + center label | Tilted barcode card (gold bars) |
 | Silhouette at 32 px | Filled circle with center dot | Pointed-doorway outline with inner block |
 | Color distribution | Large black area, gold accent ring | Gold arch outline dominates, small kraft shape |
 | Metaphor | Music / vinyl | Architecture / treasure / collection |

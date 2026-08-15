@@ -215,6 +215,8 @@ const fr = {
   'catalog.nothingElseBy': 'Rien d\'autre de {name} dans votre {collectionLabel}',
   'catalog.moreRelated': 'et {n} de plus',
   'catalog.scanNext': 'Scanner suivant',
+  'catalog.addAndScanNext': 'Ajouter & scanner le suivant',
+  'catalog.addedCount': 'Ajouté — {n} aujourd\'hui',
   'catalog.add': 'Ajouter à {collectionLabel}',
   'catalog.addAnyway': 'Ajouter quand même',
   'catalog.manualTitleRequired': 'Ajoutez un titre — donnez un nom à ce disque d\'abord.',

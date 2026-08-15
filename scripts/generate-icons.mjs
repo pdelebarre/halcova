@@ -28,6 +28,17 @@ const smallSvg = masterSvg
     match.replace(/stroke-width="16"/, 'stroke-width="28"')
   )
   .replace(/rx="12" ry="12"/, 'rx="0" ry="0"')
+  // At 32px the 4-bar barcode would alias into mush — swap it for 3 bolder,
+  // wider bars with wider gaps so the bars stay distinct (brief §6.4:
+  // "fewer, thicker bars" at small sizes).
+  .replace(
+    /<g class="barcode-bars"[\s\S]*?<\/g>/,
+    `<g class="barcode-bars" fill="#C9A227">
+      <rect x="-46" y="-62" width="24" height="124" />
+      <rect x="-12" y="-62" width="24" height="124" />
+      <rect x="22"  y="-62" width="24" height="124" />
+    </g>`
+  )
   .replace(/<!-- 6\. Wordmark[\s\S]*?<\/text>/, '');
 
 const targets = [

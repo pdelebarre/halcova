@@ -105,4 +105,60 @@ describe('ScanResult', () => {
     act(() => { vi.advanceTimersByTime(800) })
     expect(onOwnWishlist).toHaveBeenCalledTimes(1)
   })
+
+  // ===========================================================================
+  // C1.1 / C1.2 — Add & scan next loop + already-owned button swap
+  // ===========================================================================
+
+  it('offers "Add & scan next" as the primary for a scan-sourced result, with plain "Add" demoted', () => {
+    vi.useFakeTimers()
+    const onAddAndScanNext = vi.fn()
+    renderResult({ source: 'scan', onAddAndScanNext })
+
+    const primary = screen.getByRole('button', { name: 'Add & scan next' })
+    expect(primary.className).toContain('btn-primary')
+
+    // The plain "Add" demotes to the ghost slot next to "Scan next" (C1.1).
+    expect(screen.getByRole('button', { name: 'Scan next' }).className).toContain('btn-ghost')
+    expect(screen.getByRole('button', { name: 'Add to crate' }).className).toContain('btn-ghost')
+
+    fireEvent.click(primary)
+    act(() => { vi.advanceTimersByTime(800) })
+    expect(onAddAndScanNext).toHaveBeenCalledTimes(1)
+    expect(onAddAndScanNext).toHaveBeenCalledWith(CANDIDATE)
+  })
+
+  it('keeps plain "Add" as the primary for a manual/search result (no scan stack)', () => {
+    const onAddAndScanNext = vi.fn()
+    // `source` defaults to 'manual' — even if the handler were wired, the
+    // primary must NOT promote to "Add & scan next".
+    renderResult({ onAddAndScanNext })
+
+    expect(screen.getByRole('button', { name: 'Add to crate' }).className).toContain('btn-primary')
+    expect(screen.queryByRole('button', { name: 'Add & scan next' })).not.toBeInTheDocument()
+  })
+
+  it('does not promote to "Add & scan next" when the handler is missing (defensive)', () => {
+    renderResult({ source: 'scan' })
+    expect(screen.getByRole('button', { name: 'Add to crate' }).className).toContain('btn-primary')
+    expect(screen.queryByRole('button', { name: 'Add & scan next' })).not.toBeInTheDocument()
+  })
+
+  it('makes "Scan next" the primary and "Add anyway" the ghost for an already-owned item', () => {
+    const onScanNext = vi.fn()
+    renderResult({ ownedExact: { id: 'r1', title: 'Miles Davis - Kind of Blue' }, onScanNext })
+
+    const primary = screen.getByRole('button', { name: 'Scan next' })
+    expect(primary.className).toContain('btn-primary')
+    expect(screen.getByRole('button', { name: 'Add anyway' }).className).toContain('btn-ghost')
+
+    fireEvent.click(primary)
+    expect(onScanNext).toHaveBeenCalledTimes(1)
+    expect(onScanNext).toHaveBeenCalledWith()
+  })
+
+  it('does not crash on a malformed candidate (no error boundary → dark screen)', () => {
+    const malformed = { year: undefined, formatType: null } // no title, no cover
+    expect(() => renderResult({ candidate: malformed, source: 'scan', onAddAndScanNext: vi.fn() })).not.toThrow()
+  })
 })

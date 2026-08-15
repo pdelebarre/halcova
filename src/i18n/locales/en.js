@@ -163,6 +163,49 @@ const en = {
   'detail.albumByArtist': '{album} by {artist}',
   'detail.barcode': 'Barcode',
   'detail.isbn': 'ISBN',
+  // Community rating (Task 1 reviews) — shared by records (Discogs) and books
+  // (Google Books); other locales fall back to en until translated.
+  'detail.rating': 'Community rating',
+  'detail.ratingCount': '{n} ratings',
+
+  // §9b Community reviews (Task 6) — the shared ReviewsSection. Reviews are
+  // authored by signed-in members; the list + aggregate are public. Other
+  // locales fall back to en until translated (same pattern as detail.rating).
+  'reviews.section': 'Community reviews',
+  'reviews.anonymous': 'A member',
+  'reviews.emptyTitle': 'No reviews yet',
+  'reviews.emptyBody': 'Be the first to review this {entity}.',
+  'reviews.loadError': "Couldn't load reviews.",
+  'reviews.avg': '{avg} out of 5',
+  'reviews.countOne': '1 review',
+  'reviews.countMany': '{n} reviews',
+  'reviews.starsAria': 'Rated {n} out of 5',
+  'reviews.ratingField': 'Your rating',
+  'reviews.ratingHint': 'Tap a star to rate — 1 is poor, 5 is excellent.',
+  'reviews.starAria': 'Rate {n} out of 5',
+  'reviews.bodyLabel': 'Your review',
+  'reviews.bodyPlaceholder': 'What did you think? (optional)',
+  'reviews.save': 'Post review',
+  'reviews.update': 'Update review',
+  'reviews.edit': 'Edit',
+  'reviews.delete': 'Delete',
+  'reviews.deleteConfirm': 'Delete review?',
+  'reviews.needRating': 'Pick a star rating first.',
+  'reviews.submitError': "Couldn't save your review — try again.",
+  'reviews.error.PLAN_FORBIDDEN': "Your plan doesn't include reviews.",
+  'reviews.error.RATE_LIMITED': 'Too many reviews right now — wait a moment and try again.',
+  'reviews.error.NOT_FOUND': 'That review is gone. Refresh to see the latest.',
+  'reviews.error.BAD_REQUEST': "Couldn't save your review — check the details.",
+  // Success + busy copy for the composer.
+  'reviews.postedToast': 'Review posted',
+  'reviews.updatedToast': 'Review updated',
+  'reviews.posting': 'Posting…',
+  'reviews.saving': 'Saving…',
+  // Relative dates for review timestamps.
+  'reviews.justNow': 'Just now',
+  'reviews.minAgo': '{n}m ago',
+  'reviews.hourAgo': '{n}h ago',
+  'reviews.dayAgo': '{n}d ago',
 
   // §10 Collection view
   'view.isThisIt': 'Is this it?',
@@ -243,6 +286,8 @@ const en = {
   'catalog.nothingElseBy': 'Nothing else by {name} in your {collectionLabel}',
   'catalog.moreRelated': 'and {n} more',
   'catalog.scanNext': 'Scan next',
+  'catalog.addAndScanNext': 'Add & scan next',
+  'catalog.addedCount': 'Added — {n} today',
   'catalog.add': 'Add to {collectionLabel}',
   'catalog.addAnyway': 'Add anyway',
   'catalog.manualTitleRequired': 'Add a title — give this record a name first.',

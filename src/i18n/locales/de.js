@@ -215,6 +215,8 @@ const de = {
   'catalog.nothingElseBy': 'Nichts weiteres von {name} in deinem {collectionLabel}',
   'catalog.moreRelated': 'und {n} weitere',
   'catalog.scanNext': 'Nächsten scannen',
+  'catalog.addAndScanNext': 'Hinzufügen & weiter scannen',
+  'catalog.addedCount': 'Hinzugefügt — {n} heute',
   'catalog.add': 'Zu {collectionLabel} hinzufügen',
   'catalog.addAnyway': 'Trotzdem hinzufügen',
   'catalog.manualTitleRequired': 'Gib einen Titel ein — benenne diesen Eintrag zuerst.',

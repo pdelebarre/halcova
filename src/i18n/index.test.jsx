@@ -133,6 +133,30 @@ describe('t()', () => {
     })
   })
 
+  describe('C1 activation keys (catalog.addAndScanNext / catalog.addedCount)', () => {
+    it('ships the scan-loop copy in every supported locale', () => {
+      const expected = {
+        en: ['Add & scan next', 'Added — {n} today'],
+        'en-GB': ['Add & scan next', 'Added — {n} today'],
+        fr: ['Ajouter & scanner le suivant', 'Ajouté — {n} aujourd\'hui'],
+        nl: ['Toevoegen & doorgaan met scannen', 'Toegevoegd — {n} vandaag'],
+        'pt-BR': ['Adicionar & escanear o próximo', 'Adicionado — {n} hoje'],
+        de: ['Hinzufügen & weiter scannen', 'Hinzugefügt — {n} heute'],
+        es: ['Añadir y escanear el siguiente', 'Añadido — {n} hoy'],
+        it: ['Aggiungi & scansiona il prossimo', 'Aggiunto — {n} oggi'],
+      }
+      for (const [locale, [label, template]] of Object.entries(expected)) {
+        setLocale(locale)
+        expect(t('catalog.addAndScanNext')).toBe(label)
+        // {n} interpolates; the raw template is preserved when params are empty.
+        const counted = t('catalog.addedCount', { n: 3 })
+        expect(counted).toContain('3')
+        expect(counted).not.toContain('{n}')
+        expect(t('catalog.addedCount', {})).toBe(template)
+      }
+    })
+  })
+
   describe('fallback behaviour', () => {
     it('falls back to en when key is missing in a non-en locale', () => {
       // 'common.copy' exists in en but let's test with a key that exists in en
