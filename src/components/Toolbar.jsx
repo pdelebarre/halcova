@@ -35,6 +35,7 @@ export default function Toolbar({
   onToggleLending,
   onOpenLoans,
   loansButtonRef,
+  overdueCount = 0,
   onOpenAisles,
   aislesOpen = false,
   extraFilterCount = 0,
@@ -104,7 +105,9 @@ export default function Toolbar({
 
   // W7: global loans dashboard button — icon + "Loans" label, no numeric
   // badge (the dashboard is global across records + books, so a per-tab count
-  // would mislead). Rendered whenever lending is enabled.
+  // would mislead). Rendered whenever lending is enabled. A5.4: when there are
+  // overdue loans, surface a danger-tinted overdue badge on the button — the
+  // aria-label/focus-restore behaviour is left untouched.
   function renderLoansButton() {
     if (!lendingEnabled) return null
     return (
@@ -122,6 +125,7 @@ export default function Toolbar({
           <path d="M12 13v4M10 15h4" />
         </svg>
         <span className="loans-label">{loansLabel}</span>
+        {overdueCount > 0 && <span className="filter-badge loans-overdue-badge">{overdueCount}</span>}
       </button>
     )
   }

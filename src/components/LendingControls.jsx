@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { t, getLocale } from '../i18n'
-import { isOverdue, toLocalDate } from '../utils/lending'
+import { isOverdue, toLocalDate, addDays } from '../utils/lending'
+import { classifyContact } from '../utils/contact'
 import './LendingControls.css'
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,35 @@ export default function LendingControls({ item, catalog, lendingEnabled, lending
     }
   }
 
+  // A5.2 / B5 Phase 1 — device-native "Remind": opens the share sheet with a
+  // pre-filled localized message when navigator.share exists; otherwise copies
+  // the same text and toasts `lending.remindCopied`. No server, works offline.
+  async function handleRemind() {
+    const borrowerName = item?.lending?.borrower?.name || ''
+    const title = item?.title || ''
+    const dueText = item?.lending?.dueOn ? formatDate(item.lending.dueOn) : ''
+    const message = typeof lending.remindMessage === 'function'
+      ? lending.remindMessage(borrowerName, title, dueText)
+      : ''
+    if (!message) return
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ text: message })
+      } catch {
+        // User dismissed the share sheet (AbortError) — not an error to toast.
+      }
+      return
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(message)
+        if (typeof lending.remindCopied === 'function') notify(lending.remindCopied(borrowerName))
+      } catch {
+        // Clipboard unavailable (e.g. non-secure context) — nothing to toast.
+      }
+    }
+  }
+
   // Return → two-step confirm (mirrors AlbumDetail's remove): first tap arms
   // the confirm label, second tap executes; auto-reverts after ~3s.
   function handleReturn() {
@@ -182,14 +212,44 @@ export default function LendingControls({ item, catalog, lendingEnabled, lending
           {status.dueLine && (
             <p className={status.overdue ? 'lending-status-overdue' : undefined}>{status.dueLine}</p>
           )}
-          <button
-            type="button"
-            className={`btn ${confirmReturn ? 'btn-confirm' : 'btn-ghost'}`}
-            onClick={handleReturn}
-            disabled={busy}
-          >
-            {confirmReturn ? lending.returnConfirm : lending.return}
-          </button>
+          {/* A5.1 — one-tap contact action when a contact is stored: the
+              stored string classifies to exactly one action (Call/Email/Message).
+              Unclassifiable contacts render nothing (no dead link). */}
+          <div className="lending-status-actions">
+            {(() => {
+              const contact = item?.lending?.borrower?.contact
+              if (!contact) return null
+              const target = classifyContact(contact)
+              if (!target.type || !target.href) return null
+              const label = target.type === 'tel'
+                ? lending.contactCall
+                : target.type === 'email'
+                  ? lending.contactEmail
+                  : lending.contactMessage
+              return (
+                <a className="btn btn-sm btn-ghost lending-contact-action" href={target.href}>
+                  {label}
+                </a>
+              )
+            })()}
+            {/* A5.2 — device-native Remind (share sheet / clipboard + toast). */}
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost lending-remind"
+              onClick={handleRemind}
+              disabled={busy}
+            >
+              {lending.remind}
+            </button>
+            <button
+              type="button"
+              className={`btn ${confirmReturn ? 'btn-confirm' : 'btn-ghost'}`}
+              onClick={handleReturn}
+              disabled={busy}
+            >
+              {confirmReturn ? lending.returnConfirm : lending.return}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="lending-idle">
@@ -242,6 +302,24 @@ export default function LendingControls({ item, catalog, lendingEnabled, lending
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
+            {/* A5.3 — due-date presets: today + 1w / 2w / 1m via local-day
+                math (addDays). The free-form date input stays the 4th option. */}
+            <div className="lending-presets">
+              {[
+                { key: 'due1w', days: 7 },
+                { key: 'due2w', days: 14 },
+                { key: 'due1m', days: 30 },
+              ].map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  className={`lending-preset${dueDate === addDays(undefined, preset.days) ? ' active' : ''}`}
+                  onClick={() => setDueDate(addDays(undefined, preset.days))}
+                >
+                  {lending[preset.key]}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="lending-form-actions">
@@ -258,6 +336,10 @@ export default function LendingControls({ item, catalog, lendingEnabled, lending
       {history.length > 0 && (
         <div className="lending-history">
           <p className="detail-section-label">{lending.history}</p>
+          {/* A5.5 — honesty about the 10-loan cap once history is full. */}
+          {history.length >= 10 && (
+            <p className="lending-history-cap">{lending.historyCapNote}</p>
+          )}
           <ul className="lending-history-list">
             {history.map((entry, i) => (
               <li key={`${entry?.returnedOn || entry?.lentOn || ''}-${i}`} className="lending-history-entry">

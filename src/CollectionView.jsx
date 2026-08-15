@@ -57,7 +57,7 @@ const NEW_ARRIVALS_COUNT = 5
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   // Partition (§ Fix): wishlist items are UNOWNED wants — they never count as
@@ -892,6 +892,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onToggleLending={toggleLending}
           onOpenLoans={onOpenLoans}
           loansButtonRef={loansButtonRef}
+          overdueCount={overdueCount}
           onOpenAisles={() => setAisleSheetOpen(true)}
           aislesOpen={aisleSheetOpen}
           extraFilterCount={activeAisle ? 1 : 0}
@@ -922,6 +923,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           lendingEnabled={lendingEnabled}
           onOpenLoans={onOpenLoans}
           loansButtonRef={loansButtonRef}
+          overdueCount={overdueCount}
         />
       )}
 

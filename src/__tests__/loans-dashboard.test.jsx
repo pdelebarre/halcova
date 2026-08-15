@@ -150,7 +150,7 @@ describe('LoansDashboard (W7)', () => {
     expect(screen.getByText('Try a different search or clear the filters.')).toBeInTheDocument()
   })
 
-  it('sorts by lent date (newest first) by default', async () => {
+  it('sorts overdue-first by default (promoted due sort — A5.4)', async () => {
     const older = loanedRecord({ id: 'r-old' }, { lentOn: '2026-01-01T00:00:00Z' })
     const newer = loanedRecord({ id: 'r-new', title: 'Nina Simone - Little Girl Blue' }, { lentOn: '2026-06-01T00:00:00Z' })
     api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [older, newer] : []))
@@ -158,7 +158,22 @@ describe('LoansDashboard (W7)', () => {
     const { container } = renderDashboard()
     await screen.findByText('Kind of Blue')
 
-    expect(screen.getByLabelText('Sort')).toHaveValue('lent')
+    // Default is the overdue-first 'due' sort; no due dates → title tiebreak.
+    expect(screen.getByLabelText('Sort')).toHaveValue('due')
+    const titles = Array.from(container.querySelectorAll('.loan-title-text')).map((el) => el.textContent)
+    expect(titles).toEqual(['Kind of Blue', 'Little Girl Blue'])
+  })
+
+  it('sorts by lent date (newest first) when Lent sort is selected', async () => {
+    const older = loanedRecord({ id: 'r-old' }, { lentOn: '2026-01-01T00:00:00Z' })
+    const newer = loanedRecord({ id: 'r-new', title: 'Nina Simone - Little Girl Blue' }, { lentOn: '2026-06-01T00:00:00Z' })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [older, newer] : []))
+
+    const { container } = renderDashboard()
+    await screen.findByText('Kind of Blue')
+
+    fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'lent' } })
+
     const titles = Array.from(container.querySelectorAll('.loan-title-text')).map((el) => el.textContent)
     expect(titles).toEqual(['Little Girl Blue', 'Kind of Blue'])
   })
@@ -278,5 +293,94 @@ describe('LoansDashboard (W7)', () => {
     rerender(<LoansDashboard open onClose={vi.fn()} onLoanReturned={vi.fn()} returnFocusRef={{ current: null }} />)
 
     await waitFor(() => expect(api.listItems).toHaveBeenCalledTimes(2))
+  })
+})
+
+// ===========================================================================
+// A5 lending polish (#90/#92): contact actions + Remind in rows, overdue
+// count in the header. Default sort is now overdue-first (see above).
+// ===========================================================================
+
+describe('LoansDashboard — A5.4 overdue surfacing', () => {
+  it('shows the overdue count in the header when > 0', async () => {
+    const overdue = loanedRecord({ id: 'r-over' }, { dueOn: new Date(Date.now() - 5 * DAY).toISOString() })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [overdue] : []))
+
+    renderDashboard()
+
+    expect(await screen.findByText(/1 overdue/)).toBeInTheDocument()
+  })
+
+  it('hides the overdue count from the header when none are overdue', async () => {
+    const future = loanedRecord({ id: 'r-future', title: 'Nina Simone - Little Girl Blue' }, { dueOn: new Date(Date.now() + 30 * DAY).toISOString() })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [future] : []))
+
+    renderDashboard()
+    await screen.findByText('Little Girl Blue')
+
+    expect(screen.queryByText(/overdue/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('LoansDashboard — A5.1 contact actions in rows', () => {
+  it('renders the stored contact as a one-tap action', async () => {
+    const item = loanedRecord({}, { borrower: { name: 'Alice', contact: 'alice@example.com' } })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [item] : []))
+
+    renderDashboard()
+
+    const link = await screen.findByRole('link', { name: 'Email' })
+    expect(link).toHaveAttribute('href', 'mailto:alice@example.com')
+  })
+
+  it('renders no contact action for an unclassifiable contact', async () => {
+    const item = loanedRecord({}, { borrower: { name: 'Alice', contact: 'call me' } })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [item] : []))
+
+    renderDashboard()
+    await screen.findByRole('button', { name: 'Remind' })
+
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
+  })
+})
+
+describe('LoansDashboard — A5.2 Remind on each row', () => {
+  it('copies the message and shows the notice when share is unavailable', async () => {
+    const item = loanedRecord({}, { dueOn: '2026-08-15' })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [item] : []))
+
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
+    renderDashboard()
+
+    const remind = await screen.findByRole('button', { name: 'Remind' })
+    fireEvent.click(remind)
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(writeText.mock.calls[0][0]).toContain('Alice')
+    expect(screen.getByText('Message copied — send it to Alice')).toBeInTheDocument()
+  })
+
+  it('opens the share sheet when navigator.share is available', async () => {
+    const item = loanedRecord({}, { dueOn: '2026-08-15' })
+    api.listItems.mockImplementation(async (kind) => (kind === 'records' ? [item] : []))
+
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+
+    renderDashboard()
+
+    const remind = await screen.findByRole('button', { name: 'Remind' })
+    fireEvent.click(remind)
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    const text = share.mock.calls[0][0].text
+    expect(text).toContain('Alice')
+    expect(text).toContain('Kind of Blue')
+    expect(text).toMatch(/due/)
   })
 })

@@ -75,6 +75,23 @@
   border: 1px solid var(--line);
 }
 
+/* A5.1/A5.2 — right-hand action column: contact link + Remind + return. */
+.loan-row-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.loan-row-actions .btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.loans-contact {
+  text-decoration: none;
+  text-align: center;
+}
+
 /* Overdue rows get a subtle left accent so they scan at a glance — the
    "Overdue since…" line already carries the danger-bright text. */
 .loan-row.is-overdue {

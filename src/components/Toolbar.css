@@ -265,6 +265,13 @@
   font-weight: 600;
 }
 
+/* A5.4 — overdue badge on the Loans button: danger-tinted version of the
+   standard pill so it reads as a problem, not a plain count. */
+.loans-overdue-badge {
+  background: var(--danger-bright);
+  color: var(--sleeve-black);
+}
+
 /* Sort: label hidden on very narrow screens — just the chevron */
 .sort-label {
   max-width: 96px;
