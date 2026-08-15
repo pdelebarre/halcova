@@ -71,5 +71,16 @@ Use `describe`/`it` that read like requirements, not implementation:
 - Coverage excludes `src/main.jsx` and `src/test/**` by design; don't add
   tests for entry-point or test-helper files.
 
+## Coverage Threshold
+- The team gates on **70%** for all four metrics — `statements`, `branches`,
+  `functions`, `lines` — enforced by `coverage.thresholds` in
+  `vitest.config.js`. `npm run test:coverage` exits non-zero if any metric
+  falls below 70%.
+- Branches is usually the tightest metric; new conditionals without tests show
+  up there first.
+- Never lower the threshold to make the suite green — write the missing tests,
+  or narrow the `exclude` list deliberately and explain why.
+
 ## Verification
-- `npm test` is green and `npm run lint` stays clean before you call work done.
+- `npm test` is green, `npm run test:coverage` clears the 70% threshold, and
+  `npm run lint` stays clean before you call work done.

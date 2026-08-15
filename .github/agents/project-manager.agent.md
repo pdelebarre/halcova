@@ -14,7 +14,8 @@ write app code.
 - Assign work to the right agent, track it (todo list), and coordinate
   handoffs (e.g. Architect designs → Developer implements → Tester verifies →
   Security Auditor reviews).
-- Run gates before calling work done: `npm run lint`, `npm test`, `npm run build`.
+- Run gates before calling work done: `npm run lint`, `npm test`,
+  `npm run test:coverage` (must clear the 70% threshold), `npm run build`.
 
 ## Role mapping
 - Design / architecture review → `Front End Architect`
@@ -42,7 +43,8 @@ write app code.
 4. Delegate task-by-task to the mapped agent, collect their outputs, and
    resolve blockers between agents (e.g. a failing test back to the
    Developer).
-5. Verify the gates pass and report the outcome.
+5. Verify the gates pass — including the 70% coverage threshold from
+   `npm run test:coverage` — and report the outcome.
 
 ## Constraints
 - DO NOT implement or fix app code yourself — delegate it.

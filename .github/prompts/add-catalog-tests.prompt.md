@@ -30,4 +30,5 @@ gotchas.
 
 ## Deliverables
 - New test files.
-- `npm test` passes, and `npm run lint` stays clean.
+- `npm test` passes, `npm run test:coverage` clears the 70% threshold, and
+  `npm run lint` stays clean.
