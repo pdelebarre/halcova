@@ -101,24 +101,56 @@
   white-space: nowrap;
 }
 
-/* W7: On-loan / Overdue badge (rendered only when lending is enabled). */
-.lending-badge {
+/* A5.6 (#117): on-loan icon — compact CLICKABLE glyph replacing the text
+   badge. It's a role="button" span (cards are <button>s — no nesting), with
+   a 44px hit area, top-left over the cover where the badge used to sit, and
+   z-index above the cover. Overdue adds a danger dot + ring so urgency stays
+   visible. Sits inside `.sleeve` (overflow hidden) — the 44px box at 6px inset
+   keeps the focus outline fully inside the cover. */
+.loan-icon {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-  padding: 4px 10px;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--success);
   background: rgba(18, 15, 11, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.lending-badge.overdue {
-  color: var(--danger-bright);
-  border-color: rgba(224, 105, 91, 0.6);
+.loan-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.loan-icon:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: 2px;
+}
+/* P1-1 (color-blind safe): overdue must not differ by hue alone — when
+   overdue the pill FILLS with --danger-bright and the glyph goes dark
+   (mirrors .btn-confirm's dark-on-gold), so on-loan (green glyph, dark chip)
+   and overdue (dark glyph, filled danger chip) differ by area/fill as well
+   as hue. The alert dot also grows to 12px. --sleeve-black on --danger-bright
+   is ~5.1:1, above the 4.5:1 AA bar for the glyph. */
+.loan-icon.overdue {
+  color: var(--sleeve-black);
+  background: var(--danger-bright);
+  border-color: var(--danger-bright);
+  box-shadow: 0 0 0 1px rgba(224, 105, 91, 0.25);
+}
+.loan-icon-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--danger-bright);
+  border: 2px solid rgba(18, 15, 11, 0.92);
 }

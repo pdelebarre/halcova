@@ -15,6 +15,7 @@ import * as paymentApi from './api/payment'
 import * as collectionApi from './api/collection'
 import { useAuth } from './hooks/useAuth'
 import { getAccessCode } from './utils/session'
+import { isOverdue } from './utils/lending'
 import { t } from './i18n'
 import './App.css'
 
@@ -26,6 +27,19 @@ const CATALOGS = { records: recordsCatalog, books: booksCatalog }
 const PAID_PLANS = new Set(['premium', 'lifetime', 'unlimited'])
 function isPaidPlan(user) {
   return !!user && PAID_PLANS.has(user.plan)
+}
+
+// Mirror of the inline `lendingEnabled` derivation below, extracted so the
+// overdue-badge fetch can re-check it without a session object swap. Admin
+// always has lending; an expired premium only keeps it via an explicit
+// `features.lending` flag.
+function hasLending(user) {
+  if (!user) return false
+  if (user.role === 'admin') return true
+  if (user.features?.lending) return true
+  if (!isPaidPlan(user)) return false
+  if (user.plan === 'premium' && user.planExpiresAt && new Date(user.planExpiresAt).getTime() < Date.now()) return false
+  return true
 }
 
 // Remove a query param from the address bar without a reload — used to strip
@@ -53,6 +67,9 @@ export default function App() {
   // re-fetches and stays in sync.
   const [loansOpen, setLoansOpen] = useState(false)
   const [refreshTick, setRefreshTick] = useState(0)
+  // A5.4: global overdue loan count (records + books) surfaced as the badge
+  // on the Toolbar Loans button. Refetched on sign-in / plan change / return.
+  const [overdueCount, setOverdueCount] = useState(0)
   const loansButtonRef = useRef(null)
 
   // S6 paywall: CollectionView reports WHY it's blocked ({ reason, kind,
@@ -69,6 +86,26 @@ export default function App() {
   // would go stale across the 2s polls).
   const sessionRef = useRef(session)
   useEffect(() => { sessionRef.current = session }, [session])
+
+  // A5.4 — keep the Loans-button overdue badge in sync. Fetches both
+  // collections (only when lending is enabled) and counts overdue loans; the
+  // dashboard also reports its own count via onOverdueCount when it opens, so
+  // the badge matches what the user just saw. Errors/offline → 0 (never throw).
+  useEffect(() => {
+    if (!hasLending(session?.user)) {
+      setOverdueCount(0)
+      return undefined
+    }
+    let cancelled = false
+    Promise.all([collectionApi.listItems('records'), collectionApi.listItems('books')])
+      .then(([records, books]) => {
+        if (cancelled) return
+        const all = [...(Array.isArray(records) ? records : []), ...(Array.isArray(books) ? books : [])]
+        setOverdueCount(all.filter((it) => !!it?.lending?.dueOn && isOverdue(it.lending.dueOn)).length)
+      })
+      .catch(() => { if (!cancelled) setOverdueCount(0) })
+    return () => { cancelled = true }
+  }, [session?.user, refreshTick])
 
   // Stable App toast: auto-dismissing feedback used by the magic-link and
   // checkout-return flows above the collection shell.
@@ -254,8 +291,7 @@ export default function App() {
   // includes it, the admin always has it, and the admin's manual per-member
   // `features.lending` override still works. Games stays an admin-granted
   // per-account flag (unchanged).
-  const paidActive = isPaidPlan(user) && planStatus !== 'expired'
-  const lendingEnabled = !!(user.features?.lending || paidActive || user.role === 'admin')
+  const lendingEnabled = hasLending(user)
   const gamesEnabled = !!user.features?.games
   const isFree = (plan === 'free' || planStatus === 'expired') && !isDemo
 
@@ -324,6 +360,7 @@ export default function App() {
           catalog={catalog}
           onRequestSettings={() => setSettingsOpen(true)}
           lendingEnabled={lendingEnabled}
+          overdueCount={overdueCount}
           onOpenLoans={() => setLoansOpen(true)}
           onOpenPaywall={openPaywall}
           refreshTick={refreshTick}
@@ -345,6 +382,7 @@ export default function App() {
           open={loansOpen}
           onClose={() => setLoansOpen(false)}
           onLoanReturned={() => setRefreshTick((n) => n + 1)}
+          onOverdueCount={setOverdueCount}
           returnFocusRef={loansButtonRef}
         />
       )}

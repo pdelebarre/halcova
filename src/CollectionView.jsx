@@ -57,7 +57,7 @@ const NEW_ARRIVALS_COUNT = 5
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   // Partition (§ Fix): wishlist items are UNOWNED wants — they never count as
@@ -75,6 +75,13 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const [coverState, setCoverState] = useState({ busy: false, error: '' })
   const [scanCandidate, setScanCandidate] = useState(null) // { candidate, ownedExact, wishlistExact, sameAlbum, otherArtist }
   const [selectedItem, setSelectedItem] = useState(null)
+  // A5.6 (#117): the deep-link hint for the detail sheet — 'lending' scrolls
+  // + focuses the LendingControls section when the on-loan icon is tapped.
+  const [detailFocus, setDetailFocus] = useState(null)
+  // P2-5: the element that initiated a 'lending' deep-link (the loan icon on
+  // the originating card/list row), so closing the sheet can return focus to
+  // it rather than dropping to <body>. Replaced on every open.
+  const detailSourceRef = useRef(null)
   const [toast, setToast] = useState(null) // { msg, kind: 'add' | 'remove' | 'error' }
   const toastTimer = useRef(null)
   // C2.4 (issue #88): records token availability, learned from the server.
@@ -350,8 +357,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     !hasActiveFilters &&
     floorSections.length > 0
 
-  function openItem(item) {
+  // A5.6 (#117): onOpen gains an optional hint — { focus: 'lending' } deep-
+  // links straight to the item's lend card (detail sheet scrolled + focused on
+  // LendingControls). Without a hint this is a normal detail open.
+  function openItem(item, hint) {
+    // P2-5: remember who asked. A 'lending' deep-link originates from the loan
+    // icon (role="button" span on the card/list row) — document.activeElement
+    // is that icon at click time (a real click on a tabIndex=0 element focuses
+    // it), so we can return focus there when the sheet closes.
+    detailSourceRef.current = hint?.focus === 'lending' ? document.activeElement : null
     setSelectedItem(item)
+    setDetailFocus(hint?.focus || null)
     setModal('detail')
   }
 
@@ -360,8 +376,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   function handleCrateDive() {
     if (!ownedItems.length) return
     const pick = ownedItems[Math.floor(Math.random() * ownedItems.length)]
-    setSelectedItem(pick)
-    setModal('detail')
+    openItem(pick)
   }
 
   // Pin/unpin (§ Phase 1): `pinned` is an additive item field (the collection
@@ -686,8 +701,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }
 
   function handleOpenFromResult(item) {
-    setSelectedItem(item)
-    setModal('detail')
+    openItem(item)
   }
 
   // C1.1: add the scanned item, then immediately re-open the warm scanner so
@@ -892,6 +906,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onToggleLending={toggleLending}
           onOpenLoans={onOpenLoans}
           loansButtonRef={loansButtonRef}
+          overdueCount={overdueCount}
           onOpenAisles={() => setAisleSheetOpen(true)}
           aislesOpen={aisleSheetOpen}
           extraFilterCount={activeAisle ? 1 : 0}
@@ -922,6 +937,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           lendingEnabled={lendingEnabled}
           onOpenLoans={onOpenLoans}
           loansButtonRef={loansButtonRef}
+          overdueCount={overdueCount}
         />
       )}
 
@@ -1223,7 +1239,21 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         <Detail
           item={selectedItem}
           catalog={catalog}
-          onClose={() => { setModal(null); setSelectedItem(null) }}
+          focusSection={detailFocus}
+          onClose={() => {
+            setModal(null)
+            setSelectedItem(null)
+            setDetailFocus(null)
+            // P2-5: after a 'lending' deep-link, return focus to the
+            // originating loan icon (not <body>). Guard: the source may have
+            // been filtered out / unmounted while the sheet was open — and
+            // never throw (no error boundary → dark-screen safety).
+            const source = detailSourceRef.current
+            detailSourceRef.current = null
+            if (source && typeof source.focus === 'function' && source.isConnected) {
+              try { source.focus({ preventScroll: true }) } catch { /* never throw */ }
+            }
+          }}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
           onTogglePinned={() => handleTogglePinned(selectedItem)}

@@ -4,6 +4,7 @@ import { isOverdue } from '../utils/lending'
 import { t, getLocale } from '../i18n'
 import { useMedia } from '../hooks/useMedia'
 import Highlight from './Highlight'
+import LoanIcon from './LoanIcon'
 import './ListView.css'
 
 const ROW_H = 56
@@ -174,14 +175,28 @@ function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {}, query = 
   const meta = [item.label, item.catno, item.year].filter(Boolean)
   const badge = BADGE_CLASS[item.formatType] || 'other'
 
-  // W7: on-loan badge — mirrors the grid card. Optional-chained + isOverdue's
-  // NaN guard keep weird item shapes from crashing (no error boundary).
+  // A5.6 (#117): on-loan icon — mirrors the grid card. Overdue is derived
+  // client-side (day-granularity, local) from item.lending.dueOn;
+  // optional-chaining + isOverdue's NaN guard keep weird item shapes from
+  // crashing (no error boundary). The icon's aria-label comes from
+  // copy.lending.manageLoan*, falling back to the badge text.
   const lending = item?.lending
   const isOnLoan = lendingEnabled && !!lending
   const overdue = isOnLoan && isOverdue(lending?.dueOn)
-  const lendingBadge = overdue
-    ? (copy.lending?.badgeOverdue || t('lending.badgeOverdue'))
-    : (copy.lending?.badge || t('lending.badge'))
+  const lendingCopy = copy?.lending || {}
+  const borrowerName = lending?.borrower?.name || ''
+  let manageLabel
+  if (overdue) {
+    manageLabel = typeof lendingCopy.manageLoanOverdue === 'function'
+      ? lendingCopy.manageLoanOverdue(borrowerName)
+      : (lendingCopy.badgeOverdue || t('lending.badgeOverdue'))
+  } else {
+    manageLabel = typeof lendingCopy.manageLoan === 'function'
+      ? lendingCopy.manageLoan(borrowerName)
+      : (lendingCopy.badge || t('lending.badge'))
+  }
+  // The row's own name is just the item (the loan icon carries the on-loan
+  // status as its own accessible name — no double announcement).
   const baseLabel = [artist, album].filter(Boolean).join(' — ') || t('list.collectionItem')
 
   return (
@@ -189,7 +204,7 @@ function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {}, query = 
       type="button"
       className="list-row"
       onClick={() => onOpen(item)}
-      aria-label={isOnLoan ? `${baseLabel} — ${lendingBadge}` : baseLabel}
+      aria-label={baseLabel}
     >
       <span className="list-cover" aria-hidden="true">
         {item.coverImage
@@ -209,7 +224,11 @@ function ListItemRow({ item, onOpen, lendingEnabled = false, copy = {}, query = 
       </span>
       {item.formatType && <span className={`format-badge ${badge}`}>{item.formatType}</span>}
       {isOnLoan && (
-        <span className={`list-lending-badge${overdue ? ' overdue' : ''}`} aria-hidden="true">{lendingBadge}</span>
+        <LoanIcon
+          overdue={overdue}
+          label={manageLabel}
+          onActivate={() => onOpen(item, { focus: 'lending' })}
+        />
       )}
       <svg className="list-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <path d="M9 6l6 6-6 6" />

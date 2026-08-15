@@ -252,4 +252,55 @@ describe('Detail sheet (books)', () => {
     )
     expect(lastReviewsProps().sourceId).toBeNull()
   })
+
+  // A5.6 (#117) deep-link on BOOKS — the parallel path to AlbumDetail's,
+  // which the grid-lending-badge integration tests only exercise for records.
+  // The book card's loan icon deep-links straight to the lend card, so the
+  // BookDetail scroll+focus effect must move focus into the lending section
+  // (not the close button) and never throw (no error boundary).
+  it('deep-links a loaned book to the lend card: focuses the lending section', () => {
+    // Fire the rAF the deep-link effect uses synchronously so the focus
+    // assertion is deterministic (same pattern as loans-dashboard.test).
+    vi.stubGlobal('requestAnimationFrame', (cb) => { cb(); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    const { container } = render(
+      <BookDetail
+        item={{
+          id: 'b1',
+          title: 'Ursula K. Le Guin - A Wizard of Earthsea',
+          lending: { borrower: { name: 'Alice' }, lentOn: '2026-08-01T00:00:00Z' },
+        }}
+        catalog={booksCatalog}
+        onClose={() => {}}
+        onDelete={() => {}}
+        onSaveNotes={() => {}}
+        lendingEnabled
+        focusSection="lending"
+      />,
+    )
+    const section = container.querySelector('.lending')
+    expect(section).toBeInTheDocument()
+    // The deep-link moves focus to the lending section, not the close button.
+    expect(section).toHaveFocus()
+    expect(container.querySelector('.sheet-close')).not.toHaveFocus()
+  })
+
+  it('falls back to the close-button focus when the lending section is absent (A5.6 dark-screen safety)', () => {
+    vi.stubGlobal('requestAnimationFrame', (cb) => { cb(); return 1 })
+    vi.stubGlobal('cancelAnimationFrame', () => {})
+    const { container } = render(
+      <BookDetail
+        item={{ id: 'b2', title: 'Manual - Book', notes: '' }}
+        catalog={booksCatalog}
+        onClose={() => {}}
+        onDelete={() => {}}
+        onSaveNotes={() => {}}
+        // lendingEnabled is false → LendingControls renders nothing, so the
+        // deep-link must be a safe no-op and the sheet opens focused normally.
+        focusSection="lending"
+      />,
+    )
+    expect(container.querySelector('.lending')).toBeNull()
+    expect(container.querySelector('.sheet-close')).toHaveFocus()
+  })
 })

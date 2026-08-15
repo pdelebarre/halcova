@@ -314,6 +314,23 @@ const nl = {
   'lending.sortTitle': 'Title A–Z',
   'lending.dashboardDue': 'Due {date}',
   'lending.dashboardOverdue': 'Overdue since {date}',
+  // A5 lending polish — Remind, presets, overdue count, history cap.
+  'lending.remind': 'Herinner',
+  'lending.remindMessage.base': 'Hoi {name} — ik dacht even aan de “{title}” die ik je heb uitgeleend. 😊',
+  'lending.remindMessage.due': ' Het zou op {date} terug moeten zijn.',
+  'lending.remindCopied': 'Bericht gekopieerd — stuur het naar {name}',
+  'lending.due1w': '1 week',
+  'lending.due2w': '2 weken',
+  'lending.due1m': '1 maand',
+  'lending.overdueCount': '{n} te laat',
+  'lending.historyCapNote': 'De geschiedenis bewaart de laatste 10 uitleningen.',
+  'lending.contactCall': 'Bellen',
+  'lending.contactEmail': 'E-mail',
+  'lending.contactMessage': 'Bericht',
+  // A5.6 (#117): EN master — native NL translation pending (see
+  // marketing/localization-dictionary-addendum.md).
+  'lending.manageLoan': 'On loan to {name} — manage',
+  'lending.manageLoanOverdue': 'Overdue — on loan to {name} — manage',
 
   // §16 Update
   'update.newVersion': 'New version available',

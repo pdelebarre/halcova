@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import LendingControls from '../components/LendingControls'
 import { recordsCatalog } from '../catalog'
+import { addDays } from '../utils/lending'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -125,6 +126,10 @@ describe('LendingControls', () => {
   it('does not crash when lending is present without a borrower', () => {
     renderControls({ id: 'r1', title: 'X', lending: { lentOn: '2026-08-01T00:00:00Z' } })
     expect(screen.getByRole('button', { name: 'Mark returned' })).toBeInTheDocument()
+    // A5.1: no borrower → nothing to classify → no Call/Email/Message link.
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
   })
 
   describe('lending history', () => {
@@ -301,5 +306,125 @@ describe('S6 lending gate — paywall trigger', () => {
     await waitFor(() =>
       expect(showToast).toHaveBeenCalledWith('Could not save — check your connection', 'error'))
     expect(onOpenPaywall).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// A5 lending polish (#90/#92): contact actions, Remind, due presets, history cap.
+// ===========================================================================
+
+describe('A5.1 — contact actions on the status line', () => {
+  it('renders a Call link for a stored phone contact', () => {
+    renderControls(onLoanItem({ borrower: { name: 'Alice', contact: '+33 6 12 34 56 78' } }))
+    expect(screen.getByRole('link', { name: 'Call' })).toHaveAttribute('href', 'tel:+33 6 12 34 56 78')
+  })
+
+  it('renders an Email link for a stored email contact', () => {
+    renderControls(onLoanItem({ borrower: { name: 'Alice', contact: 'alice@example.com' } }))
+    expect(screen.getByRole('link', { name: 'Email' })).toHaveAttribute('href', 'mailto:alice@example.com')
+  })
+
+  it('renders a Message link for a WhatsApp-style contact', () => {
+    renderControls(onLoanItem({ borrower: { name: 'Alice', contact: 'wa: 06 12 34 56 78' } }))
+    expect(screen.getByRole('link', { name: 'Message' })).toHaveAttribute('href', 'https://wa.me/0612345678')
+  })
+
+  it('renders no contact link when the stored contact is not actionable', () => {
+    renderControls(onLoanItem({ borrower: { name: 'Alice', contact: 'call me' } }))
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
+  })
+
+  it('renders no contact link when no contact is stored', () => {
+    renderControls(onLoanItem())
+    expect(screen.queryByRole('link', { name: 'Call' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Email' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Message' })).not.toBeInTheDocument()
+  })
+})
+
+describe('A5.2 — Remind (share sheet / clipboard fallback)', () => {
+  it('opens the share sheet with a pre-filled localized message when navigator.share exists', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    renderControls(onLoanItem({ dueOn: '2026-08-15' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remind' }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    const text = share.mock.calls[0][0].text
+    expect(text).toContain('Alice')
+    expect(text).toContain('Kind of Blue')
+    expect(text).toMatch(/due/)
+  })
+
+  it('copies the message and toasts remindCopied when share is unavailable', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const showToast = vi.fn()
+    renderControls(onLoanItem({ dueOn: '2026-08-15' }), { showToast })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remind' }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(writeText.mock.calls[0][0]).toContain('Alice')
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Message copied — send it to Alice', undefined))
+  })
+
+  it('omits the due clause from the message when there is no due date', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    renderControls(onLoanItem())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remind' }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1))
+    const text = share.mock.calls[0][0].text
+    expect(text).toContain('Alice')
+    expect(text).not.toMatch(/due/i)
+  })
+})
+
+describe('A5.3 — due-date presets', () => {
+  it('sets the due date to today + 1 week when the 1-week chip is tapped', () => {
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' })
+    fireEvent.click(screen.getByRole('button', { name: 'Lend…' }))
+    fireEvent.click(screen.getByRole('button', { name: '1 week' }))
+    expect(screen.getByLabelText(/Due date/).value).toBe(addDays(undefined, 7))
+  })
+
+  it('sets today + 2 weeks and today + 1 month for the other chips', () => {
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' })
+    fireEvent.click(screen.getByRole('button', { name: 'Lend…' }))
+    fireEvent.click(screen.getByRole('button', { name: '2 weeks' }))
+    expect(screen.getByLabelText(/Due date/).value).toBe(addDays(undefined, 14))
+    fireEvent.click(screen.getByRole('button', { name: '1 month' }))
+    expect(screen.getByLabelText(/Due date/).value).toBe(addDays(undefined, 30))
+  })
+
+  it('keeps the free-form date input as a fourth option', () => {
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue' })
+    fireEvent.click(screen.getByRole('button', { name: 'Lend…' }))
+    fireEvent.change(screen.getByLabelText(/Due date/), { target: { value: '2026-12-31' } })
+    expect(screen.getByLabelText(/Due date/).value).toBe('2026-12-31')
+  })
+})
+
+describe('A5.5 — history cap note', () => {
+  const fullHistory = Array.from({ length: 10 }, (_, i) => ({
+    borrower: { name: `Borrower ${i}` },
+    lentOn: `2026-0${(i % 9) + 1}-01`,
+  }))
+
+  it('shows the one-line cap note when history is full (10)', () => {
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue', lendingHistory: fullHistory })
+    expect(screen.getByText('History keeps the last 10 loans.')).toBeInTheDocument()
+  })
+
+  it('does not show the cap note below the cap', () => {
+    renderControls({ id: 'r1', title: 'Miles Davis - Kind of Blue', lendingHistory: fullHistory.slice(0, 9) })
+    expect(screen.queryByText('History keeps the last 10 loans.')).not.toBeInTheDocument()
   })
 })

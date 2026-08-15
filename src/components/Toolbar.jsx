@@ -17,7 +17,7 @@ const DEFAULT_SORTS = [
  * Format/genre/artist filters live in the filter sheet (§4.3, §5).
  */
 export default function Toolbar({
-  query, setQuery,
+  query = '', setQuery,
   placeholder = 'Search your collection…',
   formats = [], activeFormats = [], toggleFormat,
   genres = [], activeGenres = [], toggleGenre,
@@ -35,6 +35,7 @@ export default function Toolbar({
   onToggleLending,
   onOpenLoans,
   loansButtonRef,
+  overdueCount = 0,
   onOpenAisles,
   aislesOpen = false,
   extraFilterCount = 0,
@@ -68,8 +69,10 @@ export default function Toolbar({
   const doneLabel = copy.search?.done || 'Done'
 
   // The search pill grows taller + glows while the field is focused or a
-  // search is active (§ Phase 3 — "bigger when I search").
-  const searchActive = searchFocused || query.trim() !== ''
+  // search is active (§ Phase 3 — "bigger when I search"). Guard the
+  // dereference: the minimal toolbar renders without a query prop, so query
+  // defaults to '' and trim() must never throw (dark-screen failure mode).
+  const searchActive = searchFocused || (query || '').trim() !== ''
 
   // Exit search mode without clearing the query — blur + handlers (CollectionView
   // decides whether to clear). Shared by Escape and the Done pill.
@@ -104,7 +107,12 @@ export default function Toolbar({
 
   // W7: global loans dashboard button — icon + "Loans" label, no numeric
   // badge (the dashboard is global across records + books, so a per-tab count
-  // would mislead). Rendered whenever lending is enabled.
+  // would mislead). Rendered whenever lending is enabled. A5.4: when there are
+  // overdue loans, surface a danger-tinted overdue badge on the button.
+  // P1-3: the visual badge is not announced by screen readers (it's a plain
+  // number span), so when overdueCount > 0 the count is ALSO composed into the
+  // aria-label (lending.overdueCount exists in all 8 locales). Focus-restore
+  // behaviour is untouched.
   function renderLoansButton() {
     if (!lendingEnabled) return null
     return (
@@ -114,7 +122,7 @@ export default function Toolbar({
         className="toolbar-btn loans-btn"
         onClick={onOpenLoans}
         tabIndex={searchActive ? -1 : 0}
-        aria-label={loansLabel}
+        aria-label={overdueCount > 0 ? `${loansLabel} — ${t('lending.overdueCount', { n: overdueCount })}` : loansLabel}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="7" y="3" width="10" height="4" rx="1" />
@@ -122,6 +130,7 @@ export default function Toolbar({
           <path d="M12 13v4M10 15h4" />
         </svg>
         <span className="loans-label">{loansLabel}</span>
+        {overdueCount > 0 && <span className="filter-badge loans-overdue-badge">{overdueCount}</span>}
       </button>
     )
   }

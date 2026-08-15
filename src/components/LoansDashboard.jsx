@@ -4,6 +4,7 @@ import * as apiLending from '../api/lending'
 import { t, getLocale } from '../i18n'
 import { splitArtistTitle } from '../utils/match'
 import { isOverdue, toLocalDate } from '../utils/lending'
+import { classifyContact } from '../utils/contact'
 import './LoansDashboard.css'
 
 // Sort control options — labels via t() so they localize.
@@ -42,13 +43,15 @@ function formatDate(value) {
  *   onLoanReturned()– fired after a successful return so App can bump
  *                     `refreshTick` and refresh the visible collection.
  *   returnFocusRef  – ref to the Toolbar "Loans" button (focus restore).
+ *   onOverdueCount  – reported the moment loans load, so App can keep the
+ *                     Toolbar badge in sync with what this sheet just showed.
  */
-export default function LoansDashboard({ open = false, onClose, onLoanReturned, returnFocusRef }) {
+export default function LoansDashboard({ open = false, onClose, onLoanReturned, returnFocusRef, onOverdueCount }) {
   const [loans, setLoans] = useState([])
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [sortBy, setSortBy] = useState('lent')
+  const [sortBy, setSortBy] = useState('due') // A5.4: 'due' sorts overdue-first, so it's the default
   const [returningId, setReturningId] = useState(null)
   const [confirmId, setConfirmId] = useState(null) // item id armed for the confirm step
   const [notice, setNotice] = useState(null) // { msg, kind: 'ok' | 'error' }
@@ -73,11 +76,13 @@ export default function LoansDashboard({ open = false, onClose, onLoanReturned, 
       ].filter((it) => !!it?.lending)
       setLoans(merged)
       setStatus('ready')
+      // A5.4 — report the overdue count up so the Toolbar badge stays in sync.
+      onOverdueCount?.(merged.filter((it) => !!it?.lending?.dueOn && isOverdue(it.lending.dueOn)).length)
     } catch (err) {
       setError(err?.message || '')
       setStatus('error')
     }
-  }, [])
+  }, [onOverdueCount])
 
   function close() {
     // Focus returns to the Loans button that opened the dashboard.
@@ -91,7 +96,7 @@ export default function LoansDashboard({ open = false, onClose, onLoanReturned, 
     if (!open) return undefined
     load()
     setQuery('')
-    setSortBy('lent')
+    setSortBy('due')
     setNotice(null)
     setConfirmId(null)
     const raf = window.requestAnimationFrame(() => searchRef.current?.focus())
@@ -169,6 +174,13 @@ export default function LoansDashboard({ open = false, onClose, onLoanReturned, 
     return list
   }, [filtered, sortBy])
 
+  // A5.4: global overdue count (all loans, not just the current search) —
+  // shown in the header and, via App, as the badge on the Toolbar Loans button.
+  const overdueCount = useMemo(
+    () => loans.filter((it) => !!it?.lending?.dueOn && isOverdue(it.lending.dueOn)).length,
+    [loans],
+  )
+
   // Return: call the lending API, drop the row on success (+ notify App so the
   // visible collection refreshes), keep it and surface an error on failure.
   async function doReturn(item) {
@@ -204,7 +216,11 @@ export default function LoansDashboard({ open = false, onClose, onLoanReturned, 
     <div className="sheet-overlay loans-overlay" role="dialog" aria-modal="true" aria-label={t('lending.dashboardTitle')}>
       <div className="sheet loans-sheet">
         <div className="sheet-header">
-          <h2>{t('lending.dashboardTitle')}{status === 'ready' && loans.length > 0 ? ` (${loans.length})` : ''}</h2>
+          <h2>
+            {t('lending.dashboardTitle')}
+            {status === 'ready' && loans.length > 0 ? ` (${loans.length})` : ''}
+            {overdueCount > 0 ? ` · ${t('lending.overdueCount', { n: overdueCount })}` : ''}
+          </h2>
           <button type="button" className="sheet-close" onClick={close} aria-label={t('common.close')}>✕</button>
         </div>
 
@@ -265,6 +281,7 @@ export default function LoansDashboard({ open = false, onClose, onLoanReturned, 
                   returning={returningId === item.id}
                   confirming={confirmId === item.id}
                   onReturnClick={() => onReturnClick(item)}
+                  onNotify={(notice) => setNotice(notice)}
                 />
               ))}
             </ul>
@@ -282,10 +299,12 @@ export default function LoansDashboard({ open = false, onClose, onLoanReturned, 
 }
 
 // One loan row: kind chip, title, artist, borrower + lent date, due/overdue
-// line, and the two-step "Mark returned" action.
-function LoanRow({ item, returning, confirming, onReturnClick }) {
+// line, the stored contact as a one-tap action (A5.1), a device-native Remind
+// (A5.2), and the two-step "Mark returned" action.
+function LoanRow({ item, returning, confirming, onReturnClick, onNotify }) {
   const { artist, album } = splitArtistTitle(item.title)
   const lending = item?.lending || {}
+  const borrower = lending.borrower || {}
   const dueOn = lending.dueOn
   const overdue = !!(dueOn && isOverdue(dueOn))
   const lentDate = formatDate(lending.lentOn)
@@ -298,6 +317,42 @@ function LoanRow({ item, returning, confirming, onReturnClick }) {
   }
   const actionLabel = confirming ? t('lending.returnConfirm') : t('lending.return')
 
+  // A5.1 — the stored contact classifies to exactly one action; unclassifiable
+  // contacts render nothing (no dead link).
+  const contactTarget = classifyContact(borrower.contact)
+  const contactLabel = contactTarget.type === 'tel'
+    ? t('lending.contactCall')
+    : contactTarget.type === 'email'
+      ? t('lending.contactEmail')
+      : contactTarget.type === 'wa'
+        ? t('lending.contactMessage')
+        : null
+
+  // A5.2 — pre-filled localized message (base + optional due clause); share
+  // sheet when available, otherwise clipboard + toast.
+  async function handleRemind() {
+    const dueText = dueOn ? formatDate(dueOn) : ''
+    const message = t('lending.remindMessage.base', { name: borrower.name || '', title: item.title || '' })
+      + (dueText ? t('lending.remindMessage.due', { date: dueText }) : '')
+    if (!message) return
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ text: message })
+      } catch {
+        // User dismissed the share sheet (AbortError) — not an error to toast.
+      }
+      return
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(message)
+        onNotify?.({ msg: t('lending.remindCopied', { name: borrower.name || '' }), kind: 'ok' })
+      } catch {
+        // Clipboard unavailable (e.g. non-secure context) — nothing to toast.
+      }
+    }
+  }
+
   return (
     <li className={`loan-row${overdue ? ' is-overdue' : ''}`}>
       <div className="loan-row-main">
@@ -307,23 +362,38 @@ function LoanRow({ item, returning, confirming, onReturnClick }) {
         </span>
         {artist && <span className="loan-artist">{artist}</span>}
         <span className="loan-meta">
-          {lending.borrower?.name && (
-            <span className="loan-status-out">{t('lending.statusOut', { name: lending.borrower.name, date: lentDate })}</span>
+          {borrower.name && (
+            <span className="loan-status-out">{t('lending.statusOut', { name: borrower.name, date: lentDate })}</span>
           )}
           {dueLine && (
             <span className={`loan-due${overdue ? ' loan-due-overdue' : ''}`}>{dueLine}</span>
           )}
         </span>
       </div>
-      <button
-        type="button"
-        className={`btn btn-sm loans-return${confirming ? ' btn-confirm' : ' btn-ghost'}`}
-        onClick={onReturnClick}
-        disabled={returning}
-        aria-label={actionLabel}
-      >
-        {returning ? t('common.loading') : actionLabel}
-      </button>
+      <div className="loan-row-actions">
+        {contactTarget.type && contactLabel && (
+          <a className="btn btn-sm btn-ghost loans-contact" href={contactTarget.href}>
+            {contactLabel}
+          </a>
+        )}
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost loans-remind"
+          onClick={handleRemind}
+          disabled={returning}
+        >
+          {t('lending.remind')}
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm loans-return${confirming ? ' btn-confirm' : ' btn-ghost'}`}
+          onClick={onReturnClick}
+          disabled={returning}
+          aria-label={actionLabel}
+        >
+          {returning ? t('common.loading') : actionLabel}
+        </button>
+      </div>
     </li>
   )
 }

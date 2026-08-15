@@ -29,18 +29,55 @@ function onLoan(overrides = {}) {
   }
 }
 
-describe('grid lending badge (W7)', () => {
-  it('shows an On loan badge on a loaned item with no due date', () => {
+describe('grid on-loan icon (A5.6 #117)', () => {
+  it('renders a clickable loan icon (role=button) on a loaned item', () => {
     const { container } = render(
       <AlbumGrid items={[onLoan()]} onOpen={vi.fn()} lendingEnabled copy={copy} />,
     )
-    const badge = container.querySelector('.lending-badge')
-    expect(badge).toBeInTheDocument()
-    expect(badge.textContent).toBe('On loan')
-    expect(badge).not.toHaveClass('overdue')
+    const icon = container.querySelector('.loan-icon')
+    expect(icon).toBeInTheDocument()
+    expect(icon).toHaveAttribute('role', 'button')
+    expect(icon).toHaveAttribute('tabindex', '0')
+    expect(icon).toHaveAccessibleName('On loan to Alice — manage')
+    expect(icon).not.toHaveClass('overdue')
+    // The old text badge is gone.
+    expect(container.querySelector('.lending-badge')).toBeNull()
   })
 
-  it('still shows On loan when the due date is in the future', () => {
+  it('deep-links to the lend card when the icon is activated', () => {
+    const onOpen = vi.fn()
+    const { container } = render(
+      <AlbumGrid items={[onLoan()]} onOpen={onOpen} lendingEnabled copy={copy} />,
+    )
+    fireEvent.click(container.querySelector('.loan-icon'))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), { focus: 'lending' })
+  })
+
+  it('activates the icon on Enter and Space (keyboard)', () => {
+    const onOpen = vi.fn()
+    const { container } = render(
+      <AlbumGrid items={[onLoan()]} onOpen={onOpen} lendingEnabled copy={copy} />,
+    )
+    const icon = container.querySelector('.loan-icon')
+
+    fireEvent.keyDown(icon, { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), { focus: 'lending' })
+
+    onOpen.mockClear()
+    fireEvent.keyDown(icon, { key: ' ' })
+    expect(onOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it('still opens the full detail (no focus hint) when the card body is tapped', () => {
+    const onOpen = vi.fn()
+    const { container } = render(
+      <AlbumGrid items={[onLoan()]} onOpen={onOpen} lendingEnabled copy={copy} />,
+    )
+    fireEvent.click(container.querySelector('.album-card'))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }))
+  })
+
+  it('still shows on-loan when the due date is in the future', () => {
     const { container } = render(
       <AlbumGrid
         items={[onLoan({ dueOn: new Date(Date.now() + 30 * DAY).toISOString() })]}
@@ -49,12 +86,12 @@ describe('grid lending badge (W7)', () => {
         copy={copy}
       />,
     )
-    const badge = container.querySelector('.lending-badge')
-    expect(badge.textContent).toBe('On loan')
-    expect(badge).not.toHaveClass('overdue')
+    const icon = container.querySelector('.loan-icon')
+    expect(icon).toHaveAccessibleName('On loan to Alice — manage')
+    expect(icon).not.toHaveClass('overdue')
   })
 
-  it('shows an Overdue badge when the due date is in the past', () => {
+  it('shows the overdue affordance (class + aria-label) when the due date is in the past', () => {
     const { container } = render(
       <AlbumGrid
         items={[onLoan({ dueOn: new Date(Date.now() - 30 * DAY).toISOString() })]}
@@ -63,19 +100,23 @@ describe('grid lending badge (W7)', () => {
         copy={copy}
       />,
     )
-    const badge = container.querySelector('.lending-badge')
-    expect(badge.textContent).toBe('Overdue')
-    expect(badge).toHaveClass('overdue')
+    const icon = container.querySelector('.loan-icon')
+    expect(icon).toHaveClass('overdue')
+    expect(icon).toHaveAccessibleName('Overdue — on loan to Alice — manage')
+    // P1-1: the overdue affordance includes the alert dot (the filled-pill
+    // styling lives in CSS — this class gates it, so overdue differs by
+    // fill/area as well as hue, not hue alone).
+    expect(container.querySelector('.loan-icon-dot')).toBeInTheDocument()
   })
 
-  it('renders no badge when lending is disabled', () => {
+  it('renders no icon when lending is disabled', () => {
     const { container } = render(
       <AlbumGrid items={[onLoan()]} onOpen={vi.fn()} lendingEnabled={false} copy={copy} />,
     )
-    expect(container.querySelector('.lending-badge')).toBeNull()
+    expect(container.querySelector('.loan-icon')).toBeNull()
   })
 
-  it('shows the same badge on book cards', () => {
+  it('shows the same icon on book cards', () => {
     const { container } = render(
       <BookGrid
         items={[{
@@ -88,9 +129,9 @@ describe('grid lending badge (W7)', () => {
         copy={booksCatalog.copy}
       />,
     )
-    const badge = container.querySelector('.lending-badge')
-    expect(badge).toBeInTheDocument()
-    expect(badge.textContent).toBe('On loan')
+    const icon = container.querySelector('.loan-icon')
+    expect(icon).toBeInTheDocument()
+    expect(icon).toHaveAccessibleName('On loan to Alice — manage')
   })
 
   it('does not crash on weird item shapes', () => {
@@ -162,5 +203,113 @@ describe('filter sheet — On loan toggle (W7)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
     expect(screen.queryByRole('switch', { name: /On loan/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('loan icon deep-link to the lend card (A5.6 #117)', () => {
+  beforeEach(() => {
+    api.listItems.mockResolvedValue([LOANED, NOT_LOANED])
+  })
+
+  it('opens the detail sheet focused on the LendingControls section from the icon', async () => {
+    const { container } = render(
+      <CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} lendingEnabled />,
+    )
+    await waitFor(() => expect(container.querySelectorAll('.album-card')).toHaveLength(2))
+
+    fireEvent.click(container.querySelector('.loan-icon'))
+
+    // The detail sheet opens with the lending section rendered…
+    await waitFor(() => expect(container.querySelector('.lending')).toBeInTheDocument())
+    // …and the deep-link moved focus into the sheet (not the close button).
+    await waitFor(() => expect(container.querySelector('.lending')).toHaveFocus())
+  })
+
+  it('opens a normal detail (no lending deep-link) when the card body is tapped', async () => {
+    const { container } = render(
+      <CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} lendingEnabled />,
+    )
+    await waitFor(() => expect(container.querySelectorAll('.album-card')).toHaveLength(2))
+
+    fireEvent.click(container.querySelectorAll('.album-card')[0])
+
+    const sheet = await screen.findByRole('dialog')
+    expect(sheet).toBeInTheDocument()
+    // Normal open focuses the sheet's close button (existing pattern).
+    await waitFor(() => expect(sheet.querySelector('.sheet-close')).toHaveFocus())
+  })
+
+  it('self-corrects the deep-link scroll once async content settles (P2-4)', async () => {
+    const scrollIntoView = vi.fn()
+    const orig = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      const { container } = render(
+        <CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} lendingEnabled />,
+      )
+      await waitFor(() => expect(container.querySelectorAll('.album-card')).toHaveLength(2))
+
+      fireEvent.click(container.querySelector('.loan-icon'))
+
+      await waitFor(() => expect(container.querySelector('.lending')).toBeInTheDocument())
+      // The browser-native self-correction scrolls the lending section into
+      // view (block: start) — from the RAF and again when async content
+      // (tracklist / reviews) settles above LendingControls.
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' })))
+    } finally {
+      Element.prototype.scrollIntoView = orig
+    }
+  })
+
+  it('returns focus to the originating loan icon when the deep-linked sheet closes (P2-5)', async () => {
+    const { container } = render(
+      <CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} lendingEnabled />,
+    )
+    await waitFor(() => expect(container.querySelectorAll('.album-card')).toHaveLength(2))
+
+    const icon = container.querySelector('.loan-icon')
+    // A real click on a tabIndex=0 element focuses it (fireEvent doesn't) —
+    // that focused element is what CollectionView restores focus to on close.
+    icon.focus()
+    fireEvent.click(icon)
+
+    await waitFor(() => expect(container.querySelector('.lending')).toHaveFocus())
+
+    // Close the sheet (✕) — focus returns to the loan icon, not <body>.
+    fireEvent.click(container.querySelector('.sheet-close'))
+    await waitFor(() => expect(icon).toHaveFocus())
+  })
+})
+
+// A5.4 empty-collection flow: an empty collection + lending enabled must keep
+// the Loans button reachable (the global dashboard) via CollectionView's
+// minimal toolbar — with the overdue badge/aria-label still wired up.
+describe('empty collection + lending (W7 / A5.4)', () => {
+  beforeEach(() => {
+    api.listItems.mockResolvedValue([])
+  })
+
+  it('keeps the Loans button (with its overdue badge) reachable from an empty collection', async () => {
+    const { container } = render(
+      <CollectionView
+        catalog={recordsCatalog}
+        onRequestSettings={() => {}}
+        lendingEnabled
+        overdueCount={2}
+      />,
+    )
+
+    // The empty state renders…
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try a sample' })).toBeInTheDocument())
+    // …and the minimal toolbar still exposes the Loans button + overdue badge.
+    expect(screen.getByRole('button', { name: 'Loans — 2 overdue' })).toBeInTheDocument()
+    expect(container.querySelector('.loans-overdue-badge')).toHaveTextContent('2')
+  })
+
+  it('renders no Loans button on an empty collection when lending is disabled', async () => {
+    render(<CollectionView catalog={recordsCatalog} onRequestSettings={() => {}} />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try a sample' })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Loans' })).not.toBeInTheDocument()
   })
 })

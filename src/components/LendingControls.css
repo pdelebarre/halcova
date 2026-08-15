@@ -5,6 +5,13 @@
   margin-bottom: 16px;
 }
 
+/* A5.6 (#117): the section is a programmatic focus target for the on-loan
+   card icon's deep-link — hide the default focus ring (we scroll to it and
+   focus it only as an anchor; the actual controls get their own focus). */
+.lending:focus {
+  outline: none;
+}
+
 /* Not on loan — status + the "Lend…" action. */
 .lending-idle {
   display: flex;
@@ -46,6 +53,22 @@
   align-self: flex-start;
   min-height: 44px;
   margin-top: 4px;
+}
+
+/* A5.1/A5.2 — contact action + Remind + Mark returned flow in a wrapping
+   row under the status lines (still ≥44px touch targets). */
+.lending-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.lending-status-actions .btn {
+  min-height: 44px;
+  margin-top: 0;
+}
+.lending-contact-action {
+  text-decoration: none;
 }
 
 /* Armed "Mark returned" confirm step — gold, not red: returning a loan
@@ -107,6 +130,37 @@
 }
 .lending-form-actions .btn { flex: 1; }
 
+/* A5.3 — due-date preset chips next to the date input (today + 1w/2w/1m).
+   The active chip echoes the picked date so the choice reads back. */
+.lending-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lending-preset {
+  flex: 1;
+  min-width: 72px;
+  /* P2-8: 44px meets the touch-target bar (was 40px). */
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+  color: var(--jacket-kraft-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+.lending-preset.active {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.1);
+}
+.lending-preset:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: -1px;
+}
+
 /* Lending history — past loans, newest-first, quiet list. */
 .lending-history {
   margin-top: 12px;
@@ -122,6 +176,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* A5.5 — one-line honesty note once history hits the 10-loan cap. */
+.lending-history-cap {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--static-grey);
+  font-style: italic;
 }
 .lending-history-entry {
   display: flex;

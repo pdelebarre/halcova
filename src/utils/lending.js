@@ -28,3 +28,23 @@ export function isOverdue(value) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   return dueDay < today
 }
+
+// Format a *local* Date as a bare 'YYYY-MM-DD' (the format <input
+// type="date"> emits — and what the backend stores for dueOn).
+function toDateString(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Add `days` to a date string using the same local-day math as toLocalDate —
+// NO UTC drift (a bare 'YYYY-MM-DD' parsed as UTC would shift a day in
+// timezones behind UTC). Missing / malformed input falls back to *today*, so
+// the due-date presets can call addDays(undefined, offset) for "today +
+// offset". Never throws (no-error-boundary app), returns a bare 'YYYY-MM-DD'.
+export function addDays(dateStr, days) {
+  const base = toLocalDate(dateStr)
+  if (Number.isNaN(base.getTime())) {
+    const now = new Date()
+    return toDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() + days))
+  }
+  return toDateString(new Date(base.getFullYear(), base.getMonth(), base.getDate() + days))
+}

@@ -417,11 +417,28 @@ export const recordsCatalog = {
       returnedToast: t('lending.returnedToast'),
       badge: t('lending.badge'),
       badgeOverdue: t('lending.badgeOverdue'),
+      // A5.6 (#117): aria-labels for the on-loan card icon (deep-links to the
+      // lend card). badge/badgeOverdue above stay as tooltip/fallback text.
+      manageLoan: (name) => t('lending.manageLoan', { name }),
+      manageLoanOverdue: (name) => t('lending.manageLoanOverdue', { name }),
       filter: t('lending.filter'),
       filterHint: t('lending.filterHint'),
       history: t('lending.history'),
       historyLent: (date) => t('lending.historyLent', { date }),
       historyReturned: (date) => t('lending.historyReturned', { date }),
+      // A5 lending polish (#90/#92): Remind + contact actions + due presets.
+      remind: t('lending.remind'),
+      remindMessage: (name, title, dueText) =>
+        t('lending.remindMessage.base', { name, title }) + (dueText ? t('lending.remindMessage.due', { date: dueText }) : ''),
+      remindCopied: (name) => t('lending.remindCopied', { name }),
+      due1w: t('lending.due1w'),
+      due2w: t('lending.due2w'),
+      due1m: t('lending.due1m'),
+      overdueCount: (n) => t('lending.overdueCount', { n }),
+      historyCapNote: t('lending.historyCapNote'),
+      contactCall: t('lending.contactCall'),
+      contactEmail: t('lending.contactEmail'),
+      contactMessage: t('lending.contactMessage'),
     },
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,
@@ -504,11 +521,28 @@ export const booksCatalog = {
       returnedToast: t('lending.returnedToast'),
       badge: t('lending.badge'),
       badgeOverdue: t('lending.badgeOverdue'),
+      // A5.6 (#117): aria-labels for the on-loan card icon (deep-links to the
+      // lend card). badge/badgeOverdue above stay as tooltip/fallback text.
+      manageLoan: (name) => t('lending.manageLoan', { name }),
+      manageLoanOverdue: (name) => t('lending.manageLoanOverdue', { name }),
       filter: t('lending.filter'),
       filterHint: t('lending.filterHint'),
       history: t('lending.history'),
       historyLent: (date) => t('lending.historyLent', { date }),
       historyReturned: (date) => t('lending.historyReturned', { date }),
+      // A5 lending polish (#90/#92): Remind + contact actions + due presets.
+      remind: t('lending.remind'),
+      remindMessage: (name, title, dueText) =>
+        t('lending.remindMessage.base', { name, title }) + (dueText ? t('lending.remindMessage.due', { date: dueText }) : ''),
+      remindCopied: (name) => t('lending.remindCopied', { name }),
+      due1w: t('lending.due1w'),
+      due2w: t('lending.due2w'),
+      due1m: t('lending.due1m'),
+      overdueCount: (n) => t('lending.overdueCount', { n }),
+      historyCapNote: t('lending.historyCapNote'),
+      contactCall: t('lending.contactCall'),
+      contactEmail: t('lending.contactEmail'),
+      contactMessage: t('lending.contactMessage'),
     },
     emptySub: 'Scan the ISBN on a book to catalog your first title.',
     emptyTagline: 'your shelf, cataloged',

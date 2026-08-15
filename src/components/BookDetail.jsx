@@ -6,7 +6,7 @@ import ReviewsSection from './ReviewsSection'
 import './AlbumDetail.css'
 import './BookDetail.css'
 
-export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall }) {
+export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall, focusSection }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
 
@@ -21,16 +21,54 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
   // (pin, lending) and its remove copy says "wishlist", not shelf/crate.
   const isWant = !!item.wishlist
   const closeRef = useRef(null)
+  const scrollRef = useRef(null)
+  const lendingRef = useRef(null)
 
   // Focus into the sheet on open; Esc closes (same pattern as WishlistSheet).
+  // A5.6 (#117): a 'lending' focus hint skips the close-button focus — the
+  // deep-link effect below scrolls to + focuses the lending section instead.
+  // If the section isn't present (wishlist want, gated-off) we fall back to
+  // the normal close-button focus so the sheet never opens unfocused.
   useEffect(() => {
-    closeRef.current?.focus()
+    if (!(focusSection === 'lending' && lendingRef.current)) closeRef.current?.focus()
     function onKey(e) {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, focusSection])
+
+  // A5.6 (#117): deep-link to the lend card — scroll .detail-scroll to the
+  // LendingControls wrapper and move focus there. Null-checks the section ref
+  // and the scroll target (no error boundary → dark-screen safety); when the
+  // section isn't present this is a no-op and the sheet opens normally.
+  useEffect(() => {
+    if (focusSection !== 'lending') return undefined
+    const scrollEl = scrollRef.current
+    const target = lendingRef.current
+    if (!scrollEl || !target) return undefined
+    const raf = requestAnimationFrame(() => {
+      try {
+        const top = target.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
+        const reduceMotion = typeof window.matchMedia === 'function'
+          && window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+        if (typeof scrollEl.scrollTo === 'function') {
+          scrollEl.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' })
+        }
+        // P2-4: self-correcting — redundant with the manual math above, but the
+        // browser resolves the true position (async content may have shifted
+        // the section between the RAF capture and now).
+        if (typeof target.scrollIntoView === 'function') {
+          target.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
+        }
+      } catch {
+        // jsdom / older engines without scrollTo/scrollIntoView — scroll
+        // position is a progressive enhancement; never throw from here.
+      }
+      target.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [focusSection])
 
   const [description, setDescription] = useState(item.description || '')
   const [pageCount, setPageCount] = useState(item.pageCount || '')
@@ -57,6 +95,27 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
     }
     return () => { cancelled = true }
   }, [item.googleBooksId, item.description, catalog])
+
+  // P2-4: async content (volume description, ReviewsSection) renders ABOVE
+  // LendingControls and can shift the section after the one-shot RAF above
+  // lands. Whenever that async state settles, re-run the browser-native
+  // scrollIntoView — redundant with the manual math but self-correcting.
+  // Null-guarded + try/catch (no error boundary → dark-screen safety).
+  useEffect(() => {
+    if (focusSection !== 'lending') return undefined
+    const target = lendingRef.current
+    if (!target) return undefined
+    const reduceMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+    try {
+      if (typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' })
+      }
+    } catch {
+      // progressive enhancement — never throw from here.
+    }
+    return undefined
+  }, [focusSection, description, descError])
 
   useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current) }, [])
 
@@ -121,7 +180,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
           </div>
         </div>
 
-        <div className="detail-scroll">
+        <div className="detail-scroll" ref={scrollRef}>
           <div className="detail-cover book">
             {item.coverImage
               ? <img src={item.coverImage} alt="" />
@@ -212,6 +271,7 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
               onReturn={onReturn}
               showToast={showToast}
               onOpenPaywall={onOpenPaywall}
+              wrapperRef={lendingRef}
             />
           )}
         </div>
