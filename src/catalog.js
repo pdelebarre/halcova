@@ -79,6 +79,17 @@ export const recordsCatalog = {
     // C2.4 (issue #88): persistent, non-blocking hint under the Scan button
     // in the empty state when Records lookups have no Discogs token.
     noTokenHint: 'Records lookups need a Discogs token — add yours in Settings.',
+    // C2.3 (issue #85): "Try a sample" — a curated item fed straight into the
+    // result flow (no lookup, no token, no network) so a new user sees a full
+    // result sheet in ~10s. `isSample` marks the candidate read-only at every
+    // write boundary — it can never be added / wishlisted / converted.
+    trySample: 'Try a sample',
+    trySampleNote: 'This is a sample — add your own item to start your collection.',
+    // C2.3 (issue #85): the on-brand pill + safe primary on a sample's result
+    // sheet. EN-primary for now; other locales fall back via i18n until the
+    // native-speaker pass lands.
+    trySampleBadge: 'Sample',
+    trySampleCta: "That's the idea",
     loading: 'Loading your crate…',
     addToast: 'Added to your crate',
     removeLabel: 'Remove from crate',
@@ -509,6 +520,14 @@ export const booksCatalog = {
     // renders it for the Records catalog, but both catalogs expose the same
     // copy shape.
     noTokenHint: 'Records lookups need a Discogs token — add yours in Settings.',
+    // C2.3 (issue #85): same "Try a sample" affordance as records — the sample
+    // is read-only and must never reach the shelf/backend.
+    trySample: 'Try a sample',
+    trySampleNote: 'This is a sample — add your own item to start your collection.',
+    // C2.3 (issue #85): the on-brand pill + safe primary on a sample's result
+    // sheet. EN-primary for now; other locales fall back via i18n.
+    trySampleBadge: 'Sample',
+    trySampleCta: "That's the idea",
     loading: 'Loading your shelf…',
     addToast: 'Added to your shelf',
     removeLabel: 'Remove from shelf',

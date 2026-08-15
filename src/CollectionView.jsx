@@ -15,6 +15,7 @@ import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/
 import { extractSearchQuery } from './utils/ocrText'
 import { itemInBin } from './utils/browse'
 import { track } from './utils/track'
+import { SAMPLE_RECORD, SAMPLE_BOOK } from './utils/sample'
 import { t, getLocale } from './i18n'
 import './App.css'
 
@@ -380,6 +381,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // Converting flips the `wishlist` flag off so the item joins the owned
   // collection and appears on the shelf/Floor. Removing deletes it outright.
   async function handleAddToWishlist(candidate) {
+    // C2.3 (issue #85): samples are read-only — never persist a wishlist want.
+    if (candidate?.isSample) {
+      showToast(copy.trySampleNote || t('catalog.trySampleNote'), 'add')
+      return
+    }
     const payload = { ...candidate, wishlist: true }
     delete payload.id
     delete payload.dateAdded
@@ -400,6 +406,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   async function handleConvertToOwned(item) {
     if (!item) return
+    // C2.3 (issue #85): samples are read-only — never convert one to owned.
+    if (item.isSample) {
+      showToast(copy.trySampleNote || t('catalog.trySampleNote'), 'add')
+      return
+    }
     // Wishlist → owned grows the owned count: gate the convert at the cap (the
     // server caps `{ wishlist: false }` too — this keeps the UI honest).
     if (atLimit) {
@@ -618,6 +629,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }
 
   async function handleAddCandidate(candidate, { scanNext = false } = {}) {
+    // C2.3 (issue #85): a sample must NEVER reach the backend — no add(), no
+    // track(), no counter. Surface the note and leave the result sheet open.
+    if (candidate?.isSample) {
+      showToast(copy.trySampleNote || t('catalog.trySampleNote'), 'add')
+      return
+    }
     // Defensive: a free user at the cap should never reach here — the FAB and
     // empty-state entries are gated — but guard anyway so no doomed POST fires.
     if (atLimit) {
@@ -682,6 +699,24 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   function handleScanNext() {
     setScanCandidate(null)
     setModal('scan')
+  }
+
+  // C2.3 (issue #85): "Try a sample" — a curated item fed straight into the
+  // normal result flow (no lookup API, no token, no network). `source:
+  // 'sample'` deliberately is NOT 'scan', so no "Add & scan next" or momentum
+  // toast applies, and `isSample` marks the candidate read-only at every write
+  // boundary (add / wishlist / convert). Guard defensively: a malformed sample
+  // must never crash — there is no error boundary.
+  function handleTrySample() {
+    const sample = catalog.kind === 'books' ? SAMPLE_BOOK : SAMPLE_RECORD
+    if (!sample || typeof sample !== 'object') return
+    presentCandidate({ ...sample, isSample: true }, 'sample')
+  }
+
+  // C2.3 (issue #85): the sample result sheet's safe primary surfaces the
+  // "this is a sample" note as a toast — it never adds.
+  function handleSampleNote() {
+    showToast(copy.trySampleNote || t('catalog.trySampleNote'), 'add')
   }
 
   async function handleDelete(id) {
@@ -928,6 +963,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
             onScan={isDemo ? undefined : () => setModal('scan')}
             onScanCover={isDemo ? undefined : openCoverScan}
             onManualAdd={isDemo ? undefined : () => setModal('manual')}
+            onTrySample={handleTrySample}
           />
         )}
 
@@ -1178,6 +1214,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onClose={() => { setModal(null); setScanCandidate(null) }}
           copy={copy}
           isDemo={isDemo}
+          isSample={!!scanCandidate.candidate?.isSample}
+          onSampleNote={handleSampleNote}
         />
       )}
 

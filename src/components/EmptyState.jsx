@@ -1,7 +1,7 @@
 import { t } from '../i18n'
 import './EmptyState.css'
 
-export default function EmptyState({ kind = 'empty', copy = {}, noToken = false, onScan, onScanCover, onManualAdd, onClear }) {
+export default function EmptyState({ kind = 'empty', copy = {}, noToken = false, onScan, onScanCover, onManualAdd, onTrySample, onClear }) {
   const iconClass = copy.emptyIcon || 'empty-disc'
   // C2 onboarding (issue #88): `emptySteps` (a 3-item array) replaces the
   // single emptySub sentence. Guarded so a malformed value can never crash —
@@ -50,6 +50,15 @@ export default function EmptyState({ kind = 'empty', copy = {}, noToken = false,
       {onManualAdd && (
         <button type="button" className="btn btn-ghost" onClick={onManualAdd} style={{ marginTop: 8 }}>
           {copy.emptyManualBtn || t('catalog.emptyManualBtn')}
+        </button>
+      )}
+      {/* C2.3 (issue #85): "Try a sample" — a curated item is fed straight into
+          the result flow (no lookup, no token, no network) so a brand-new user
+          sees a full result sheet in ~10s. Read-only, so it's safe for demo
+          visitors too. Only rendered when the flow wired the handler. */}
+      {onTrySample && (
+        <button type="button" className="btn btn-ghost" onClick={onTrySample} style={{ marginTop: 8 }}>
+          {copy.trySample || t('catalog.trySample')}
         </button>
       )}
     </div>

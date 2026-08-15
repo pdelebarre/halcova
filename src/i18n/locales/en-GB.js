@@ -196,6 +196,11 @@ const enGB = {
   'catalog.emptyStep2': 'Confirm the match',
   'catalog.emptyStep3': "Done — it's in your collection",
   'catalog.noTokenHint': 'Records lookups need a Discogs token — add yours in Settings.',
+  // C2.3 (issue #85): try-a-sample — en-GB inherits en verbatim.
+  'catalog.trySample': 'Try a sample',
+  'catalog.trySampleNote': 'This is a sample — add your own item to start your collection.',
+  'catalog.trySampleBadge': 'Sample',
+  'catalog.trySampleCta': "That's the idea",
   'catalog.clearFilters': 'Clear filters',
   'catalog.loading': 'Loading your {collectionLabel}…',
   'catalog.addToast': 'Added to your {collectionLabel}',

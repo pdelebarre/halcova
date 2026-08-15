@@ -64,7 +64,7 @@ function RelatedSection({ heading, items, onOpen, moreLabel }) {
   )
 }
 
-export default function ScanResult({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist, onAdd, onAddToWishlist, onOwnWishlist, onOpenItem, onScanNext, onClose, copy, isDemo = false, source = 'manual', onAddAndScanNext }) {
+export default function ScanResult({ candidate, ownedExact, wishlistExact, sameAlbum, otherArtist, onAdd, onAddToWishlist, onOwnWishlist, onOpenItem, onScanNext, onClose, copy, isDemo = false, source = 'manual', onAddAndScanNext, isSample = false, onSampleNote }) {
   const { artist, album } = splitArtistTitle(candidate.title)
   const [adding, setAdding] = useState(false)
   const [wishlistAdding, setWishlistAdding] = useState(false)
@@ -177,6 +177,12 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
                 : <span className="result-cover-placeholder">{album?.[0] || '?'}</span>}
             </div>
             <div className="result-heading">
+              {/* C2.3 (issue #85): a small on-brand pill marks the curated
+                  sample so it's clearly not a real lookup. Guarded — a missing
+                  copy key must never crash render (no error boundary). */}
+              {isSample && copy.trySampleBadge && (
+                <span className="sample-badge">{copy.trySampleBadge}</span>
+              )}
               <p className="result-title">{album}</p>
               <p className="result-artist">{artist}</p>
               <p className="result-sub">
@@ -198,90 +204,115 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
             )}
           </div>
 
-          {sameAlbum.length > 0 && (
+          {/* C2.3 (issue #85): a sample is read-only — never offer the
+              detail-open / related-rows path (it would reach update/delete/
+              lend). The empty-state entry point means no related items exist
+              anyway, but guard defensively. */}
+          {!isSample && sameAlbum.length > 0 && (
             <RelatedSection heading={copy.sameHeading} items={sameAlbum} onOpen={onOpenItem} moreLabel={copy.moreRelated} />
           )}
 
-          {otherArtist.length > 0 ? (
+          {!isSample && (otherArtist.length > 0 ? (
             <RelatedSection heading={copy.moreBy(artist, otherArtist.length)} items={otherArtist} onOpen={onOpenItem} moreLabel={copy.moreRelated} />
           ) : (
             <div className="related-section">
               <p className="related-heading">{copy.nothingElseBy(artist)}</p>
             </div>
-          )}
+          ))}
         </div>
 
         <div className="sheet-actions">
-          {/* C1.2: for an already-owned item "Scan next" moves up to the
-              primary slot, so it no longer appears as a ghost here. */}
-          {!ownedExact && (
-            <button type="button" className="btn btn-ghost" onClick={onScanNext}>{copy.scanNext}</button>
-          )}
-
-          {isDemo ? (
-            // Read-only demo space (ADR-0001): there is no Add action — just a
-            // notice pointing visitors at signing in with their own account.
-            <p className="demo-readonly-notice">{t('demo.readOnlyNotice')}</p>
-          ) : (
+          {/* C2.3 (issue #85): a sample must NEVER reach a write path — no
+              "Scan next", wishlist, lend, or Add. The safe primary surfaces
+              the sample note (toast via onSampleNote); the note is also shown
+              inline so it's readable at a glance and never crashes if the
+              handler is missing (no error boundary). */}
+          {isSample ? (
             <>
-              {/* C1.1: on a scan-sourced result the plain "Add" demotes into
-                  the ghost slot next to "Scan next". */}
-              {primaryMode === 'addAndScanNext' && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={handleAdd}
-                  disabled={adding}
-                  aria-busy={adding}
-                >
-                  {copy.add || t('catalog.add', { collectionLabel: '' })}
-                </button>
-              )}
-
-              {/* C1.2: for an already-owned item "Add anyway" is the ghost action. */}
-              {primaryMode === 'scanNext' && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={handleAdd}
-                  disabled={adding}
-                  aria-busy={adding}
-                >
-                  {copy.addAnyway || t('catalog.addAnyway')}
-                </button>
-              )}
-
-              {!ownedExact && !wishlistExact && (
-                <button
-                  type="button"
-                  className={`btn btn-ghost btn-wishlist${wishlistAdding ? ' adding' : ''}`}
-                  onClick={handleWishlistAdd}
-                  disabled={wishlistAdding}
-                  aria-busy={wishlistAdding}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 20s-7-4.5-9.2-8.6C1.2 8.4 2.9 5 6.4 5c2 0 3.2 1.2 3.6 1.8C10.4 5 13 4.4 15 5.6 17 7 18 10 16.4 12.4 15.2 14.2 12 20 12 20z" />
-                  </svg>
-                  {copy.wishlist?.addToWishlist || 'Add to wishlist'}
-                </button>
-              )}
-
+              <p className="sample-readonly-note">{copy.trySampleNote || t('catalog.trySampleNote')}</p>
               <button
                 type="button"
-                className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
-                onClick={primaryHandlers[primaryMode] || handleAdd}
-                disabled={adding}
-                aria-busy={adding}
+                className="btn btn-primary"
+                onClick={() => onSampleNote?.()}
+                disabled={typeof onSampleNote !== 'function'}
               >
-                {adding ? (
-                  <>
-                    <span className="add-disc" aria-hidden="true" />
-                    {copy.addDone || t('catalog.addDone')}
-                  </>
-                ) : (
-                  primaryLabel
-                )}
+                {copy.trySampleCta || t('catalog.trySampleCta')}
               </button>
+            </>
+          ) : (
+            <>
+              {/* C1.2: for an already-owned item "Scan next" moves up to the
+                  primary slot, so it no longer appears as a ghost here. */}
+              {!ownedExact && (
+                <button type="button" className="btn btn-ghost" onClick={onScanNext}>{copy.scanNext}</button>
+              )}
+
+              {isDemo ? (
+                // Read-only demo space (ADR-0001): there is no Add action — just a
+                // notice pointing visitors at signing in with their own account.
+                <p className="demo-readonly-notice">{t('demo.readOnlyNotice')}</p>
+              ) : (
+                <>
+                  {/* C1.1: on a scan-sourced result the plain "Add" demotes into
+                      the ghost slot next to "Scan next". */}
+                  {primaryMode === 'addAndScanNext' && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={handleAdd}
+                      disabled={adding}
+                      aria-busy={adding}
+                    >
+                      {copy.add || t('catalog.add', { collectionLabel: '' })}
+                    </button>
+                  )}
+
+                  {/* C1.2: for an already-owned item "Add anyway" is the ghost action. */}
+                  {primaryMode === 'scanNext' && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={handleAdd}
+                      disabled={adding}
+                      aria-busy={adding}
+                    >
+                      {copy.addAnyway || t('catalog.addAnyway')}
+                    </button>
+                  )}
+
+                  {!ownedExact && !wishlistExact && (
+                    <button
+                      type="button"
+                      className={`btn btn-ghost btn-wishlist${wishlistAdding ? ' adding' : ''}`}
+                      onClick={handleWishlistAdd}
+                      disabled={wishlistAdding}
+                      aria-busy={wishlistAdding}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20s-7-4.5-9.2-8.6C1.2 8.4 2.9 5 6.4 5c2 0 3.2 1.2 3.6 1.8C10.4 5 13 4.4 15 5.6 17 7 18 10 16.4 12.4 15.2 14.2 12 20 12 20z" />
+                      </svg>
+                      {copy.wishlist?.addToWishlist || 'Add to wishlist'}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className={`btn btn-primary btn-add${adding ? ' adding' : ''}`}
+                    onClick={primaryHandlers[primaryMode] || handleAdd}
+                    disabled={adding}
+                    aria-busy={adding}
+                  >
+                    {adding ? (
+                      <>
+                        <span className="add-disc" aria-hidden="true" />
+                        {copy.addDone || t('catalog.addDone')}
+                      </>
+                    ) : (
+                      primaryLabel
+                    )}
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

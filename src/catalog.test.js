@@ -42,6 +42,13 @@ describe('recordsCatalog', () => {
     expect(recordsCatalog.copy.scanNext).toBe('Scan next')
   })
 
+  it('exposes the C2.3 try-a-sample copy keys (issue #85)', () => {
+    expect(recordsCatalog.copy.trySample).toBe('Try a sample')
+    expect(recordsCatalog.copy.trySampleNote).toBe('This is a sample — add your own item to start your collection.')
+    expect(recordsCatalog.copy.trySampleBadge).toBe('Sample')
+    expect(recordsCatalog.copy.trySampleCta).toBe("That's the idea")
+  })
+
   it('exposes browse axes (Genre · Artist · Decade · Format · Label)', () => {
     expect(recordsCatalog.browseAxes.map((a) => a.id)).toEqual(['genre', 'artist', 'decade', 'format', 'label'])
     for (const axis of recordsCatalog.browseAxes) {
@@ -96,6 +103,13 @@ describe('booksCatalog', () => {
     expect(booksCatalog.copy.addAndScanNext).toBe('Add & scan next')
     expect(booksCatalog.copy.addedCount(2)).toBe('Added — 2 today')
     expect(booksCatalog.copy.scanNext).toBe('Scan next')
+  })
+
+  it('exposes the C2.3 try-a-sample copy keys on the books catalog too (issue #85)', () => {
+    expect(booksCatalog.copy.trySample).toBe('Try a sample')
+    expect(booksCatalog.copy.trySampleNote).toBe('This is a sample — add your own item to start your collection.')
+    expect(booksCatalog.copy.trySampleBadge).toBe('Sample')
+    expect(booksCatalog.copy.trySampleCta).toBe("That's the idea")
   })
 
   it('exposes browse axes (Category · Author · Year)', () => {

@@ -204,3 +204,37 @@
   padding: 12px 14px;
   text-align: left;
 }
+
+/* C2.3 (issue #85): on-brand "Sample" pill — marks the curated sample result
+   so it's clearly not a real lookup, and signals it's read-only. */
+.sample-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: fit-content;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sleeve-black);
+  background: var(--runout-gold);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-bottom: 6px;
+}
+
+/* C2.3 (issue #85): the read-only note shown under a sample's safe primary —
+   same dashed-notice treatment as the demo notice, gold-tinted to match the
+   badge. A sample can never be added, so this carries the "add your own item"
+   guidance instead. */
+.sample-readonly-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--jacket-kraft-dim);
+  border: 1px dashed rgba(201, 162, 39, 0.5);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  text-align: left;
+}
