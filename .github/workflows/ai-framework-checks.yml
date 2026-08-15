@@ -1,0 +1,45 @@
+name: AI framework checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/agents/**'
+      - '.github/skills/**'
+      - '.github/prompts/**'
+      - '.github/ai/**'
+      - '.github/workflows/ai-framework-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/agents/**'
+      - '.github/skills/**'
+      - '.github/prompts/**'
+      - '.github/ai/**'
+      - '.github/workflows/ai-framework-checks.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Markdown front matter and required sections
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/skills/token-efficient-work/SKILL.md
+          test -f .github/prompts/common-working-policy.prompt.md
+          for file in .github/agents/*.agent.md; do
+            grep -q '^---$' "$file" || { echo "Missing front matter: $file"; exit 1; }
+            grep -q '^name:' "$file" || { echo "Missing name: $file"; exit 1; }
+            grep -q '^description:' "$file" || { echo "Missing description: $file"; exit 1; }
+          done
+          for file in .github/skills/*/SKILL.md; do
+            test -s "$file" || { echo "Empty skill: $file"; exit 1; }
+          done
+      - name: Check token policy references
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in .github/agents/*.agent.md; do
+            grep -Eq 'token-efficient-work|token-conscious|token' "$file" || { echo "No token policy reference: $file"; exit 1; }
+          done
