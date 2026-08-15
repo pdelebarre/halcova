@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useScrolled } from '../hooks/useScrolled'
 import { t, getLocale } from '../i18n'
 import FilterSheet from './FilterSheet'
@@ -318,7 +319,11 @@ export default function Toolbar({
         {activeFilterCount > 0 ? (copy.filtersActive?.(activeFilterCount) ?? t('toolbar.filtersActive', { n: activeFilterCount })) : ''}
       </span>
 
-      {sheetOpen && (
+      {/* Overlays render in a portal to document.body: the toolbar carries a
+          backdrop-filter when scrolled, which would otherwise become the
+          containing block for these position:fixed sheets and clip them
+          (hidden / partially hidden on iPhone). */}
+      {sheetOpen && createPortal(
         <FilterSheet
           copy={copy}
           formats={formats}
@@ -343,10 +348,11 @@ export default function Toolbar({
           onApplyView={onApplyView}
           onDeleteView={onDeleteView}
           onRenameView={onRenameView}
-        />
+        />,
+        document.body
       )}
 
-      {sortOpen && (
+      {sortOpen && createPortal(
         <SortMenu
           options={sortOptions}
           value={sortBy}
@@ -354,7 +360,8 @@ export default function Toolbar({
           onClose={closeSort}
           anchorRef={sortBtnRef}
           copy={copy}
-        />
+        />,
+        document.body
       )}
     </div>
   )
