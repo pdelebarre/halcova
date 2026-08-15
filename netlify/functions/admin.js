@@ -4,10 +4,15 @@
 //   - approve a request (grants Records and/or Books, returns the access code)
 //   - reject a request
 //   - change a member's collection access / disable them
-//   - delete a member (and their collection stores)
+//   - delete a member (their collection stores AND their reviews)
+//   - moderate community reviews (hide / show / delete, plus a listing)
 
 import { randomUUID } from 'node:crypto'
 import { ADMIN_KEY, OWNER_ID, bearer, generateAccessCode, publicUser } from './_shared/auth'
+import { parsePagination } from './_shared/pagination'
+import { db, isPostgresConfigured } from './_shared/postgres'
+import { createReviewsRepo } from './_shared/repositories/reviews-repo'
+import { createReviewsBlobStore } from './_shared/reviews-blob'
 import {
   deleteUserCollections,
   getRequest,
@@ -59,6 +64,24 @@ export function sanitizeFeatures(features) {
   const result = {}
   for (const key of KNOWN_FEATURES) result[key] = !!features?.[key]
   return result
+}
+
+// Reviews data-path dispatch (Task 5 + Task 7) — the SAME Postgres-first /
+// Blobs-fallback choice reviews.js makes, so admin moderation and the
+// deleteUser review cleanup behave identically whether the app is on Postgres
+// or Blobs. Both backends (createReviewsRepo / createReviewsBlobStore) expose
+// the same ops; `op` runs against the active store and its result is returned
+// as { backend, result } — `backend` so callers that need path-specific
+// handling (the Blobs listAll ignores limit/offset) can react.
+async function withReviews(op) {
+  if (isPostgresConfigured()) {
+    try {
+      return { backend: 'postgres', result: await op(createReviewsRepo(db)) }
+    } catch (err) {
+      console.error('admin: Postgres reviews path failed, falling back to Blobs:', err?.message || err)
+    }
+  }
+  return { backend: 'blobs', result: await op(createReviewsBlobStore()) }
 }
 
 function hasAccess(collections) {
@@ -148,14 +171,73 @@ async function handleUpdateUser(body) {
   return json(200, { user: publicUser(user) })
 }
 
+// Task 7 (M2) — deleteUser review cleanup. Removes the member's reviews from
+// the backend that is AUTHORITATIVE for reviews, and never silently from a
+// DIFFERENT one:
+//   - Blobs path (DATABASE_URL unset): the shared Blobs store is the only home
+//     of reviews — clean it.
+//   - Postgres path (DATABASE_URL set): Postgres is the authoritative home.
+//     The Postgres cleanup MUST succeed — falling back to a Blobs-only cleanup
+//     (as withReviews would on a Postgres error) would leave the Postgres rows
+//     orphaned once the member is deleted. A Postgres failure therefore
+//     surfaces: the whole deleteUser 500s and the member is NOT deleted (see
+//     the ordering in handleDeleteUser). A best-effort Blobs sweep then catches
+//     any read-through writes that landed in Blobs while Postgres was down —
+//     parity with deleteUserCollections' dual-clean.
+// Idempotent in both backends (a member with no reviews is a no-op).
+async function deleteMemberReviews(userId) {
+  if (!isPostgresConfigured()) {
+    await createReviewsBlobStore().deleteByAuthor(userId)
+    return
+  }
+  const repo = createReviewsRepo(db)
+  await repo.deleteByAuthor(userId)
+  try {
+    await createReviewsBlobStore().deleteByAuthor(userId)
+  } catch { /* the authoritative Postgres cleanup already succeeded */ }
+}
+
 async function handleDeleteUser(body) {
   if (!body.userId) return json(400, { error: 'Missing userId.' })
   if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be deleted.' })
   const user = await getUser(body.userId)
   if (!user) return json(404, { error: 'User not found.' })
 
-  await removeUserRecord(user.id)
+  // Task 7 (M2): a member's reviews go with them. This runs FIRST, before the
+  // user record is removed, so a failed reviews cleanup aborts the whole delete
+  // — a member is never left deleted with orphaned reviews pointing at a
+  // removed user. Cleanup is idempotent in both backends, so a retry after a
+  // partial failure is safe. NOTE: reviews belong to the RELEASE, not the copy
+  // — this runs only on user deletion, never on item removal from a collection.
+  await deleteMemberReviews(user.id)
   await deleteUserCollections(user.id)
+  await removeUserRecord(user.id)
+  return json(200, { ok: true })
+}
+
+// Task 5 — admin review moderation. All three are admin-key-only (the default
+// export 401s before any action runs). Each returns { ok: true } on success,
+// 400 for a missing reviewId and 404 for an unknown one — consistent with the
+// rest of admin.js.
+async function handleHideReview(body) {
+  if (!body.reviewId) return json(400, { error: 'Missing reviewId.' })
+  const { result: ok } = await withReviews((store) => store.setStatus(body.reviewId, 'hidden'))
+  if (!ok) return json(404, { error: 'Review not found.' })
+  return json(200, { ok: true })
+}
+
+async function handleShowReview(body) {
+  if (!body.reviewId) return json(400, { error: 'Missing reviewId.' })
+  const { result: ok } = await withReviews((store) => store.setStatus(body.reviewId, 'published'))
+  if (!ok) return json(404, { error: 'Review not found.' })
+  return json(200, { ok: true })
+}
+
+async function handleDeleteReview(body) {
+  if (!body.reviewId) return json(400, { error: 'Missing reviewId.' })
+  // Admin override: deleteReview removes the row/entry regardless of author.
+  const { result: ok } = await withReviews((store) => store.deleteReview(body.reviewId))
+  if (!ok) return json(404, { error: 'Review not found.' })
   return json(200, { ok: true })
 }
 
@@ -166,13 +248,31 @@ export default async (req) => {
     }
 
     if (req.method === 'GET') {
+      const url = new URL(req.url)
       const [requests, users] = await Promise.all([listRequests(), listUsers()])
       // Part B: codes are hashed. The admin list no longer carries plaintext
       // codes (nor their hashes) — re-reveal is replaced by the `rotate` action,
       // which mints a NEW code and returns it exactly once. publicUser strips
       // both `code` and `code_hash`, so the list never leaks either, regardless
       // of which backend served it (the Blobs fallback still holds plaintext).
-      return json(200, { requests, users: users.map(publicUser) })
+      const body = { requests, users: users.map(publicUser) }
+      // Task 5 — admin review moderation listing. Opt-in via ?reviews=1 so the
+      // member-list call the AdminPanel makes stays lightweight. All reviews,
+      // newest first, paginated (pagination.js), with an optional ?status=
+      // filter (published | pending | hidden). Review objects never carry
+      // codes/emails — only the public authorName + kind + sourceId + rating +
+      // body + status + timestamps (the same shape reviews.js serves).
+      if (url.searchParams.get('reviews') === '1') {
+        const { offset, limit } = parsePagination(url.searchParams)
+        const status = url.searchParams.get('status') || undefined
+        const { backend, result } = await withReviews((store) => store.listAll({ status, limit, offset }))
+        // The Postgres repo applies LIMIT/OFFSET in SQL; the Blobs store
+        // ignores them and returns the whole newest-first list — slice there.
+        body.reviews = backend === 'blobs' ? result.slice(offset, offset + limit) : result
+        body.limit = limit
+        body.offset = offset
+      }
+      return json(200, body)
     }
 
     if (req.method === 'POST') {
@@ -181,8 +281,14 @@ export default async (req) => {
         case 'approve': return handleApprove(body)
         case 'reject': return handleReject(body)
         case 'updateUser': return handleUpdateUser(body)
-        case 'deleteUser': return handleDeleteUser(body)
+        // M2 — await so a rejected deleteUser (e.g. the reviews cleanup failing
+        // with Postgres down) is caught by the outer try/catch and surfaces as a
+        // clean 500 instead of an unhandled rejection. The member is NOT deleted.
+        case 'deleteUser': return await handleDeleteUser(body)
         case 'rotate': return handleRotate(body)
+        case 'hideReview': return handleHideReview(body)
+        case 'showReview': return handleShowReview(body)
+        case 'deleteReview': return handleDeleteReview(body)
         default: return json(400, { error: 'Unknown action.' })
       }
     }

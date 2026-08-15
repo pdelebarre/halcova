@@ -62,6 +62,8 @@ export const recordsCatalog = {
   },
   detailLink: (item) => `https://www.discogs.com/release/${item.discogsId}`,
   detailLinkLabel: 'View on Discogs ↗',
+  // Community reviews (Task 6): the provider id that anchors a review thread.
+  reviewKey: (item) => item.discogsId,
   copy: {
     emptyIcon: 'empty-disc',
     // Kind-specific overrides for the shared collection flow.
@@ -401,6 +403,19 @@ export const recordsCatalog = {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,
       backToTop: 'Back to top',
     },
+    // Community reviews (Task 6) — shared ReviewsSection copy. Full strings
+    // live in i18n (`reviews.*`); this bridge lets a catalog override the
+    // section title and composer labels, and `{entity}` interpolates at the
+    // call site for kind-appropriate empty-state wording.
+    reviews: {
+      section: t('reviews.section'),
+      save: t('reviews.save'),
+      update: t('reviews.update'),
+      postedToast: t('reviews.postedToast'),
+      updatedToast: t('reviews.updatedToast'),
+      posting: t('reviews.posting'),
+      saving: t('reviews.saving'),
+    },
   },
 }
 
@@ -438,6 +453,8 @@ export const booksCatalog = {
   },
   detailLink: (item) => item.infoLink || `https://books.google.com/books?id=${item.googleBooksId}`,
   detailLinkLabel: 'View on Google Books ↗',
+  // Community reviews (Task 6): the provider id that anchors a review thread.
+  reviewKey: (item) => item.googleBooksId,
   copy: {
     emptyIcon: 'empty-book',
     // Kind-specific overrides for the shared collection flow.
@@ -748,6 +765,17 @@ export const booksCatalog = {
     view: {
       showing: (n, m) => `Showing ${Number(n || 0).toLocaleString()} of ${Number(m || 0).toLocaleString()}`,
       backToTop: 'Back to top',
+    },
+    // Community reviews (Task 6) — shared ReviewsSection copy (see records
+    // catalog for the layout; wording bridges i18n `reviews.*`).
+    reviews: {
+      section: t('reviews.section'),
+      save: t('reviews.save'),
+      update: t('reviews.update'),
+      postedToast: t('reviews.postedToast'),
+      updatedToast: t('reviews.updatedToast'),
+      posting: t('reviews.posting'),
+      saving: t('reviews.saving'),
     },
   },
 }

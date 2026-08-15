@@ -161,3 +161,22 @@
   color: var(--runout-gold);
   border-color: var(--runout-gold);
 }
+
+/* Community rating (Task 1 reviews): quiet star + average + count row at the
+   bottom of the metadata block. Only rendered when a rating exists, so these
+   styles have nothing to do when the item has none. */
+.detail-meta-rating dd {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.rating-star {
+  color: var(--runout-gold);
+  font-size: 14px;
+  line-height: 1;
+}
+.rating-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--static-grey);
+}

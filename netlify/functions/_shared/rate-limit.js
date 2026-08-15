@@ -58,6 +58,29 @@ export async function consume(store, key, limit, now = Date.now(), windowMs = RA
   return { limited: false }
 }
 
+// Fixed-window DISTINCT-item counter: like consume, but counts unique `item`
+// values touched in the window instead of raw events — used to cap how many
+// DIFFERENT things one identity can reach per window (e.g. how many releases a
+// member opens a review thread on). Repeating an already-tracked item never
+// advances the counter, so editing what you already touched stays free. Same
+// fixed-window reset + best-effort read/write semantics as consume.
+export async function consumeDistinct(store, key, item, limit, now = Date.now(), windowMs = RATE_LIMIT_WINDOW_MS) {
+  let entry = null
+  try {
+    entry = (await store.get(key, { type: 'json' })) || null
+  } catch {
+    entry = null
+  }
+  const w = windowIndex(now, windowMs)
+  const items = entry && entry.w === w && Array.isArray(entry.items) ? entry.items : []
+  if (items.includes(item)) return { limited: false } // already tracked this window
+  if (items.length >= limit) return { limited: true, retryAfter: retryAfterSeconds(now, windowMs) }
+  try {
+    await store.setJSON(key, { w, items: [...items, item] })
+  } catch { /* best-effort */ }
+  return { limited: false }
+}
+
 // Build a per-scope limiter bound to a blob store; call it with the identity.
 export function createRateLimiter({ store, scope, limit = DEFAULT_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS }) {
   return (identity, now = Date.now()) => consume(store, rateLimitKey(scope, identity), limit, now, windowMs)

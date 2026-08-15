@@ -2,12 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
 import { t } from '../i18n'
 import LendingControls from './LendingControls'
+import ReviewsSection from './ReviewsSection'
 import './AlbumDetail.css'
 import './BookDetail.css'
 
 export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
   const copy = catalog?.copy || {}
+
+  // Community rating (Task 1 reviews): star + average + count, shown only when
+  // the provider surfaced one. Guarded — never render/throw on absent data.
+  const rating = Number(item.rating)
+  const ratingCount = Number(item.ratingCount)
+  const hasRating = rating > 0 || ratingCount > 0
+  const ratingValue = Number.isFinite(rating) && rating > 0 ? (Math.round(rating * 10) / 10).toString() : ''
 
   // A wishlist "want" is unowned: it gets none of the owned-only affordances
   // (pin, lending) and its remove copy says "wishlist", not shelf/crate.
@@ -134,6 +142,18 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
             {item.genre?.length ? (
               <div><dt>{t('detail.categories')}</dt><dd>{item.genre.join(', ')}</dd></div>
             ) : null}
+            {hasRating && (
+              <div className="detail-meta-rating">
+                <dt>{t('detail.rating')}</dt>
+                <dd className="detail-rating">
+                  <span className="rating-star" aria-hidden="true">★</span>
+                  <span className="rating-value">{ratingValue}</span>
+                  {ratingCount > 0 && (
+                    <span className="rating-count">{t('detail.ratingCount', { n: ratingCount })}</span>
+                  )}
+                </dd>
+              </div>
+            )}
           </dl>
 
           {(description || item.googleBooksId) && (
@@ -144,6 +164,13 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
               {description && <p className="book-description">{description}</p>}
             </div>
           )}
+
+          <ReviewsSection
+            kind={catalog.kind}
+            sourceId={typeof catalog.reviewKey === 'function' ? catalog.reviewKey(item) : item.googleBooksId}
+            catalog={catalog}
+            showToast={showToast}
+          />
 
           <div className="detail-notes">
             <p className="detail-section-label">{t('detail.notes')}</p>
