@@ -16,6 +16,17 @@
 3. **Three gamification tickets were shipped but never closed** — #45, #50, #44 shipped in PR #62 (merged 2026-08-14). Closed in this grooming pass; epic #43's remaining work is #47 (Phase 2) and #49 (Phase 3).
 4. **Phase 1–2 of the campaign are name-free and safe to run now** — the app does not need a public URL until Phase 4. This gives ~2 weeks of runway to clear the P0 gates without panic.
 
+## Delivery status (2026-08-15, PM sweep)
+
+P0 code shipped and merged (tickets closed as completed):
+- ✅ **#119** icon with barcode — merged via **PR #124** (`feat/halcova-icon`) · *soft gate: Marketing approval of the rendered mark remains for the Phase 3 reveal*
+- ✅ **#89** C1 add & scan next — merged via **PR #125** (`feat/scan-add-loop`)
+- ✅ **#86** C2 token-free first-run tab + **#88** C2 empty-state onboarding — merged via **PR #126** (`feat/empty-state-onboarding`)
+
+🟡 **#87** warm camera — mechanism merged via **PR #125**, but **iOS device validation is still outstanding** (ticket kept open; record no re-permission flash / no drain before closing).
+
+Still open P0 launch gates: **#120** (legal/domain — owner decision) · **#121** (landing page + Request access + UTM — owner deploy) · **#85** (try-a-sample, blocked on validation).
+
 ---
 
 ## 1. Priority map (what the PM should take over)
@@ -24,7 +35,7 @@
 
 | Ticket | What | Blocks | Notes |
 | --- | --- | --- | --- |
-| **#119** | Halcova icon **with barcode element** → PNGs in `public/` (brief `marketing/brief-halcova-icon.md`) | Phase 3 reveal | Dispatch to UI/UX Expert; PWA manifest + apple-touch wiring |
+| ~~**#119**~~ ✅ | Halcova icon **with barcode element** → PNGs in `public/` (brief `marketing/brief-halcova-icon.md`) | Phase 3 reveal | **DONE 2026-08-15** — merged via PR #124; Marketing approval of the final mark still pending (soft gate) |
 | **#120** | **Legal/domain/handles** check for "Halcova" (trademark EN/FR/NL/PT-BR/DE/ES/IT, `halcova.app`, @halcova handles) | Phase 3 reveal | `[VALIDATE]` — owner decision; `halcova.app` already referenced by mailer + Stripe success URLs |
 | **#121** | **Landing page live + Request access + UTM/analytics** | Phase 4 open | Deploy via `netlify deploy --build`; copy in `campaign-landing-page.md`; UTM per channel; count visits+requests; admin approval waves |
 
@@ -32,10 +43,10 @@
 
 | Ticket | What | Priority | Notes |
 | --- | --- | --- | --- |
-| **#86** | C2 — Token-free first-run tab default | P0 | Cold-start fix; a fresh member's first scan works immediately |
-| **#88** | C2 — Empty-state onboarding + records token hint | P0 | First-win onboarding; copy `emptyStep1/2/3`, `noTokenHint` |
-| **#89** | C1 — Add & scan next loop + momentum toast | P0 | Bulk cataloging; "scan a stack" is the demo moment |
-| **#87** | C1 — Keep the camera warm on iOS | P0 · **blocked** | Gated on device validation (no re-permission flash, no drain) |
+| ~~**#86**~~ ✅ | C2 — Token-free first-run tab default | P0 | **DONE** via PR #126 |
+| ~~**#88**~~ ✅ | C2 — Empty-state onboarding + records token hint | P0 | **DONE** via PR #126 |
+| ~~**#89**~~ ✅ | C1 — Add & scan next loop + momentum toast | P0 | **DONE** via PR #125 |
+| **#87** 🟡 | C1 — Keep the camera warm on iOS | P0 · **blocked** | Impl merged via PR #125; **device validation outstanding** (keep open until recorded) |
 | **#85** | C2 — Try-a-sample barcode | P0 · **blocked** | Gated on validation (stable release ID + prevent-save mechanism) |
 | **#90** | A5 — Contact actions + Remind button | P1 | Retention (Web Share / clipboard, offline) |
 | **#92** | A5 — Due-date presets, overdue surfacing, history note | P1 | |
