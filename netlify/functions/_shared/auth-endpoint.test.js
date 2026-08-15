@@ -21,11 +21,16 @@
 // The identity + magic-link + rate-limit blob stores are mocked in-memory
 // (same pattern as payment.test.js / billing.test.js) so no network or real
 // backend is touched.
+//
+// NOTE: this file lives in _shared/ (not netlify/functions/) so Netlify does
+// not treat it as a deployable function — Netlify ignores underscore-prefixed
+// paths when discovering functions, and a dotted name like 'auth.test' is
+// rejected with a 422 "Incorrect function names" error on deploy.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import handler from './auth'
-import { signMagicLink } from './_shared/magic-link'
-import { getUser, listRequests, listUsers, saveUser } from './_shared/users'
+import handler from '../auth'
+import { signMagicLink } from './magic-link'
+import { getUser, listRequests, listUsers, saveUser } from './users'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
