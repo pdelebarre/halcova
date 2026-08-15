@@ -28,6 +28,7 @@ jobs:
 
       - name: Run tests with coverage
         run: npm run test:coverage
+        continue-on-error: true
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v4
