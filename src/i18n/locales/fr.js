@@ -195,6 +195,9 @@ const fr = {
   'catalog.emptyStep2': 'Confirmer le résultat',
   'catalog.emptyStep3': 'Terminé — c\'est dans votre collection',
   'catalog.noTokenHint': 'La recherche de disques nécessite un jeton Discogs — ajoutez le vôtre dans Réglages.',
+  // C2.3 (issue #85): try-a-sample (localization-dictionary-addendum.md §1).
+  'catalog.trySample': 'Essayer un exemple',
+  'catalog.trySampleNote': 'Ceci est un exemple — ajoutez votre propre article pour commencer votre collection.',
   'catalog.clearFilters': 'Effacer les filtres',
   'catalog.loading': 'Chargement de votre {collectionLabel}…',
   'catalog.addToast': 'Ajouté à votre {collectionLabel}',

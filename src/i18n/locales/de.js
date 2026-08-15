@@ -195,6 +195,9 @@ const de = {
   'catalog.emptyStep2': 'Treffer bestätigen',
   'catalog.emptyStep3': 'Fertig — es steht in deiner Sammlung',
   'catalog.noTokenHint': 'Für Platten wird ein Discogs-Token benötigt — füge deins in den Einstellungen hinzu.',
+  // C2.3 (issue #85): try-a-sample (localization-dictionary-addendum.md §1).
+  'catalog.trySample': 'Beispiel ausprobieren',
+  'catalog.trySampleNote': 'Das ist ein Beispiel — füge dein eigenes Item hinzu, um deine Sammlung zu starten.',
   'catalog.clearFilters': 'Filter löschen',
   'catalog.loading': 'Lade dein {collectionLabel}…',
   'catalog.addToast': 'Zu deinem {collectionLabel} hinzugefügt',

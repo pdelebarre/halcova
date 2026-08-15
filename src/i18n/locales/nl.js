@@ -195,6 +195,9 @@ const nl = {
   'catalog.emptyStep2': 'Bevestig het resultaat',
   'catalog.emptyStep3': 'Klaar — het staat in je collectie',
   'catalog.noTokenHint': 'Voor platen heb je een Discogs-token nodig — voeg de jouwe toe in Instellingen.',
+  // C2.3 (issue #85): try-a-sample (localization-dictionary-addendum.md §1).
+  'catalog.trySample': 'Probeer een voorbeeld',
+  'catalog.trySampleNote': 'Dit is een voorbeeld — voeg je eigen item toe om je collectie te starten.',
   'catalog.clearFilters': 'Filters wissen',
   'catalog.loading': 'Je {collectionLabel} laden…',
   'catalog.addToast': 'Toegevoegd aan je {collectionLabel}',

@@ -195,6 +195,9 @@ const ptBR = {
   'catalog.emptyStep2': 'Confirmar a correspondência',
   'catalog.emptyStep3': 'Pronto — está na sua coleção',
   'catalog.noTokenHint': 'A busca de discos precisa de um token do Discogs — adicione o seu em Configurações.',
+  // C2.3 (issue #85): try-a-sample (localization-dictionary-addendum.md §1).
+  'catalog.trySample': 'Experimentar um exemplo',
+  'catalog.trySampleNote': 'Este é um exemplo — adicione seu próprio item para começar sua coleção.',
   'catalog.clearFilters': 'Limpar filtros',
   'catalog.loading': 'Carregando seu {collectionLabel}…',
   'catalog.addToast': 'Adicionado ao seu {collectionLabel}',

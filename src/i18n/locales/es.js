@@ -195,6 +195,9 @@ const es = {
   'catalog.emptyStep2': 'Confirma la coincidencia',
   'catalog.emptyStep3': 'Listo — está en tu colección',
   'catalog.noTokenHint': 'La búsqueda de discos requiere un token de Discogs — añade el tuyo en Ajustes.',
+  // C2.3 (issue #85): try-a-sample (localization-dictionary-addendum.md §1).
+  'catalog.trySample': 'Probar un ejemplo',
+  'catalog.trySampleNote': 'Esto es un ejemplo — añade tu propio artículo para empezar tu colección.',
   'catalog.clearFilters': 'Borrar filtros',
   'catalog.loading': 'Cargando tu {collectionLabel}…',
   'catalog.addToast': 'Añadido a tu {collectionLabel}',

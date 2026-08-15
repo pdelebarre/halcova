@@ -266,6 +266,13 @@ const en = {
   'catalog.emptyStep2': 'Confirm the match',
   'catalog.emptyStep3': "Done — it's in your collection",
   'catalog.noTokenHint': 'Records lookups need a Discogs token — add yours in Settings.',
+  // C2.3 (issue #85): try-a-sample — see localization-dictionary-addendum.md §1.
+  'catalog.trySample': 'Try a sample',
+  'catalog.trySampleNote': 'This is a sample — add your own item to start your collection.',
+  // C2.3 (issue #85): sample sheet pill + safe primary. EN-primary; other
+  // locales fall back here until the native-speaker pass lands.
+  'catalog.trySampleBadge': 'Sample',
+  'catalog.trySampleCta': "That's the idea",
   'catalog.clearFilters': 'Clear filters',
   'catalog.loading': 'Loading your {collectionLabel}…',
   'catalog.addToast': 'Added to your {collectionLabel}',

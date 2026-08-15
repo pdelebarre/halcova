@@ -195,6 +195,9 @@ const it = {
   'catalog.emptyStep2': 'Conferma la corrispondenza',
   'catalog.emptyStep3': 'Fatto — ora è nella tua collezione',
   'catalog.noTokenHint': 'La ricerca dei dischi richiede un token Discogs — aggiungi il tuo nelle Impostazioni.',
+  // C2.3 (issue #85): try-a-sample (localization-dictionary-addendum.md §1).
+  'catalog.trySample': 'Prova un esempio',
+  'catalog.trySampleNote': 'Questo è un esempio — aggiungi il tuo articolo per iniziare la tua collezione.',
   'catalog.clearFilters': 'Cancella filtri',
   'catalog.loading': 'Caricamento del tuo {collectionLabel}…',
   'catalog.addToast': 'Aggiunto al tuo {collectionLabel}',
