@@ -2,11 +2,35 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AlbumDetail from '../components/AlbumDetail'
 import BookDetail from '../components/BookDetail'
+import ReviewsSection from '../components/ReviewsSection'
 import { booksCatalog, recordsCatalog } from '../catalog'
 
 // AlbumDetail fetches a tracklist for items with a discogsId — stub it out.
 vi.mock('../api/discogs', () => ({
   getReleaseDetail: vi.fn().mockResolvedValue({ tracklist: [] }),
+}))
+
+// The detail sheets mount the shared ReviewsSection — stub its hook so the
+// mount tests never hit the network and the section renders a quiet empty
+// state.
+vi.mock('../hooks/useReviews', () => ({
+  useReviews: vi.fn(() => ({
+    reviews: [],
+    mine: null,
+    allReviews: [],
+    aggregate: { avg: 0, count: 0 },
+    status: 'ready',
+    error: null,
+    addOrUpdate: vi.fn().mockResolvedValue({ review: {} }),
+    remove: vi.fn().mockResolvedValue({ ok: true }),
+    signedIn: false,
+  })),
+}))
+
+// Spy on the ReviewsSection mount so tests can assert the review thread is
+// routed through catalog.reviewKey(item) and that showToast is forwarded.
+vi.mock('../components/ReviewsSection', () => ({
+  default: vi.fn(() => null),
 }))
 
 const RECORD = {
@@ -34,6 +58,12 @@ function renderDetail(item = RECORD, overrides = {}) {
     ...overrides,
   }
   return render(<AlbumDetail {...props} />)
+}
+
+// Last props the (mocked) ReviewsSection was mounted with.
+function lastReviewsProps() {
+  const calls = ReviewsSection.mock.calls
+  return calls[calls.length - 1][0]
 }
 
 describe('Detail sheet (records)', () => {
@@ -74,6 +104,58 @@ describe('Detail sheet (records)', () => {
   it('omits the external link for manually added items', () => {
     renderDetail({ ...RECORD, discogsId: null })
     expect(screen.queryByRole('link', { name: /View on Discogs/ })).not.toBeInTheDocument()
+  })
+
+  it('mounts the community reviews section routed through catalog.reviewKey', () => {
+    renderDetail(RECORD)
+    const props = lastReviewsProps()
+    expect(props.kind).toBe('records')
+    expect(props.sourceId).toBe(101) // recordsCatalog.reviewKey(item) === item.discogsId
+    expect(props.catalog).toBe(recordsCatalog)
+  })
+
+  it('passes a null thread id for manually added records (no provider id)', () => {
+    renderDetail({ ...RECORD, discogsId: null })
+    // reviewKey returns null for a record without an id — ReviewsSection
+    // renders nothing in that case.
+    expect(lastReviewsProps().sourceId).toBeNull()
+  })
+
+  it('routes the review thread through a catalog reviewKey override', () => {
+    const customCatalog = { ...recordsCatalog, reviewKey: (it) => `custom-${it.discogsId}` }
+    renderDetail(RECORD, { catalog: customCatalog })
+    expect(lastReviewsProps().sourceId).toBe('custom-101')
+  })
+
+  it('falls back to the provider id when reviewKey is missing', () => {
+    const bareCatalog = { ...recordsCatalog }
+    delete bareCatalog.reviewKey
+    renderDetail(RECORD, { catalog: bareCatalog })
+    expect(lastReviewsProps().sourceId).toBe(101)
+  })
+
+  it('forwards showToast to the reviews section', () => {
+    const showToast = vi.fn()
+    renderDetail(RECORD, { showToast })
+    expect(lastReviewsProps().showToast).toBe(showToast)
+  })
+
+  it('renders the community rating row when the item has one', () => {
+    renderDetail({ ...RECORD, rating: 4.5, ratingCount: 128 })
+    expect(screen.getByText('Community rating')).toBeInTheDocument()
+    expect(screen.getByText('4.5')).toBeInTheDocument()
+    expect(screen.getByText('128 ratings')).toBeInTheDocument()
+  })
+
+  it('renders nothing when the item has no rating (dark-screen safety)', () => {
+    renderDetail(RECORD) // no rating fields
+    expect(screen.queryByText('Community rating')).not.toBeInTheDocument()
+
+    // Weird shapes must never crash or render a phantom row.
+    renderDetail({ ...RECORD, rating: null, ratingCount: undefined })
+    expect(screen.queryByText('Community rating')).not.toBeInTheDocument()
+    renderDetail({ ...RECORD, rating: 0, ratingCount: 0 })
+    expect(screen.queryByText('Community rating')).not.toBeInTheDocument()
   })
 })
 
@@ -124,5 +206,50 @@ describe('Detail sheet (books)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(onSaveNotes).toHaveBeenCalledWith('Signed copy'))
+  })
+
+  it('renders the community rating row when the item has one', () => {
+    render(
+      <BookDetail
+        item={{ ...BOOK, rating: 4.1, ratingCount: 96 }}
+        catalog={booksCatalog}
+        onClose={() => {}}
+        onDelete={() => {}}
+        onSaveNotes={() => {}}
+      />
+    )
+    expect(screen.getByText('Community rating')).toBeInTheDocument()
+    expect(screen.getByText('4.1')).toBeInTheDocument()
+    expect(screen.getByText('96 ratings')).toBeInTheDocument()
+  })
+
+  it('omits the rating row for books without a rating', () => {
+    render(
+      <BookDetail item={BOOK} catalog={booksCatalog} onClose={() => {}} onDelete={() => {}} onSaveNotes={() => {}} />
+    )
+    expect(screen.queryByText('Community rating')).not.toBeInTheDocument()
+  })
+
+  it('mounts the community reviews section routed through catalog.reviewKey for books', () => {
+    render(
+      <BookDetail item={BOOK} catalog={booksCatalog} onClose={() => {}} onDelete={() => {}} onSaveNotes={() => {}} />
+    )
+    const props = lastReviewsProps()
+    expect(props.kind).toBe('books')
+    expect(props.sourceId).toBe('abc123') // booksCatalog.reviewKey(item) === item.googleBooksId
+    expect(props.catalog).toBe(booksCatalog)
+  })
+
+  it('passes a null thread id for manually added books (no provider id)', () => {
+    render(
+      <BookDetail
+        item={{ id: 'b2', title: 'Manual - Book', googleBooksId: null, infoLink: '', notes: '' }}
+        catalog={booksCatalog}
+        onClose={() => {}}
+        onDelete={() => {}}
+        onSaveNotes={() => {}}
+      />
+    )
+    expect(lastReviewsProps().sourceId).toBeNull()
   })
 })

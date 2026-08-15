@@ -56,6 +56,21 @@ function parseFormatType(formatArray) {
   return 'Other'
 }
 
+// Discogs reports the community rating two ways: search results carry
+// `community.rating` (0–5) + `community.rating_count`; release details nest
+// them as `community.rating.{average,count}`. Normalize both to the shared
+// `rating` / `ratingCount` fields, omitting them when absent (0 = no votes).
+function communityRating(community) {
+  const c = community || {}
+  const nested = (c.rating && typeof c.rating === 'object') ? c.rating : null
+  const average = typeof c.rating === 'number' ? c.rating : nested?.average
+  const count = Number.isInteger(c.rating_count) ? c.rating_count : nested?.count
+  const out = {}
+  if (typeof average === 'number' && average > 0) out.rating = average
+  if (Number.isInteger(count) && count > 0) out.ratingCount = count
+  return out
+}
+
 export async function searchByBarcode(barcode) {
   const clean = cleanBarcode(barcode)
   const data = await discogsFetch('searchBarcode', { barcode: clean })
@@ -75,6 +90,7 @@ export async function searchByBarcode(barcode) {
     coverImage: proxyCoverUrl(FN_BASE, r.cover_image || r.thumb),
     resourceUrl: r.resource_url,
     barcode: clean,
+    ...communityRating(r.community),
   }))
 }
 
@@ -96,6 +112,7 @@ export async function searchByText(query) {
     coverImage: proxyCoverUrl(FN_BASE, r.cover_image || r.thumb),
     resourceUrl: r.resource_url,
     barcode: '',
+    ...communityRating(r.community),
   }))
 }
 
@@ -109,5 +126,6 @@ export async function getReleaseDetail(discogsId) {
     })),
     notes: data.notes || '',
     images: (data.images || []).map((i) => i.resource_url),
+    ...communityRating(data.community),
   }
 }

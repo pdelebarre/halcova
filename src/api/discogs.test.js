@@ -66,6 +66,33 @@ describe('searchByBarcode', () => {
     expect(results[0].coverImage).toBe('')
     expect(results[1].coverImage).toBe('')
   })
+
+  it('surfaces the community rating and count when present', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      results: [{
+        id: 202, title: 'Miles Davis - Kind of Blue', year: 1959,
+        community: { rating: 4.5, rating_count: 128 },
+      }],
+    }))
+
+    const results = await discogs.searchByBarcode('123')
+    expect(results[0]).toMatchObject({ rating: 4.5, ratingCount: 128 })
+  })
+
+  it('omits rating fields when the community block is absent or empty', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      results: [
+        { id: 1, title: 'No Community' },
+        { id: 2, title: 'Zero rating', community: { rating: 0, rating_count: 0 } },
+      ],
+    }))
+
+    const results = await discogs.searchByBarcode('123')
+    expect(results[0].rating).toBeUndefined()
+    expect(results[0].ratingCount).toBeUndefined()
+    expect(results[1].rating).toBeUndefined()
+    expect(results[1].ratingCount).toBeUndefined()
+  })
 })
 
 describe('parseFormatType (via searchByText)', () => {
@@ -127,6 +154,17 @@ describe('getReleaseDetail', () => {
     expect(detail.tracklist).toEqual([])
     expect(detail.images).toEqual([])
     expect(detail.notes).toBe('')
+  })
+
+  it('surfaces the nested community rating from a release detail', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      tracklist: [],
+      notes: '',
+      images: [],
+      community: { rating: { count: 42, average: 4.2 } },
+    }))
+    const detail = await discogs.getReleaseDetail(101)
+    expect(detail).toMatchObject({ rating: 4.2, ratingCount: 42 })
   })
 })
 

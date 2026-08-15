@@ -115,6 +115,33 @@ describe('searchByBarcode', () => {
     global.fetch.mockResolvedValue(okJson({}))
     expect(await books.searchByBarcode('123')).toEqual([])
   })
+
+  it('surfaces averageRating and ratingsCount when present', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{
+        id: 'vol-r',
+        volumeInfo: {
+          title: 'A Wizard of Earthsea',
+          authors: ['Ursula K. Le Guin'],
+          averageRating: 4.3,
+          ratingsCount: 512,
+        },
+      }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0]).toMatchObject({ rating: 4.3, ratingCount: 512 })
+  })
+
+  it('omits rating fields when the volume has none', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-nr', volumeInfo: { title: 'Plain', authors: ['A. Author'] } }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0].rating).toBeUndefined()
+    expect(results[0].ratingCount).toBeUndefined()
+  })
 })
 
 describe('searchByText', () => {

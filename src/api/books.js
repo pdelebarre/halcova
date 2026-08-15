@@ -70,7 +70,7 @@ function toBookItem(volume, scannedIsbn) {
   const title = v.title || ''
   const itemTitle = authors ? `${authors} - ${title}` : title
 
-  return {
+  const item = {
     googleBooksId: volume.id || null,
     title: itemTitle,
     year: yearFrom(v.publishedDate),
@@ -90,6 +90,11 @@ function toBookItem(volume, scannedIsbn) {
     infoLink: volume.selfLink || '',
     resourceUrl: volume.selfLink || '',
   }
+  // Google Books volumes carry averageRating (0–5) + ratingsCount — surface
+  // them on the item when present (absent or 0 = no community votes).
+  if (typeof v.averageRating === 'number' && v.averageRating > 0) item.rating = v.averageRating
+  if (Number.isInteger(v.ratingsCount) && v.ratingsCount > 0) item.ratingCount = v.ratingsCount
+  return item
 }
 
 export async function searchByBarcode(isbn) {
