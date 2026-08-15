@@ -103,6 +103,17 @@
   max-width: 280px;
 }
 
+/* O-1 (free-tier-guidance.md, #143): quiet, non-blocking free-plan note under
+   the steps/tagline — free members only. Deliberately subtle (same muted tone
+   as the token hint) and it never pushes the Scan button out of reach. */
+.empty-plan-note {
+  font-size: 12px;
+  color: var(--static-grey);
+  margin: -8px 0 18px;
+  max-width: 280px;
+  font-style: italic;
+}
+
 /* Tagline migrated out of the header chrome (§4.2) — sits under the title. */
 .empty-tagline {
   font-family: var(--font-mono);
