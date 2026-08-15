@@ -338,6 +338,15 @@ const nl = {
 
   // §17 Gratis abonnement & demo
   'plan.freeCounter': '{count} van {cap} items toegevoegd',
+  // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only
+  // (free-tier-guidance.md #143/#144). Native-tester sign-off pending per
+  // localization-plan.md — do NOT ship before the pass. "spot" is colloquial:
+  // gloss as a natural collector equivalent (e.g. "plek"), not a literal
+  // translation. "no card, no expiry" must stay conversational, not a legal
+  // payment promise.
+  'plan.onboardNote': 'Free plan: up to 10 per collection — no card, no expiry.',
+  'plan.nearLimitHint': '{remaining} spots left on the free plan',
+  'plan.counterLabel': 'Free plan: {count} of {cap} items added',
   'plan.atLimitHint': 'Je hebt {cap} items toegevoegd — de limiet van het gratis abonnement. Vraag de beheerder om een upgrade om door te gaan.',
   'plan.limitToast': 'Limiet van het gratis abonnement bereikt. Vraag de beheerder om een upgrade om meer toe te voegen.',
   'plan.limitFab': 'Gratis abonnement vol — upgrade om meer toe te voegen',

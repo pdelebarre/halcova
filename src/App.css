@@ -40,7 +40,14 @@
 
 .plan-banner-counter { color: var(--jacket-kraft); letter-spacing: 0.02em; }
 
-.plan-banner-hint { color: var(--danger); }
+/* Free-tier plan hints — both states must pass WCAG AA on --sleeve-black
+   (#16130F) for 12px text. The at-cap (10/10) state keeps the red danger
+   tone via --danger-bright (~5.59:1, up from --danger's 3.85:1 which failed
+   AA); the near-limit (8/9) heads-up uses the soft gold --runout-gold
+   (~7.7:1) — value-framing, not a threat, and visually distinct from the
+   at-cap state. */
+.plan-banner-hint { color: var(--danger-bright); }
+.plan-banner-hint--near { color: var(--runout-gold); }
 
 /* S6 soft upgrade entry — "Upgrade" link in the free-plan banner. */
 .plan-banner-upgrade {

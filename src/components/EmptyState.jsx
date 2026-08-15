@@ -1,7 +1,7 @@
 import { t } from '../i18n'
 import './EmptyState.css'
 
-export default function EmptyState({ kind = 'empty', copy = {}, noToken = false, onScan, onScanCover, onManualAdd, onTrySample, onClear }) {
+export default function EmptyState({ kind = 'empty', copy = {}, noToken = false, planNote, onScan, onScanCover, onManualAdd, onTrySample, onClear }) {
   const iconClass = copy.emptyIcon || 'empty-disc'
   // C2 onboarding (issue #88): `emptySteps` (a 3-item array) replaces the
   // single emptySub sentence. Guarded so a malformed value can never crash —
@@ -37,6 +37,11 @@ export default function EmptyState({ kind = 'empty', copy = {}, noToken = false,
         <p className="empty-sub">{copy.emptySub || t('catalog.emptySub')}</p>
       )}
       {copy.emptyTagline && <p className="empty-tagline">{copy.emptyTagline}</p>}
+      {/* O-1 (free-tier-guidance.md, #143): one quiet, non-blocking free-plan
+          note under the steps/tagline — free members only. CollectionView
+          passes it only when the member is free (guarded like `noToken`). It
+          never requires dismissal and never covers the Scan button below. */}
+      {planNote && <p className="empty-plan-note">{planNote}</p>}
       {onScan && <button type="button" className="btn btn-primary" onClick={onScan}>{copy.emptyBtn || t('catalog.emptyBtn')}</button>}
       {/* C2.4 (issue #88): persistent, non-blocking records token hint under
           the Scan button. CollectionView passes noToken only for the Records

@@ -413,6 +413,21 @@ const en = {
 
   // §17 Free plan & demo
   'plan.freeCounter': '{count} of {cap} items added',
+  // Free-tier guidance (free-tier-guidance.md O-1 / D-1 / D-2, #143/#144).
+  // [VALIDATE — owner sign-off on #139] The "no card, no expiry" wording and
+  // the public plan name ("Premium") are pending owner confirmation on #139 —
+  // adjust here when the owner decides. "Per collection" is PO-confirmed
+  // (10 records AND 10 books, counted separately).
+  'plan.onboardNote': 'Free plan: up to 10 per collection — no card, no expiry.',
+  // Near-limit hint — fallback string; the pluralization-safe FUNCTION
+  // override lives in catalog.js (`copy.plan.nearLimitHint`). Non-EN locales
+  // inherit via fallback until the native-speaker pass lands.
+  // P2-4: "on the free plan" dropped — the banner is already free-plan
+  // context, and the shorter hint keeps the Upgrade button on the same row at
+  // 320–390px.
+  'plan.nearLimitHint': '{remaining} spots left',
+  // Accessible aria-label for the free-plan counter (D-1).
+  'plan.counterLabel': 'Free plan: {count} of {cap} items added',
   'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Upgrade to keep adding.",
   'plan.limitToast': 'Free-plan limit reached — upgrade to add more.',
   'plan.limitFab': 'Free plan full — upgrade to add more',

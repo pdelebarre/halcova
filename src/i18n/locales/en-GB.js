@@ -340,6 +340,10 @@ const enGB = {
 
   // §17 Free plan & demo — same copy as en for the baseline
   'plan.freeCounter': '{count} of {cap} items added',
+  // Free-tier guidance (free-tier-guidance.md #143/#144) — mirrors en.
+  'plan.onboardNote': 'Free plan: up to 10 per collection — no card, no expiry.',
+  'plan.nearLimitHint': '{remaining} spots left',
+  'plan.counterLabel': 'Free plan: {count} of {cap} items added',
   'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Ask the admin to upgrade your plan to keep adding.",
   'plan.limitToast': 'Free-plan limit reached. Ask the admin to upgrade your plan to add more.',
   'plan.limitFab': 'Free plan full — upgrade to add more',

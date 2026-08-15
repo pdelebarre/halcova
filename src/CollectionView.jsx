@@ -48,6 +48,15 @@ const TOAST_ICONS = { add: '✓', remove: '–', error: '✕' }
 // add UI so users aren't sent on a doomed add.
 const FREE_PLAN_CAP = 10
 
+// Near-limit hint (free-tier-guidance.md §4 D-2, #143/#144): show a
+// non-blocking "N spots left" hint when a free member is at cap−2 and cap−1
+// (8 and 9 of 10). It precedes the at-cap hint and replaces nothing.
+// [VALIDATE — owner sign-off on #139] The 8/9 thresholds are proposed, not
+// confirmed — product may prefer a single threshold (9 only) or "last spot"
+// only. Adjust THIS constant (and the copy in src/i18n/locales/en.js /
+// src/catalog.js) when the owner decides.
+const FREE_PLAN_NEAR_LIMIT = 2
+
 // How many of the most recently added items get their own shelf on the Floor.
 // The Floor activates once the collection grows past this many items.
 const NEW_ARRIVALS_COUNT = 5
@@ -129,6 +138,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // are gated once the cap is reached so a free user never attempts an add the
   // server will reject with PLAN_LIMIT.
   const atLimit = isFree && ownedItems.length >= FREE_PLAN_CAP
+  // D-2 (free-tier-guidance.md, #143/#144): remaining owned spots + whether to
+  // surface the non-blocking near-limit hint (cap−2 / cap−1 only). Never when
+  // at the cap — the at-limit hint owns that slot.
+  const remaining = FREE_PLAN_CAP - ownedItems.length
+  const nearLimit = !atLimit && remaining > 0 && remaining <= FREE_PLAN_NEAR_LIMIT
 
   // S6 lending gate: a free member sees a gated "Lending" affordance in the
   // detail sheet that opens the paywall (reason 'feature'). Never for demo
@@ -243,6 +257,15 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     return typeof copy.addedCount === 'function'
       ? copy.addedCount(n)
       : t('catalog.addedCount', { n: String(n) })
+  }
+
+  // D-2 (free-tier-guidance.md, #143/#144): the near-limit hint copy is a
+  // catalog `.copy` FUNCTION override (pluralization-safe, like addedCount);
+  // non-EN falls back to the i18n `plan.nearLimitHint` string.
+  function nearLimitMsg(remaining) {
+    return typeof copy.plan?.nearLimitHint === 'function'
+      ? copy.plan.nearLimitHint(remaining)
+      : t('plan.nearLimitHint', { remaining: String(remaining) })
   }
 
   function toggleFormat(f) {
@@ -864,10 +887,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           owner/unlimited and demo visitors. */}
       {status === 'ready' && isFree && (
         <div className="plan-banner">
-          <div className="plan-banner-status" role="status">
+          <div
+            className="plan-banner-status"
+            role="status"
+            aria-label={t('plan.counterLabel', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
+          >
             <span className="plan-banner-counter">
               {t('plan.freeCounter', { count: ownedItems.length, cap: FREE_PLAN_CAP })}
             </span>
+            {nearLimit && (
+              <span className="plan-banner-hint plan-banner-hint--near">{nearLimitMsg(remaining)}</span>
+            )}
             {atLimit && (
               <span className="plan-banner-hint">{t('plan.atLimitHint', { cap: FREE_PLAN_CAP })}</span>
             )}
@@ -972,10 +1002,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           </div>
         )}
 
+        {/* O-1 (free-tier-guidance.md, #143): the free-plan onboarding note is
+            passed to the empty state for free members ONLY — guarded like
+            `noToken`, so owner/paid/demo visitors never receive it. */}
         {status === 'ready' && ownedItems.length === 0 && (
           <EmptyState
             copy={copy}
             noToken={catalog.kind === 'records' && recordsNoToken}
+            planNote={isFree ? t('plan.onboardNote') : undefined}
             onScan={isDemo ? undefined : () => setModal('scan')}
             onScanCover={isDemo ? undefined : openCoverScan}
             onManualAdd={isDemo ? undefined : () => setModal('manual')}

@@ -205,6 +205,20 @@ export const recordsCatalog = {
         },
       },
     },
+    // Free-tier guidance (free-tier-guidance.md §4 D-2, #143/#144): the plan
+    // banner's counter + hints read i18n `plan.*` directly (t()) — the only
+    // catalog override here is `nearLimitHint`, a FUNCTION so pluralization is
+    // safe (mirrors the `addedCount` override above; i18n
+    // `plan.nearLimitHint` is the non-EN fallback).
+    // [VALIDATE — owner sign-off on #139] The onboard-note wording ("no card,
+    // no expiry"), the public plan name ("Premium") and the near-limit
+    // thresholds (8/9 of 10) are pending owner confirmation on ticket #139.
+    // Adjust the strings in src/i18n/locales/en.js and FREE_PLAN_NEAR_LIMIT in
+    // src/CollectionView.jsx when the owner decides.
+    plan: {
+      nearLimitHint: (remaining) =>
+        remaining === 1 ? '1 spot left' : `${remaining} spots left`,
+    },
     search: {
       results: (n, q) => `${n} ${n === 1 ? 'match' : 'matches'} for “${q}”`,
       clear: 'Clear search results',
@@ -676,6 +690,16 @@ export const booksCatalog = {
           body: t('paywall.reason.expired.body'),
         },
       },
+    },
+    // Free-tier guidance (free-tier-guidance.md §4 D-2, #143/#144): same as
+    // records — `nearLimitHint` is the pluralization-safe FUNCTION override
+    // (i18n `plan.nearLimitHint` is the non-EN fallback).
+    // [VALIDATE — owner sign-off on #139] The onboard-note wording ("no card,
+    // no expiry"), the public plan name ("Premium") and the near-limit
+    // thresholds (8/9 of 10) are pending owner confirmation on ticket #139.
+    plan: {
+      nearLimitHint: (remaining) =>
+        remaining === 1 ? '1 spot left' : `${remaining} spots left`,
     },
     // Gamification (Phase 1 § Play): release 1.1 Collection Persona + share
     // card. Copy bridges t() (EN master in the i18n locales; other locales

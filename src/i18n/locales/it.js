@@ -338,6 +338,15 @@ const it = {
 
   // §17 Piano gratuito e demo
   'plan.freeCounter': '{count} di {cap} articoli aggiunti',
+  // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only
+  // (free-tier-guidance.md #143/#144). Native-tester sign-off pending per
+  // localization-plan.md — do NOT ship before the pass. "spot" is colloquial:
+  // gloss as a natural collector equivalent (e.g. "posto"), not a literal
+  // translation. "no card, no expiry" must stay conversational, not a legal
+  // payment promise.
+  'plan.onboardNote': 'Free plan: up to 10 per collection — no card, no expiry.',
+  'plan.nearLimitHint': '{remaining} spots left on the free plan',
+  'plan.counterLabel': 'Free plan: {count} of {cap} items added',
   'plan.atLimitHint': 'Hai aggiunto {cap} articoli — il limite del piano gratuito. Chiedi all\'admin di passare al piano superiore per continuare ad aggiungere.',
   'plan.limitToast': 'Limite del piano gratuito raggiunto. Chiedi all\'admin di passare al piano superiore per aggiungere altro.',
   'plan.limitFab': 'Piano gratuito pieno — passa al piano superiore per aggiungere',
