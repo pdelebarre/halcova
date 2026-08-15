@@ -77,3 +77,42 @@ describe('App auth gating', () => {
     expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument()
   })
 })
+
+// C2.1 (issue #86): the first-run tab default needs to distinguish the Books
+// store's emptiness, so mock the collection response per `collection` param.
+function mockSignedInWithBooks(user, booksItems = []) {
+  saveSession({ user, code: 'RU-AAAA-BBBB-CCCC' })
+  global.fetch = vi.fn((url) => {
+    const u = String(url)
+    if (u.includes('/functions/auth')) return Promise.resolve(res(200, { user }))
+    if (u.includes('/functions/collection')) {
+      return Promise.resolve(res(200, { items: u.includes('collection=books') ? booksItems : [] }))
+    }
+    return Promise.resolve(res(404, { error: 'not found' }))
+  })
+}
+
+describe('first-run tab default (C2.1, issue #86)', () => {
+  it('lands a member with Books access and an empty collection on Books', async () => {
+    mockSignedInWithBooks({ id: 'u1', name: 'Ada', role: 'member', collections: { records: true, books: true } }, [])
+    render(<App />)
+    // Books is the token-free first tab — its empty state is the active view.
+    expect(await screen.findByRole('button', { name: 'Scan a book' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scan a record' })).not.toBeInTheDocument()
+  })
+
+  it('keeps Records when the member already has Books items', async () => {
+    mockSignedInWithBooks({ id: 'u2', name: 'Bob', role: 'member', collections: { records: true, books: true } }, [ITEM])
+    render(<App />)
+    // Established member — Books has items, so Records stays the default tab.
+    expect(await screen.findByRole('button', { name: 'Scan a record' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scan a book' })).not.toBeInTheDocument()
+  })
+
+  it('lands a records-only member on Records', async () => {
+    mockSignedInWithBooks({ id: 'u3', name: 'Cara', role: 'member', collections: { records: true, books: false } }, [])
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Scan a record' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scan a book' })).not.toBeInTheDocument()
+  })
+})

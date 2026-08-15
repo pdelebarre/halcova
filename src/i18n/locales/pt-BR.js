@@ -190,6 +190,11 @@ const ptBR = {
   'catalog.emptyTagline': 'seu {collectionLabel}, catalogado',
   'catalog.emptyBtn': 'Escanear um item',
   'catalog.emptyManualBtn': 'Adicionar por título',
+  // C2 onboarding (issue #88) — emptySteps is assembled from these three.
+  'catalog.emptyStep1': 'Escanear o código de barras',
+  'catalog.emptyStep2': 'Confirmar a correspondência',
+  'catalog.emptyStep3': 'Pronto — está na sua coleção',
+  'catalog.noTokenHint': 'A busca de discos precisa de um token do Discogs — adicione o seu em Configurações.',
   'catalog.clearFilters': 'Limpar filtros',
   'catalog.loading': 'Carregando seu {collectionLabel}…',
   'catalog.addToast': 'Adicionado ao seu {collectionLabel}',

@@ -74,6 +74,35 @@
   max-width: 280px;
 }
 
+/* C2 onboarding (issue #88): the three "how it works" steps replace the
+   single emptySub sentence. Left-aligned, numbered, readable on the dark
+   theme. */
+.empty-steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  max-width: 280px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--jacket-kraft-dim);
+}
+.empty-steps li {
+  margin-bottom: 6px;
+}
+.empty-steps li::marker {
+  color: var(--label-red);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* C2.4 (issue #88): persistent, non-blocking records token hint under the
+   Scan button in the empty state. */
+.empty-nohint {
+  font-size: 12px;
+  color: var(--static-grey);
+  margin: 8px 0 0;
+  max-width: 280px;
+}
+
 /* Tagline migrated out of the header chrome (§4.2) — sits under the title. */
 .empty-tagline {
   font-family: var(--font-mono);

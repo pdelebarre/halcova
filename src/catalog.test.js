@@ -27,6 +27,13 @@ describe('recordsCatalog', () => {
     expect(recordsCatalog.copy.moreBy('Miles Davis', 3)).toBe('More by Miles Davis in your crate (3)')
     expect(recordsCatalog.copy.nothingElseBy('Miles Davis')).toBe('Nothing else by Miles Davis in your crate')
     expect(recordsCatalog.copy.resultGood.label).toBe('Not in your crate yet')
+    // C2 onboarding (issue #88): three steps + the records token hint.
+    expect(recordsCatalog.copy.emptySteps).toEqual([
+      'Scan the barcode',
+      'Confirm the match',
+      "Done — it's in your collection",
+    ])
+    expect(recordsCatalog.copy.noTokenHint).toMatch(/Discogs token/)
   })
 
   it('exposes browse axes (Genre · Artist · Decade · Format · Label)', () => {
@@ -69,6 +76,14 @@ describe('booksCatalog', () => {
     expect(booksCatalog.copy.emptyTitle).toBe('Your shelf is empty')
     expect(booksCatalog.copy.addToast).toBe('Added to your shelf')
     expect(booksCatalog.copy.moreBy('Le Guin', 2)).toBe('More by Le Guin on your shelf (2)')
+    // C2 onboarding (issue #88): books mirrors the generic steps + hint copy
+    // (step 3 uses the generic "collection" noun, not "shelf").
+    expect(booksCatalog.copy.emptySteps).toEqual([
+      'Scan the barcode',
+      'Confirm the match',
+      "Done — it's in your collection",
+    ])
+    expect(booksCatalog.copy.noTokenHint).toMatch(/Discogs token/)
   })
 
   it('exposes browse axes (Category · Author · Year)', () => {

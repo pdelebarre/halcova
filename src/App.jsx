@@ -12,6 +12,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { recordsCatalog, booksCatalog } from './catalog'
 import * as authApi from './api/auth'
 import * as paymentApi from './api/payment'
+import * as collectionApi from './api/collection'
 import { useAuth } from './hooks/useAuth'
 import { getAccessCode } from './utils/session'
 import { t } from './i18n'
@@ -77,9 +78,37 @@ export default function App() {
     appToastTimer.current = setTimeout(() => setAppToast(null), 3200)
   }, [])
 
-  // Reset to the first collection when a different user signs in.
+  // Reset to the first collection when a different user signs in. C2.1
+  // (issue #86): route first-run to the token-free path — a brand-new member
+  // lands on Books (no Discogs token needed, so their first scan works
+  // immediately) when Books is granted and its collection is still empty;
+  // established members and records-only accounts keep Records. On a lookup
+  // failure we fall back to Records, the safe default.
   useEffect(() => {
-    setTab('records')
+    const userId = session?.user?.id
+    if (!userId) return undefined
+    // Read the current session via the ref (kept in sync above) so this effect
+    // can stay keyed only on user.id — a plan refresh (new session object,
+    // same user) must never reset the member's manually-chosen tab.
+    const user = sessionRef.current?.user
+    const collections = user?.collections || {}
+    if (!collections.books) {
+      setTab('records')
+      return undefined
+    }
+    let cancelled = false
+    // Promise.resolve() wraps the call so a mocked/non-promise return (or a
+    // synchronous throw) can never crash the effect — dark-screen safety.
+    Promise.resolve()
+      .then(() => collectionApi.listItems('books'))
+      .then((items) => {
+        if (cancelled) return
+        setTab(Array.isArray(items) && items.length === 0 ? 'books' : 'records')
+      })
+      .catch(() => {
+        if (!cancelled) setTab('records')
+      })
+    return () => { cancelled = true }
   }, [session?.user?.id])
 
   // S1 self-serve signup (ADR-0003 §3): arriving via ?magic-link=<token> (the

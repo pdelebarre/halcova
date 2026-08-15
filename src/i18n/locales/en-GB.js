@@ -191,6 +191,11 @@ const enGB = {
   'catalog.emptyTagline': 'your {collectionLabel}, catalogued',
   'catalog.emptyBtn': 'Scan an item',
   'catalog.emptyManualBtn': 'Add by title',
+  // C2 onboarding (issue #88) — emptySteps is assembled from these three.
+  'catalog.emptyStep1': 'Scan the barcode',
+  'catalog.emptyStep2': 'Confirm the match',
+  'catalog.emptyStep3': "Done — it's in your collection",
+  'catalog.noTokenHint': 'Records lookups need a Discogs token — add yours in Settings.',
   'catalog.clearFilters': 'Clear filters',
   'catalog.loading': 'Loading your {collectionLabel}…',
   'catalog.addToast': 'Added to your {collectionLabel}',

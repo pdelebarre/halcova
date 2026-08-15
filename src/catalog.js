@@ -70,6 +70,13 @@ export const recordsCatalog = {
     emptySub: 'Scan the barcode on a sleeve to catalog your first record.',
     emptyTagline: 'your crate, cataloged',
     emptyBtn: 'Scan a record',
+    // C2 onboarding (issue #88): three micro-steps replace the single
+    // emptySub sentence. Step 3 uses the generic "collection" noun (not
+    // "crate") to match the localized arrays and avoid DE/IT gender agreement.
+    emptySteps: ['Scan the barcode', 'Confirm the match', "Done — it's in your collection"],
+    // C2.4 (issue #88): persistent, non-blocking hint under the Scan button
+    // in the empty state when Records lookups have no Discogs token.
+    noTokenHint: 'Records lookups need a Discogs token — add yours in Settings.',
     loading: 'Loading your crate…',
     addToast: 'Added to your crate',
     removeLabel: 'Remove from crate',
@@ -472,6 +479,13 @@ export const booksCatalog = {
     emptySub: 'Scan the ISBN on a book to catalog your first title.',
     emptyTagline: 'your shelf, cataloged',
     emptyBtn: 'Scan a book',
+    // C2 onboarding (issue #88): same three steps as records; step 3 keeps the
+    // generic "collection" noun (not "shelf") to match the localized arrays.
+    emptySteps: ['Scan the barcode', 'Confirm the match', "Done — it's in your collection"],
+    // C2.4 (issue #88): mirror of the records hint — CollectionView only
+    // renders it for the Records catalog, but both catalogs expose the same
+    // copy shape.
+    noTokenHint: 'Records lookups need a Discogs token — add yours in Settings.',
     loading: 'Loading your shelf…',
     addToast: 'Added to your shelf',
     removeLabel: 'Remove from shelf',
