@@ -27,6 +27,7 @@ import { db as postgresDb } from '../postgres'
 import { createUsersRepo } from './users-repo'
 import { createItemsRepo } from './items-repo'
 import { createLookupCacheRepo } from './lookup-cache-repo'
+import { createFeedbackRepo } from './feedback-repo'
 import * as blobUsers from './blob-users'
 
 // Wrap a read so a Postgres miss or error falls back to the Blobs impl.
@@ -162,6 +163,7 @@ export function createPostgresRepository({ db = postgresDb } = {}) {
   const usersPg = createUsersRepo(db)
   const items = createItemsRepo(db)
   const lookupCache = createLookupCacheRepo(db)
+  const feedback = createFeedbackRepo(db)
 
   const users = {
     // Reads — DB first, Blobs fallback on miss/error, EXCEPT findUserByCode:
@@ -186,6 +188,7 @@ export function createPostgresRepository({ db = postgresDb } = {}) {
   return {
     backend: 'postgres',
     users,
+    feedback,
     items,
     lookupCache,
   }
