@@ -12,6 +12,15 @@
   padding: 0 16px calc(var(--safe-bottom) + 90px);
 }
 
+/* T2 (issue #110): the per-kind "room" scope. A plain block wrapper whose only
+   job is to carry the theme CSS variables (`--theme-accent`, …) + the kind
+   marker. It must NOT create a scroll container or a new layout/positioning
+   context: the sticky Toolbar and the position:fixed FAB/modals below it keep
+   behaving exactly as before, so Records rendering is unchanged (gold). */
+.collection-view {
+  width: 100%;
+}
+
 .status-line {
   padding: 60px 24px;
   text-align: center;

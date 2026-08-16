@@ -9,6 +9,7 @@ import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
 import PaywallModal from './components/PaywallModal'
 import ErrorBoundary from './components/ErrorBoundary'
+import { ThemeProvider } from './theme'
 import { recordsCatalog, booksCatalog } from './catalog'
 import * as authApi from './api/auth'
 import * as paymentApi from './api/payment'
@@ -354,25 +355,34 @@ export default function App() {
           The boundary shares the key so switching tabs also clears an error
           state — a failure in one collection never blanks the header/nav or
           poisons the other tab. */}
-      <ErrorBoundary key={`boundary-${catalog.kind}`}>
-        <CollectionView
-          key={catalog.kind}
-          catalog={catalog}
-          onRequestSettings={() => setSettingsOpen(true)}
-          lendingEnabled={lendingEnabled}
-          overdueCount={overdueCount}
-          onOpenLoans={() => setLoansOpen(true)}
-          onOpenPaywall={openPaywall}
-          refreshTick={refreshTick}
-          loansButtonRef={loansButtonRef}
-          plan={plan}
-          planStatus={planStatus}
-          isFree={isFree}
-          isDemo={isDemo}
-          user={user}
-          gamificationEnabled={gamesEnabled}
-        />
-      </ErrorBoundary>
+      {/* T2 (issue #110): ThemeProvider feeds the active catalog's room theme
+          (records = gold, books = neutral placeholder until T3 #104) to the
+          collection below; CollectionView applies it as CSS variables on its
+          own container. `catalog?.theme` is optional-chained — a missing theme
+          can never throw. The provider is keyed implicitly by catalog.kind via
+          the boundary/CollectionView keys, so each tab swap gets a fresh
+          accent scope. */}
+      <ThemeProvider theme={catalog?.theme}>
+        <ErrorBoundary key={`boundary-${catalog.kind}`}>
+          <CollectionView
+            key={catalog.kind}
+            catalog={catalog}
+            onRequestSettings={() => setSettingsOpen(true)}
+            lendingEnabled={lendingEnabled}
+            overdueCount={overdueCount}
+            onOpenLoans={() => setLoansOpen(true)}
+            onOpenPaywall={openPaywall}
+            refreshTick={refreshTick}
+            loansButtonRef={loansButtonRef}
+            plan={plan}
+            planStatus={planStatus}
+            isFree={isFree}
+            isDemo={isDemo}
+            user={user}
+            gamificationEnabled={gamesEnabled}
+          />
+        </ErrorBoundary>
+      </ThemeProvider>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}

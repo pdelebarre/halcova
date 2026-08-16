@@ -1,20 +1,75 @@
 :root {
-  --sleeve-black: #16130F;
-  --vinyl-groove: #211D18;
-  --vinyl-groove-2: #2B251E;
-  --jacket-kraft: #EFE6D8;
-  --jacket-kraft-dim: #C9BFAF;
-  --label-red: #B23A2E;
-  --label-red-bright: #CE4B3D;
-  --runout-gold: #C9A227;
-  --static-grey: #A49C8E;
-  --glass: rgba(33, 29, 24, 0.72);
+  /* ==============================================================
+     THEME TOKENS — T1 neutral core + per-kind accents (epic #95)
+     --------------------------------------------------------------
+     • Neutral core (`--color-*`): the semantic foundation shared by
+       EVERY room ("one home") — canonical source of truth.
+     • Per-kind accents (`--kind-*`): each collection type's "room".
+     • Records aliases (vinyl-named `--sleeve-black`, `--runout-gold`,
+       …) are kept and resolve to the same values, so today's look is
+       a visual no-op for records.
+     • Books accent is a NEUTRAL PLACEHOLDER until T3 picks the Phase 0
+       color (gated on the survey — epic #95 blocking 1).
+     Contrast ratios are measured against the dark base `#16130F`
+     (marketing/mockups/theme-rooms/README.md).
+     ============================================================== */
+
+  /* --- Neutral core: dark base + surfaces --- */
+  --color-bg: #16130F;                   /* dark base (records alias: --sleeve-black) */
+  --color-surface-1: #211D18;            /* raised surface 1 (--vinyl-groove) */
+  --color-surface-2: #2B251E;            /* raised surface 2 (--vinyl-groove-2) */
+  --color-glass: rgba(33, 29, 24, 0.72); /* frosted glass (--glass) */
+
+  /* --- Neutral core: text --- */
+  --color-text: #EFE6D8;                 /* primary text (--jacket-kraft) */
+  --color-text-dim: #C9BFAF;             /* secondary text (--jacket-kraft-dim) */
+  --color-text-muted: #A49C8E;           /* muted text / placeholder (--static-grey) */
+  --color-line: #35302A;                 /* borders & dividers (--line) */
+
+  /* --- Neutral core: semantic colors — global & identical across rooms --- */
+  --color-danger: #C24B3F;               /* semantic danger (--danger) */
+  --color-danger-bright: #E0695B;        /* lighter danger for small text/badges: >= 4.5:1 on --color-surface-2 and the grid chip (--danger-bright) */
+  --color-success: #7A9A6B;              /* semantic success (--success) */
+  --color-alarm: #B23A2E;                /* primary action / "already own" red — the Scan FAB (--label-red) */
+  --color-alarm-bright: #CE4B3D;         /* hover/bright variant (--label-red-bright) */
+
+  /* --- Neutral core: brand accent ---
+     runout gold is the UNIVERSAL Halcova accent (wordmark, icons,
+     primary CTAs) shared by every room, so it lives in the neutral
+     core, not a kind group. Gold = 7.65:1 on #16130F ✓. */
+  --color-brand: #C9A227;                /* gold — 7.65:1 on --color-bg ✓ */
+
+  /* --- Per-kind accent aliases (the "rooms") ---
+     Records = gold, exactly today's look (visual no-op).
+     Books = NEUTRAL PLACEHOLDER until T3 picks the Phase 0 color.
+     Contrast gate on #16130F (mockups/theme-rooms/README.md):
+       gold 7.65:1 ✓ · amber #D9A441 8.23:1 ✓ · green #7FA98C 7.02:1 ✓
+       oxblood #B05750 3.81:1 ⚠ UI-only · oxblood text #CB7C70 5.87:1 ✓
+     (Do NOT assign amber/green/oxblood here — that's the gated T3.) */
+  --kind-records-accent: var(--color-brand);  /* gold = today's look (7.65:1 on #16130F ✓) */
+  --kind-books-accent: var(--color-text-muted); /* PLACEHOLDER — neutral, no chosen color (T3 gated) */
+
+  /* --- Records aliases (vinyl-named, kept for compatibility) ---
+     These are the records room's tokens. Same values as before →
+     records rendering is unchanged (visual no-op). */
+  --sleeve-black: var(--color-bg);
+  --vinyl-groove: var(--color-surface-1);
+  --vinyl-groove-2: var(--color-surface-2);
+  --jacket-kraft: var(--color-text);
+  --jacket-kraft-dim: var(--color-text-dim);
+  --label-red: var(--color-alarm);
+  --label-red-bright: var(--color-alarm-bright);
+  --runout-gold: var(--color-brand);
+  --static-grey: var(--color-text-muted);
+  --glass: var(--color-glass);
+  --line: var(--color-line);
+  --danger: var(--color-danger);
+  --danger-bright: var(--color-danger-bright);
+  --success: var(--color-success);
+
+  /* --- Non-color tokens (unchanged) --- */
   --shadow-card: 0 6px 14px rgba(0,0,0,0.35);
   --shadow-float: 0 10px 24px rgba(0,0,0,0.45);
-  --line: #35302A;
-  --danger: #C24B3F;
-  --danger-bright: #E0695B; /* lighter danger for small text/badges: >= 4.5:1 on --vinyl-groove-2 and the grid chip */
-  --success: #7A9A6B;
 
   --font-display: 'Fraunces Variable', Georgia, serif; /* self-hosted variable face */
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

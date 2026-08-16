@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 import { saveSession } from './utils/session'
 
@@ -75,6 +75,31 @@ describe('App auth gating', () => {
     render(<App />)
     expect(await screen.findByRole('button', { name: 'Records' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument()
+  })
+})
+
+describe('App — theme room scope (epic #95, T2 #110)', () => {
+  beforeEach(() => {
+    saveSession(null)
+  })
+
+  it('swaps the accent scope when switching the Records|Books tab, without a dark screen', async () => {
+    mockSignedIn({ id: 'u1', name: 'Ada', role: 'member', collections: { records: true, books: true } })
+    const { container } = render(<App />)
+
+    // Default room is Records — gold accent scope on the collection container.
+    await screen.findByRole('button', { name: 'Records' })
+    await waitFor(() => expect(container.querySelector('.collection-view')?.dataset.kind).toBe('records'))
+    const recordsScope = container.querySelector('.collection-view')
+    expect(recordsScope.style.getPropertyValue('--theme-accent')).toBe('var(--kind-records-accent)')
+
+    // Switch to the Books tab → the scope swaps to the neutral placeholder
+    // (no books color invented — that's gated T3, #104).
+    fireEvent.click(screen.getByRole('button', { name: 'Books' }))
+    await waitFor(() => expect(container.querySelector('.collection-view')?.dataset.kind).toBe('books'))
+    const booksScope = container.querySelector('.collection-view')
+    expect(booksScope).not.toBeNull()
+    expect(booksScope.style.getPropertyValue('--theme-accent')).toBe('var(--kind-books-accent)')
   })
 })
 
