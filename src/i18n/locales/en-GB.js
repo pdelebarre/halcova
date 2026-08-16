@@ -347,6 +347,8 @@ const enGB = {
   'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Ask the admin to upgrade your plan to keep adding.",
   'plan.limitToast': 'Free-plan limit reached. Ask the admin to upgrade your plan to add more.',
   'plan.limitFab': 'Free plan full — upgrade to add more',
+  // Free-tier guidance D-7 (#171): free-only note in the wishlist empty state.
+  'wishlist.freeNote': "Wants are unlimited and don't use a spot on your plan.",
   'admin.plan': 'Plan',
   'admin.planFree': 'Free',
   'admin.planUnlimited': 'Unlimited',
