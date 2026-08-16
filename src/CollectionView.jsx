@@ -11,6 +11,7 @@ import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
 import PlayPanel from './components/PlayPanel'
 import { useCollection } from './hooks/useCollection'
+import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { extractSearchQuery } from './utils/ocrText'
 import { itemInBin } from './utils/browse'
@@ -68,6 +69,14 @@ const NEW_ARRIVALS_COUNT = 5
  */
 export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
   const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
+
+  // T2 (issue #110): the active room's theme, provided by App.jsx. `useTheme()`
+  // degrades to {} outside a provider, so a missing theme can never throw
+  // (no dark-screen risk). The resolved CSS variables land on the container
+  // below, scoping the accent for every descendant. Keyed per-kind by App.jsx,
+  // so a tab switch remounts this view fresh — no stale accent scope.
+  const theme = useTheme()
+  const themeVars = useMemo(() => themeToCssVars(theme), [theme])
 
   // Partition (§ Fix): wishlist items are UNOWNED wants — they never count as
   // owned, and never appear in the crate/shelf, stats, aisles or search.
@@ -881,7 +890,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   }, [ownedItems, debouncedQuery, activeFormats, activeGenres, activeArtist, activeLending, activeAisle, catalog, sortBy, hasQuery])
 
   return (
-    <>
+    <div className="collection-view" data-kind={catalog.kind} style={themeVars}>
       {/* Free tier: total-items counter (items.length, not the visible count)
           + the at-cap hint. Shown only for free-plan members — absent for
           owner/unlimited and demo visitors. */}
@@ -1337,6 +1346,6 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       {status === 'ready' && gamificationEnabled && playOpen && (
         <PlayPanel items={ownedItems} catalog={catalog} onClose={() => setPlayOpen(false)} />
       )}
-    </>
+    </div>
   )
 }

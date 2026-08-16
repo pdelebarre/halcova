@@ -64,6 +64,17 @@ export const recordsCatalog = {
   detailLinkLabel: 'View on Discogs ↗',
   // Community reviews (Task 6): the provider id that anchors a review thread.
   reviewKey: (item) => item.discogsId,
+  // Room theme (epic #95, T2 #110): the per-kind accent scope, provided by
+  // App.jsx's ThemeProvider and applied as CSS variables on the collection
+  // container in CollectionView.jsx. Values are CSS custom-property references
+  // into the T1 token layer (src/index.css). Records = gold — exactly today's
+  // look (a visual no-op). `accentText` / `ambient` are neutral-core references
+  // until the room gets its own color.
+  theme: {
+    accent: 'var(--kind-records-accent)',
+    accentText: 'var(--color-bg)',
+    ambient: 'var(--color-surface-1)',
+  },
   copy: {
     emptyIcon: 'empty-disc',
     // Kind-specific overrides for the shared collection flow.
@@ -513,6 +524,14 @@ export const booksCatalog = {
   detailLinkLabel: 'View on Google Books ↗',
   // Community reviews (Task 6): the provider id that anchors a review thread.
   reviewKey: (item) => item.googleBooksId,
+  // Room theme (epic #95, T2 #110): same shape as records, but the accent is
+  // the NEUTRAL PLACEHOLDER --kind-books-accent until T3 (#104) picks the
+  // Phase 0 color. The wiring must work; a books color must NOT be invented.
+  theme: {
+    accent: 'var(--kind-books-accent)',
+    accentText: 'var(--color-bg)',
+    ambient: 'var(--color-surface-1)',
+  },
   copy: {
     emptyIcon: 'empty-book',
     // Kind-specific overrides for the shared collection flow.

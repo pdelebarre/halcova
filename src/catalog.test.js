@@ -70,6 +70,14 @@ describe('recordsCatalog', () => {
     expect(format.value({ formatType: 'LP' })).toEqual(['LP'])
     expect(format.value({})).toEqual([])
   })
+
+  it('exposes room theme metadata — gold for records (epic #95, T2 #110)', () => {
+    expect(recordsCatalog.theme).toBeTypeOf('object')
+    // The accent is the T1 per-kind token: records = gold, today's look.
+    expect(recordsCatalog.theme.accent).toBe('var(--kind-records-accent)')
+    expect(recordsCatalog.theme.accentText).toBe('var(--color-bg)')
+    expect(recordsCatalog.theme.ambient).toBe('var(--color-surface-1)')
+  })
 })
 
 describe('booksCatalog', () => {
@@ -131,6 +139,15 @@ describe('booksCatalog', () => {
     const year = booksCatalog.browseAxes.find((a) => a.id === 'year')
     expect(year.value({ year: 1969 })).toEqual(['1969'])
     expect(year.value({})).toEqual([])
+  })
+
+  it('exposes a NEUTRAL placeholder room theme until T3 picks the books color (epic #95, T2 #110)', () => {
+    expect(booksCatalog.theme).toBeTypeOf('object')
+    // Books accent stays the T1 neutral placeholder — wiring works but no
+    // books color is invented here (that's the gated T3, issue #104).
+    expect(booksCatalog.theme.accent).toBe('var(--kind-books-accent)')
+    expect(booksCatalog.theme.accentText).toBe('var(--color-bg)')
+    expect(booksCatalog.theme.ambient).toBe('var(--color-surface-1)')
   })
 })
 
