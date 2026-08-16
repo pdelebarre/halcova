@@ -431,6 +431,9 @@ const en = {
   'plan.atLimitHint': "You've added {cap} items — the free-plan limit. Upgrade to keep adding.",
   'plan.limitToast': 'Free-plan limit reached — upgrade to add more.',
   'plan.limitFab': 'Free plan full — upgrade to add more',
+  // Free-tier guidance D-7 (#171): free-only note in the wishlist empty state
+  // (wants are unlimited and never count toward the 10-item cap).
+  'wishlist.freeNote': "Wants are unlimited and don't use a spot on your plan.",
 
   // §17b Paywall (ADR-0003 S6) — self-serve upgrade + Stripe checkout.
   // EN master only; other locales inherit via fallback until the native-speaker

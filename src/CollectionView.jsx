@@ -1330,6 +1330,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onOpenItem={(item) => { setWishlistOpen(false); openItem(item) }}
           copy={copy}
           isDemo={isDemo}
+          isFree={isFree}
         />
       )}
 

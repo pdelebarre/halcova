@@ -152,6 +152,9 @@ export const recordsCatalog = {
       button: 'Wishlist',
       title: 'Your wishlist',
       empty: 'Your wishlist is empty — scan something in a shop and add it here.',
+      // D-7 (#171): free-only note in the wishlist empty state — wants are
+      // unlimited and never count toward the 10-item cap.
+      freeNote: "Wants are unlimited and don't use a spot on your plan.",
       addToCrate: 'Add to crate',
       addToCrateToast: 'Added to your crate',
       remove: 'Remove from wishlist',
@@ -638,6 +641,9 @@ export const booksCatalog = {
       button: 'Wishlist',
       title: 'Your wishlist',
       empty: 'Your wishlist is empty — scan something in a shop and add it here.',
+      // D-7 (#171): free-only note in the wishlist empty state — wants are
+      // unlimited and never count toward the 10-item cap.
+      freeNote: "Wants are unlimited and don't use a spot on your plan.",
       addToCrate: 'Add to shelf',
       addToCrateToast: 'Added to your shelf',
       remove: 'Remove from wishlist',

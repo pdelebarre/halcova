@@ -19,7 +19,7 @@ const FMT_CLASS = { LP: 'lp', EP: 'ep', CD: 'cd', '7"': 'seven', '12"': 'lp' }
  * (convert → owned, appears on the shelf/Floor) and "Remove". Owned items
  * never appear here — they live in the collection.
  */
-export default function WishlistSheet({ items = [], onConvert, onRemove, onClose, onOpenItem, copy = {}, isDemo = false }) {
+export default function WishlistSheet({ items = [], onConvert, onRemove, onClose, onOpenItem, copy = {}, isDemo = false, isFree = false }) {
   const wl = copy.wishlist || {}
   const closeRef = useRef(null)
 
@@ -49,7 +49,15 @@ export default function WishlistSheet({ items = [], onConvert, onRemove, onClose
 
         <div className="wishlist-body">
           {items.length === 0 && (
-            <p className="wishlist-empty">{wl.empty || 'Your wishlist is empty.'}</p>
+            <>
+              <p className="wishlist-empty">{wl.empty || 'Your wishlist is empty.'}</p>
+              {/* D-7 (#171): free-only, factual line — wants are unlimited and
+                  don't use a spot on the plan. Free members only; demo and
+                  paid/owner never see it. Copy lives in catalog.copy / i18n. */}
+              {isFree && !isDemo && (
+                <p className="wishlist-free-note">{wl.freeNote || t('wishlist.freeNote') || ''}</p>
+              )}
+            </>
           )}
 
           <ul className="wishlist-list">

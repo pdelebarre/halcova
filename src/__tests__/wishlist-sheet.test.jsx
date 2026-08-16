@@ -101,3 +101,33 @@ describe('Wishlist sheet — full cards', () => {
     expect(container.querySelector('.record-peek')).not.toBeInTheDocument()
   })
 })
+
+describe('Wishlist sheet — free-plan note (D-7 #171)', () => {
+  // The exact free-only line; sourced from the catalog copy so it stays in sync.
+  const FREE_NOTE = recordsCatalog.copy.wishlist.freeNote
+
+  it('shows the free-only note in the empty state for free members', () => {
+    renderSheet([], { isFree: true })
+
+    expect(screen.getByText(FREE_NOTE)).toBeInTheDocument()
+  })
+
+  it('hides the note when not on the free plan (default)', () => {
+    renderSheet([])
+
+    expect(screen.queryByText(FREE_NOTE)).not.toBeInTheDocument()
+  })
+
+  it('never shows the note to demo visitors, even when isFree is passed', () => {
+    renderSheet([], { isFree: true, isDemo: true })
+
+    expect(screen.queryByText(FREE_NOTE)).not.toBeInTheDocument()
+  })
+
+  it('leaves a populated wishlist unaffected (rows render, no note)', () => {
+    renderSheet([WANT], { isFree: true })
+
+    expect(screen.getByText('Kind of Blue')).toBeInTheDocument()
+    expect(screen.queryByText(FREE_NOTE)).not.toBeInTheDocument()
+  })
+})
