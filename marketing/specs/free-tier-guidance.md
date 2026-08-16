@@ -155,15 +155,17 @@ The Lending gate opens the paywall (`reason: 'feature'`).
 - **✅ Confirmed (PO, 2026-08-15): the cap is per collection** — 10 records AND
   10 books, counted separately. The copy may say "up to 10 per collection" in
   public. Resolved.
-- **[VALIDATE] "no card, no expiry".** The free plan currently has no expiry and
-  no payment — but confirm no future expiry/entitlement change is planned before
-  we promise "no expiry" publicly.
-- **[VALIDATE] Plan naming.** Consumer copy says "Premium" (one-time); the plan
-  enum also holds `premium` (subscription) and `unlimited` (grandfathered). Keep
-  all public copy on "Premium" unless the owner changes the pricing model.
-- **[VALIDATE] Near-limit thresholds.** D-2 proposes 8 and 9. Product may prefer
-  a single threshold (e.g. 9 only) or "last spot" only.
-- **[VALIDATE] Wishlist free note (D-7).** Ship only if the owner wants to
-  encourage unbounded wishlisting; otherwise drop.
-- **[VALIDATE] Counter aria-label wording** with the Ergonomics Reviewer /
-  a11y pass before merge.
+- **✅ Confirmed (owner, 2026-08-16, via #139): "no card, no expiry".** Keep the
+  wording — the free plan has no expiry and no payment. Do not promise anything
+  about payment in other locales that reads as a legal guarantee.
+- **✅ Confirmed (owner, 2026-08-16, via #139): Plan naming.** Keep consumer copy
+  on "Premium" (one-time). Internal enums (`premium` subscription, `unlimited`
+  grandfathered) unchanged.
+- **✅ Confirmed (PM decision on owner delegation, 2026-08-16, via #139): Near-limit
+  thresholds.** Keep the two-step **8 and 9 of 10** (cap−2 / cap−1, `FREE_PLAN_NEAR_LIMIT
+  = 2`) — chosen by the PM from the owner's "between 8 and 12" band; already shipped
+  in PR #148.
+- **✅ Confirmed (owner, 2026-08-16, via #139): Wishlist free note (D-7) — SHIP.**
+  Not yet implemented — tracked as ticket "Free-tier guidance T6" (epic #138).
+- **✅ Confirmed (owner, 2026-08-16, via #139): Counter aria-label wording.** Keep
+  `plan.counterLabel` ("Free plan: {count} of {cap} items added") — ergonomics pass OK.
