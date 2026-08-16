@@ -35,6 +35,14 @@ export async function createMemDb() {
     returns: DataType.text,
     implementation: (s) => String(s ?? '').trim(),
   })
+  // Migration 006's message CHECK uses char_length (native on real Postgres);
+  // pg-mem doesn't implement it, so register it like btrim above.
+  mem.public.registerFunction({
+    name: 'char_length',
+    args: [DataType.text],
+    returns: DataType.integer,
+    implementation: (s) => String(s ?? '').length,
+  })
   mem.public.none(await migrationSql())
   const { Pool } = mem.adapters.createPg()
   const pool = new Pool()

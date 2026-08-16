@@ -9,7 +9,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { newDb } from 'pg-mem'
+import { DataType, newDb } from 'pg-mem'
 import { applyMigrations } from '../../../scripts/db-migrate.mjs'
 
 const MIGRATIONS_DIR = path.join(
@@ -18,6 +18,14 @@ const MIGRATIONS_DIR = path.join(
 
 function createRawMemPool() {
   const mem = newDb()
+  // Migration 006's message CHECK uses char_length, which pg-mem doesn't
+  // implement — register it (real Postgres has it natively).
+  mem.public.registerFunction({
+    name: 'char_length',
+    args: [DataType.text],
+    returns: DataType.integer,
+    implementation: (s) => String(s ?? '').length,
+  })
   const { Pool } = mem.adapters.createPg()
   return { pool: new Pool() }
 }
