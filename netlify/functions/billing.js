@@ -22,6 +22,7 @@
 // leave the server.
 
 import { randomUUID } from 'node:crypto'
+import { getStore } from '@netlify/blobs'
 import { stripeWebhookSecret, verifyWebhookSignature } from './_shared/stripe'
 import {
   findUserByEmail,
@@ -35,6 +36,9 @@ import { applyEntitlement, materializeCheckoutSession } from './_shared/entitlem
 import { generateAccessCode } from './_shared/auth'
 import { json, securityHeaders } from './_shared/security'
 import { logAudit, safeLog } from './_shared/audit'
+import { recordAnomaly } from './_shared/anomaly'
+
+const RATE_LIMITS_STORE = 'runout-rate-limits'
 
 // SEC-6.1 (#215): the ONLY event types this webhook ever gives side effects
 // to. Stripe sends dozens of other event types; every one of them is acked
@@ -128,6 +132,9 @@ export default async (req) => {
   const signature = req.headers.get('stripe-signature') || ''
   if (!verifyWebhookSignature({ rawBody, signature })) {
     logAudit('webhook.invalid_signature', {})
+    // SEC-6.6 (#220): repeated invalid signatures are a webhook anomaly signal
+    // (a forged-event probe / replay attack).
+    await recordAnomaly(getStore(RATE_LIMITS_STORE), 'anom:webhook:invalid_sig', { threshold: 5, signal: 'webhook_invalid_signature_burst' })
     return json(400, { error: 'Invalid signature.' })
   }
 

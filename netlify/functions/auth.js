@@ -25,6 +25,8 @@ import {
   saveUser,
 } from './_shared/users'
 import { json, readJsonBody, safeError } from './_shared/security'
+import { logAudit } from './_shared/audit'
+import { recordAnomaly } from './_shared/anomaly'
 
 // NOTE — CSRF (SEC-3.5, #198): sessions are NOT cookie-based. SEC-EPIC-1
 // (#176) uses a Bearer session token held in localStorage and sent as an
@@ -173,13 +175,27 @@ async function handleLogin(body, req) {
   }
 
   const user = await profileForCode(code)
-  if (!user) return json(401, { error: "That access code isn't recognized. Check it and try again." })
-  if (user.status !== 'active') return json(403, { error: 'This account is disabled. Ask the admin to re-enable it.' })
+  if (!user) {
+    // SEC-6.4 (#218): an unknown-code login attempt is a security-relevant
+    // signal (brute force / typo) — audit it, never the code itself.
+    logAudit('auth.login_failed', { reason: 'unknown_code' })
+    // SEC-6.6 (#220): a burst of failed logins from one IP is an early-warning
+    // anomaly signal (in addition to the per-IP rate limit).
+    if (ip) {
+      await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:auth:login:${ip}`, { threshold: 10, signal: 'auth_failure_burst' })
+    }
+    return json(401, { error: "That access code isn't recognized. Check it and try again." })
+  }
+  if (user.status !== 'active') {
+    logAudit('auth.login_failed', { reason: 'disabled', userId: user.id })
+    return json(403, { error: 'This account is disabled. Ask the admin to re-enable it.' })
+  }
   // The access code is an EXCHANGE credential only (SEC-EPIC-1, #176): a
   // successful login mints a fresh, opaque, expiring SESSION token — never the
   // code — which the client persists and sends on every later call. The raw
   // token is returned exactly once here and only its hash is stored server-side.
   const { token } = await createSession({ userId: user.id, role: user.role })
+  logAudit('auth.login_success', { userId: user.id, role: user.role })
   return json(200, { user: publicUser(user), session: token })
 }
 
@@ -197,7 +213,11 @@ async function handleMe(req) {
   // The Bearer is now a session token, not an access code — a live session
   // resolves to the user (disabled accounts are rejected here too, SEC-1.9).
   const resolved = await resolveSession(req)
-  if (resolved.error) return resolved.error
+  if (resolved.error) {
+    // SEC-6.4 (#218): an invalid/expired/revoked session at revalidation.
+    logAudit('auth.session_invalid', {})
+    return resolved.error
+  }
   return json(200, { user: publicUser(resolved.user), session: token })
 }
 
@@ -208,6 +228,7 @@ async function handleLogout(req) {
   const token = bearer(req)
   if (!token) return json(400, { error: 'Not signed in.' })
   await revokeSession(token)
+  logAudit('auth.logout', {})
   return json(200, { ok: true })
 }
 
@@ -222,6 +243,7 @@ async function handleLogoutAll(req) {
   const resolved = await resolveSession(req)
   if (resolved.error) return resolved.error
   await revokeAllForUser(resolved.user.id)
+  logAudit('auth.logout_all', { userId: resolved.user.id })
   return json(200, { ok: true })
 }
 
