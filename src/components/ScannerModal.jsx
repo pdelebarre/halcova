@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { prepareZXingModule, readBarcodes } from 'zxing-wasm/reader'
+import { prepareZXingModule, purgeZXingModule, readBarcodes } from 'zxing-wasm/reader'
 import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
 import { t } from '../i18n'
 import './ScannerModal.css'
@@ -40,17 +40,14 @@ const MAX_DECODE_WIDTH = 640
 // After this long of armed scanning (camera live, loop decoding) with zero
 // decodes AND zero hard errors, show a subtle "nothing detected yet" hint so
 // it's never a silent black hole. Does NOT reset the camera.
+// After this long of armed scanning with no barcode detected, show a subtle
+// hint so it's never a silent black hole. Never fatal, never resets the camera.
 const WATCHDOG_MS = 9000
-// If the video never becomes ready with real dimensions within this window
-// (black/frozen stream, e.g. an iOS Safari re-acquisition), bail to the error
-// path instead of silently spinning on 1×1 frames forever.
-const VIDEO_READY_TIMEOUT_MS = 8000
-// How many CONSECUTIVE readBarcodes failures (each ~180ms apart) we tolerate
-// before surfacing the retry UI. A single transient throw — e.g. getImageData
-// briefly throwing "canvas not ready" on iOS, or a one-off decoder hiccup —
-// must never kill an otherwise-working scanner, but a persistent failure
-// (wasm not loading/instantiating) still surfaces after ~1s.
-const MAX_CONSECUTIVE_DECODE_FAILURES = 5
+// After this many CONSECUTIVE readBarcodes throws (each ~180ms apart), re-init
+// the wasm module so a transient load/instantiation failure self-heals. The
+// scanner NEVER hard-stops with an error — a per-frame failure just keeps
+// scanning, which is the behavior that predated the decode-hardening changes.
+const REINIT_AFTER_FAILURES = 6
 
 export default function ScannerModal({ onDetected, onClose, active = true }) {
   const videoRef = useRef(null)
@@ -100,14 +97,19 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
       stopStream()
     }
 
-    // Hard errors (wasm load failure, canvas failure) are surfaced ONCE per
-    // arm and the decode loop halts — the retry button re-arms fresh, so this
-    // never spams. A normal frame with no barcode (readBarcodes → []) is NOT
-    // an error and never reaches here.
-    const hardStopWithError = (message) => {
-      if (cancelled) return
-      cancelAnimationFrame(rafId)
-      setErrorMsg(message)
+    // Self-heal: a transient wasm load/instantiation failure must not
+    // permanently break scanning. Purge the cached module so the next
+    // readBarcodes call re-downloads + re-instantiates it from scratch.
+    const reinitWasm = () => {
+      try {
+        purgeZXingModule()
+        prepareZXingModule({
+          overrides: { locateFile: (path) => (path.endsWith('.wasm') ? wasmUrl : path) },
+        })
+        console.warn('[scanner] re-initialized zxing wasm after decode failures')
+      } catch {
+        // Ignore — the next readBarcodes attempt will simply try again.
+      }
     }
 
     async function decodeFrame(video, canvas, ctx) {
@@ -198,7 +200,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         let decoding = false
         let lastDecode = 0
-        let consecutiveDecodeFailures = 0
+        let decodeFailures = 0
 
         // Detect torch capability on the first video track and cache the track.
         try {
@@ -214,25 +216,18 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
           if (cancelled) return
           const now = performance.now()
 
-          // Readiness watchdog: never decode until the video has real frames.
-          // If it never becomes ready (black/frozen stream from an iOS
-          // re-acquisition), bail to the error path instead of spinning on
-          // 1×1 frames forever.
-          if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
-            if (now - armedAt >= VIDEO_READY_TIMEOUT_MS) {
-              hardStopWithError(t('scan.cameraFail'))
-              return
-            }
-            rafId = requestAnimationFrame(loop)
-            return
-          }
-
-          // No-detection watchdog: after WATCHDOG_MS of armed scanning with
-          // zero decodes and zero hard errors, nudge the user — never a silent
-          // black hole. Lightweight: shown once per arm, no camera reset.
+          // No-detection watchdog: after WATCHDOG_MS of armed scanning with no
+          // decode, nudge the user. Never fatal and never resets the camera.
           if (!watchdogShown && now - armedAt >= WATCHDOG_MS) {
             watchdogShown = true
             setHintMsg(t('scan.noBarcodeYet'))
+          }
+
+          // Wait for real frames before decoding. Never fatal — the watchdog
+          // above still gives feedback while the video becomes ready.
+          if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+            rafId = requestAnimationFrame(loop)
+            return
           }
 
           if (!decoding && now - lastDecode >= DECODE_INTERVAL_MS) {
@@ -243,16 +238,18 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
               // array — means the decode path is healthy, so reset the failure
               // counter. Only a thrown exception counts against us.
               await decodeFrame(video, canvas, ctx)
-              consecutiveDecodeFailures = 0
+              decodeFailures = 0
             } catch (err) {
-              // readBarcodes threw (e.g. wasm not loaded/instantiated). A single
-              // transient throw must not kill an otherwise-working scanner, so
-              // surface the retry UI only after several CONSECUTIVE failures.
-              consecutiveDecodeFailures += 1
+              // readBarcodes threw (e.g. wasm not loaded/instantiated). This is
+              // NEVER fatal: count consecutive failures and, past a threshold,
+              // re-init the wasm module so a transient load failure self-heals.
+              // The loop keeps scanning regardless (as it did before the
+              // decode-hardening changes).
+              decodeFailures += 1
               console.warn('[scanner] decode failed', err?.message || err)
-              if (consecutiveDecodeFailures >= MAX_CONSECUTIVE_DECODE_FAILURES) {
-                hardStopWithError(t('scan.decodeError'))
-                return
+              if (decodeFailures >= REINIT_AFTER_FAILURES) {
+                decodeFailures = 0
+                reinitWasm()
               }
             } finally {
               decoding = false
