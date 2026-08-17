@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import ScannerModal from '../components/ScannerModal'
-import { readBarcodes } from 'zxing-wasm/reader'
+import { purgeZXingModule, readBarcodes } from 'zxing-wasm/reader'
 
 // The WASM decoder is hoisted and stubbed before the component module loads.
 vi.mock('zxing-wasm/reader', () => ({
   readBarcodes: vi.fn().mockResolvedValue([]),
   prepareZXingModule: () => {},
+  purgeZXingModule: vi.fn(),
 }))
 
 // Mock navigator.mediaDevices and readBarcodes to exercise retry/torch logic.
@@ -123,9 +124,10 @@ describe('ScannerModal decode hardening', () => {
   })
 
   // A PERSISTENT decoder failure (e.g. the self-hosted wasm never loading)
-  // still surfaces the retry UI — but only after several CONSECUTIVE failures,
-  // never on a single transient throw.
-  it('surfaces a decode error + retry after persistent decoder failures (not on the first throw)', async () => {
+  // must NEVER surface a fatal error or stop the scanner (the pre-#280
+  // behavior). Instead it keeps scanning and, past the threshold, self-heals
+  // by re-initializing the wasm module.
+  it('keeps scanning with no error on persistent decode failure, and self-heals by re-initing the wasm', async () => {
     vi.useFakeTimers()
     try {
       const onDetected = vi.fn()
@@ -135,17 +137,19 @@ describe('ScannerModal decode hardening', () => {
 
       // Persistently reject (like a wasm that never loads/instantiates).
       readBarcodes.mockRejectedValue(new Error('wasm load failed'))
+      purgeZXingModule.mockClear()
 
       utils.rerender(<ScannerModal onDetected={onDetected} onClose={onClose} active />)
 
-      // Each decode attempt is ~180ms apart (DECODE_INTERVAL_MS); well past the
-      // 5-consecutive-failure threshold the retry UI must appear.
+      // Each decode attempt is ~180ms apart; past the 6-failure threshold the
+      // loop re-inits the wasm. No fatal error is ever surfaced.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000)
       })
 
-      expect(screen.getByText(/Couldn't read the camera feed/)).toBeTruthy()
-      expect(screen.getByRole('button', { name: /retry camera/i })).toBeTruthy()
+      expect(screen.queryByText(/Couldn't read the camera feed/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /retry camera/i })).not.toBeInTheDocument()
+      expect(purgeZXingModule).toHaveBeenCalled() // self-healed the wasm
       expect(onDetected).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
