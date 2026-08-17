@@ -24,11 +24,16 @@ import {
   saveRequest,
   saveUser,
 } from './_shared/users'
+import { json, readJsonBody, safeError } from './_shared/security'
 
-const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
-})
+// NOTE — CSRF (SEC-3.5, #198): sessions are NOT cookie-based. SEC-EPIC-1
+// (#176) uses a Bearer session token held in localStorage and sent as an
+// `Authorization` header on every state-changing call. There is no ambient
+// cookie credential, so classic cookie-CSRF does not apply — a cross-site form
+// POST cannot attach the Bearer header (it isn't auto-sent), and the token is
+// never readable by a third-party origin. Every function requires the Bearer
+// token (401 otherwise), which is the CSRF defense for a header-based token
+// flow. This is asserted by a negative test in auth-endpoint.test.js.
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Fixed-window limits (T5). Login is the auth brute-force surface: per-IP is
@@ -382,7 +387,12 @@ async function handleVerifyMagicLink(body, req) {
 export default async (req) => {
   try {
     if (req.method === 'POST') {
-      const body = await req.json().catch(() => ({}))
+      // SEC-3.2 (#195): cap the JSON body before parsing so a runaway client
+      // can't buffer/bloat a function with an oversized action payload. A
+      // body over the cap → 413; malformed JSON → 400. The auth actions are
+      // tiny, so the default 64 KB cap is more than enough.
+      const { value: body, error } = await readJsonBody(req)
+      if (error) return error
       if (body.action === 'request') return handleRequest(body)
       if (body.action === 'login') return handleLogin(body, req)
       if (body.action === 'requestMagicLink') return handleRequestMagicLink(body, req)
@@ -398,6 +408,7 @@ export default async (req) => {
 
     return json(405, { error: 'Method not allowed' })
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }

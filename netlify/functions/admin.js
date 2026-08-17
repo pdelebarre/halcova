@@ -12,6 +12,7 @@
 //   - moderate community reviews (hide / show / delete, plus a listing)
 
 import { randomUUID } from 'node:crypto'
+import { getStore } from '@netlify/blobs'
 import { OWNER_ID, generateAccessCode, publicUser } from './_shared/auth'
 import { requireAdmin } from './_shared/session-auth'
 import { deleteAllForUser, revokeAllForUser } from './_shared/sessions'
@@ -21,6 +22,8 @@ import { createReviewsRepo } from './_shared/repositories/reviews-repo'
 import { createReviewsBlobStore } from './_shared/reviews-blob'
 import { createFeedbackRepo } from './_shared/repositories/feedback-repo'
 import { createFeedbackBlobStore } from './_shared/feedback-blob'
+import { createRateLimiter, clientIp } from './_shared/rate-limit'
+import { badRequest, json, readJsonBody, safeError } from './_shared/security'
 import {
   deleteUserCollections,
   getRequest,
@@ -32,9 +35,17 @@ import {
   saveUser,
 } from './_shared/users'
 
-const json = (statusCode, body) => new Response(JSON.stringify(body), {
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+// SEC-3.6 (#199): admin actions get their own per-IP limit (the owner is a
+// single high-trust identity, so a per-user limit would be pointless). A
+// compromised-but-limited source can't script a flood of admin writes. The
+// limit is generous (the owner is expected to act) but present and
+// env-tunable, matching the collection/auth limiters.
+const ADMIN_LIMIT = Number(process.env.RUNOUT_ADMIN_RATE_LIMIT) || 120
+
+const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...headers },
 })
 
 function sanitizeCollections(collections) {
@@ -97,8 +108,9 @@ function hasAccess(collections) {
 }
 
 async function handleApprove(body) {
-  if (!body.requestId) return json(400, { error: 'Missing requestId.' })
-  const request = await getRequest(body.requestId)
+  const v = validateId(body.requestId, 'requestId')
+  if (v.error) return badRequest(v.error)
+  const request = await getRequest(v.value)
   if (!request) return json(404, { error: 'Request not found.' })
   if (request.status !== 'pending') return json(409, { error: 'That request was already handled.' })
 
@@ -127,8 +139,9 @@ async function handleApprove(body) {
 }
 
 async function handleReject(body) {
-  if (!body.requestId) return json(400, { error: 'Missing requestId.' })
-  const request = await getRequest(body.requestId)
+  const v = validateId(body.requestId, 'requestId')
+  if (v.error) return badRequest(v.error)
+  const request = await getRequest(v.value)
   if (!request) return json(404, { error: 'Request not found.' })
   if (request.status !== 'pending') return json(409, { error: 'That request was already handled.' })
   await saveRequest({ ...request, status: 'rejected', rejectedAt: new Date().toISOString() })
@@ -142,9 +155,10 @@ async function handleReject(body) {
 // The response shape matches approve ({ user, code }) so the client's existing
 // "here is the code" box can reuse it.
 async function handleRotate(body) {
-  if (!body.userId) return json(400, { error: 'Missing userId.' })
-  if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be edited here.' })
-  const user = await getUser(body.userId)
+  const v = validateId(body.userId, 'userId')
+  if (v.error) return badRequest(v.error)
+  if (v.value === OWNER_ID) return json(400, { error: 'The owner account cannot be edited here.' })
+  const user = await getUser(v.value)
   if (!user) return json(404, { error: 'User not found.' })
 
   const newCode = generateAccessCode()
@@ -159,9 +173,10 @@ async function handleRotate(body) {
 }
 
 async function handleUpdateUser(body) {
-  if (!body.userId) return json(400, { error: 'Missing userId.' })
-  if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be edited here.' })
-  const user = await getUser(body.userId)
+  const v = validateId(body.userId, 'userId')
+  if (v.error) return badRequest(v.error)
+  if (v.value === OWNER_ID) return json(400, { error: 'The owner account cannot be edited here.' })
+  const user = await getUser(v.value)
   if (!user) return json(404, { error: 'User not found.' })
 
   if (body.collections) {
@@ -239,9 +254,10 @@ async function deleteMemberFeedback(userId) {
 }
 
 async function handleDeleteUser(body) {
-  if (!body.userId) return json(400, { error: 'Missing userId.' })
-  if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be deleted.' })
-  const user = await getUser(body.userId)
+  const v = validateId(body.userId, 'userId')
+  if (v.error) return badRequest(v.error)
+  if (v.value === OWNER_ID) return json(400, { error: 'The owner account cannot be deleted.' })
+  const user = await getUser(v.value)
   if (!user) return json(404, { error: 'User not found.' })
 
   // Task 7 (M2) + T8 (H1): a member's reviews AND feedback go with them. This
@@ -267,25 +283,42 @@ async function handleDeleteUser(body) {
 // 400 for a missing reviewId and 404 for an unknown one — consistent with the
 // rest of admin.js.
 async function handleHideReview(body) {
-  if (!body.reviewId) return json(400, { error: 'Missing reviewId.' })
-  const { result: ok } = await withReviews((store) => store.setStatus(body.reviewId, 'hidden'))
+  const v = validateId(body.reviewId, 'reviewId')
+  if (v.error) return badRequest(v.error)
+  const { result: ok } = await withReviews((store) => store.setStatus(v.value, 'hidden'))
   if (!ok) return json(404, { error: 'Review not found.' })
   return json(200, { ok: true })
 }
 
 async function handleShowReview(body) {
-  if (!body.reviewId) return json(400, { error: 'Missing reviewId.' })
-  const { result: ok } = await withReviews((store) => store.setStatus(body.reviewId, 'published'))
+  const v = validateId(body.reviewId, 'reviewId')
+  if (v.error) return badRequest(v.error)
+  const { result: ok } = await withReviews((store) => store.setStatus(v.value, 'published'))
   if (!ok) return json(404, { error: 'Review not found.' })
   return json(200, { ok: true })
 }
 
 async function handleDeleteReview(body) {
-  if (!body.reviewId) return json(400, { error: 'Missing reviewId.' })
+  const v = validateId(body.reviewId, 'reviewId')
+  if (v.error) return badRequest(v.error)
   // Admin override: deleteReview removes the row/entry regardless of author.
-  const { result: ok } = await withReviews((store) => store.deleteReview(body.reviewId))
+  const { result: ok } = await withReviews((store) => store.deleteReview(v.value))
   if (!ok) return json(404, { error: 'Review not found.' })
   return json(200, { ok: true })
+}
+
+// Validate the ids shared across admin actions (SEC-3.1, #194): requestId,
+// userId and reviewId must be short, non-empty strings. Reused by each handler
+// so the shape checks live in one place instead of being re-derived. The
+// message keeps the field name (e.g. 'Missing reviewId.') for client parity.
+function validateId(value, label) {
+  const missing = value === undefined || value === null
+    || (typeof value !== 'string' && typeof value !== 'number')
+    || String(value).trim() === ''
+  if (missing) return { error: { code: 'MISSING_ID', message: `Missing ${label}.` } }
+  const v = String(value).trim()
+  if (v.length > 200) return { error: { code: 'INVALID_ID', message: `${label} is too long.` } }
+  return { value: v }
 }
 
 export default async (req) => {
@@ -295,6 +328,19 @@ export default async (req) => {
     // login (auth.js); a member session or a forged/absent key is rejected.
     const admin = await requireAdmin(req)
     if (admin.error) return admin.error
+
+    // SEC-3.6 (#199): admin writes are rate-limited per IP. The owner is a
+    // single identity, so keying on the client IP bounds a flood source.
+    if (req.method === 'POST') {
+      const ip = clientIp(req)
+      if (ip) {
+        const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'admin', limit: ADMIN_LIMIT })
+        const rl = await limiter(ip)
+        if (rl.limited) {
+          return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+        }
+      }
+    }
 
     if (req.method === 'GET') {
       const url = new URL(req.url)
@@ -325,7 +371,9 @@ export default async (req) => {
     }
 
     if (req.method === 'POST') {
-      const body = await req.json().catch(() => ({}))
+      // SEC-3.2 (#195): cap the JSON body before parsing.
+      const { value: body, error } = await readJsonBody(req)
+      if (error) return error
       switch (body.action) {
         case 'approve': return handleApprove(body)
         case 'reject': return handleReject(body)
@@ -344,6 +392,7 @@ export default async (req) => {
 
     return json(405, { error: 'Method not allowed' })
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }

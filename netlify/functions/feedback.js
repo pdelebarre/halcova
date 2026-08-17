@@ -35,6 +35,7 @@ import { requireAdmin } from './_shared/session-auth'
 import { createFeedbackBlobStore } from './_shared/feedback-blob'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { getRepository } from './_shared/repository'
+import { safeError } from './_shared/security'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 
@@ -256,6 +257,7 @@ export default async function feedbackHandler(req) {
     if (v.error) return v.error
     return dispatch((feedback) => handleCreate(req, feedback, user, v))
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }

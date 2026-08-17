@@ -30,8 +30,9 @@ import { parsePagination, sliceIds } from './pagination'
 import { DEMO_SEED, seedDemoStore } from './demo-data'
 import { adjustOwnedCount, ensureOwnedCount, wishlistToggleDelta } from './counts'
 import { invalidateListCache } from './list-cache'
-import { pickItemFields } from './item-fields'
+import { pickItemFields, validateItem } from './item-fields'
 import { getRepository } from './repository'
+import { badRequest } from './security'
 
 function planLimitError(limit) {
   const err = new Error(`You've reached the free plan limit of ${limit} items. Ask the admin to upgrade your plan.`)
@@ -57,26 +58,28 @@ async function readItemsFromBlobs(req, { user, collection, url }) {
 }
 
 // DB-first read-through: serve Postgres when it has rows, otherwise fall back
-// to Blobs (pre-backfill or DB error). When Postgres has rows the store has
-// been (at least partially) backfilled, so it could be missing items that live
-// only in Blobs — wishlist wants added before or in between backfills would
-// otherwise be silently invisible to GET (the "disappeared items" bug). We
-// lazily reconcile that drift, then serve the complete Postgres rows.
+// to Blobs ONLY for a pre-backfill store (0 rows, healthy DB) — the legitimate
+// read-through backfill path. When Postgres has rows the store has been (at
+// least partially) backfilled, so it could be missing items that live only in
+// Blobs — wishlist wants added before or in between backfills would otherwise
+// be silently invisible to GET (the "disappeared items" bug). We lazily
+// reconcile that drift, then serve the complete Postgres rows.
+//
+// SEC-4.1 (#202): a Postgres READ FAILURE (an outage) is NOT a reason to
+// silently switch the data authority to Blobs. The error propagates to
+// collection.js, which returns a controlled 503 (alerting via the log) rather
+// than serving possibly-different/stale Blobs data and masking the outage.
+// Only the "0 rows" case below is a legitimate read-through fallback.
 async function readItems(req, { user, collection, url }) {
   const repo = getRepository()
   const { offset, limit } = parsePagination(url.searchParams)
-  let items
-  try {
-    items = await repo.items.listItems(user.id, collection, { limit, offset })
-  } catch {
-    items = null
-  }
-  if (items === null || items.length === 0) {
+  const items = await repo.items.listItems(user.id, collection, { limit, offset })
+  if (items.length === 0) {
     return readItemsFromBlobs(req, { user, collection, url })
   }
   await reconcileFromBlobs(repo, user.id, collection)
-  items = await repo.items.listItems(user.id, collection, { limit, offset })
-  return json(200, { items })
+  const full = await repo.items.listItems(user.id, collection, { limit, offset })
+  return json(200, { items: full })
 }
 
 // Lazy, self-healing read-through (ADR-0002 Phase 1, epic #38): a store that
@@ -149,12 +152,16 @@ async function mirrorDelete(userId, collection, id, existing) {
 
 async function handlePost(req, { user, collection }) {
   const body = await req.json()
+  // SEC-3.1 (#194): type + length validate the allowlisted fields (parity with
+  // the Blobs path). Junk is rejected 400 before any DB write.
+  const v = validateItem(body)
+  if (v.error) return badRequest(v.error)
   const repo = getRepository()
   const limit = planLimitFor(user)
   // SEC-EPIC-2 (#188): only allowlisted item fields are written. A crafted
   // body (ownerId/userId/role/plan/collections/id/…) is dropped here — the
   // row is owner-scoped by the resolved session's user.id, never the body.
-  const picked = pickItemFields(body)
+  const picked = pickItemFields(v.item)
   const newId = randomUUID()
   const item = { ...picked, id: newId, dateAdded: picked.dateAdded || new Date().toISOString() }
 
@@ -203,11 +210,14 @@ async function handlePut(req, { user, collection, id }) {
   let existing = null
   try {
     existing = await repo.items.getItem(user.id, collection, id)
-  } catch {
-    existing = null
+  } catch (err) {
+    // SEC-4.1 (#202): a Postgres read failure is an outage — do NOT silently
+    // switch to Blobs. Propagate so collection.js returns 503.
+    throw err
   }
   if (!existing) {
-    // Read-through: a pre-backfill item lives in Blobs.
+    // Read-through: a pre-backfill item legitimately lives in Blobs (the DB is
+    // healthy and simply has no row for this item yet).
     try {
       const store = getStore(storeNameFor(user.id, collection))
       existing = await store.get(`item:${id}`, { type: 'json' })
@@ -217,7 +227,10 @@ async function handlePut(req, { user, collection, id }) {
   }
   if (!existing) return json(404, { error: 'Not found' })
 
-  const patch = pickItemFields(await req.json())
+  // SEC-3.1 (#194): partial validation (a PUT may patch any subset).
+  const v = validateItem(await req.json(), { partial: true })
+  if (v.error) return badRequest(v.error)
+  const patch = pickItemFields(v.item)
   const convertingToOwned = wishlistToggleDelta(patch, existing).delta === 1
   const limit = planLimitFor(user)
 
@@ -264,8 +277,10 @@ async function handleDelete(req, { user, collection, id }) {
   let existing = null
   try {
     existing = await repo.items.getItem(user.id, collection, id)
-  } catch {
-    existing = null
+  } catch (err) {
+    // SEC-4.1 (#202): a Postgres read failure is an outage — do NOT silently
+    // switch to Blobs. Propagate so collection.js returns 503.
+    throw err
   }
   if (!existing) {
     try {

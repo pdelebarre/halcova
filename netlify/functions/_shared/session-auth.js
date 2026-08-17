@@ -14,10 +14,11 @@
 import { DEMO_USER, OWNER_ID, bearer } from './auth'
 import { getSessionByToken, isSessionLive, renewSessionIfNeeded } from './sessions'
 import { getUser } from './users'
+import { securityHeaders } from './security'
 
 const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
+  headers: { 'Content-Type': 'application/json', ...securityHeaders(), ...headers },
 })
 
 // The owner's constant profile, reconstructed from an admin session. Mirrors

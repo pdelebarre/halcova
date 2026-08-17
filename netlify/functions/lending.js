@@ -17,6 +17,7 @@ import { getStore } from '@netlify/blobs'
 import { COLLECTIONS, authorize, json } from './_shared/collection-store'
 import { effectiveFeatures } from './_shared/entitlements'
 import { storeNameFor } from './_shared/users'
+import { safeError } from './_shared/security'
 
 const FEATURE_OFF_MSG = "Lending isn't enabled for your account."
 const HISTORY_CAP = 10
@@ -42,7 +43,8 @@ export default async function lending(req) {
       ? await handleLend(store, body.itemId, body)
       : await handleReturn(store, body.itemId)
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }
 

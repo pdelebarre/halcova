@@ -625,6 +625,75 @@ skips functions), or Git-connected import.
 - All traffic is HTTPS in production; camera access additionally requires a
   secure context.
 
+### 13.1 Web security headers (SEC-EPIC-3 #197)
+
+- **Function responses** carry the security headers on every JSON response
+  (shared `json` in `netlify/functions/_shared/security.js`):
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+  `X-Frame-Options: DENY`, a CSP of `default-src 'none'; frame-ancestors 'none'`
+  (a JSON API returns no HTML, so the strictest CSP is safe), and
+  `Permissions-Policy`.
+- **The SPA + assets** get the full header set from `netlify.toml`: CSP
+  (`script-src 'self'`, `style-src 'self' 'unsafe-inline'` for React inline
+  styles, `img-src` allowing the cover/lookup hosts, `worker-src 'self' blob:`
+  for the scanner/OCR worker, `frame-ancestors 'none'`), HSTS, nosniff,
+  Referrer-Policy, Permissions-Policy (`camera=(self)` for the scanner) and
+  X-Frame-Options.
+
+### 13.2 Data at rest, in transit, backups & recovery (SEC-EPIC-4 #203)
+
+- **In transit** — all traffic is HTTPS (Netlify TLS). The Stripe webhook is
+  additionally verified with a constant-time HMAC over the raw body
+  (`Stripe-Signature`), and magic-link tokens are HMAC-signed + single-use.
+- **At rest** — two stores, both managed by Netlify:
+  - **Netlify Blobs** (identity, collections, reviews, feedback, lookup
+    caches, rate-limit counters): server-side encrypted at rest by Netlify;
+    scoped per site/environment. Blobs are the reversible mirror / fallback
+    source during the Postgres read-through cutover.
+  - **Managed Postgres** (`DATABASE_URL`, Phase 1 / ADR-0002): TLS-encrypted in
+    transit and at rest by the managed provider. Identity secrets are stored
+    only as `sha256(code_hash)` (never plaintext codes); collection/lending/
+    review/feedback/lookup-cache rows live in their tables.
+- **Backup / restore** — Netlify Blobs and managed Postgres both provide
+  managed backup + restore at the provider level. In a disaster, the read-
+  through design means the surviving store (Blobs mirror or Postgres) is a
+  legitimate recovery source, but only through the **documented** backfill/
+  mirror paths — a Postgres **outage** is **not** a reason to silently switch
+  authority to Blobs (SEC-4.1 #202 returns 503 `DATA_SOURCE_UNAVAILABLE`).
+- **Retention / deletion guarantees** — see the classification table below.
+  Deleted member data is removed from the live stores (collections, lending,
+  reviews, feedback, sessions, user record) but **may persist in provider
+  backups** until those backups age out — this is documented deliberate
+  retention, not a silent leak.
+
+### 13.3 Data classification & retention (SEC-EPIC-4 #204)
+
+| Class | Examples | Retention / minimization |
+|-------|----------|--------------------------|
+| Identity | user id, name, email, access-code hash (`code_hash`), `RU-…` code (Blobs mirror only) | Code is hashed in Postgres (never plaintext); `publicUser` strips `code`/`code_hash`/billing ids before any client response. Code plaintext exists only in the legacy Blobs mirror during read-through (reversible cutover). |
+| Billing | Stripe customer/subscription/checkout ids, plan, planExpiresAt | Billing ids are server-only (stripped by `publicUser`); the Stripe webhook never echoes codes. |
+| Collection | items, `lending` / `lendingHistory` (borrower name/contact), wishlist | Per-user store; lending is bounded (max 10 history entries) and borrower contact is capped. |
+| Reviews | public review body/rating/authorName (shared, no per-user store) | `authorId` stripped from other reviewers in public lists; deleted on member delete. |
+| Feedback | message, author id/name, url, user_agent (private to author + owner) | PII-adjacent; admin inbox is `no-store, private`; deleted on member delete. |
+| Lookup cache | normalized Discogs/Google Books responses | Shared, TTL-capped (1–30 days), provider response size-capped. |
+
+Member **deletion** (`admin deleteUser`) removes the member's sessions,
+collection stores (incl. lending), reviews and feedback in one cascade (see
+`handleDeleteUser` in `admin.js`), ordered so a failed cleanup aborts the whole
+delete — a member is never left deleted with orphaned data. Deleted data may
+persist in provider backups until they age out (documented above).
+
+### 13.4 CSRF (SEC-EPIC-3 #198)
+
+Sessions are **not cookie-based** (SEC-EPIC-1 #176): the session token is held
+in `localStorage` and sent as an `Authorization: Bearer` header on every
+state-changing call. There is **no ambient cookie credential**, so classic
+cookie-CSRF does not apply — a cross-site form POST cannot attach the Bearer
+header. Every state-changing request requires a valid Bearer token (401
+otherwise), which is the CSRF defense for a header-based token flow. This is
+asserted by negative tests in `auth-endpoint.test.js` (no `Set-Cookie` is ever
+issued; a forged cross-site Origin with no Bearer is 401).
+
 ---
 
 ## 14. Tooling & scripts

@@ -53,11 +53,7 @@ import {
 } from './_shared/stripe'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { materializeCheckoutSession } from './_shared/entitlements'
-
-const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
-})
+import { json, readJsonBody, safeError } from './_shared/security'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // M1 (S8, #54): `checkout` is pre-auth (a prospect checks out with just an
@@ -364,7 +360,9 @@ async function handlePortal(body, req) {
 export default async (req) => {
   try {
     if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
-    const body = await req.json().catch(() => ({}))
+    // SEC-3.2 (#195): cap the JSON body before parsing.
+    const { value: body, error } = await readJsonBody(req)
+    if (error) return error
     // Handlers may throw an httpError (e.g. resolveIdentity's 401/403) — they
     // are AWAITED so the try/catch below formats them instead of letting the
     // rejection escape the function.
@@ -373,7 +371,9 @@ export default async (req) => {
     if (body.action === 'portal') return await handlePortal(body, req)
     return json(400, { error: 'Unknown action.' })
   } catch (err) {
+    // A thrown helper error carries its own safe { error, code } body.
     if (err?.httpStatus) return json(err.httpStatus, err.body)
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }

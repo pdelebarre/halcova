@@ -220,6 +220,11 @@ describe('default export — malformed body and a failing Blobs store', () => {
 
     const res = await call('GET', `?kind=records&sourceId=${SOURCE_ID}`)
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toContain('blob store unavailable')
+    // SEC-3.7 (#200): a 500 surfaces a generic INTERNAL message — the internal
+    // 'blob store unavailable' detail must NOT leak to the client.
+    const body = await res.json()
+    expect(body.code).toBe('INTERNAL')
+    expect(body.error).not.toContain('blob store unavailable')
+    expect(body.error).toBe('Something went wrong. Please try again.')
   })
 })

@@ -31,6 +31,7 @@ import { isPostgresConfigured, db } from './_shared/postgres'
 import { createReviewsRepo } from './_shared/repositories/reviews-repo'
 import { createReviewsBlobStore } from './_shared/reviews-blob'
 import { isValidSourceId, sourceIdError } from './_shared/reviews-shared'
+import { safeError } from './_shared/security'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity fixed-window limit for review WRITES (POST/DELETE); GET stays
@@ -163,7 +164,8 @@ async function handleBlobs(req, ctx) {
   try {
     return await handleStore(req, createReviewsBlobStore(), ctx)
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }
 
@@ -261,32 +263,37 @@ async function writeGuardError(req, user, kind, sourceId) {
 }
 
 export default async function reviewsHandler(req) {
-  const { user, error } = await authorize(req)
-  if (error) return error
+  try {
+    const { user, error } = await authorize(req)
+    if (error) return error
 
-  const { kind, sourceId, id, body } = await parseRequest(req)
+    const { kind, sourceId, id, body } = await parseRequest(req)
 
-  const kindErr = kindError(req, kind)
-  if (kindErr) return kindErr
+    const kindErr = kindError(req, kind)
+    if (kindErr) return kindErr
 
-  const planErr = planError(user, kind)
-  if (planErr) return planErr
+    const planErr = planError(user, kind)
+    if (planErr) return planErr
 
-  if (req.method === 'POST' || req.method === 'DELETE') {
-    const guardErr = await writeGuardError(req, user, kind, sourceId)
-    if (guardErr) return guardErr
-  }
-
-  const ctx = { user, kind, sourceId, id, body }
-  // Postgres when configured (DB first, Blobs fallback on error); Blobs
-  // otherwise.
-  if (isPostgresConfigured()) {
-    try {
-      return await handlePostgres(req, ctx)
-    } catch (err) {
-      console.error('reviews: Postgres path failed, falling back to Blobs:', err?.message || err)
-      return handleBlobs(req, ctx)
+    if (req.method === 'POST' || req.method === 'DELETE') {
+      const guardErr = await writeGuardError(req, user, kind, sourceId)
+      if (guardErr) return guardErr
     }
+
+    const ctx = { user, kind, sourceId, id, body }
+    // Postgres when configured (DB first, Blobs fallback on error); Blobs
+    // otherwise.
+    if (isPostgresConfigured()) {
+      try {
+        return await handlePostgres(req, ctx)
+      } catch (err) {
+        console.error('reviews: Postgres path failed, falling back to Blobs:', err?.message || err)
+        return handleBlobs(req, ctx)
+      }
+    }
+    return handleBlobs(req, ctx)
+  } catch (err) {
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
-  return handleBlobs(req, ctx)
 }

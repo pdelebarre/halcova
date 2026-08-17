@@ -7,10 +7,11 @@ import { storeNameFor } from './_shared/users'
 import { parsePagination, sliceIds, isDefaultPage } from './_shared/pagination'
 import { ensureOwnedCount, adjustOwnedCount, wishlistToggleDelta } from './_shared/counts'
 import { readListCache, writeListCache, invalidateListCache } from './_shared/list-cache'
-import { pickItemFields } from './_shared/item-fields'
+import { pickItemFields, validateItem } from './_shared/item-fields'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { isPostgresConfigured } from './_shared/postgres'
 import { handlePostgres } from './_shared/collection-postgres'
+import { badRequest, readJsonBody, safeError } from './_shared/security'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity fixed-window limit for collection reads/writes (T5).
@@ -54,7 +55,13 @@ async function handleBlobs(req, { user, collection, id, url }) {
     }
 
     if (req.method === 'POST') {
-      const body = await req.json()
+      // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap).
+      const parsed = await readJsonBody(req)
+      if (parsed.error) return parsed.error
+      // SEC-3.1 (#194): type + length validate the allowlisted fields.
+      const v = validateItem(parsed.value)
+      if (v.error) return badRequest(v.error)
+      const body = v.item
 
       // Free-tier cap: enforced on ADDS only, server-side. Owner / unlimited
       // users bypass it (planLimitFor returns null). The cap now reads the
@@ -101,7 +108,13 @@ async function handleBlobs(req, { user, collection, id, url }) {
       // SEC-EPIC-2 (#188): the PUT patch is narrowed to the item allowlist
       // before the merge, so a spoofed ownerId/userId/role/plan/id in the body
       // is dropped and can never change ownership or escalate privileges.
-      const patch = pickItemFields(await req.json())
+      // SEC-3.2 (#195): cap the body before parsing. SEC-3.1 (#194): partial
+      // validation (a PUT may patch any subset of fields).
+      const parsed = await readJsonBody(req)
+      if (parsed.error) return parsed.error
+      const v = validateItem(parsed.value, { partial: true })
+      if (v.error) return badRequest(v.error)
+      const patch = v.item
 
       // S4 (#58): converting a wishlist item to owned ({ wishlist: false } on a
       // stored wishlist item) is an ADD for cap purposes — it consumes the
@@ -150,7 +163,8 @@ async function handleBlobs(req, { user, collection, id, url }) {
 
     return json(405, { error: 'Method not allowed' })
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }
 
@@ -194,16 +208,24 @@ export default async (req) => {
     })
   }
 
-  // Phase 1 (ADR-0002): when DATABASE_URL is configured, serve from Postgres
-  // (read DB first, fall back to Blobs on miss/error). If Postgres is
-  // unreachable, the whole request degrades to the Blobs path — a Postgres
-  // outage behaves exactly like today instead of 500ing.
+  // Phase 1 (ADR-0002): when DATABASE_URL is configured, serve from Postgres.
+  // SEC-4.1 (#202): Postgres is the configured data authority. A failure here
+  // (an outage) returns a CONTROLLED 503 with a clear operational log line —
+  // we do NOT silently switch authority to Blobs and serve possibly-different/
+  // stale data that would mask the outage. The legitimate read-through
+  // backfill fallbacks (0-rows pre-backfill store, not-found item) live inside
+  // collection-postgres.js and the demo space never routes through the DB
+  // path — both still work. Only the silent authority switch is removed.
   if (isPostgresConfigured()) {
     try {
       return await handlePostgres(req, { user, collection, id, url })
     } catch (err) {
-      console.error('collection: Postgres path failed, falling back to Blobs:', err?.message || err)
-      return handleBlobs(req, { user, collection, id, url })
+      // Operational alert (message only — never a code/token/key/secret).
+      console.error('collection: Postgres data source unavailable (503):', err?.message || err)
+      return json(503, {
+        error: 'The collection service is temporarily unavailable. Please try again shortly.',
+        code: 'DATA_SOURCE_UNAVAILABLE',
+      })
     }
   }
 

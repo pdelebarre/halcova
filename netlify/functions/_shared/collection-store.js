@@ -9,14 +9,16 @@
 // belongs here.
 
 import { resolveSession } from './session-auth'
+import { securityHeaders } from './security'
 
 // Only these collection kinds exist; anything else is rejected.
 export const COLLECTIONS = { records: true, books: true }
 export const INDEX_KEY = 'index'
 
+// Shared JSON responder with the security headers applied (SEC-3.4, #197).
 export const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
+  headers: { 'Content-Type': 'application/json', ...securityHeaders(), ...headers },
 })
 
 export async function readIndex(store) {
