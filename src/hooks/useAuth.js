@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as authApi from '../api/auth'
-import { getSession, getSessionToken } from '../utils/session'
+import { getSession, getSessionToken, clearLocalUserData } from '../utils/session'
 
 // Owns the signed-in session. Persists to localStorage (runout.session) so
 // the PWA remembers you between visits, and revalidates the code against the
@@ -28,7 +28,12 @@ export function useAuth() {
   }, [])
 
   const login = useCallback(async (code) => {
+    // SEC-EPIC-2 (#192): switching accounts must never surface the previous
+    // account's local browsing/search/view/gamification state to the next
+    // user. Capture the previous user id BEFORE the exchange overwrites it.
+    const previousId = getSession()?.user?.id
     const user = await authApi.login(code)
+    if (previousId && previousId !== user.id) clearLocalUserData()
     setSession({ user, session: getSessionToken() })
     return user
   }, [])
@@ -49,6 +54,7 @@ export function useAuth() {
   const logout = useCallback(() => {
     authApi.logout()
     setSession(null)
+    clearLocalUserData()
   }, [])
 
   // SEC-1.4 (#179): revoke EVERY session for this user (all devices, current
@@ -56,6 +62,7 @@ export function useAuth() {
   const logoutAll = useCallback(() => {
     authApi.logoutAll()
     setSession(null)
+    clearLocalUserData()
   }, [])
 
   return { session, ready, login, logout, logoutAll, refresh, requestAccess, setSession }

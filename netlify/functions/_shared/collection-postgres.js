@@ -30,6 +30,7 @@ import { parsePagination, sliceIds } from './pagination'
 import { DEMO_SEED, seedDemoStore } from './demo-data'
 import { adjustOwnedCount, ensureOwnedCount, wishlistToggleDelta } from './counts'
 import { invalidateListCache } from './list-cache'
+import { pickItemFields } from './item-fields'
 import { getRepository } from './repository'
 
 function planLimitError(limit) {
@@ -150,8 +151,12 @@ async function handlePost(req, { user, collection }) {
   const body = await req.json()
   const repo = getRepository()
   const limit = planLimitFor(user)
+  // SEC-EPIC-2 (#188): only allowlisted item fields are written. A crafted
+  // body (ownerId/userId/role/plan/collections/id/…) is dropped here — the
+  // row is owner-scoped by the resolved session's user.id, never the body.
+  const picked = pickItemFields(body)
   const newId = randomUUID()
-  const item = { ...body, id: newId, dateAdded: body.dateAdded || new Date().toISOString() }
+  const item = { ...picked, id: newId, dateAdded: picked.dateAdded || new Date().toISOString() }
 
   // M2 (backfill-aware plan limit): a member store that predates the backfill
   // has 0 rows in Postgres, so the SQL owned count would read 0 and never bite
@@ -212,7 +217,7 @@ async function handlePut(req, { user, collection, id }) {
   }
   if (!existing) return json(404, { error: 'Not found' })
 
-  const patch = await req.json()
+  const patch = pickItemFields(await req.json())
   const convertingToOwned = wishlistToggleDelta(patch, existing).delta === 1
   const limit = planLimitFor(user)
 
