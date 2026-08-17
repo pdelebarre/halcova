@@ -56,6 +56,26 @@ Blobs.
   `Multi-tenant Security` for tenant isolation) review before it is declared
   done (see `.github/ai/README.md`).
 
+## Tickets & Epics
+
+- **Every ticket is a GitHub issue and belongs to exactly one parent epic.**
+  Never file a ticket without linking it to its epic issue. If no epic exists
+  for the work, create one (labeled `epic`) before creating any subtask
+  tickets.
+- **Epic naming:** `[DOMAIN]-EPIC-<N>` for work-stream epics (e.g. `SEC-EPIC-1`,
+  `SEC-EPIC-2`, … for security); product/marketing epics use `epic #<N>`. An
+  epic is a numbered issue labeled `epic` that links all of its subtask
+  tickets.
+- **Ticket naming:** numbered issues within an epic, referenced as `#<N>`
+  (e.g. `#176`, `#188`). Follow the epic's `T<k>` subtask ordering (T1, T2, …)
+  and reference the epic + ticket in code/comments/docs as `(EPIC, #ticket)`,
+  e.g. `(SEC-EPIC-1, #176)`. Apply the epic's labels (`backend`, `frontend`,
+  `i18n`, `qa`, `marketing`, `security`, `enhancement`, `priority:P0–P3`,
+  `blocked`).
+- The Project Manager owns this: identify the parent epic before breaking work
+  into tasks, and never hand off a task that isn't tied to a ticket + epic.
+- Live epic/ticket map and milestone plan: `marketing/backlog-grooming-launch-handoff.md`.
+
 ## Branching & Version Control
 
 - **Never commit new feature work directly to `main`.** Before starting any
