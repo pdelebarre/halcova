@@ -33,10 +33,12 @@ import {
 } from './_shared/users'
 import { applyEntitlement, materializeCheckoutSession } from './_shared/entitlements'
 import { generateAccessCode } from './_shared/auth'
+import { json, securityHeaders } from './_shared/security'
 
+// Webhook JSON responder with the security headers applied (SEC-3.4, #197).
 const json = (statusCode, body) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', ...securityHeaders() },
 })
 
 // The same dependency set the payment.js reconcile path uses — both build the
@@ -91,7 +93,12 @@ export default async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
 
   // Read + verify the RAW body before touching JSON (never req.json() first).
+  // SEC-3.2 (#195): cap the raw webhook body so a malicious oversized payload
+  // can't buffer unbounded bytes before the signature check rejects it.
   const rawBody = await req.text().catch(() => '')
+  if (Buffer.byteLength(rawBody, 'utf8') > 1 * 1024 * 1024) {
+    return json(413, { error: 'Webhook payload too large.', code: 'PAYLOAD_TOO_LARGE' })
+  }
   const signature = req.headers.get('stripe-signature') || ''
   if (!verifyWebhookSignature({ rawBody, signature })) {
     return json(400, { error: 'Invalid signature.' })

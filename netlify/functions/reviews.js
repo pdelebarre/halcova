@@ -3,8 +3,10 @@
 // Reviews are SHARED across ALL users: a release's reviews are public, so
 // unlike collections/items there is NO per-user store — one shared
 // `runout-reviews` blob store, or the `reviews` Postgres table when
-// DATABASE_URL is set (chosen via isPostgresConfigured(), with a read-through
-// Blobs fallback when Postgres errors — parity with collection.js).
+// DATABASE_URL is set (chosen via isPostgresConfigured()). On a Postgres
+// ERROR (an outage) the handler returns a controlled 503
+// DATA_SOURCE_UNAVAILABLE rather than masking the outage with a Blobs mirror
+// (SEC-4.1 #202 — parity with collection.js).
 //
 // Auth on every request (Bearer access code / admin key — `authorize` from
 // _shared/collection-store), a per-kind plan gate for members (a member
@@ -31,6 +33,7 @@ import { isPostgresConfigured, db } from './_shared/postgres'
 import { createReviewsRepo } from './_shared/repositories/reviews-repo'
 import { createReviewsBlobStore } from './_shared/reviews-blob'
 import { isValidSourceId, sourceIdError } from './_shared/reviews-shared'
+import { readJsonBody, safeError } from './_shared/security'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity fixed-window limit for review WRITES (POST/DELETE); GET stays
@@ -163,14 +166,15 @@ async function handleBlobs(req, ctx) {
   try {
     return await handleStore(req, createReviewsBlobStore(), ctx)
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }
 
 // Postgres-backed handler. DB-level errors are deliberately NOT caught here —
-// they propagate to the default export, which degrades the whole request to
-// the Blobs path (a Postgres outage behaves exactly like today instead of
-// 500ing — parity with collection-postgres.js).
+// they propagate to the default export, which returns a controlled 503
+// DATA_SOURCE_UNAVAILABLE instead of serving a possibly-divergent Blobs mirror
+// (SEC-4.1 #202 — parity with collection-postgres.js/collection.js).
 //
 // Exported (in addition to the default) so the pg path can be exercised
 // directly in tests with an injected pg-mem `db`, mirroring how
@@ -188,18 +192,20 @@ async function parseRequest(req) {
   const querySourceId = url.searchParams.get('sourceId')
   const id = url.searchParams.get('id')
   const isPost = req.method === 'POST'
-  const body = isPost ? await readBody(req) : null
+  const parsed = isPost ? await readBody(req) : null
+  if (parsed?.error) return { error: parsed.error }
+  const body = parsed?.value ?? null
   const kind = isPost ? (body?.kind || queryKind) : queryKind
   const sourceId = isPost ? (body?.sourceId || querySourceId) : querySourceId
   return { kind, sourceId, id, body }
 }
 
 async function readBody(req) {
-  try {
-    return await req.json()
-  } catch {
-    return {}
-  }
+  // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap);
+  // malformed JSON -> 400. Returns { value } on success or { error: <Response> }.
+  const parsed = await readJsonBody(req)
+  if (parsed.error) return parsed
+  return { value: parsed.value ?? {} }
 }
 
 // Kind gate: required + known for GET/POST; only validated (when present) on
@@ -261,32 +267,45 @@ async function writeGuardError(req, user, kind, sourceId) {
 }
 
 export default async function reviewsHandler(req) {
-  const { user, error } = await authorize(req)
-  if (error) return error
+  try {
+    const { user, error } = await authorize(req)
+    if (error) return error
 
-  const { kind, sourceId, id, body } = await parseRequest(req)
+    const parsedReq = await parseRequest(req)
+    if (parsedReq.error) return parsedReq.error
+    const { kind, sourceId, id, body } = parsedReq
 
-  const kindErr = kindError(req, kind)
-  if (kindErr) return kindErr
+    const kindErr = kindError(req, kind)
+    if (kindErr) return kindErr
 
-  const planErr = planError(user, kind)
-  if (planErr) return planErr
+    const planErr = planError(user, kind)
+    if (planErr) return planErr
 
-  if (req.method === 'POST' || req.method === 'DELETE') {
-    const guardErr = await writeGuardError(req, user, kind, sourceId)
-    if (guardErr) return guardErr
-  }
-
-  const ctx = { user, kind, sourceId, id, body }
-  // Postgres when configured (DB first, Blobs fallback on error); Blobs
-  // otherwise.
-  if (isPostgresConfigured()) {
-    try {
-      return await handlePostgres(req, ctx)
-    } catch (err) {
-      console.error('reviews: Postgres path failed, falling back to Blobs:', err?.message || err)
-      return handleBlobs(req, ctx)
+    if (req.method === 'POST' || req.method === 'DELETE') {
+      const guardErr = await writeGuardError(req, user, kind, sourceId)
+      if (guardErr) return guardErr
     }
+
+    const ctx = { user, kind, sourceId, id, body }
+    // Postgres when configured (DB first, Blobs fallback on error); Blobs
+    // otherwise.
+    if (isPostgresConfigured()) {
+      try {
+        return await handlePostgres(req, ctx)
+      } catch (err) {
+        // SEC-4.1 (#202): a Postgres outage is NOT masked by serving a Blobs
+        // mirror (which could diverge) — surface a controlled 503; the real
+        // detail goes to the log only (message, never a secret/stack).
+        console.error('reviews: Postgres data source unavailable (503):', err?.message || err)
+        return json(503, {
+          error: 'The reviews service is temporarily unavailable. Please try again shortly.',
+          code: 'DATA_SOURCE_UNAVAILABLE',
+        })
+      }
+    }
+    return handleBlobs(req, ctx)
+  } catch (err) {
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
-  return handleBlobs(req, ctx)
 }

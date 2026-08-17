@@ -646,3 +646,24 @@ describe('deleteUser — the member\'s feedback is removed too (T8 #78)', () => 
     expect(rows.map((r) => r.author_id)).toEqual(['u2'])
   })
 })
+
+// SEC-EPIC-4 (#206): deleting a member must revoke their live sessions (the
+// full lifecycle — data + credential). The member's collection/lending data
+// is removed via deleteUserCollections (lending state lives on the item), and
+// their reviews/feedback via deleteMemberReviews/deleteMemberFeedback (tested
+// above); this test pins the session revocation that completes the lifecycle.
+describe('deleteUser — the member\'s live sessions are revoked (SEC-EPIC-4 #206)', () => {
+  it('revokes every live session for a deleted member', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    const { token } = await createSession({ userId: 'u1', role: 'member' })
+    expect(await getSessionByToken(token)).toBeTruthy()
+
+    const res = await post({ action: 'deleteUser', userId: 'u1' })
+    expect(res.status).toBe(200)
+    // No orphaned live session can outlive the deleted account.
+    expect(await getSessionByToken(token)).toBeFalsy()
+    // The account record, its stores and its reviews/feedback are all gone too.
+    expect(usersMock.removeUserRecord).toHaveBeenCalledWith('u1')
+    expect(usersMock.deleteUserCollections).toHaveBeenCalledWith('u1')
+  })
+})

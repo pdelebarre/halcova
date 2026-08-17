@@ -1,0 +1,57 @@
+# SBOM generation for production releases (SEC-EPIC-5, #212).
+#
+# On every `v*` tag (and on demand) this generates a CycloneDX Software Bill of
+# Materials from the npm dependency tree and:
+#   - uploads it as a workflow artifact (available from any run), and
+#   - attaches it to the GitHub Release for that tag (via the gh CLI, so no
+#     extra third-party action to pin).
+#
+# Retrieval:
+#   - Release asset: open the release for the tag -> Assets -> `halcova-sbom.json`.
+#   - Workflow artifact: Actions -> <run> -> Artifacts -> download `sbom`.
+#
+# SEC-5.4 (#211): actions/checkout, actions/setup-node and actions/upload-artifact
+# are pinned to immutable commit SHAs (dependabot keeps them updated).
+#   - actions/checkout@v7 -> 3d3c42e5aac5ba805825da76410c181273ba90b1
+#   - actions/setup-node@v7 -> 820762786026740c76f36085b0efc47a31fe5020
+#   - actions/upload-artifact@v4 -> ea165f8d65b6e75b540449e92b4886f43607fa02
+name: Generate SBOM
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to attach the SBOM as a release asset
+
+jobs:
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      # npm's built-in SBOM generator (npm >= 9.7) emits a CycloneDX JSON SBOM
+      # to stdout. --omit=dev keeps the SBOM focused on production deps.
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --omit=dev --sbom-format=cyclonedx > halcova-sbom.json
+      - name: Upload SBOM as a workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sbom
+          path: halcova-sbom.json
+      - name: Attach SBOM to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" halcova-sbom.json --clobber
+          echo "SBOM attached to release ${GITHUB_REF_NAME}."

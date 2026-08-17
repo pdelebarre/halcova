@@ -17,8 +17,15 @@ import { resolveSession } from './_shared/session-auth'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
+import { json, safeError, securityHeaders } from './_shared/security'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
+
+// SEC-3.2 (#195): cap the provider response size before it's parsed or cached.
+// A malicious/hostile provider response (or a degenerate result set) must not
+// buffer unbounded bytes into the function or the shared cache. 1 MiB is well
+// above any real Google Books response for this app's small queries.
+const MAX_PROXY_BYTES = 1 * 1024 * 1024
 
 // Optional server-side API key. When set, it's appended to every outbound
 // Google Books request so quota is attributed to the key (a per-project quota)
@@ -51,9 +58,11 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 const BOOKS_USER_LIMIT = Number(process.env.RUNOUT_BOOKS_RATE_LIMIT) || 60
 const BOOKS_OVERALL_LIMIT = Number(process.env.RUNOUT_BOOKS_OVERALL_RATE_LIMIT) || 300
 
+// Keep the `json` name used throughout this file, but with security headers
+// applied (SEC-3.4, #197).
 const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
+  headers: { 'Content-Type': 'application/json', ...securityHeaders(), ...headers },
 })
 
 // Blob keys are character/length restricted, and free-text user input can't be
@@ -181,7 +190,17 @@ async function lookup(lookupSpec, ttlMs, identity) {
     return { error: json(502, { error: 'Google Books request failed.', code: 'HTTP_ERROR' }) }
   }
 
-  const data = await res.json()
+  // SEC-3.2 (#195): cap the provider body before parsing/caching.
+  const raw = await res.text()
+  if (Buffer.byteLength(raw, 'utf8') > MAX_PROXY_BYTES) {
+    return { error: json(502, { error: 'Provider response too large.', code: 'HTTP_ERROR' }) }
+  }
+  let data
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    return { error: json(502, { error: 'Provider returned an invalid response.', code: 'HTTP_ERROR' }) }
+  }
   // Caching is best-effort — a failed write must not fail a successful lookup.
   // Writes through to both the DB and the legacy Blob store.
   await writeCache('books', lookupSpec.cacheKey, data, ttlMs)
@@ -189,32 +208,37 @@ async function lookup(lookupSpec, ttlMs, identity) {
 }
 
 export default async (req) => {
-  const url = new URL(req.url)
-  const action = url.searchParams.get('action')
+  try {
+    const url = new URL(req.url)
+    const action = url.searchParams.get('action')
 
-  // Cover images are loaded by <img> tags, which cannot send the access-code
-  // Authorization header — so this action is deliberately PUBLIC (T6). It is
-  // safe because handleCover only ever fetches small images from an explicit
-  // host allowlist (https-only, size-capped). Every other action stays
-  // authenticated below.
-  if (action === 'cover') {
+    // Cover images are loaded by <img> tags, which cannot send the access-code
+    // Authorization header — so this action is deliberately PUBLIC (T6). It is
+    // safe because handleCover only ever fetches small images from an explicit
+    // host allowlist (https-only, size-capped). Every other action stays
+    // authenticated below.
+    if (action === 'cover') {
+      if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
+      return handleCover(url.searchParams, getStore(CACHE_STORE))
+    }
+
+    const { user, error } = await authorize(req)
+    if (error) return error
+
     if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
-    return handleCover(url.searchParams, getStore(CACHE_STORE))
+
+    const lookupSpec = buildLookup(action, url.searchParams)
+    if (!lookupSpec) return json(400, { error: 'Unknown action.' })
+
+    // Members/owner key provider limits by user id; the shared demo identity is
+    // keyed by client IP so one demo visitor can't throttle every other.
+    const identity = rateLimitIdentity(user, req)
+
+    const result = await lookup(lookupSpec, TTL_MS[action], identity)
+    if (result.error) return result.error
+    return json(200, result.data)
+  } catch (err) {
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
-
-  const { user, error } = await authorize(req)
-  if (error) return error
-
-  if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
-
-  const lookupSpec = buildLookup(action, url.searchParams)
-  if (!lookupSpec) return json(400, { error: 'Unknown action.' })
-
-  // Members/owner key provider limits by user id; the shared demo identity is
-  // keyed by client IP so one demo visitor can't throttle every other.
-  const identity = rateLimitIdentity(user, req)
-
-  const result = await lookup(lookupSpec, TTL_MS[action], identity)
-  if (result.error) return result.error
-  return json(200, result.data)
 }

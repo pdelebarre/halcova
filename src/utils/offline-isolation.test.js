@@ -188,4 +188,46 @@ describe('the service worker never runtime-caches user-scoped endpoints', () => 
     expect(block).toContain('discogs')
     expect(block).toContain('books')
   })
+
+  it('the precache glob and manifest never include session or user data (SEC-4.4 #205)', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const path = (await import('node:path')).default
+    const { fileURLToPath } = await import('node:url')
+    const viteConfigPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'vite.config.js')
+    const src = await readFile(viteConfigPath, 'utf8')
+
+    // The precache glob covers only static shell assets (js/css/html/png/svg/
+    // ico/wasm/gz/woff) — never session/user JSON or any private data.
+    const glob = src.match(/globPatterns:\s*\[([^\]]*)\]/)?.[1] || ''
+    expect(glob).toMatch(/\*\*\/\*\.\{js,css,html,png,svg,ico,wasm,gz,woff2,woff\}/)
+    // No session/user-scoped files are precached.
+    expect(glob).not.toMatch(/session/)
+    expect(glob).not.toMatch(/user/)
+
+    // The manifest carries only static app metadata — no user data.
+    const manifest = src.slice(src.indexOf('manifest: {'), src.indexOf('workbox: {'))
+    expect(manifest).not.toMatch(/session/)
+    expect(manifest).not.toMatch(/userData|userId|accessCode|runout\.session/)
+  })
+
+  it('a collection API response never lands in any service-worker cache (SEC-4.4 #205)', async () => {
+    // The collection/auth/admin/lending/reviews/feedback/payment routes are
+    // absent from runtimeCaching (asserted above). This locks in that a
+    // collection response is never cacheable by the SW: the only runtime
+    // cache rules reference the /discogs + /books lookup/covers proxies, and
+    // the collection endpoint is not among them, so Cache Storage can never
+    // hold a private collection response.
+    const { readFile } = await import('node:fs/promises')
+    const path = (await import('node:path')).default
+    const { fileURLToPath } = await import('node:url')
+    const viteConfigPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'vite.config.js')
+    const src = await readFile(viteConfigPath, 'utf8')
+    const start = src.indexOf('runtimeCaching: [')
+    const end = src.indexOf('],', start)
+    const block = src.slice(start, end)
+    // Every cached urlPattern is scoped to the lookup/cover proxies.
+    expect(block).toMatch(/action.*=.*'cover'/)
+    expect(block).not.toContain('collection')
+    expect(block).not.toContain("'/api/'")
+  })
 })

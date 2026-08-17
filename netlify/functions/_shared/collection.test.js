@@ -529,3 +529,49 @@ describe('collection rate limiting (T5)', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('SEC-3.1 (#194) — invalid item bodies are rejected with a clean 400, never 500', () => {
+  it('POST with a type-mismatch year → 400 TYPE_ERROR', async () => {
+    seedMember()
+    const res = await call('POST', '?collection=records', { title: 'A', year: 'not-a-year' })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TYPE_ERROR')
+  })
+
+  it('POST with an over-length notes field → 400 TOO_LONG', async () => {
+    seedMember()
+    const res = await call('POST', '?collection=records', { title: 'A', notes: 'x'.repeat(6000) })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TOO_LONG')
+  })
+
+  it('POST with a missing title → 400 REQUIRED', async () => {
+    seedMember()
+    const res = await call('POST', '?collection=records', { year: 2020 })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('REQUIRED')
+  })
+
+  it('PUT partial patch validates the present fields (a non-boolean wishlist → 400)', async () => {
+    seedMember()
+    const store = collectionStore([{ id: 'r1', title: 'X' }])
+    const res = await call('PUT', '?collection=records&id=r1', { wishlist: 'yes' })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TYPE_ERROR')
+  })
+})
+
+describe('SEC-3.2 (#195) — oversized payloads are rejected cleanly', () => {
+  it('POST with a body over the byte cap → 413 PAYLOAD_TOO_LARGE, never processed', async () => {
+    seedMember()
+    const bigReq = {
+      ...req('POST', '?collection=records', {}),
+      text: async () => JSON.stringify({ title: 'A', notes: 'x'.repeat(200 * 1024) }),
+    }
+    const res = await handler(bigReq)
+    expect(res.status).toBe(413)
+    expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
+    // Nothing was written.
+    expect(stores[`collection-${USER_ID}-records`].data.has('index')).toBe(false)
+  })
+})

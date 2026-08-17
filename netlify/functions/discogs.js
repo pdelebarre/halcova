@@ -9,10 +9,17 @@ import { resolveSession } from './_shared/session-auth'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
+import { json, safeError, securityHeaders } from './_shared/security'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 // Discogs policy requires a User-Agent header on every request.
 const USER_AGENT = 'RunoutRecordCollector/1.0 (records & books catalog)'
+
+// SEC-3.2 (#195): cap the provider response size before it's parsed or cached.
+// A hostile/degenerate Discogs response must not buffer unbounded bytes into
+// the function or the shared cache. 2 MiB is above any real Discogs search/
+// release payload this app requests.
+const MAX_PROXY_BYTES = 2 * 1024 * 1024
 
 // One shared store for every user — that's the whole point: user A's lookup
 // serves user B, so a second request never hits Discogs again. Part B: reads go
@@ -36,9 +43,11 @@ const TTL = {
   release: 30 * DAY, // release details are stable
 }
 
+// Keep the `json` name used throughout this file, but with security headers
+// applied (SEC-3.4, #197).
 const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
   status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
+  headers: { 'Content-Type': 'application/json', ...securityHeaders(), ...headers },
 })
 
 // Same contract as collection.js (SEC-EPIC-1, #176): every request carries a
@@ -104,7 +113,12 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
       if (res.status === 429) return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' })
       return json(502, { error: 'Discogs request failed.', code: 'HTTP_ERROR' })
     }
-    data = await res.json()
+    // SEC-3.2 (#195): cap the provider body before parsing/caching.
+    const raw = await res.text()
+    if (Buffer.byteLength(raw, 'utf8') > MAX_PROXY_BYTES) {
+      return json(502, { error: 'Discogs response too large.', code: 'HTTP_ERROR' })
+    }
+    data = JSON.parse(raw)
   } catch {
     return json(502, { error: 'Discogs request failed.', code: 'HTTP_ERROR' })
   }
@@ -116,6 +130,7 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
 }
 
 export default async (req) => {
+  try {
   const url = new URL(req.url)
   const action = url.searchParams.get('action')
 
@@ -158,4 +173,8 @@ export default async (req) => {
   }
 
   return json(400, { error: 'Unknown action.' })
+  } catch (err) {
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
+  }
 }

@@ -85,9 +85,14 @@ an implementer.
 
 ## Supply-chain & secrets security (SEC-EPIC-5)
 
-Advisory, non-blocking scanning is wired into CI so supply-chain findings
-surface without gating the launch branch. The blocking security CI merge gate
-is a later milestone (#213) — nothing in these workflows fails a build.
+Two layers of scanning:
+
+- **Advisory, non-blocking** (`codeql.yml`, `secret-scan.yml`, `sonarcloud.yml`)
+  surface findings without gating the launch branch.
+- **Blocking merge gate** (`security-ci.yml`, #213) **fails the check-run** on
+  critical/high findings so it blocks merges via the required status checks.
+  It covers security unit tests, SAST (CodeQL security-extended), dependency
+  checks (`npm audit --audit-level=high`) and secret scanning (Gitleaks).
 
 - **Dependency/SCA scanning (#208)** — Dependabot (`.github/dependabot.yml`)
   opens weekly update PRs for npm and GitHub Actions; an advisory
@@ -111,8 +116,35 @@ is a later milestone (#213) — nothing in these workflows fails a build.
    **Secret scanning** and **Push protection** (blocks known secrets pushed to
    the repo in real time). Optionally enable **Dependabot alerts** and
    **Dependabot security updates** to complement the weekly PRs.
-2. Follow-up for #208: commit a `package-lock.json` so the npm ecosystem
+2. In **Settings → Branches**, add the `security-ci.yml` job names
+   (`security-tests`, `dependency-audit`, `secret-scan`, `sast`) to the
+   branch-protection **required status checks** so the blocking gate actually
+   gates merges (this is what makes #213 effective).
+3. Follow-up for #208: commit a `package-lock.json` so the npm ecosystem
    (Dependabot + `npm audit`) resolves pinned versions.
+
+### Exceptions policy (#213 — who may waive a blocking finding, and how)
+
+The blocking gate is a **merge gate**, not a veto on shipping with a known
+issue — but exceptions are narrow and audited:
+
+- **Which findings can be waived**:
+  - **Moderate / low** severity findings do NOT block merges (the gate only
+    fails on high/critical). They are tracked via the advisory scans and
+    Dependabot PRs; fix on the normal cadence.
+  - **High / critical** findings can only be waived when (a) a **ticket** is
+    filed describing the finding, the impact, and the remediation plan, and
+    (b) the **Security Auditor** approves the exception. No self-approval by
+    the implementer.
+  - **Secrets** (Gitleaks / secret scanning) are **never** waivable — a
+    detected secret is a rotation incident (see the response procedure
+    below), not a merge exception.
+- **By whom**: only the **Security Auditor** (with the Project Manager's
+  concurrence for schedule impact) may approve a high/critical exception.
+- **With a ticket**: every exception must reference an open issue (e.g.
+  `#NNN`), and the PR description must link it. The exception is temporary:
+  the ticket stays open until the finding is remediated, and the PR is not
+  considered "done" under the mandatory security gate until the ticket closes.
 
 ### Secret-leak response & rotation procedure
 

@@ -17,6 +17,7 @@ import { getStore } from '@netlify/blobs'
 import { COLLECTIONS, authorize, json } from './_shared/collection-store'
 import { effectiveFeatures } from './_shared/entitlements'
 import { storeNameFor } from './_shared/users'
+import { readJsonBody, safeError } from './_shared/security'
 
 const FEATURE_OFF_MSG = "Lending isn't enabled for your account."
 const HISTORY_CAP = 10
@@ -42,19 +43,19 @@ export default async function lending(req) {
       ? await handleLend(store, body.itemId, body)
       : await handleReturn(store, body.itemId)
   } catch (err) {
-    return json(500, { error: err.message || 'Internal error' })
+    // SEC-3.7 (#200): never surface the internal message to the client.
+    return safeError(err, req)
   }
 }
 
 async function readBody(req) {
-  try {
-    // A JSON `null` body is valid JSON but not a request body — default to {}
-    // so validateAction rejects it with a 400 instead of a TypeError that
-    // would escape the handler's try/catch as a 500.
-    return (await req.json()) ?? {}
-  } catch {
-    return { error: json(400, { error: 'Invalid JSON body.' }) }
-  }
+  // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap);
+  // malformed JSON -> 400. readJsonBody returns { value } on success or
+  // { error: <Response> } — the caller returns body.error early. A JSON `null`
+  // body defaults to {} so validateAction rejects it with a 400.
+  const parsed = await readJsonBody(req)
+  if (parsed.error) return parsed
+  return parsed.value ?? {}
 }
 
 // Borrower text mirrors cleanName in netlify/functions/auth.js — always stored

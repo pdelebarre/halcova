@@ -480,3 +480,67 @@ describe('magic link — fails closed when the secret is unconfigured (CWE-287)'
     expect(await listRequests()).toHaveLength(0)
   })
 })
+
+// SEC-3.5 (#198) — CSRF is not applicable to the Bearer-token flow.
+//
+// Sessions are NOT cookie-based (SEC-EPIC-1 #176): the session token is held
+// in localStorage and sent as an `Authorization: Bearer` header on every call.
+// There is no ambient cookie credential, so classic cookie-CSRF (a cross-site
+// form POST auto-attaching the cookie) cannot apply. These negative tests lock
+// that in: a state-changing request without a valid Bearer is rejected 401,
+// and no response ever sets a cookie.
+describe('SEC-3.5 (#198) — CSRF-immune token-based sessions', () => {
+  it('a state-changing request without a valid Bearer token is rejected (401) — no ambient credential', async () => {
+    // logoutAll revokes sessions (a state change). With no Bearer there is no
+    // ambient credential to ride on, so it 401s — a cross-site attacker cannot
+    // forge this request.
+    const res = await handler(req({ action: 'logoutAll' }, { token: '' }))
+    expect(res.status).toBe(401)
+  })
+
+  it('a forged foreign Origin with no Bearer is still rejected (Origin is not the trust boundary)', async () => {
+    const res = await handler({
+      method: 'POST',
+      headers: {
+        get: (k) => {
+          const key = String(k).toLowerCase()
+          if (key === 'origin') return 'https://evil.example'
+          if (key === 'sec-fetch-site') return 'cross-site'
+          return null
+        },
+      },
+      json: async () => ({ action: 'logoutAll' }),
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it('no response sets a cookie — the app never uses cookie sessions', async () => {
+    // A successful state-changing call (logout) must not set Set-Cookie.
+    const { createSession } = await import('./sessions')
+    const { token } = await createSession({ userId: 'owner', role: 'admin' })
+    const res = await handler(req({ action: 'logout' }, { token }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('a request with a valid Bearer succeeds regardless of a foreign Origin header', async () => {
+    // Token-based: the Bearer is the sole credential; a spoofed Origin does
+    // not weaken auth (the client never auto-attaches the Bearer).
+    const { createSession } = await import('./sessions')
+    const { token } = await createSession({ userId: 'owner', role: 'admin' })
+    const res = await handler({
+      method: 'POST',
+      headers: {
+        get: (k) => {
+          const key = String(k).toLowerCase()
+          if (key === 'authorization') return `Bearer ${token}`
+          if (key === 'origin') return 'https://evil.example'
+          return null
+        },
+      },
+      json: async () => ({ action: 'logoutAll' }),
+    })
+    expect(res.status).toBe(200)
+    expect((await res.json()).ok).toBe(true)
+  })
+})
