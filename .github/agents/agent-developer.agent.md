@@ -46,6 +46,12 @@ skill for the authoritative reference; this body is the fast ruleset.
   Runout Engineer.
 - DO NOT create new feature files on `main` — work on a `feat/`, `chore/`, or
   `docs/` branch (see the `feature-branching` skill).
+- **Always work on a dedicated branch for team/agent customization.** Agent,
+  prompt, skill, and instruction edits are `docs/` or `chore/` work — create a
+  `docs/<slug>` (or `chore/<slug>`) branch off `main` before editing, and never
+  commit them into an in-flight `feat/`/`fix/` branch or mix them with unrelated
+  changes in the working tree. Isolate only the customization files on the
+  branch (stash unrelated work if the tree is dirty), then finish with a PR.
 - DO NOT modify the built-in `agent-customization` skill or extension files.
 - DO NOT add a new agent/prompt/skill without a keyword-rich `description`.
 - Keep Runout conventions: match the style of the existing
@@ -57,17 +63,21 @@ skill for the authoritative reference; this body is the fast ruleset.
 1. Load the `agent-customization` skill; read the existing
    `.github/agents/`, `.github/prompts/`, and `.github/skills/` files to match
    conventions.
-2. Clarify requirements: role/purpose, when it should trigger, who invokes it,
+2. Before editing, create a dedicated `docs/<slug>` (or `chore/<slug>`) branch
+   off `main` (see the `feature-branching` skill). If the working tree is dirty
+   with unrelated work, stash it first so only the customization files ride
+   along — never mix them into an in-flight `feat/`/`fix/` branch.
+3. Clarify requirements: role/purpose, when it should trigger, who invokes it,
    and any assets (scripts/templates/references) it needs.
-3. Pick the primitive, choose the path, and write the file with valid
+4. Pick the primitive, choose the path, and write the file with valid
    frontmatter and a keyword-rich `description` + `argument-hint`.
-4. Validate: correct location, YAML parses, `name` matches, description is
+5. Validate: correct location, YAML parses, `name` matches, description is
    meaningful with real trigger words, and (for prompts) the `agent:` route
    targets a real agent.
-5. If adding to the team roster, register the new agent in
+6. If adding to the team roster, register the new agent in
    `project-manager.agent.md` (`agents:` list + a routing line) so the Project
    Manager can delegate to it.
-6. Report what was created/changed and why.
+7. Report what was created/changed and why.
 
 ## Output Format
 List the file(s) created or edited, the primitive chosen and why, the trigger
