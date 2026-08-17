@@ -212,6 +212,173 @@ describe('t()', () => {
     })
   })
 
+  describe('T7 feedback keys (epic #74, issue #79)', () => {
+    it('ships every feedback key in all 8 locales (no raw-key fallback)', () => {
+      const required = [
+        'feedback.title',
+        'feedback.subtitle',
+        'feedback.typeLabel',
+        'feedback.type.suggestion',
+        'feedback.type.bug',
+        'feedback.categoryLabel',
+        'feedback.category.records',
+        'feedback.category.books',
+        'feedback.category.scanner',
+        'feedback.category.auth',
+        'feedback.category.billing',
+        'feedback.category.games',
+        'feedback.category.lending',
+        'feedback.category.other',
+        'feedback.messageLabel',
+        'feedback.messagePlaceholder',
+        'feedback.charCount',
+        'feedback.contextLabel',
+        'feedback.contextDetail',
+        'feedback.contextEmpty',
+        'feedback.submit',
+        'feedback.submitting',
+        'feedback.successTitle',
+        'feedback.successBody',
+        'feedback.referenceUnknown',
+        'feedback.done',
+        'feedback.error.generic',
+        'feedback.error.NO_TOKEN',
+        'feedback.error.RATE_LIMITED',
+        'feedback.error.MESSAGE_TOO_LONG',
+        'feedback.error.DEMO_READONLY',
+        'admin.tab.members',
+        'admin.tab.feedback',
+        'admin.feedback.unread',
+        'admin.feedback.filterStatus',
+        'admin.feedback.filterType',
+        'admin.feedback.allStatuses',
+        'admin.feedback.allTypes',
+        'admin.feedback.status.open',
+        'admin.feedback.status.in_progress',
+        'admin.feedback.status.done',
+        'admin.feedback.status.wontfix',
+        'admin.feedback.status.duplicate',
+        'admin.feedback.type.suggestion',
+        'admin.feedback.type.bug',
+        'admin.feedback.statusActions',
+        'admin.feedback.empty',
+        'admin.feedback.emptyFiltered',
+        'admin.feedback.retry',
+        'admin.feedback.from',
+        'admin.feedback.route',
+        'admin.feedback.version',
+        'admin.feedback.device',
+        'admin.feedback.agent',
+        'admin.feedback.noteLabel',
+        'admin.feedback.notePlaceholder',
+        'admin.feedback.saveNote',
+        'admin.feedback.noteSaved',
+        'admin.feedback.saving',
+        'admin.feedback.delete',
+        'admin.feedback.deleteConfirm',
+      ]
+      for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
+        setLocale(locale)
+        for (const key of required) {
+          // t() returns the key itself only when the key is missing everywhere.
+          expect(t(key)).not.toBe(key)
+        }
+      }
+    })
+
+    it('uses the glossary-reused feedback terms (not English) in the 6 non-EN locales', () => {
+      // The glossary (localization-dictionary.md) covers Records/Books/Account/
+      // Done/Members/Retry, so those feedback keys reuse the already-validated
+      // per-locale values instead of falling back to English.
+      const samples = {
+        fr: {
+          'feedback.category.records': 'Disques',
+          'feedback.category.books': 'Livres',
+          'feedback.category.auth': 'Compte',
+          'feedback.done': 'Terminé',
+          'admin.tab.members': 'Membres',
+          'admin.feedback.status.done': 'Terminé',
+          'admin.feedback.retry': 'Réessayer',
+        },
+        nl: {
+          'feedback.category.records': 'Platen',
+          'feedback.category.books': 'Boeken',
+          'feedback.category.auth': 'Account',
+          'feedback.done': 'Klaar',
+          'admin.tab.members': 'Leden',
+          'admin.feedback.status.done': 'Klaar',
+          'admin.feedback.retry': 'Opnieuw',
+        },
+        'pt-BR': {
+          'feedback.category.records': 'Discos',
+          'feedback.category.books': 'Livros',
+          'feedback.category.auth': 'Conta',
+          'feedback.done': 'Concluído',
+          'admin.tab.members': 'Membros',
+          'admin.feedback.status.done': 'Concluído',
+          'admin.feedback.retry': 'Tentar de novo',
+        },
+        de: {
+          'feedback.category.records': 'Platten',
+          'feedback.category.books': 'Bücher',
+          'feedback.category.auth': 'Konto',
+          'feedback.done': 'Fertig',
+          'admin.tab.members': 'Mitglieder',
+          'admin.feedback.status.done': 'Fertig',
+          'admin.feedback.retry': 'Erneut versuchen',
+        },
+        es: {
+          'feedback.category.records': 'Discos',
+          'feedback.category.books': 'Libros',
+          'feedback.category.auth': 'Cuenta',
+          'feedback.done': 'Hecho',
+          'admin.tab.members': 'Miembros',
+          'admin.feedback.status.done': 'Hecho',
+          'admin.feedback.retry': 'Reintentar',
+        },
+        it: {
+          'feedback.category.records': 'Dischi',
+          'feedback.category.books': 'Libri',
+          'feedback.category.auth': 'Account',
+          'feedback.done': 'Fatto',
+          'admin.tab.members': 'Membri',
+          'admin.feedback.status.done': 'Fatto',
+          'admin.feedback.retry': 'Riprova',
+        },
+      }
+      for (const [locale, entries] of Object.entries(samples)) {
+        setLocale(locale)
+        for (const [key, expected] of Object.entries(entries)) {
+          expect(t(key)).toBe(expected)
+        }
+      }
+    })
+
+    it('keeps the EN baseline for glossary-silent feedback keys in every locale', () => {
+      // The glossary has no feedback section, so the modal/inbox sentences stay
+      // EN and are flagged [VALIDATE] for the native-tester pass. They must
+      // resolve to the same string in every locale (not the raw key).
+      const enBaseline = {
+        'feedback.title': 'Feedback',
+        'feedback.subtitle': 'Suggest an idea or report a problem — we read everything.',
+        'feedback.typeLabel': 'Feedback type',
+        'feedback.categoryLabel': 'What\'s it about? (optional)',
+        'feedback.submit': 'Send feedback',
+        'feedback.successTitle': 'Thanks — we got it.',
+        'admin.tab.feedback': 'Feedback',
+        'admin.feedback.empty': 'No feedback yet — the inbox is quiet.',
+        'admin.feedback.notePlaceholder': 'Internal note — only you see this.',
+        'admin.feedback.deleteConfirm': 'Delete this feedback report? This cannot be undone.',
+      }
+      for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
+        setLocale(locale)
+        for (const [key, expected] of Object.entries(enBaseline)) {
+          expect(t(key)).toBe(expected)
+        }
+      }
+    })
+  })
+
   describe('fallback behaviour', () => {
     it('falls back to en when key is missing in a non-en locale', () => {
       // 'common.copy' exists in en but let's test with a key that exists in en
