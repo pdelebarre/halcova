@@ -172,6 +172,17 @@ export function createItemsRepo(db) {
     return rows[0]?.count || 0
   }
 
+  // (ADMIN-EPIC-1, #259) — dashboard aggregate: OWNED item totals by kind
+  // (records / books) across ALL owners. `NOT wishlist` is the same "owned"
+  // predicate countOwned uses (the free-tier cap), so the dashboard's
+  // collection size matches the cap semantics. SQL GROUP BY — no per-item scan.
+  async function countsByKind() {
+    const { rows } = await db.query(
+      `SELECT kind, count(*)::int AS count FROM items WHERE NOT wishlist GROUP BY kind`,
+    )
+    return rows
+  }
+
   // Delete every item for an owner (used when a member is deleted, so Postgres
   // never orphans rows — the blob path's deleteUserCollections covers the Blobs).
   async function deleteAllForOwner(ownerId) {
@@ -206,6 +217,7 @@ export function createItemsRepo(db) {
     updateItem,
     deleteItem,
     countOwned,
+    countsByKind,
     deleteAllForOwner,
     transaction,
   }

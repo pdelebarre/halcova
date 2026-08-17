@@ -73,6 +73,12 @@ const en = {
   'scan.torchOff': 'Turn off torch',
   'scan.retryCamera': 'Retry camera',
   'scan.enterManually': 'Enter details manually instead',
+  // Decode hardening: shown when the camera has been armed for a while with
+  // nothing decoded (subtle hint — no camera reset), or when the decoder hits a
+  // hard failure / the camera is interrupted (error + retry).
+  'scan.noBarcodeYet': 'No barcode detected yet — hold steady, keep it in the frame',
+  'scan.decodeError': "Couldn't read the camera feed. Retry to restart scanning.",
+  'scan.cameraLost': 'The camera was interrupted. Retry to restart scanning.',
 
   // §6b Cover scan (on-device OCR — camera/gallery, no barcode needed)
   'coverScan.title': 'Scan a cover',
@@ -762,6 +768,43 @@ const en = {
   'admin.feedback.saving': 'Saving…',
   'admin.feedback.delete': 'Delete report',
   'admin.feedback.deleteConfirm': 'Delete this feedback report? This cannot be undone.',
+
+  // Admin dashboard (ADMIN-EPIC-1, #260/#263) — EN baseline. Tab label,
+  // section + card labels, captions, "Last updated", the pending badge
+  // aria-label, and loading/error/empty strings. Other locales are filled by
+  // the i18n ticket (T4); non-EN fall back to this baseline via t().
+  'admin.tab.dashboard': 'Dashboard',
+  'admin.dashboard.title': 'Dashboard',
+  'admin.dashboard.empty': 'No data yet.',
+  'admin.dashboard.retry': 'Retry',
+  'admin.dashboard.updated': 'Last updated {time}',
+  'admin.dashboard.pendingBadge': '{n} pending requests',
+  'admin.dashboard.section.pending': 'Pending requests',
+  'admin.dashboard.pendingCaption': 'Waiting for your approval',
+  'admin.dashboard.section.members': 'Members',
+  'admin.dashboard.member.total': 'Total members',
+  'admin.dashboard.member.active': 'Active',
+  'admin.dashboard.member.disabled': 'Disabled',
+  'admin.dashboard.section.signups': 'Signups',
+  'admin.dashboard.signup.today': 'Today',
+  'admin.dashboard.signup.week': 'This week',
+  'admin.dashboard.signup.month': 'This month',
+  'admin.dashboard.signup.total': 'Total',
+  'admin.dashboard.section.plans': 'Plans',
+  'admin.dashboard.plan.free': 'Free',
+  'admin.dashboard.plan.premium': 'Premium',
+  'admin.dashboard.plan.lifetime': 'Lifetime',
+  'admin.dashboard.plan.unlimited': 'Unlimited',
+  'admin.dashboard.section.collection': 'Collection size',
+  'admin.dashboard.collection.records': 'Records',
+  'admin.dashboard.collection.books': 'Books',
+  'admin.dashboard.section.feedback': 'Feedback',
+  'admin.dashboard.feedback.total': 'Total',
+  'admin.dashboard.section.reviews': 'Reviews',
+  'admin.dashboard.review.total': 'Total',
+  'admin.dashboard.review.published': 'Published',
+  'admin.dashboard.review.pending': 'Pending',
+  'admin.dashboard.review.hidden': 'Hidden',
 }
 
 export default en

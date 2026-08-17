@@ -134,6 +134,18 @@ export function createFeedbackRepo(db) {
     return rows.map(toFeedback)
   }
 
+  // (ADMIN-EPIC-1, #259) — dashboard aggregate: feedback volume by status as
+  // `[{ status, count }]`. SQL GROUP BY — the admin counts never scan the
+  // whole table. Unknown statuses (there is no CHECK on the column) are simply
+  // not tallied into the known enum; the caller's `total` still accounts for
+  // every row.
+  async function countsByStatus() {
+    const { rows } = await db.query(
+      `SELECT status, count(*)::int AS count FROM feedback GROUP BY status`,
+    )
+    return rows
+  }
+
   // Admin triage: update a feedback's status and/or owner-only admin note. A
   // junk id is a no-op (null) and a JUNK status makes the WHOLE update a no-op
   // (null) — never a 500. Only the fields the caller actually sends are
@@ -199,6 +211,7 @@ export function createFeedbackRepo(db) {
   return {
     createFeedback,
     listFeedback,
+    countsByStatus,
     updateFeedback,
     deleteFeedback,
     deleteByAuthor,

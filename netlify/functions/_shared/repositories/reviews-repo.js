@@ -196,6 +196,17 @@ export function createReviewsRepo(db) {
     return rows.map(toReview)
   }
 
+  // (ADMIN-EPIC-1, #259) — dashboard aggregate: review volume by status as
+  // `[{ status, count }]`. SQL GROUP BY — no full-table read for the admin
+  // counts. Unknown statuses (no CHECK on the column) are not tallied into the
+  // known enum; the caller's `total` still accounts for every row.
+  async function countsByStatus() {
+    const { rows } = await db.query(
+      `SELECT status, count(*)::int AS count FROM reviews GROUP BY status`,
+    )
+    return rows
+  }
+
   // Member deletion cleanup (parity with items deleteAllForOwner): remove
   // every review the member wrote so Postgres never orphans rows.
   async function deleteByAuthor(authorId) {
@@ -229,6 +240,7 @@ export function createReviewsRepo(db) {
     deleteReview,
     setStatus,
     listAll,
+    countsByStatus,
     deleteByAuthor,
     transaction,
   }

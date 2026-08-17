@@ -12,6 +12,7 @@ export default function Header({
   onOpenCredits,
   showAdmin = false,
   user,
+  pendingCount = 0,
   onLogout,
 }) {
   const scrolled = useScrolled()
@@ -78,6 +79,13 @@ export default function Header({
               {showAdmin && (
                 <button type="button" role="menuitem" onClick={() => run(onOpenAdmin)}>
                   {t('common.adminPanel')}
+                  {/* "Admin panel" menuitem badge (ADMIN-EPIC-1, #263) — same
+                      alert-fatigue rule as the avatar chip: only when > 0. */}
+                  {pendingCount > 0 && (
+                    <span className="admin-badge menu-badge" aria-label={t('admin.dashboard.pendingBadge', { n: pendingCount })}>
+                      {pendingCount}
+                    </span>
+                  )}
                 </button>
               )}
               <button type="button" role="menuitem" onClick={() => run(onOpenCredits)}>
@@ -94,9 +102,23 @@ export default function Header({
               onClick={() => setMenuOpen((s) => !s)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              aria-label={t('header.accountLabel', { name: user.name })}
+              aria-label={
+                showAdmin && pendingCount > 0
+                  ? `${t('header.accountLabel', { name: user.name })} — ${t('admin.dashboard.pendingBadge', { n: pendingCount })}`
+                  : t('header.accountLabel', { name: user.name })
+              }
             >
               <span className="user-chip-initial">{String(user.name || '?').charAt(0).toUpperCase()}</span>
+              {/* Avatar chip badge (ADMIN-EPIC-1, #263) — red .admin-badge at
+                  the chip's corner, shown only when count > 0 (alert-fatigue
+                  rule). The count is also folded into the chip's aria-label
+                  above so screen readers announce it even though the button
+                  already carries an explicit label. */}
+              {showAdmin && pendingCount > 0 && (
+                <span className="admin-badge avatar-badge" aria-label={t('admin.dashboard.pendingBadge', { n: pendingCount })}>
+                  {pendingCount}
+                </span>
+              )}
             </button>
           </div>
         )}

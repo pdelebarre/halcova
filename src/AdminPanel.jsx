@@ -78,6 +78,32 @@ function Switch({ checked, onChange, label, hint }) {
   )
 }
 
+// Dashboard counts are untrusted server data (ADMIN-EPIC-1, #260) — every read
+// goes through a guard so a malformed/partial count renders 0 instead of
+// throwing (no error boundary → dark screen). Number() also coerces the
+// occasional string count from a misconfigured backend.
+function num(v) {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+function fmtNum(v) {
+  return num(v).toLocaleString(getLocale())
+}
+
+// Display-only stat card: a <dl> with a <dt> label + <dd> value so screen
+// readers read them as terms/definitions. Deliberately NOT a link/button —
+// cards are glance surfaces, not navigation, so they can't be mis-tapped. No
+// aria-live: values change on navigation, not in place.
+function StatCard({ label, value, caption, className = '' }) {
+  return (
+    <dl className={`admin-stat-card ${className}`.trim()}>
+      <dt className="admin-stat-label">{label}</dt>
+      <dd className="admin-stat-value">{value}</dd>
+      {caption ? <dd className="admin-stat-caption">{caption}</dd> : null}
+    </dl>
+  )
+}
+
 // The admin screen: accept pending signup requests (granting Records and/or
 // Books), manage members' access, disable/delete accounts. Reachable only by
 // the owner (the admin key session).
@@ -94,7 +120,7 @@ export default function AdminPanel({ onClose }) {
 
   // Feedback inbox (epic #74, T6 #75). Loaded on mount so the Feedback tab's
   // unread badge (open items) is correct before the owner ever clicks it.
-  const [tab, setTab] = useState('members') // 'members' | 'feedback'
+  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'dashboard'
   const [allItems, setAllItems] = useState([]) // full newest-first inbox (badge source)
   const [fbLoading, setFbLoading] = useState(true)
   const [fbError, setFbError] = useState('')
@@ -104,6 +130,15 @@ export default function AdminPanel({ onClose }) {
   const [noteDraft, setNoteDraft] = useState('') // admin note draft for the expanded item
   const [fbBusy, setFbBusy] = useState(null) // id with a status/note/delete in flight
   const [noteSaved, setNoteSaved] = useState(false)
+
+  // Dashboard aggregates (ADMIN-EPIC-1, #260). Loaded on mount (mirroring the
+  // inbox) so the tab is ready the instant the owner clicks it. `fetchedAt`
+  // is set client-side at load for the "Last updated" caption — the counts
+  // payload itself carries no timestamp.
+  const [counts, setCounts] = useState(null)
+  const [dashLoading, setDashLoading] = useState(true)
+  const [dashError, setDashError] = useState('')
+  const [fetchedAt, setFetchedAt] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -139,6 +174,27 @@ export default function AdminPanel({ onClose }) {
   }, [])
 
   useEffect(() => { loadFeedback() }, [loadFeedback])
+
+  // Load the dashboard counts (ADMIN-EPIC-1, #260). Every failure degrades to
+  // an in-tab error state with retry — never an uncaught throw. The response
+  // is `{ requests, users, counts }`; a missing/malformed `counts` is treated
+  // as "no data yet" rather than a crash.
+  const loadDashboard = useCallback(async () => {
+    setDashLoading(true)
+    setDashError('')
+    try {
+      const res = await authApi.adminDashboard()
+      setCounts(res?.counts || null)
+      setFetchedAt(new Date().toISOString())
+    } catch (err) {
+      setCounts(null)
+      setDashError(err?.message || '')
+    } finally {
+      setDashLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadDashboard() }, [loadDashboard])
 
   const unread = allItems.filter((i) => i?.status === 'open').length
   const visibleItems = allItems.filter((i) =>
@@ -378,6 +434,16 @@ export default function AdminPanel({ onClose }) {
   const pending = data.requests.filter((r) => r.status === 'pending')
   const members = data.users.filter((u) => u.role !== 'admin')
 
+  // Guarded dashboard reads (ADMIN-EPIC-1, #260) — a malformed/partial counts
+  // payload must render 0s, never throw (no error boundary → dark screen).
+  const c = counts || {}
+  const dashMembers = c.members || {}
+  const dashSignups = c.signups || {}
+  const dashPlans = c.plans || {}
+  const dashCollections = c.collections || {}
+  const dashFeedback = c.feedback || {}
+  const dashReviews = c.reviews || {}
+
   return (
     <div className="sheet-overlay" role="dialog" aria-modal="true" aria-label={t('common.adminPanel')}>
       <div className="sheet admin-sheet">
@@ -397,6 +463,14 @@ export default function AdminPanel({ onClose }) {
             onClick={() => setTab('members')}
           >
             {t('admin.tab.members')}
+            {/* Members-tab pending badge (ADMIN-EPIC-1, #263) — reuses the
+                already-loaded data.requests (zero extra fetch) and the same
+                .admin-badge pattern the Feedback tab uses. */}
+            {pending.length > 0 && (
+              <span className="admin-badge" aria-label={t('admin.dashboard.pendingBadge', { n: pending.length })}>
+                {pending.length}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -411,6 +485,15 @@ export default function AdminPanel({ onClose }) {
                 {unread}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'dashboard'}
+            className={`admin-tab${tab === 'dashboard' ? ' active' : ''}`}
+            onClick={() => setTab('dashboard')}
+          >
+            {t('admin.tab.dashboard')}
           </button>
         </div>
 
@@ -586,6 +669,107 @@ export default function AdminPanel({ onClose }) {
             )}
           </section>
             </>
+          ) : tab === 'dashboard' ? (
+            <section>
+              {/* Admin dashboard (ADMIN-EPIC-1, #260) — aggregate stat cards
+                  from GET /admin?dashboard=1 (T1 backend). Display-only <dl>
+                  cards (no links, no aria-live); every read guarded so a
+                  malformed count degrades to 0 instead of throwing. */}
+              <h3 className="admin-h3">{t('admin.dashboard.title')}</h3>
+
+              {dashLoading ? (
+                <div className="admin-dash-grid" aria-hidden="true">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="admin-stat-card admin-dash-skeleton" />
+                  ))}
+                </div>
+              ) : dashError ? (
+                <p className="sheet-error" role="alert">
+                  {dashError}
+                  <button type="button" className="btn btn-ghost btn-sm admin-fb-retry" onClick={loadDashboard}>
+                    {t('admin.dashboard.retry')}
+                  </button>
+                </p>
+              ) : !counts ? (
+                <p className="sheet-empty">{t('admin.dashboard.empty')}</p>
+              ) : (
+                <>
+                  {/* Pending requests — the one number the owner must not
+                      miss: a full-width card with a red edge. */}
+                  <div className="admin-dash-pending">
+                    <StatCard
+                      className="is-pending"
+                      label={t('admin.dashboard.section.pending')}
+                      value={fmtNum(c.pendingRequests)}
+                      caption={t('admin.dashboard.pendingCaption')}
+                    />
+                  </div>
+
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.dashboard.section.members')}</h4>
+                    <div className="admin-dash-grid">
+                      <StatCard label={t('admin.dashboard.member.total')} value={fmtNum(dashMembers.total)} />
+                      <StatCard label={t('admin.dashboard.member.active')} value={fmtNum(dashMembers.active)} />
+                      <StatCard label={t('admin.dashboard.member.disabled')} value={fmtNum(dashMembers.disabled)} />
+                    </div>
+                  </section>
+
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.dashboard.section.signups')}</h4>
+                    <div className="admin-dash-grid">
+                      <StatCard label={t('admin.dashboard.signup.today')} value={fmtNum(dashSignups.today)} />
+                      <StatCard label={t('admin.dashboard.signup.week')} value={fmtNum(dashSignups.thisWeek)} />
+                      <StatCard label={t('admin.dashboard.signup.month')} value={fmtNum(dashSignups.thisMonth)} />
+                      <StatCard label={t('admin.dashboard.signup.total')} value={fmtNum(dashSignups.total)} />
+                    </div>
+                  </section>
+
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.dashboard.section.plans')}</h4>
+                    <div className="admin-dash-grid">
+                      <StatCard label={t('admin.dashboard.plan.free')} value={fmtNum(dashPlans.free)} />
+                      <StatCard label={t('admin.dashboard.plan.premium')} value={fmtNum(dashPlans.premium)} />
+                      <StatCard label={t('admin.dashboard.plan.lifetime')} value={fmtNum(dashPlans.lifetime)} />
+                      <StatCard label={t('admin.dashboard.plan.unlimited')} value={fmtNum(dashPlans.unlimited)} />
+                    </div>
+                  </section>
+
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.dashboard.section.collection')}</h4>
+                    <div className="admin-dash-grid">
+                      <StatCard label={t('admin.dashboard.collection.records')} value={fmtNum(dashCollections.records)} />
+                      <StatCard label={t('admin.dashboard.collection.books')} value={fmtNum(dashCollections.books)} />
+                    </div>
+                  </section>
+
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.dashboard.section.feedback')}</h4>
+                    <div className="admin-dash-grid">
+                      <StatCard label={t('admin.feedback.status.open')} value={fmtNum(dashFeedback.open)} />
+                      <StatCard label={t('admin.feedback.status.in_progress')} value={fmtNum(dashFeedback.in_progress)} />
+                      <StatCard label={t('admin.feedback.status.done')} value={fmtNum(dashFeedback.done)} />
+                      <StatCard label={t('admin.feedback.status.wontfix')} value={fmtNum(dashFeedback.wontfix)} />
+                      <StatCard label={t('admin.feedback.status.duplicate')} value={fmtNum(dashFeedback.duplicate)} />
+                      <StatCard label={t('admin.dashboard.feedback.total')} value={fmtNum(dashFeedback.total)} />
+                    </div>
+                  </section>
+
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.dashboard.section.reviews')}</h4>
+                    <div className="admin-dash-grid">
+                      <StatCard label={t('admin.dashboard.review.total')} value={fmtNum(dashReviews.total)} />
+                      <StatCard label={t('admin.dashboard.review.published')} value={fmtNum(dashReviews.published)} />
+                      <StatCard label={t('admin.dashboard.review.pending')} value={fmtNum(dashReviews.pending)} />
+                      <StatCard label={t('admin.dashboard.review.hidden')} value={fmtNum(dashReviews.hidden)} />
+                    </div>
+                  </section>
+
+                  {fetchedAt && (
+                    <p className="admin-dash-updated">{t('admin.dashboard.updated', { time: fmtDateTime(fetchedAt) })}</p>
+                  )}
+                </>
+              )}
+            </section>
           ) : (
             <section>
               {/* Feedback inbox — owner-only triage (epic #74, T6 #75) */}

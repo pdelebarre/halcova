@@ -409,3 +409,105 @@
   outline: 2px solid var(--runout-gold);
   outline-offset: -1px;
 }
+
+/* Admin dashboard stat cards (ADMIN-EPIC-1, #260) — on-theme §4.4.
+   Cards are a distinct surface (--vinyl-groove-2 + --line border, like
+   .admin-row); 2-column grid on narrow screens (never 3 at ≤375px), widening
+   to 3 only where there is room. Values use tabular-nums so counts don't
+   jitter as they change. */
+.admin-dash-section {
+  margin-bottom: 18px;
+}
+.admin-dash-section:last-child {
+  margin-bottom: 0;
+}
+
+.admin-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (min-width: 480px) {
+  .admin-dash-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Each stat is a <dl>: <dt> label + <dd> value (screen readers read them as
+   term/definition). Display-only — not a link/button — so cards can't be
+   mis-tapped. */
+.admin-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.admin-stat-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+}
+.admin-stat-value {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--runout-gold);
+}
+.admin-stat-caption {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--static-grey);
+}
+
+/* Loading skeleton — same card footprint so the grid doesn't jump when the
+   data arrives. */
+.admin-dash-skeleton {
+  min-height: 76px;
+  background: var(--vinyl-groove);
+  animation: admin-dash-pulse 1.2s ease-in-out infinite;
+}
+@keyframes admin-dash-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* Pending requests — the one number the owner must not miss. A full-width
+   card with a red edge draws the eye without making it look tappable. */
+.admin-dash-pending {
+  margin: 0 0 18px;
+}
+.admin-stat-card.is-pending {
+  background: rgba(178, 58, 46, 0.06);
+  border-color: var(--label-red);
+}
+
+.admin-dash-updated {
+  margin: 16px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--static-grey);
+}
+
+/* Pending badges in the Header (ADMIN-EPIC-1, #263). These live here (not
+   Header.css) so the badge style is shared with the panel tabs — AdminPanel.css
+   is bundled globally, so it applies to the header too.
+   Avatar chip badge: absolute at the chip's top-right corner (the chip is a
+   44px circle inside the position:relative .avatar-wrap). */
+.admin-badge.avatar-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  pointer-events: none;
+}
+/* "Admin panel" menuitem badge: pinned to the right edge of the menuitem
+   (the avatar-menu buttons are display:flex). */
+.admin-badge.menu-badge {
+  margin-left: auto;
+}
