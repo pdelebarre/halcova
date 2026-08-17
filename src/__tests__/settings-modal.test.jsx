@@ -116,4 +116,19 @@ describe('SettingsModal — i18n', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
+
+  it('opens the feedback modal from the Feedback card (feat/feedback #82)', () => {
+    const onOpenFeedback = vi.fn()
+    setLocale('en')
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} onOpenFeedback={onOpenFeedback} />
+      </LocaleProvider>
+    )
+
+    const card = screen.getByRole('button', { name: /Feedback/ })
+    expect(card).toBeInTheDocument()
+    fireEvent.click(card)
+    expect(onOpenFeedback).toHaveBeenCalledTimes(1)
+  })
 })

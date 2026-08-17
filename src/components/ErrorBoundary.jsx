@@ -49,7 +49,18 @@ export default class ErrorBoundary extends Component {
             >
               {t('error.reload')}
             </button>
-            <p className="error-boundary-note">{t('error.reported')}</p>
+            {/* Report path (feat/feedback #82): the old static note claimed the
+                error was reported when nothing was sent. This button opens the
+                FeedbackModal pre-filled type=bug + current route/version — App
+                wires `onReport`; the optional-chaining keeps the safety-net
+                card rendering even without it (standalone tests). */}
+            <button
+              type="button"
+              className="error-boundary-report"
+              onClick={() => this.props.onReport?.()}
+            >
+              {t('error.report')}
+            </button>
           </div>
         </main>
       )

@@ -250,10 +250,12 @@ const en = {
 
   // §12b Error boundary (T7) — the last-resort fallback shown instead of a
   // dark blank screen when an uncaught render error takes down a subtree.
+  // The old `error.reported` note was false (nothing auto-reported); T5 #82
+  // replaced it with a real "Report a problem" button.
   'error.title': 'Something went wrong',
   'error.message': "The app hit an unexpected error. Your collection is safe.",
   'error.reload': 'Reload',
-  'error.reported': 'This error has been reported.',
+  'error.report': 'Report a problem',
 
   // §13 Catalog copy bridge — these are consumed by catalog.copy functions
   'catalog.emptyTitle': 'Your collection is empty',
@@ -688,6 +690,43 @@ const en = {
   'gamif.story.notes-coverage.body': 'Notes on {n} of {count} {entity}s ({pct}%). Future you says thanks.',
   'gamif.story.total-pages.title': 'A serious page count',
   'gamif.story.total-pages.body': 'Your shelf holds {pages} pages across {n} books. The neighbors are impressed.',
+
+  // §19 In-app feedback (epic #74, T5 #82) — member suggestions + bug reports
+  // from Settings and the ErrorBoundary crash card. EN baseline; other locales
+  // inherit via fallback until the T7 native-speaker pass. `{n}`/`{max}` are
+  // the char counter, `{ref}` the short reference id, and `{route}`/`{version}`/
+  // `{device}` the auto-context line. Tone: wry, warm collector voice.
+  'feedback.title': 'Feedback',
+  'feedback.subtitle': 'Suggest an idea or report a problem — we read everything.',
+  'feedback.typeLabel': 'Feedback type',
+  'feedback.type.suggestion': 'Suggestion',
+  'feedback.type.bug': 'Report a problem',
+  'feedback.categoryLabel': 'What\'s it about? (optional)',
+  'feedback.category.records': 'Records',
+  'feedback.category.books': 'Books',
+  'feedback.category.scanner': 'Scanner',
+  'feedback.category.auth': 'Account',
+  'feedback.category.billing': 'Billing',
+  'feedback.category.games': 'Games',
+  'feedback.category.lending': 'Lending',
+  'feedback.category.other': 'Other',
+  'feedback.messageLabel': 'Your message',
+  'feedback.messagePlaceholder': 'What happened, or what would you love to see?',
+  'feedback.charCount': '{n} / {max}',
+  'feedback.contextLabel': 'Include app info',
+  'feedback.contextDetail': '{route} · v{version} · {device}',
+  'feedback.contextEmpty': '—',
+  'feedback.submit': 'Send feedback',
+  'feedback.submitting': 'Sending…',
+  'feedback.successTitle': 'Thanks — we got it.',
+  'feedback.successBody': 'Reference {ref}. It goes straight to the team — we read everything.',
+  'feedback.referenceUnknown': '#fb-…',
+  'feedback.done': 'Done',
+  'feedback.error.generic': 'Couldn\'t send your feedback — check your connection and try again.',
+  'feedback.error.NO_TOKEN': 'Sign in to send feedback — the team reads member reports.',
+  'feedback.error.RATE_LIMITED': 'You\'ve sent a lot recently — take a breath and try again in a minute.',
+  'feedback.error.MESSAGE_TOO_LONG': 'That message is too long — keep it under 4000 characters.',
+  'feedback.error.DEMO_READONLY': 'The demo is read-only — sign in to send feedback.',
 }
 
 export default en

@@ -1,7 +1,7 @@
 import { t, LOCALES, SUPPORTED_LOCALES, useLocale } from '../i18n'
 import './SettingsModal.css'
 
-export default function SettingsModal({ onClose }) {
+export default function SettingsModal({ onClose, onOpenFeedback }) {
   const { locale, setLocale } = useLocale()
 
   return (
@@ -38,6 +38,21 @@ export default function SettingsModal({ onClose }) {
           <div className="settings-card settings-help-books">
             {t('settings.booksHelp')}
           </div>
+
+          {/* Feedback entry (feat/feedback #82): a tappable card that opens the
+              FeedbackModal. App wires onOpenFeedback; the optional-chaining
+              keeps the sheet usable if it isn't passed (standalone tests). */}
+          <button
+            type="button"
+            className="settings-card settings-feedback-card"
+            onClick={() => onOpenFeedback?.()}
+          >
+            <span className="settings-feedback-row">
+              <span className="settings-feedback-title">{t('feedback.title')}</span>
+              <span className="settings-feedback-arrow" aria-hidden="true">→</span>
+            </span>
+            <span className="settings-feedback-subtitle">{t('feedback.subtitle')}</span>
+          </button>
         </div>
       </div>
     </div>
