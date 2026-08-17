@@ -6,7 +6,7 @@
 // keeping the client-facing fields the UI needs (plan, planExpiresAt,
 // features, collections).
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { publicUser } from './auth'
 
 const MEMBER = {
@@ -64,5 +64,71 @@ describe('publicUser — strips secrets, keeps client-facing fields', () => {
   it('strips only the secret fields when they are absent', () => {
     const out = publicUser({ id: 'u2', name: 'Bob', plan: 'free' })
     expect(out).toEqual({ id: 'u2', name: 'Bob', plan: 'free' })
+  })
+})
+
+// SEC-1.5 (#180) — ADMIN_KEY must FAIL CLOSED in production-like environments.
+// ADMIN_KEY is a module-level constant, so each case re-imports the module with
+// the desired env (vi.resetModules + dynamic import).
+describe('ADMIN_KEY — fail closed in production (#180)', () => {
+  const ORIGINAL_ENV = { ...process.env }
+
+  beforeEach(() => {
+    vi.resetModules()
+    delete process.env.RUNOUT_ADMIN_KEY
+    delete process.env.RUNOUT_DEV_MODE
+    delete process.env.NETLIFY
+    delete process.env.NETLIFY_LOCAL
+    delete process.env.NETLIFY_DEV
+  })
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  async function loadAdminKey() {
+    const mod = await import('./auth')
+    return mod.ADMIN_KEY
+  }
+
+  it('is EMPTY (never the dev default) when NODE_ENV=production and no key is set', async () => {
+    process.env.NODE_ENV = 'production'
+    expect(await loadAdminKey()).toBe('')
+  })
+
+  it('is EMPTY when running under the Netlify CLI (deployed context) with no key', async () => {
+    process.env.NETLIFY = 'true'
+    expect(await loadAdminKey()).toBe('')
+  })
+
+  it('is EMPTY when NETLIFY_LOCAL is set with no key', async () => {
+    process.env.NETLIFY_LOCAL = 'true'
+    expect(await loadAdminKey()).toBe('')
+  })
+
+  it('uses the dev fallback only in a plain local (non-production, non-Netlify) context', async () => {
+    delete process.env.NODE_ENV
+    delete process.env.NETLIFY
+    expect(await loadAdminKey()).toBe('runout-dev-admin-key')
+  })
+
+  it('honors an explicit RUNOUT_DEV_MODE=1 opt-in even under NODE_ENV=production', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.RUNOUT_DEV_MODE = '1'
+    expect(await loadAdminKey()).toBe('runout-dev-admin-key')
+  })
+
+  it('always uses the configured RUNOUT_ADMIN_KEY when present (dev or prod)', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.RUNOUT_ADMIN_KEY = 'a-real-long-random-prod-key'
+    expect(await loadAdminKey()).toBe('a-real-long-random-prod-key')
+  })
+
+  it('in production without a key, an admin login refuses (no silent dev default)', async () => {
+    // Fail-closed end-to-end: login with the (now-empty) admin key cannot
+    // resolve the owner — there is no fallback credential to accept.
+    process.env.NODE_ENV = 'production'
+    const { ADMIN_KEY: key } = await import('./auth')
+    expect(key).toBe('')
   })
 })

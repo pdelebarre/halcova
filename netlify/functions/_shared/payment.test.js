@@ -336,6 +336,9 @@ describe('status — one-time code delivery (M2, #54)', () => {
     expect(first.status).toBe(200)
     expect(first.body.status).toBe('complete')
     expect(first.body.code).toMatch(/^RU-/)
+    // SEC-EPIC-1 (#176/#177): the brand-new prospect is signed STRAIGHT IN with
+    // a fresh session token — the client never has to persist the code.
+    expect(first.body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
 
     // The SAME sessionId can no longer read the code — the delivery marker is
     // persisted at materialization + on the first poll.

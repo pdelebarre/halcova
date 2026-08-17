@@ -33,9 +33,13 @@ export async function saveSession(session) {
   }
 }
 
+// Idempotent: returns true only when THIS call flipped a live session to
+// revoked; false for an unknown token OR one already revoked (mirrors the
+// Postgres repo's `WHERE status <> 'revoked'` row-count semantics).
 export async function revokeSessionByTokenHash(tokenHash) {
   const record = await getSessionByTokenHash(tokenHash)
   if (!record) return false
+  if (record.status === 'revoked') return false
   await store().setJSON(SESSION_KEY(tokenHash), {
     ...record,
     status: 'revoked',
