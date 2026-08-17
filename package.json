@@ -22,7 +22,7 @@
     "db:seed-demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
-    "@netlify/blobs": "^9.1.0",
+    "@netlify/blobs": "^10.7.13",
     "@stripe/stripe-js": "^7.9.0",
     "jsbarcode": "^3.11.6",
     "lucide-react": "^0.468.0",
