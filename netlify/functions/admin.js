@@ -43,10 +43,6 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 // env-tunable, matching the collection/auth limiters.
 const ADMIN_LIMIT = Number(process.env.RUNOUT_ADMIN_RATE_LIMIT) || 120
 
-const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...headers },
-})
 
 function sanitizeCollections(collections) {
   return {

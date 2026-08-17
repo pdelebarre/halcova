@@ -46,7 +46,7 @@ export function pickItemFields(body) {
   const out = {}
   if (body && typeof body === 'object' && !Array.isArray(body)) {
     for (const key of ITEM_FIELD_ALLOWLIST) {
-      if (Object.prototype.hasOwnProperty.call(body, key)) out[key] = body[key]
+      if (Object.hasOwn(body, key)) out[key] = body[key]
     }
   }
   return out

@@ -207,14 +207,10 @@ async function handlePost(req, { user, collection }) {
 async function handlePut(req, { user, collection, id }) {
   if (!id) return json(400, { error: 'Missing id' })
   const repo = getRepository()
-  let existing = null
-  try {
-    existing = await repo.items.getItem(user.id, collection, id)
-  } catch (err) {
-    // SEC-4.1 (#202): a Postgres read failure is an outage — do NOT silently
-    // switch to Blobs. Propagate so collection.js returns 503.
-    throw err
-  }
+  // SEC-4.1 (#202): a Postgres read failure is an outage — a bare await already
+  // propagates so collection.js returns 503. Only `null` (below) is the
+  // legitimate pre-backfill read-through to Blobs; an outage is NOT.
+  let existing = await repo.items.getItem(user.id, collection, id)
   if (!existing) {
     // Read-through: a pre-backfill item legitimately lives in Blobs (the DB is
     // healthy and simply has no row for this item yet).
@@ -274,14 +270,10 @@ async function handlePut(req, { user, collection, id }) {
 async function handleDelete(req, { user, collection, id }) {
   if (!id) return json(400, { error: 'Missing id' })
   const repo = getRepository()
-  let existing = null
-  try {
-    existing = await repo.items.getItem(user.id, collection, id)
-  } catch (err) {
-    // SEC-4.1 (#202): a Postgres read failure is an outage — do NOT silently
-    // switch to Blobs. Propagate so collection.js returns 503.
-    throw err
-  }
+  // SEC-4.1 (#202): a Postgres read failure is an outage — a bare await already
+  // propagates so collection.js returns 503. Only `null` (below) is the
+  // legitimate pre-backfill read-through to Blobs; an outage is NOT.
+  let existing = await repo.items.getItem(user.id, collection, id)
   if (!existing) {
     try {
       const store = getStore(storeNameFor(user.id, collection))
