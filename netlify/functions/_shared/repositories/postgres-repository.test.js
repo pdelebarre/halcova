@@ -218,3 +218,23 @@ describe('M1 — fail-closed auth writes + auth-prefers-Postgres reads', () => {
     expect(blob.findUserByCode).toHaveBeenCalledWith('RU-AAAA-BBBB-CCCC')
   })
 })
+
+describe('feedback seam — deleteByAuthor wiring (T8 H1 regression)', () => {
+  it('exposes deleteByAuthor on the Postgres seam and it removes only the author\'s rows', async () => {
+    // The seam must stay on the same op surface as the Blobs fallback
+    // (feedback-blob.js) — a caller like feedback.js / admin.js must not be
+    // able to tell which backend it's on. Dropping deleteByAuthor here would
+    // re-break the member-delete feedback purge (T8 H1).
+    expect(typeof repo.feedback.deleteByAuthor).toBe('function')
+    await repo.feedback.createFeedback({
+      type: 'suggestion', category: 'other', message: 'u1 msg', authorId: 'u1', authorName: 'Ada',
+    })
+    await repo.feedback.createFeedback({
+      type: 'bug', category: 'scanner', message: 'u2 msg', authorId: 'u2', authorName: 'Bo',
+    })
+
+    expect(await repo.feedback.deleteByAuthor('u1')).toBe(true)
+    const { rows } = await db.query('SELECT author_id FROM feedback')
+    expect(rows.map((r) => r.author_id)).toEqual(['u2'])
+  })
+})

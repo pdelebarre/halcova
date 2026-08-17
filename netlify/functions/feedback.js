@@ -41,8 +41,11 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity submission limit for POST — 5 per hour by default (a runaway
 // client or a stuck loop can't flood the inbox). Configurable via env; exported
 // so the handler tests can seed the counter for the exact window.
-export const FEEDBACK_RATE_LIMIT = Number(process.env.RUNOUT_FEEDBACK_RATE_LIMIT) || 5
-export const FEEDBACK_RATE_WINDOW_MS = Number(process.env.RUNOUT_FEEDBACK_RATE_WINDOW_MS) || 3_600_000
+// The env overrides are clamped to positive integers (Math.max(1, …)) so a bad
+// env (0 / negative / NaN) can never self-DoS the endpoint by setting a limit
+// that rejects every submission or a window that breaks the counter math.
+export const FEEDBACK_RATE_LIMIT = Math.max(1, Math.floor(Number(process.env.RUNOUT_FEEDBACK_RATE_LIMIT) || 5))
+export const FEEDBACK_RATE_WINDOW_MS = Math.max(1, Math.floor(Number(process.env.RUNOUT_FEEDBACK_RATE_WINDOW_MS) || 3_600_000))
 
 // Length caps. `message` matches the Postgres CHECK (1–4000, 006_feedback.sql):
 // an over-long message is REJECTED, never truncated — the repo contract.
@@ -145,13 +148,16 @@ async function handleCreate(req, feedback, user, v) {
 }
 
 // GET — the admin inbox, newest first, optionally status- AND/OR type-filtered.
-// Junk filters are a no-op in both repos (never a 500).
+// Junk filters are a no-op in both repos (never a 500). The inbox carries
+// private member feedback (PII-adjacent), so the response is explicitly
+// uncacheable (no-store) and never shared (private) — a proxy/CDN must not
+// serve a cached copy to a different admin session.
 async function handleList(feedback, url) {
   const items = await feedback.listFeedback({
     status: url.searchParams.get('status') || undefined,
     type: url.searchParams.get('type') || undefined,
   })
-  return json(200, { items })
+  return json(200, { items }, { 'Cache-Control': 'no-store, private' })
 }
 
 // PATCH — admin triage (status and/or adminNote). 404 for an unknown/junk id.

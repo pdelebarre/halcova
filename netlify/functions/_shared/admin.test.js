@@ -562,9 +562,9 @@ describe('deleteUser — the member\'s reviews are removed too (Task 7)', () => 
 // Blobs-only on the Blobs path, Postgres-authoritative + best-effort Blobs
 // sweep on the Postgres path, ordered BEFORE removeUserRecord) and un-skip.
 describe('deleteUser — the member\'s feedback is removed too (T8 #78)', () => {
-  // Skipped until admin.js wires feedback cleanup into handleDeleteUser (see
-  // the REGRESSION note above). Un-skip to assert the member-delete cascade.
-  it.skip('removes the member\'s feedback on the Blobs path and leaves others alone', async () => {
+  // REGRESSION (T8 H1) — wired: handleDeleteUser now purges feedback via
+  // deleteMemberFeedback (parity with deleteMemberReviews). Un-skipped.
+  it('removes the member\'s feedback on the Blobs path and leaves others alone', async () => {
     seedBlobFeedback([
       { id: '10000000-0000-4000-8000-000000000001', authorId: 'u1', message: 'member suggestion' },
       { id: '10000000-0000-4000-8000-000000000002', authorId: 'u2', type: 'bug', message: 'other member bug' },
@@ -578,15 +578,17 @@ describe('deleteUser — the member\'s feedback is removed too (T8 #78)', () => 
 
     // The member's feedback is gone from the shared runout-feedback store;
     // the other member's survives, and index:open only holds the survivor.
+    // NOTE: this mock's setJSON stores the PARSED array (not a JSON string),
+    // so index:open reads back as an array — assert on it directly.
     const store = stores['runout-feedback']
     expect(store.data.has('fb:10000000-0000-4000-8000-000000000001')).toBe(false)
     expect(store.data.has('fb:10000000-0000-4000-8000-000000000002')).toBe(true)
-    expect(JSON.parse(store.data.get('index:open'))).toEqual(['10000000-0000-4000-8000-000000000002'])
+    expect(store.data.get('index:open')).toEqual(['10000000-0000-4000-8000-000000000002'])
   })
 
-  // Skipped until admin.js wires feedback cleanup into handleDeleteUser (see
-  // the REGRESSION note above). Un-skip to assert the Postgres cascade.
-  it.skip('removes the member\'s feedback rows on the Postgres path (pg-mem)', async () => {
+  // REGRESSION (T8 H1) — wired: handleDeleteUser now purges feedback on the
+  // Postgres-authoritative path + best-effort Blobs sweep. Un-skipped.
+  it('removes the member\'s feedback rows on the Postgres path (pg-mem)', async () => {
     pgRef.configured = true
     pgRef.db = await createMemDb()
     await seedPgFeedback(pgRef.db, [
