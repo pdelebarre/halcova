@@ -358,7 +358,24 @@ export default async (req) => {
 
     if (req.method === 'GET') {
       const url = new URL(req.url)
+      // (ADMIN-EPIC-1, #264) — CWE-200 counts-only mode. The owner's PWA polls
+      // GET /admin every 60s just to read counts.pendingRequests for the badge,
+      // but the plain response returns the FULL requests+users lists (names +
+      // emails). ?counts=1 returns ONLY the { counts } block: the requests/users
+      // lists are never serialized into the response, so no PII leaves the
+      // function. They are still LOADED internally — the user-derived metrics
+      // (pendingRequests/members/signups/plans) aggregate from them — but never
+      // built into a body. If both ?dashboard=1 and ?counts=1 are present,
+      // dashboard wins (unchanged); the plain member-list call stays
+      // byte-for-byte unchanged. requireAdmin already gated this GET.
+      const wantDashboard = url.searchParams.get('dashboard') === '1'
+      const wantCountsOnly = !wantDashboard && url.searchParams.get('counts') === '1'
+
       const [requests, users] = await Promise.all([listRequests(), listUsers()])
+      if (wantCountsOnly) {
+        return json(200, { counts: await getDashboardCounts({ requests, users }) })
+      }
+
       // Part B: codes are hashed. The admin list no longer carries plaintext
       // codes (nor their hashes) — re-reveal is replaced by the `rotate` action,
       // which mints a NEW code and returns it exactly once. publicUser strips
@@ -389,7 +406,7 @@ export default async (req) => {
       // User-derived metrics aggregate in memory from the requests/users this
       // GET already loads; feedback/reviews/collections prefer SQL on the
       // Postgres path and the Blobs stores otherwise (see dashboard-counts.js).
-      if (url.searchParams.get('dashboard') === '1') {
+      if (wantDashboard) {
         body.counts = await getDashboardCounts({ requests, users })
       }
       return json(200, body)

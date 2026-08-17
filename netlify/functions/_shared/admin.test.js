@@ -949,3 +949,111 @@ describe('GET /admin?dashboard=1 — junk query params are ignored (never 500)',
     expect(Array.isArray(bothBody.reviews)).toBe(true)
   })
 })
+
+// (ADMIN-EPIC-1, #264) — the two LOW findings from the Security Auditor's
+// review of the admin dashboard: CWE-200 (counts-only mode — the badge poll
+// transfers no PII) and CWE-532 (redacted Postgres->Blobs fallback logging).
+describe('GET /admin?counts=1 — counts-only mode (ADMIN-EPIC-1, #264, CWE-200)', () => {
+  const seedCountsData = () => {
+    usersMock.listUsers.mockResolvedValue([
+      { ...MEMBER, id: 'u1', name: 'Ada', email: 'ada@example.com', status: 'active', plan: 'free', createdAt: new Date().toISOString() },
+    ])
+    usersMock.listRequests.mockResolvedValue([
+      { id: 'r1', name: 'Dana', email: 'dana@example.com', status: 'pending', createdAt: '2026-08-01T00:00:00.000Z' },
+    ])
+  }
+
+  it('returns ONLY { counts } — the requests/users lists (PII) are never serialized', async () => {
+    seedCountsData()
+    const res = await handler(req('GET', undefined, '?counts=1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Counts-only: the body is exactly { counts } and nothing else.
+    expect(Object.keys(body)).toEqual(['counts'])
+    expect(body).not.toHaveProperty('requests')
+    expect(body).not.toHaveProperty('users')
+    expect(body).not.toHaveProperty('reviews')
+    // The user-derived metrics still aggregate (loaded internally, never sent).
+    expectCountsShape(body.counts)
+    expect(body.counts).toMatchObject({ pendingRequests: 1, members: { total: 1, active: 1, disabled: 0 } })
+    // No PII anywhere in the response body.
+    const raw = JSON.stringify(body)
+    expect(raw).not.toContain('ada@example.com')
+    expect(raw).not.toContain('dana@example.com')
+    expect(raw).not.toContain('Ada')
+    expect(raw).not.toContain('Dana')
+    expect(raw).not.toContain('RU-')
+  })
+
+  it('?dashboard=1 wins when both ?dashboard=1 and ?counts=1 are present', async () => {
+    seedCountsData()
+    const res = await handler(req('GET', undefined, '?counts=1&dashboard=1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Dashboard mode: full requests+users lists still serialized, counts present.
+    expect(body.counts).toBeTruthy()
+    expect(Array.isArray(body.requests)).toBe(true)
+    expect(Array.isArray(body.users)).toBe(true)
+    expect(body.requests[0].email).toBe('dana@example.com') // unchanged behavior
+  })
+
+  it('ignores ?counts=1 when the value is not exactly "1" (no counts key)', async () => {
+    seedCountsData()
+    const body = await (await handler(req('GET', undefined, '?counts=banana'))).json()
+    expect(body).not.toHaveProperty('counts')
+    // plain member-list behavior preserved
+    expect(Array.isArray(body.requests)).toBe(true)
+    expect(Array.isArray(body.users)).toBe(true)
+  })
+})
+
+describe('GET /admin?counts=1 — still requireAdmin-gated (member/demo/forged/absent)', () => {
+  it('403s for a member session', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    const token = await sessionTokenFor({ userId: 'u1', role: 'member' })
+    const res = await getWith(token, '?counts=1')
+    expect(res.status).toBe(403)
+  })
+
+  it('403s for a demo session', async () => {
+    const token = await demoSessionToken()
+    const res = await getWith(token, '?counts=1')
+    expect(res.status).toBe(403)
+  })
+
+  it('401s for an absent bearer', async () => {
+    const res = await handler({ ...req('GET', undefined, '?counts=1'), headers: { get: () => null } })
+    expect(res.status).toBe(401)
+  })
+
+  it('401s for a forged bearer', async () => {
+    const res = await getWith('forged-token', '?counts=1')
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('dashboard-counts fallback — redacted logging (ADMIN-EPIC-1, #264, CWE-532)', () => {
+  it('scrubs access codes and emails from the Postgres→Blobs fallback log (safeLog/redactString)', async () => {
+    // The Postgres path is "configured" but every query throws an error whose
+    // message carries an access code + an email — the fallback must log it
+    // through the shared redactor (safeLog -> redactString, SEC-6.5), never
+    // verbatim, so the raw value can never land in the function log.
+    pgRef.configured = true
+    pgRef.db = {
+      query: async () => { throw new Error('connection refused for RU-AAAA-BBBB-CCCC / ada@example.com') },
+      connect: async () => { throw new Error('connection refused for RU-AAAA-BBBB-CCCC / ada@example.com') },
+    }
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const res = await handler(req('GET', undefined, '?dashboard=1'))
+      expect(res.status).toBe(200) // the Blobs fallback still serves the counts
+      const logs = errorSpy.mock.calls.map((args) => args.join(' ')).join('\n')
+      expect(logs).not.toContain('RU-AAAA-BBBB-CCCC')
+      expect(logs).not.toContain('ada@example.com')
+      expect(logs).toContain('REDACTED_CODE')
+      expect(logs).toContain('REDACTED_EMAIL')
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+})

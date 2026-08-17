@@ -12,6 +12,7 @@ import * as feedbackApi from '../api/feedback'
 vi.mock('../api/auth', () => ({
   adminList: vi.fn(),
   adminDashboard: vi.fn(),
+  adminCounts: vi.fn(),
   adminApprove: vi.fn(),
   adminReject: vi.fn(),
   adminUpdateUser: vi.fn(),
@@ -25,7 +26,8 @@ vi.mock('../api/feedback', () => ({
   deleteFeedback: vi.fn(),
 }))
 
-// The counts shape from GET /admin?dashboard=1 (T1 backend, epic §4.1).
+// The counts shape — identical from GET /admin?dashboard=1 (T1 backend, epic
+// §4.1) and the badge's counts-only GET /admin?counts=1 (T3 #264).
 const COUNTS = {
   pendingRequests: 3,
   members: { total: 12, active: 11, disabled: 1 },
@@ -69,6 +71,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   authApi.adminList.mockResolvedValue({ requests: REQUESTS, users: USERS })
   authApi.adminDashboard.mockResolvedValue(dashboardPayload())
+  authApi.adminCounts.mockResolvedValue({ counts: COUNTS })
   feedbackApi.listFeedback.mockResolvedValue([])
   // Two-step deletes mirror member delete; stubbed so jsdom never implements it.
   vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))

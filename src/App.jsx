@@ -117,13 +117,15 @@ export default function App() {
     return () => { cancelled = true }
   }, [session?.user, refreshTick])
 
-  // (ADMIN-EPIC-1, #263) — pending-request badge, three surfaces, one fetch.
-  // Reads counts.pendingRequests from GET /admin?dashboard=1 (a cheap,
-  // requireAdmin-gated aggregates call — never the full adminList), refreshed
-  // on app foreground + a modest 60s interval. Failures/offline degrade to 0
-  // (never throw), and non-admins never fetch.
+  // (ADMIN-EPIC-1, #263/#264) — pending-request badge, three surfaces, one
+  // fetch. Reads counts.pendingRequests from GET /admin?counts=1 — the cheap,
+  // requireAdmin-gated COUNTS-ONLY call (CWE-200): it returns only `{ counts }`
+  // and never the requests/users lists, so the 60s poll ships no PII (unlike
+  // ?dashboard=1 / adminList). Refreshed on app foreground + a modest 60s
+  // interval. Failures/offline degrade to 0 (never throw), and non-admins
+  // never fetch.
   const refreshPending = useCallback(() => {
-    authApi.adminDashboard()
+    authApi.adminCounts()
       .then((res) => {
         const n = Number(res?.counts?.pendingRequests)
         setPendingCount(Number.isFinite(n) && n > 0 ? n : 0)

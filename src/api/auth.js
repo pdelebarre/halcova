@@ -134,6 +134,16 @@ export async function adminDashboard() {
   return getJson(`${ADMIN_URL}?dashboard=1`, getSessionToken())
 }
 
+// Admin counts-only (ADMIN-EPIC-1, #264): GET /admin?counts=1 returns ONLY
+// `{ counts }` — the CWE-200 counts-only mode the App-level pending badge
+// polls every 60s. The requests/users lists (names + emails) are never
+// serialized into the body, so no PII leaves the function. Same
+// requireAdmin gate, response shape and error handling as adminDashboard(),
+// minus the PII lists.
+export async function adminCounts() {
+  return getJson(`${ADMIN_URL}?counts=1`, getSessionToken())
+}
+
 export async function adminApprove({ requestId, collections, features, plan }) {
   return postJson(ADMIN_URL, { action: 'approve', requestId, collections, features, plan }, getSessionToken())
 }

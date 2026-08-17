@@ -17,6 +17,7 @@
 // so member/demo/anonymous never reach this module.
 
 import { getStore } from '@netlify/blobs'
+import { safeLog } from './audit'
 import { db, isPostgresConfigured } from './postgres'
 import { readOwnedCount, ownedCountOf } from './counts'
 import { storeNameFor } from './repositories/blob-users'
@@ -139,7 +140,10 @@ async function feedbackCounts() {
     try {
       return feedbackCountsMap(await createFeedbackRepo(db).countsByStatus())
     } catch (err) {
-      console.error('admin: Postgres feedback counts failed, falling back to Blobs:', err?.message || err)
+      // (ADMIN-EPIC-1, #264) CWE-532 — the Postgres error message is untrusted
+      // (it can carry a code/email); route it through the shared redactor
+      // (safeLog -> redactString, SEC-6.5) so it can never land raw in the log.
+      safeLog('error', 'admin: Postgres feedback counts failed, falling back to Blobs', { detail: err?.message || err })
     }
   }
   return feedbackCountsMap(await createFeedbackBlobStore().countsByStatus())
@@ -150,7 +154,9 @@ async function reviewsCounts() {
     try {
       return reviewsCountsMap(await createReviewsRepo(db).countsByStatus())
     } catch (err) {
-      console.error('admin: Postgres reviews counts failed, falling back to Blobs:', err?.message || err)
+      // (ADMIN-EPIC-1, #264) CWE-532 — redact the untrusted Postgres error
+      // before logging (safeLog -> redactString, SEC-6.5).
+      safeLog('error', 'admin: Postgres reviews counts failed, falling back to Blobs', { detail: err?.message || err })
     }
   }
   return reviewsCountsMap(await createReviewsBlobStore().countsByStatus())
@@ -197,7 +203,9 @@ async function collectionCounts(users) {
     try {
       return collectionCountsMap(await createItemsRepo(db).countsByKind())
     } catch (err) {
-      console.error('admin: Postgres collections counts failed, falling back to Blobs:', err?.message || err)
+      // (ADMIN-EPIC-1, #264) CWE-532 — redact the untrusted Postgres error
+      // before logging (safeLog -> redactString, SEC-6.5).
+      safeLog('error', 'admin: Postgres collections counts failed, falling back to Blobs', { detail: err?.message || err })
     }
   }
   return blobCollectionCounts(users)
