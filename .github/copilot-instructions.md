@@ -132,6 +132,7 @@ npm run build      # vite build (PWA precaches the scanner wasm)
     (read-only UX/ergonomics/a11y review).
 - **Skills** (`.github/skills/`):
   - `add-catalog-type` — add a new kind of collectible (records → books pattern)
+  - `agentic-workflow` — run the team as an explicit agent graph (nodes/edges/state, security gate)
   - `barcode-scanning` — the zxing-wasm camera scanner
   - `lookup-api-integration` — Discogs / Google Books / new providers
   - `netlify-collection` — the Netlify function + Blobs backend
