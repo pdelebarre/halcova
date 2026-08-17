@@ -727,6 +727,41 @@ const en = {
   'feedback.error.RATE_LIMITED': 'You\'ve sent a lot recently — take a breath and try again in a minute.',
   'feedback.error.MESSAGE_TOO_LONG': 'That message is too long — keep it under 4000 characters.',
   'feedback.error.DEMO_READONLY': 'The demo is read-only — sign in to send feedback.',
+
+  // Admin feedback inbox (epic #74, T6 #75) — the owner-only triage view.
+  // Tab labels, the unread badge, status/type filters, the expandable item
+  // detail (message + auto-context + author), status actions, the admin note,
+  // and delete. EN baseline; other locales inherit via fallback (T7 pass).
+  'admin.tab.members': 'Members',
+  'admin.tab.feedback': 'Feedback',
+  'admin.feedback.unread': '{n} unread',
+  'admin.feedback.filterStatus': 'Filter by status',
+  'admin.feedback.filterType': 'Filter by type',
+  'admin.feedback.allStatuses': 'All statuses',
+  'admin.feedback.allTypes': 'All types',
+  'admin.feedback.status.open': 'Open',
+  'admin.feedback.status.in_progress': 'In progress',
+  'admin.feedback.status.done': 'Done',
+  'admin.feedback.status.wontfix': 'Won\'t fix',
+  'admin.feedback.status.duplicate': 'Duplicate',
+  'admin.feedback.type.suggestion': 'Suggestion',
+  'admin.feedback.type.bug': 'Bug',
+  'admin.feedback.statusActions': 'Change status',
+  'admin.feedback.empty': 'No feedback yet — the inbox is quiet.',
+  'admin.feedback.emptyFiltered': 'Nothing matches those filters.',
+  'admin.feedback.retry': 'Retry',
+  'admin.feedback.from': 'From {name}',
+  'admin.feedback.route': 'Route: {route}',
+  'admin.feedback.version': 'Version: {version}',
+  'admin.feedback.device': 'Device: {device}',
+  'admin.feedback.agent': 'User agent: {agent}',
+  'admin.feedback.noteLabel': 'Admin note',
+  'admin.feedback.notePlaceholder': 'Internal note — only you see this.',
+  'admin.feedback.saveNote': 'Save note',
+  'admin.feedback.noteSaved': 'Saved ✓',
+  'admin.feedback.saving': 'Saving…',
+  'admin.feedback.delete': 'Delete report',
+  'admin.feedback.deleteConfirm': 'Delete this feedback report? This cannot be undone.',
 }
 
 export default en
