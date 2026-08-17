@@ -54,6 +54,7 @@ import {
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { materializeCheckoutSession } from './_shared/entitlements'
 import { json, readJsonBody, safeError } from './_shared/security'
+import { emailHash, logAudit } from './_shared/audit'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // M1 (S8, #54): `checkout` is pre-auth (a prospect checks out with just an
@@ -228,6 +229,7 @@ async function handleCheckout(body, req) {
     return json(502, { error: 'Could not start checkout. Try again shortly.', code: 'CHECKOUT_FAILED' })
   }
 
+  logAudit('payment.checkout_created', { kind: identity.kind, emailHash: emailHash(email), plan })
   return json(200, { url: session.url, sessionId: session.id })
 }
 
@@ -262,22 +264,36 @@ async function handleStatus(body, req) {
     member = resolved.user
   }
 
+  // SEC-6.2 (#216): bind a signed-in caller to the checkout session. A member
+  // may only poll a `status` for a session that belongs to them (matched by
+  // normalized email) — otherwise 403, so user A can't read user B's checkout
+  // status/code by guessing a sessionId.
+  const assertOwnership = (targetEmail) => {
+    const memberEmail = cleanEmail(member?.email)
+    const target = cleanEmail(targetEmail)
+    if (member && memberEmail && target && memberEmail !== target) {
+      throw httpError(403, { error: "That checkout doesn't belong to you.", code: 'SESSION_MISMATCH' })
+    }
+  }
+
   // Deliver the completion response. The access code goes out ONLY to a
   // non-member caller (a brand-new prospect who just paid) and ONLY on the
-  // first successful poll (`codeDelivered`), so a leaked sessionId is a
-  // one-time capability, not a permanent backdoor to the member's code. Both
-  // the webhook fast-path and the reconcile path funnel through here so the
-  // once-delivery guarantee can never drift.
+  // first successful poll (`codeDelivered`) WITHIN the code-delivery window
+  // (SEC-6.2, #216), so a leaked sessionId is a bounded one-time capability,
+  // not a permanent backdoor to the member's code. Both the webhook fast-path
+  // and the reconcile path funnel through here so the once-delivery guarantee
+  // can never drift.
   const respondComplete = async (user, code) => {
     const notYetDelivered = user.codeDelivered !== true
+    const withinWindow = !user.codeDeliverableUntil || Date.now() < new Date(user.codeDeliverableUntil).getTime()
     let deliverCode = null
-    if (!member && notYetDelivered) {
+    if (!member && notYetDelivered && withinWindow) {
       deliverCode = code || await plaintextCodeFor(user.id)
     }
     if (deliverCode) {
       // Persist the delivery marker so the NEXT poll (or anyone with the URL)
       // can never read the code again.
-      await saveUser({ ...user, codeDelivered: true })
+      await saveUser({ ...user, codeDelivered: true, codeDeliveredAt: new Date().toISOString() })
     }
     // SEC-EPIC-1 (#176/#177): a brand-new prospect is signed STRAIGHT IN with a
     // fresh session token — the code is still handed over exactly once (so they
@@ -287,6 +303,12 @@ async function handleStatus(body, req) {
       const created = await createSession({ userId: user.id, role: user.role || 'member' })
       session = created.token
     }
+    logAudit('payment.status', {
+      status: 'complete',
+      userId: user.id,
+      member: !!member,
+      codeDelivered: !!deliverCode,
+    })
     return json(200, {
       status: 'complete',
       user: publicUser(user),
@@ -298,6 +320,7 @@ async function handleStatus(body, req) {
   // Fast path: the webhook already landed and materialized the entitlement.
   const materialized = await findUserByStripeSession(sessionId)
   if (materialized) {
+    assertOwnership(materialized.email)
     return respondComplete(materialized, null)
   }
 
@@ -326,6 +349,10 @@ async function handleStatus(body, req) {
     return json(200, { status: 'pending' })
   }
 
+  // SEC-6.2 (#216): bind the signed-in caller to the Stripe session's email
+  // before materializing, so user A can't materialize/read user B's checkout.
+  assertOwnership(session.customer_email)
+
   try {
     const { user, code } = await materializeCheckoutSession(session, materializeDeps)
     return respondComplete(user, code)
@@ -351,6 +378,7 @@ async function handlePortal(body, req) {
       customerId: user.stripeCustomerId,
       returnUrl: `${siteUrl(req)}/?settings=plan`,
     })
+    logAudit('payment.portal_opened', { userId: user.id })
     return json(200, { url: portal.url })
   } catch {
     return json(502, { error: 'Could not open the billing portal.', code: 'CHECKOUT_FAILED' })

@@ -19,7 +19,7 @@
 import { createHmac } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../billing'
-import { findUserByStripeSession, findUserByStripeSubscription, getUser, listUsers, saveRequest, saveUser } from './users'
+import { findUserByStripeSession, findUserByStripeSubscription, getUser, listRequests, listUsers, saveRequest, saveUser } from './users'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
@@ -330,5 +330,84 @@ describe('the webhook never leaks the access code', () => {
     await deliver(event)
     const user = await getUser((await listUsers())[0].id)
     expect(user.code).toMatch(/^RU-/)
+  })
+})
+
+describe('SEC-6.1 (#215) — signature replay / tamper hardening', () => {
+  // Build a signature over a custom timestamp so we can prove the replay-window
+  // tolerance rejects an expired event.
+  function signAt(rawBody, timestampSeconds, { secret = WEBHOOK_SECRET } = {}) {
+    const v1 = createHmac('sha256', secret).update(`${timestampSeconds}.${rawBody}`).digest('hex')
+    return `t=${timestampSeconds},v1=${v1}`
+  }
+
+  it('rejects an EXPIRED (replayed-from-the-past) signature with 400', async () => {
+    await seedRequest()
+    const event = { type: 'checkout.session.completed', data: { object: lifetimeSession() } }
+    const rawBody = JSON.stringify(event)
+    const stale = signAt(rawBody, Math.floor(Date.now() / 1000) - 600) // 10 min old > 5 min tolerance
+    const res = await handler(req(rawBody, stale))
+    expect(res.status).toBe(400)
+    // Nothing materialized from a replayed-from-the-past event.
+    expect(await listUsers()).toHaveLength(0)
+  })
+
+  it('rejects a TAMPERED signature (valid secret, altered body) with 400', async () => {
+    await seedRequest()
+    const event = { type: 'checkout.session.completed', data: { object: lifetimeSession() } }
+    const goodBody = JSON.stringify(event)
+    const t = Math.floor(Date.now() / 1000)
+    const v1 = createHmac('sha256', WEBHOOK_SECRET).update(`${t}.${goodBody}`).digest('hex')
+    const signature = `t=${t},v1=${v1}`
+
+    // Deliver the SAME signature but a DIFFERENT (tampered) body.
+    const tamperedBody = JSON.stringify({ ...event, data: { object: lifetimeSession({ id: 'cs_tampered' }) } })
+    const res = await handler(req(tamperedBody, signature))
+    expect(res.status).toBe(400)
+    expect(await listUsers()).toHaveLength(0)
+  })
+
+  it('verifies the RAW BODY, not req.json() — a mismatch is rejected', async () => {
+    // A request whose .json() returns a VALID event but whose raw .text() body
+    // is different (and not what the signature covers) must be rejected — the
+    // signature authenticates the exact bytes, so an attacker can't swap the
+    // interpreted payload after signing.
+    await seedRequest()
+    const rawBody = JSON.stringify({ type: 'charge.succeeded' }) // signed
+    const signature = sign(rawBody)
+    const req2 = {
+      method: 'POST',
+      headers: { get: (name) => (String(name).toLowerCase() === 'stripe-signature' ? signature : '') },
+      // .json() would interpret a DIFFERENT (forged) event:
+      json: async () => ({ type: 'checkout.session.completed', data: { object: lifetimeSession() } }),
+      text: async () => rawBody,
+    }
+    const res = await handler(req2)
+    expect(res.status).toBe(200) // the RAW body ("charge.succeeded") is what's verified+acked
+    // And critically, the forged interpretation in .json() was NEVER used:
+    expect(await listUsers()).toHaveLength(0)
+  })
+
+  it('FAILS CLOSED (503 WEBHOOK_NOT_CONFIGURED) when the webhook secret is missing', async () => {
+    delete process.env.STRIPE_WEBHOOK_SECRET
+    await seedRequest()
+    const event = { type: 'checkout.session.completed', data: { object: lifetimeSession() } }
+    // Even with a "valid-looking" signature, a missing secret must refuse.
+    const res = await handler(req(JSON.stringify(event), sign(JSON.stringify(event))))
+    expect(res.status).toBe(503)
+    expect((await res.json()).code).toBe('WEBHOOK_NOT_CONFIGURED')
+    expect(await listUsers()).toHaveLength(0)
+  })
+
+  it('never materializes a user from an unknown/unparseable event type (only KNOWN types act)', async () => {
+    await seedRequest()
+    // A realistic Stripe event we do NOT handle, plus a garbage type.
+    for (const type of ['customer.subscription.paused', 'charge.succeeded', 'payment_intent.succeeded', undefined]) {
+      const event = { type, data: { object: lifetimeSession({ id: `cs_${String(type)}` }) } }
+      const res = await handler(req(JSON.stringify(event), sign(JSON.stringify(event))))
+      expect(res.status).toBe(200) // acked so Stripe doesn't retry
+      expect(await listUsers()).toHaveLength(0) // but NO side effect
+    }
+    expect(await listRequests()).toHaveLength(1) // the seeded request is untouched
   })
 })

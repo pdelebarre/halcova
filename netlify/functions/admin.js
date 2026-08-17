@@ -24,6 +24,8 @@ import { createFeedbackRepo } from './_shared/repositories/feedback-repo'
 import { createFeedbackBlobStore } from './_shared/feedback-blob'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { badRequest, json, readJsonBody, safeError } from './_shared/security'
+import { emailHash, logAudit } from './_shared/audit'
+import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 import {
   deleteUserCollections,
   getRequest,
@@ -130,6 +132,7 @@ async function handleApprove(body) {
   }
   await saveUser(user)
   await saveRequest({ ...request, status: 'approved', approvedAt: new Date().toISOString() })
+  logAudit('admin.approve', { requestId: request.id, userId: user.id, emailHash: emailHash(user.email), collections })
 
   return json(201, { user: publicUser(user), code: user.code })
 }
@@ -141,6 +144,7 @@ async function handleReject(body) {
   if (!request) return json(404, { error: 'Request not found.' })
   if (request.status !== 'pending') return json(409, { error: 'That request was already handled.' })
   await saveRequest({ ...request, status: 'rejected', rejectedAt: new Date().toISOString() })
+  logAudit('admin.reject', { requestId: request.id })
   return json(200, { ok: true })
 }
 
@@ -165,6 +169,7 @@ async function handleRotate(body) {
   // code (SEC-EPIC-1 defense in depth) — the member signs in again with the
   // new code.
   await revokeAllForUser(user.id)
+  logAudit('admin.rotate', { userId: user.id })
   return json(200, { user: publicUser(user), code: newCode })
 }
 
@@ -194,6 +199,7 @@ async function handleUpdateUser(body) {
   // A disabled member's live sessions die immediately (SEC-1.9, #184) —
   // defense in depth on top of the per-request status check in resolveSession.
   if (user.status === 'disabled') await revokeAllForUser(user.id)
+  logAudit('admin.update_user', { userId: user.id, status: user.status })
   return json(200, { user: publicUser(user) })
 }
 
@@ -271,6 +277,7 @@ async function handleDeleteUser(body) {
   // The member's sessions go with the account (SEC-1.9, #184) — no orphaned
   // live session can outlive a deleted user.
   await deleteAllForUser(user.id)
+  logAudit('admin.delete_user', { userId: user.id, emailHash: emailHash(user.email) })
   return json(200, { ok: true })
 }
 
@@ -323,7 +330,17 @@ export default async (req) => {
     // bearer equals ADMIN_KEY. The admin key only ever minted this session at
     // login (auth.js); a member session or a forged/absent key is rejected.
     const admin = await requireAdmin(req)
-    if (admin.error) return admin.error
+    if (admin.error) {
+      // SEC-6.6 (#220): a burst of authorization denials from one IP (a
+      // non-admin probing the admin surface) is an anomaly signal.
+      const denyIp = clientIp(req)
+      if (denyIp) {
+        // NIT M5: the burst-counter key (transient) may use the raw IP, but the
+        // audit `scope` carries only a truncated hash — never the raw address.
+        await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:admin:deny:${denyIp}`, { threshold: 10, signal: 'admin_denial_burst', scope: anomalyScope('anom:admin:deny', denyIp) })
+      }
+      return admin.error
+    }
 
     // SEC-3.6 (#199): admin writes are rate-limited per IP. The owner is a
     // single identity, so keying on the client IP bounds a flood source.

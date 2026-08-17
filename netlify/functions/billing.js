@@ -22,7 +22,8 @@
 // leave the server.
 
 import { randomUUID } from 'node:crypto'
-import { verifyWebhookSignature } from './_shared/stripe'
+import { getStore } from '@netlify/blobs'
+import { stripeWebhookSecret, verifyWebhookSignature } from './_shared/stripe'
 import {
   findUserByEmail,
   findUserByStripeSession,
@@ -34,6 +35,23 @@ import {
 import { applyEntitlement, materializeCheckoutSession } from './_shared/entitlements'
 import { generateAccessCode } from './_shared/auth'
 import { json, securityHeaders } from './_shared/security'
+import { logAudit, safeLog } from './_shared/audit'
+import { recordAnomaly } from './_shared/anomaly'
+
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+
+// SEC-6.1 (#215): the ONLY event types this webhook ever gives side effects
+// to. Stripe sends dozens of other event types; every one of them is acked
+// (2xx = delivered) but NEVER mutates state — a forged/unknown event type can
+// never materialize a user or change an entitlement. Keeping the set explicit
+// means a future Stripe event can't silently gain processing by accident.
+const KNOWN_EVENT_TYPES = new Set([
+  'checkout.session.completed',
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.payment_failed',
+])
 
 // Webhook JSON responder with the security headers applied (SEC-3.4, #197).
 const json = (statusCode, body) => new Response(JSON.stringify(body), {
@@ -84,13 +102,25 @@ async function handleSubscriptionEvent(event) {
 async function handlePaymentFailed(event) {
   const invoice = event?.data?.object || event?.object
   const subscriptionId = String(invoice?.subscription || '')
-  console.log(`[billing] invoice.payment_failed subscription=${subscriptionId}`)
+  // Record the failure as an audit event (never the access code, never a
+  // Stripe secret; a subscription id is a server-side billing id, not a secret).
+  logAudit('billing.payment_failed', { subscriptionId })
   // No user mutation: entitlements persist until the current period end, and
   // the member can retry from the Billing Portal.
 }
 
 export default async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
+
+  // SEC-6.1 (#215): FAIL CLOSED on a missing webhook secret. Without
+  // STRIPE_WEBHOOK_SECRET no signature can ever be verified, so no webhook
+  // event may be accepted — a misconfigured prod (or a dev box) gets a 503,
+  // never a silent accept. This is distinct from a PRESENT secret + bad
+  // signature (an attack → 400 below).
+  if (!stripeWebhookSecret()) {
+    logAudit('webhook.not_configured', { reason: 'missing webhook secret' })
+    return json(503, { error: 'Webhooks are not configured.', code: 'WEBHOOK_NOT_CONFIGURED' })
+  }
 
   // Read + verify the RAW body before touching JSON (never req.json() first).
   // SEC-3.2 (#195): cap the raw webhook body so a malicious oversized payload
@@ -101,6 +131,10 @@ export default async (req) => {
   }
   const signature = req.headers.get('stripe-signature') || ''
   if (!verifyWebhookSignature({ rawBody, signature })) {
+    logAudit('webhook.invalid_signature', {})
+    // SEC-6.6 (#220): repeated invalid signatures are a webhook anomaly signal
+    // (a forged-event probe / replay attack).
+    await recordAnomaly(getStore(RATE_LIMITS_STORE), 'anom:webhook:invalid_sig', { threshold: 5, signal: 'webhook_invalid_signature_burst' })
     return json(400, { error: 'Invalid signature.' })
   }
 
@@ -125,13 +159,20 @@ export default async (req) => {
     } else if (type === 'invoice.payment_failed') {
       await handlePaymentFailed(event)
     }
-    // Any other event type is acked (Stripe treats 2xx as delivered).
+    // SEC-6.1 (#215) event-type policy: only KNOWN_EVENT_TYPES ever reach the
+    // handlers above. Any other/unparseable type is acked (2xx = delivered so
+    // Stripe doesn't retry forever) but causes NO side effects — audited so an
+    // unexpected-type flood is visible, never acted on.
+    if (!KNOWN_EVENT_TYPES.has(type)) {
+      logAudit('webhook.unknown_event_type', { type: typeof type === 'string' ? type.slice(0, 120) : 'unknown' })
+    }
     return json(200, { received: true })
   } catch (err) {
     // Transient failure (DB / Blobs mirror) — return 500 so Stripe retries.
     // The webhook is idempotent (keyed on the billing ids + unique indexes),
     // so a retry converges. Never log the code or any secret.
-    console.error('[billing] webhook processing failed:', err?.message || err)
+    logAudit('webhook.processing_failed', {})
+    safeLog('error', '[billing] webhook processing failed:', { message: err?.message || String(err) })
     return json(500, { error: 'Processing failed' })
   }
 }
