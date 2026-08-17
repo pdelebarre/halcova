@@ -137,6 +137,18 @@
   max-width: 88vw;
 }
 
+/* No-detection watchdog hint — subtle guidance, deliberately dimmer/smaller
+   than the status pill and never shown over an error. */
+.scanner-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--jacket-kraft-dim);
+  opacity: 0.85;
+  text-align: center;
+  max-width: 88vw;
+}
+
 .scanner-torch {
   position: absolute;
   top: calc(var(--safe-top) + 16px);

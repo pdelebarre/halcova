@@ -7,9 +7,20 @@ import './ScannerModal.css'
 // Serve the WASM decoder from our own bundle instead of a third-party CDN, so
 // scanning keeps working reliably (and gets precached by the service worker)
 // rather than depending on an external host.
+//
+// The `?url` import is already a bundled asset URL. Keep it base-robust: only
+// absolute URLs ("/…" or full http(s)) are used as-is; anything else gets
+// prefixed with the app's base path so the self-hosted wasm still resolves to
+// the right asset when the app is served from a sub-path.
+const APP_BASE = import.meta.env.BASE_URL || '/'
+const wasmUrl =
+  zxingReaderWasmUrl.startsWith('http') || zxingReaderWasmUrl.startsWith('/')
+    ? zxingReaderWasmUrl
+    : `${APP_BASE}${zxingReaderWasmUrl}`
+
 prepareZXingModule({
   overrides: {
-    locateFile: (path) => (path.endsWith('.wasm') ? zxingReaderWasmUrl : path),
+    locateFile: (path) => (path.endsWith('.wasm') ? wasmUrl : path),
   },
 })
 
@@ -26,6 +37,14 @@ const DECODE_INTERVAL_MS = 180 // ~5 decode attempts per second
 // Frames wider than this are downscaled before decoding — keeps the WASM fast
 // on mid-range phones while staying sharp enough for small barcodes.
 const MAX_DECODE_WIDTH = 640
+// After this long of armed scanning (camera live, loop decoding) with zero
+// decodes AND zero hard errors, show a subtle "nothing detected yet" hint so
+// it's never a silent black hole. Does NOT reset the camera.
+const WATCHDOG_MS = 9000
+// If the video never becomes ready with real dimensions within this window
+// (black/frozen stream, e.g. an iOS Safari re-acquisition), bail to the error
+// path instead of silently spinning on 1×1 frames forever.
+const VIDEO_READY_TIMEOUT_MS = 8000
 
 export default function ScannerModal({ onDetected, onClose, active = true }) {
   const videoRef = useRef(null)
@@ -42,6 +61,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
 
   const [statusMsg, setStatusMsg] = useState(t('scan.startingCamera'))
   const [errorMsg, setErrorMsg] = useState('')
+  const [hintMsg, setHintMsg] = useState('')
   const [retryKey, setRetryKey] = useState(0)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
@@ -57,50 +77,82 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
     let cancelled = false
     let mediaStream = null
     let rafId = 0
+    let hardErrors = 0
+    let watchdogShown = false
+    let armedAt = 0
+
+    const stopStream = () => {
+      mediaStream?.getTracks().forEach((track) => track.stop())
+    }
+
+    // Harden C1.3 re-acquisition: if the OS reclaims / ends the camera track
+    // (backgrounded tab, iOS camera handoff), stop the decode loop cleanly and
+    // surface a recoverable error instead of a silent frozen preview.
+    const handleTrackEnded = () => {
+      if (cancelled) return
+      cancelAnimationFrame(rafId)
+      setErrorMsg(t('scan.cameraLost'))
+      stopStream()
+    }
+
+    // Hard errors (wasm load failure, canvas failure) are surfaced ONCE per
+    // arm and the decode loop halts — the retry button re-arms fresh, so this
+    // never spams. A normal frame with no barcode (readBarcodes → []) is NOT
+    // an error and never reaches here.
+    const hardStopWithError = (message) => {
+      if (cancelled) return
+      cancelAnimationFrame(rafId)
+      setErrorMsg(message)
+    }
 
     async function decodeFrame(video, canvas, ctx) {
-      const scale = Math.min(1, MAX_DECODE_WIDTH / video.videoWidth)
-      const width = Math.max(1, Math.round(video.videoWidth * scale))
-      const height = Math.max(1, Math.round(video.videoHeight * scale))
+      const srcW = video.videoWidth
+      const srcH = video.videoHeight
+      // Guard the video-readiness race: never decode a 0-dims / 1×1 frame.
+      if (!srcW || !srcH) return
+
+      const scale = Math.min(1, MAX_DECODE_WIDTH / srcW)
+      const width = Math.max(1, Math.round(srcW * scale))
+      const height = Math.max(1, Math.round(srcH * scale))
       if (canvas.width !== width) canvas.width = width
       if (canvas.height !== height) canvas.height = height
       ctx.drawImage(video, 0, 0, width, height)
 
-      let imageData
-      try {
-        imageData = ctx.getImageData(0, 0, width, height)
-      } catch {
-        return // canvas not ready yet — skip this frame
-      }
+      // getImageData can throw if the canvas/context is lost — that's a HARD
+      // error, not a normal no-barcode frame. It propagates to the loop's
+      // catch, which surfaces it (with retry) instead of silently continuing.
+      const imageData = ctx.getImageData(0, 0, width, height)
 
-      try {
-        const results = await readBarcodes(imageData, READER_OPTIONS)
-        if (!cancelled && results.length > 0 && results[0].text) {
-          // Prevent further decode attempts while we play the UI pulse.
-          cancelled = true
-          setJustDecoded(true)
-          navigator.vibrate?.(60)
-          // Keep camera running briefly so the user sees the pulse animation,
-          // then stop tracks and notify the caller.
-          const text = results[0].text
-          setTimeout(() => {
-            cancelAnimationFrame(rafId)
-            mediaStream?.getTracks().forEach((track) => track.stop())
-            onDetectedRef.current(text)
-          }, 320)
-        }
-      } catch {
-        // A single frame failing to decode is normal — keep scanning.
+      // readBarcodes only throws on real failures (wasm not loaded /
+      // instantiated, bad imageData). An EMPTY array is a normal "no barcode
+      // in frame" — that stays silent by design.
+      const results = await readBarcodes(imageData, READER_OPTIONS)
+      if (cancelled) return results
+      if (results.length > 0 && results[0].text) {
+        // Prevent further decode attempts while we play the UI pulse.
+        cancelled = true
+        setJustDecoded(true)
+        navigator.vibrate?.(60)
+        // Keep camera running briefly so the user sees the pulse animation,
+        // then stop tracks and notify the caller.
+        const text = results[0].text
+        setTimeout(() => {
+          cancelAnimationFrame(rafId)
+          stopStream()
+          onDetectedRef.current(text)
+        }, 320)
       }
+      return results
     }
 
     async function start() {
-      // On re-activation (Add & scan next) reset the scan pulse, torch and any
-      // stale status so the camera looks freshly armed (the previous track —
-      // and its torch — was stopped while hidden).
+      // On re-activation (Add & scan next) reset the scan pulse, torch, hint
+      // and any stale status so the camera looks freshly armed (the previous
+      // track — and its torch — was stopped while hidden).
       setJustDecoded(false)
       setTorchOn(false)
       setStatusMsg(t('scan.startingCamera'))
+      setHintMsg('')
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
@@ -111,9 +163,15 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
           },
         })
         if (cancelled) {
-          mediaStream.getTracks().forEach((track) => track.stop())
+          stopStream()
           return
         }
+
+        // Watch for the camera being interrupted mid-scan (iOS Safari reclaims
+        // the camera when the tab backgrounds) so we never show a frozen feed.
+        mediaStream
+          .getVideoTracks()
+          .forEach((track) => track.addEventListener?.('ended', handleTrackEnded))
 
         const video = videoRef.current
         if (!video) return
@@ -134,21 +192,58 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
           torchTrackRef.current = vt
           const caps = vt.getCapabilities?.() || {}
           if (caps.torch) setTorchAvailable(true)
-        } catch (e) {
+        } catch {
           // ignore — just means torch not available
         }
 
         const loop = async () => {
           if (cancelled) return
           const now = performance.now()
-          if (!decoding && video.readyState >= 2 && now - lastDecode >= DECODE_INTERVAL_MS) {
+
+          // Readiness watchdog: never decode until the video has real frames.
+          // If it never becomes ready (black/frozen stream from an iOS
+          // re-acquisition), bail to the error path instead of spinning on
+          // 1×1 frames forever.
+          if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+            if (now - armedAt >= VIDEO_READY_TIMEOUT_MS) {
+              hardStopWithError(t('scan.cameraFail'))
+              return
+            }
+            rafId = requestAnimationFrame(loop)
+            return
+          }
+
+          // No-detection watchdog: after WATCHDOG_MS of armed scanning with
+          // zero decodes and zero hard errors, nudge the user — never a silent
+          // black hole. Lightweight: shown once per arm, no camera reset.
+          if (!watchdogShown && now - armedAt >= WATCHDOG_MS) {
+            watchdogShown = true
+            setHintMsg(t('scan.noBarcodeYet'))
+          }
+
+          if (!decoding && now - lastDecode >= DECODE_INTERVAL_MS) {
             lastDecode = now
             decoding = true
-            await decodeFrame(video, canvas, ctx)
-            decoding = false
+            try {
+              await decodeFrame(video, canvas, ctx)
+            } catch (err) {
+              // A hard error — surface it once and halt the loop (retry re-arms
+              // fresh). Distinguish it from a normal no-barcode frame, which
+              // resolves to an empty array and never reaches here.
+              hardErrors += 1
+              if (hardErrors === 1) {
+                console.warn('[scanner] decode failed', err?.message || err)
+                hardStopWithError(t('scan.decodeError'))
+                return
+              }
+            } finally {
+              decoding = false
+            }
           }
           rafId = requestAnimationFrame(loop)
         }
+
+        armedAt = performance.now()
         rafId = requestAnimationFrame(loop)
       } catch (err) {
         if (cancelled) return
@@ -165,7 +260,10 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
     return () => {
       cancelled = true
       cancelAnimationFrame(rafId)
-      mediaStream?.getTracks().forEach((track) => track.stop())
+      mediaStream?.getTracks().forEach((track) => {
+        track.removeEventListener?.('ended', handleTrackEnded)
+        track.stop()
+      })
     }
   }, [active, retryKey])
 
@@ -177,7 +275,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
       const newState = !torchOn
       await vt.applyConstraints?.(newState ? { advanced: [{ torch: true }] } : { advanced: [{ torch: false }] })
       setTorchOn(newState)
-    } catch (e) {
+    } catch {
       try {
         const ImageCaptureCtor = window.ImageCapture
         if (ImageCaptureCtor) {
@@ -185,7 +283,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
           await ic.setOptions?.({ torch: !torchOn })
           setTorchOn((s) => !s)
         }
-      } catch (e2) {
+      } catch {
         setTorchAvailable(false)
       }
     }
@@ -193,6 +291,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
 
   const handleRetry = () => {
     setErrorMsg('')
+    setHintMsg('')
     setStatusMsg(t('scan.restartingCamera'))
     setRetryKey((k) => k + 1)
   }
@@ -205,12 +304,13 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
       </div>
 
       <div className="scanner-chrome">
-        <button className="scanner-close" onClick={onClose} aria-label={t('scan.cancelScan')}>
+        <button type="button" className="scanner-close" onClick={onClose} aria-label={t('scan.cancelScan')}>
           ✕
         </button>
 
         {torchAvailable && (
           <button
+            type="button"
             className={`scanner-torch ${torchOn ? 'on' : ''}`}
             onClick={toggleTorch}
             aria-pressed={torchOn}
@@ -230,16 +330,17 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
         </div>
 
         <p className="scanner-status">{errorMsg || statusMsg}</p>
+        {!errorMsg && hintMsg && <p className="scanner-hint">{hintMsg}</p>}
 
         {errorMsg && (
           <div style={{ marginTop: 8 }}>
-            <button className="scanner-retry" onClick={handleRetry} aria-label={t('scan.retryCamera')}>
+            <button type="button" className="scanner-retry" onClick={handleRetry} aria-label={t('scan.retryCamera')}>
               {t('common.retry')}
             </button>
           </div>
         )}
 
-        <button className="scanner-manual" onClick={() => onClose('manual')}>
+        <button type="button" className="scanner-manual" onClick={() => onClose('manual')}>
           {t('scan.enterManually')}
         </button>
       </div>
