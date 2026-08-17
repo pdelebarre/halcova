@@ -44,6 +44,7 @@ export function getUserId() {
 //   runout.browse.<kind>           browse/filter/sort state
 //   runout.gamif.*                 local gameplay progression (ledger, level,
 //                                  badges-seen)
+//   runout.events[.enabled]        first-party opt-in analytics queue + flag
 // Left in place, switching accounts would surface the previous account's
 // browsing/search/view/progression state to the next user. `clearLocalUserData`
 // removes exactly those per-kind keys on sign-out and on account switch so one
@@ -58,6 +59,11 @@ const USER_SCOPED_KEY_PREFIXES = [
   'runout.views.',
   'runout.browse.',
   'runout.gamif.',
+  // Analytics (default-off, opt-in). The queue lives at the base key
+  // `runout.events` and the flag at `runout.events.enabled` — neither is
+  // user-namespaced, so both must be cleared on account switch/logout.
+  'runout.events.',
+  'runout.events',
 ]
 
 export function clearLocalUserData() {

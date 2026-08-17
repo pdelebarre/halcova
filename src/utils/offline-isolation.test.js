@@ -29,13 +29,21 @@ const MEMBER_A = { id: 'u1', name: 'Ada', role: 'member' }
 const MEMBER_B = { id: 'u2', name: 'Bob', role: 'member' }
 
 // A representative set of A's local per-kind data (search terms, saved views,
-// browse state, gamification progression) — none of it user-namespaced.
+// browse state, gamification progression, opt-in analytics queue) — none of it
+// user-namespaced.
 function seedUserAData() {
   localStorage.setItem('runout.recentSearches.records', JSON.stringify(['Pink Floyd', 'Miles Davis']))
   localStorage.setItem('runout.views.records', JSON.stringify([{ id: 'v1', name: 'My Jazz' }]))
   localStorage.setItem('runout.browse.records', JSON.stringify({ sort: 'year' }))
   localStorage.setItem('runout.gamif.ledger.records', JSON.stringify({ xp: 120 }))
   localStorage.setItem('runout.gamif.level.records', '3')
+  // A opted into first-party analytics and queued events (default-off, but
+  // must still be cleared on account switch so B never inherits A's queue).
+  localStorage.setItem('runout.events.enabled', '1')
+  localStorage.setItem('runout.events', JSON.stringify([
+    { event: 'browse', ts: '2026-01-01T00:00:00.000Z', props: { kind: 'records' } },
+    { event: 'scan', ts: '2026-01-01T00:00:01.000Z', props: { kind: 'records' } },
+  ]))
 }
 
 beforeEach(() => {
@@ -91,6 +99,25 @@ describe('sign out as A, sign in as B — B never sees A\'s local data', () => {
     expect(localStorage.getItem('runout.views.records')).toBeNull()
     expect(localStorage.getItem('runout.browse.records')).toBeNull()
     expect(localStorage.getItem('runout.gamif.ledger.records')).toBeNull()
+  })
+
+  it('account switch A→B clears A\'s opt-in analytics queue and flag', () => {
+    seedUserAData()
+    saveSession({ user: MEMBER_A, session: 'tok-a' })
+    // A queued analytics events and opted in (default-off feature).
+    expect(localStorage.getItem('runout.events.enabled')).toBe('1')
+    expect(JSON.parse(localStorage.getItem('runout.events'))).toHaveLength(2)
+
+    // Sign out A, then sign in B (the same clear path clearLocalUserData()).
+    saveSession(null)
+    clearLocalUserData()
+    expect(getSession()).toBeNull()
+    saveSession({ user: MEMBER_B, session: 'tok-b' })
+
+    // B must not inherit A's queued analytics events or the opt-in flag —
+    // this is the CWE-200 cross-account local-data leak the fix closes.
+    expect(localStorage.getItem('runout.events')).toBeNull()
+    expect(localStorage.getItem('runout.events.enabled')).toBeNull()
   })
 
   it('useAuth.login into a DIFFERENT account clears the previous account\'s local data', async () => {
