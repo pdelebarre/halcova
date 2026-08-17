@@ -13,6 +13,8 @@ preferred); `lastVerified` is the ISO date of the most recent verification
 sweep; `verifiedBy` is the human/role who verified. The quarterly fact-sweep
 updates `lastVerified` and retires anything that stopped being true.
 
+Work item: `(FEAT-EPIC-5, #277)` — Halcova Library lore content packs.
+
 ## Ledger
 
 | Claim | Source 1 | Source 2 | Last verified | Verified by |
@@ -47,6 +49,38 @@ updates `lastVerified` and retires anything that stopped being true.
 | S-0028 · Among the best-selling comic series in the world (F-0014) | Astérix official site — sales | The Guardian — Astérix features | 2026-08-17 | Marketing Manager |
 | S-0029 · Eisner's "A Contract with God" (1978) widely credited with popularizing "graphic novel" (F-0015, contested) | The Guardian — comics history | Britannica — "comic strip / graphic novel" (entry) | 2026-08-17 | Marketing Manager |
 | S-0030 · The term predates the book; "first graphic novel" is contested (F-0015) | The Guardian — graphic novel history | Will Eisner official / documentary (Will Eisner: The Spirit) | 2026-08-17 | Marketing Manager |
+| S-0031 · "Rhythm and blues" coined late 1940s by Jerry Wexler at Billboard, replacing "race music" (F-0016) | Britannica — "rhythm and blues" (entry) | Rock & Roll Hall of Fame — Jerry Wexler (inductee) | 2026-08-17 | Marketing Manager |
+| S-0032 · Soul grew from R&B + gospel in the 1950s–60s, rooted in the Black church (F-0016) | Smithsonian National Museum of African American History and Culture — soul music | Britannica — "soul music" (entry) | 2026-08-17 | Marketing Manager |
+| S-0033 · Bristol Sessions 1927; Ralph Peer recorded the Carter Family + Jimmie Rodgers (F-0017) | Country Music Hall of Fame and Museum — Bristol Sessions | Library of Congress — Bristol Sessions (National Recording Registry) | 2026-08-17 | Marketing Manager |
+| S-0034 · Sessions often called the "big bang" of country music (F-0017) | Country Music Hall of Fame and Museum — Bristol Sessions exhibit | Britannica — "country music" (entry) | 2026-08-17 | Marketing Manager |
+| S-0035 · Hip hop emerged in the Bronx, early 1970s; Kool Herc's 1973 party at 1520 Sedgwick Avenue widely cited as foundational (F-0018) | Smithsonian National Museum of American History — hip hop | Britannica — "hip-hop" (entry) | 2026-08-17 | Marketing Manager |
+| S-0036 · Culture grew across the decade via DJing, MCing, breaking, graffiti (F-0018) | Rock & Roll Hall of Fame — hip hop / break-beat history | Smithsonian — hip hop collection notes | 2026-08-17 | Marketing Manager |
+| S-0037 · Reggae developed in Jamaica, late 1960s, from ska/rocksteady; "one drop" rhythm (F-0019) | Britannica — "reggae" (entry) | Smithsonian Folkways — reggae history | 2026-08-17 | Marketing Manager |
+| S-0038 · Bob Marley and the Wailers carried reggae to a global audience in the 1970s (F-0019) | Bob Marley official site — biography | Britannica — "Bob Marley" (entry) | 2026-08-17 | Marketing Manager |
+| S-0039 · Heavy metal emerged late 1960s–early 1970s, largely Birmingham; Black Sabbath/Led Zeppelin/Deep Purple (F-0020, contested) | Britannica — "heavy metal" (entry) | Rock & Roll Hall of Fame — Black Sabbath (inductee) | 2026-08-17 | Marketing Manager |
+| S-0040 · "First metal band" genuinely contested; uncontested core ships (F-0020) | Britannica — "heavy metal" (origins section) | Rolling Stone — heavy metal history features | 2026-08-17 | Marketing Manager |
+| S-0041 · Atlantic Records founded 1947 by Ahmet Ertegun + Herb Abramson, New York (F-0021) | Atlantic Records / Rhino — label history | Rock & Roll Hall of Fame — Ahmet Ertegun (inductee) | 2026-08-17 | Marketing Manager |
+| S-0042 · R&B/soul roster (Charles, Franklin, Redding) + later rock (Led Zeppelin) (F-0021) | Atlantic Records — artist history | Britannica — "Ahmet Ertegun" (entry) | 2026-08-17 | Marketing Manager |
+| S-0043 · Chess Records founded 1950 by brothers Phil + Leonard Chess, Chicago (F-0022) | Britannica — "Chess Records" (entry) | Blues Foundation / Blues Hall of Fame — Chess | 2026-08-17 | Marketing Manager |
+| S-0044 · Electric Chicago blues (Waters, Howlin' Wolf) + early rock (Berry, Bo Diddley) (F-0022) | Chess Records / Universal — label history | Rock & Roll Hall of Fame — Chuck Berry / Bo Diddley (inductee) | 2026-08-17 | Marketing Manager |
+| S-0045 · Disco rose through the 1970s from clubs rooted in Black, Latino, and gay culture (F-0023) | Smithsonian National Museum of American History — disco | Britannica — "disco" (entry) | 2026-08-17 | Marketing Manager |
+| S-0046 · "Saturday Night Fever" (1977) + Bee Gees soundtrack made disco a global phenomenon (F-0023) | Library of Congress — National Recording Registry ("Saturday Night Fever") | Britannica — "Saturday Night Fever" (entry) | 2026-08-17 | Marketing Manager |
+| S-0047 · Beatles' February 1964 "Ed Sullivan Show" appearance opened the British Invasion (F-0024) | Rock & Roll Hall of Fame — The Beatles (inductee) | Library of Congress — The Ed Sullivan Show archive | 2026-08-17 | Marketing Manager |
+| S-0048 · UK acts dominated US charts mid-1960s (Stones, Kinks, Who) (F-0024) | Britannica — "British Invasion" (entry) | Billboard — chart history | 2026-08-17 | Marketing Manager |
+| S-0049 · Walpole's "The Castle of Otranto" (1764) widely credited as the first Gothic novel (F-0025) | British Library — Gothic literature | Britannica — "Gothic novel" (entry) | 2026-08-17 | Marketing Manager |
+| S-0050 · Second-edition subtitle "A Gothic Story"; castles/supernatural/melodrama define the genre (F-0025) | British Library — Gothic fiction collection | University of Oxford — Gothic studies reference | 2026-08-17 | Marketing Manager |
+| S-0051 · Tolkien's "The Hobbit" (1937) + "The Lord of the Rings" (1954–55) widely credited with establishing modern fantasy (F-0026) | Bodleian Libraries — Tolkien exhibition | Britannica — "fantasy literature" (entry) | 2026-08-17 | Marketing Manager |
+| S-0052 · Shaped the genre's secondary worlds, invented languages, epic quests (F-0026) | The Tolkien Society (official) | Britannica — "The Lord of the Rings" (entry) | 2026-08-17 | Marketing Manager |
+| S-0053 · Latin American Boom 1960s–70s; novelists incl. García Márquez, Vargas Llosa, Cortázar, Fuentes (F-0027) | Britannica — "Latin American literature" (entry) | Instituto Cervantes — el Boom | 2026-08-17 | Marketing Manager |
+| S-0054 · Associated with magical realism and experimental narrative (F-0027) | Britannica — "magical realism" (entry) | Nobel Prize — García Márquez profile | 2026-08-17 | Marketing Manager |
+| S-0055 · Faber and Faber founded 1929 by Geoffrey Faber, growing out of Faber & Gwyer (F-0028) | Faber and Faber official — history | Britannica — "T.S. Eliot" (entry) | 2026-08-17 | Marketing Manager |
+| S-0056 · T.S. Eliot joined as editor in 1925, became a director; published his own poetry there (F-0028) | Faber and Faber official — T.S. Eliot | T.S. Eliot Society — biography | 2026-08-17 | Marketing Manager |
+| S-0057 · Anchor Books launched 1953 by Jason Epstein at Doubleday (F-0029) | Britannica — "paperback" (entry) | Anchor / Penguin Random House — history | 2026-08-17 | Marketing Manager |
+| S-0058 · Widely credited with pioneering the American trade paperback (F-0029) | The New York Times — Jason Epstein (obituary, 2017) | Anchor Books official — history | 2026-08-17 | Marketing Manager |
+| S-0059 · Beat Generation, 1950s American movement (NYC + San Francisco); spontaneous experimental writing (F-0030) | Britannica — "Beat movement" (entry) | Smithsonian — Beat culture holdings | 2026-08-17 | Marketing Manager |
+| S-0060 · "Howl" (1956) + "On the Road" (1957) most famous works (F-0030) | Allen Ginsberg Project / official archives | Jack Kerouac / Ann Arbor archives | 2026-08-17 | Marketing Manager |
+| S-0061 · Many 19th-century novels first appeared in serial form; "The Pickwick Papers" (1836–37) popularized it (F-0031) | British Library — Victorian serials | Britannica — "Charles Dickens" (entry) | 2026-08-17 | Marketing Manager |
+| S-0062 · Dickens' later novels eagerly awaited installment by installment (F-0031) | Charles Dickens Museum (official) | British Library — Dickens | 2026-08-17 | Marketing Manager |
 
 ## Source bibliography (stable references)
 
@@ -61,3 +95,12 @@ where a source needs a local edition).
   is what ships. Re-check at the next sweep.
 - **F-0015 (`[VALIDATE]`)** — "popularized vs predates" nuance pending a
   third source at the next sweep; only the uncontested core ships meanwhile.
+- **F-0018 (`[DISPUTED]`)** — the 1973 Sedgwick Avenue party is "widely cited"
+  as a foundational moment, not asserted as the single origin; the culture grew
+  across the decade. Re-check framing at the next sweep.
+- **F-0020 (`[DISPUTED]`)** — the "first heavy-metal band" question is
+  permanent by nature; only the uncontested core (Birmingham bands defined the
+  sound) ships. Re-check each sweep.
+- **F-0027 (`[CULT]`)** — Latin American Boom is an `es` (and broader
+  Spanish-reading) local-hero topic; the universal entry stays as-is for other
+  locales, with a deeper es local-hero entry to follow.

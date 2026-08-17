@@ -1,10 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
+import { updateItem } from '../api/collection'
 import { splitArtistTitle } from '../utils/match'
 import { t } from '../i18n'
 import LendingControls from './LendingControls'
 import ReviewsSection from './ReviewsSection'
 import './AlbumDetail.css'
 import './BookDetail.css'
+
+// (FEAT-EPIC-5, #276) Phase A blob enrichment: after the volume-detail fetch
+// resolves, merge the content-bearing fields (authorsList/subtitle/series/
+// mainCategory/snippet) back onto the stored item through the normal
+// collection PUT. This is the lazy, self-healing backfill for items added
+// before enrichment — best-effort per detail open, never blocking render,
+// never throwing (no error boundary → dark-screen safety). Only changed fields
+// are written; degraded/empty detail responses are ignored so good data is
+// never clobbered. The normalizer already caps + validates the shapes the
+// server allowlist accepts (netlify item-fields.js).
+function mergeBookEnrichment(item, d, isDemo, catalog) {
+  if (!item.googleBooksId || isDemo || !item.id || !d || typeof d !== 'object') return
+  const merge = {}
+  if (Array.isArray(d.authorsList) && d.authorsList.length > 0
+    && JSON.stringify(item.authorsList) !== JSON.stringify(d.authorsList)) merge.authorsList = d.authorsList
+  if (typeof d.subtitle === 'string' && d.subtitle && d.subtitle !== item.subtitle) merge.subtitle = d.subtitle
+  if (typeof d.series === 'string' && d.series && d.series !== item.series) merge.series = d.series
+  if (typeof d.mainCategory === 'string' && d.mainCategory && d.mainCategory !== item.mainCategory) merge.mainCategory = d.mainCategory
+  if (typeof d.snippet === 'string' && d.snippet && d.snippet !== item.snippet) merge.snippet = d.snippet
+  if (Object.keys(merge).length === 0) return
+  try {
+    // Best-effort PUT through the existing collection path — failures
+    // (offline, quota) are swallowed so a backfill can never crash the sheet.
+    Promise.resolve(updateItem(item.id, merge, catalog?.storage || 'books')).catch(() => {})
+  } catch { /* never throw from enrichment */ }
+}
 
 export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall, focusSection }) {
   const { artist: author, album: bookTitle } = splitArtistTitle(item.title)
@@ -78,23 +105,46 @@ export default function BookDetail({ item, onClose, onDelete, onSaveNotes, onTog
   const [notesSaved, setNotesSaved] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const confirmTimer = useRef(null)
+  // (FEAT-EPIC-5, #276) One volume-detail fetch per open, even when the
+  // response is degraded (no snippet etc.) — otherwise needsEnrichment stays
+  // true and the effect would loop. A fresh ref on each open still retries.
+  const fetchedIdRef = useRef(null)
+  // (FEAT-EPIC-5, #276) Latest merge inputs, read from a ref inside the fetch
+  // effect so the effect can stay keyed on needsEnrichment/catalog without a
+  // stale item closure — and so a pin/notes/lend update (which replaces the
+  // item object) never re-fetches the volume detail. Read only from async
+  // callbacks, never during render.
+  const enrichRef = useRef({ item, isDemo, catalog })
+  enrichRef.current = { item, isDemo, catalog }
+
+  // (FEAT-EPIC-5, #276) Phase A enrichment: a book still needs its detail
+  // fetch when any content-bearing field is missing — the self-healing
+  // backfill for items added before enrichment. Once merged, needsEnrichment
+  // flips false and the effect goes quiet (no quota burn on repeat opens).
+  const needsEnrichment = !item.description
+    || !Array.isArray(item.authorsList) || item.authorsList.length === 0
+    || !item.subtitle || !item.series || !item.mainCategory || !item.snippet
 
   // Search results come with a short description; pull the full one (and page
-  // count) from the volume detail when it wasn't included up front.
+  // count, plus the Phase-A enrichment fields) from the volume detail when any
+  // of them is missing. One fetch per open (fetchedIdRef) so a degraded
+  // response can't loop the effect.
   useEffect(() => {
     let cancelled = false
-    if (item.googleBooksId && !item.description) {
+    if (item.googleBooksId && needsEnrichment && !isDemo && fetchedIdRef.current !== item.googleBooksId) {
+      fetchedIdRef.current = item.googleBooksId
       catalog.getDetail(item.googleBooksId)
         .then((d) => {
-          if (!cancelled) {
-            if (d.description) setDescription(d.description)
-            if (d.pageCount) setPageCount(d.pageCount)
-          }
+          if (cancelled || !d || typeof d !== 'object') return
+          if (d.description) setDescription(d.description)
+          if (d.pageCount) setPageCount(d.pageCount)
+          const ctx = enrichRef.current
+          mergeBookEnrichment(ctx.item, d, ctx.isDemo, ctx.catalog)
         })
         .catch((err) => { if (!cancelled) setDescError(err.message) })
     }
     return () => { cancelled = true }
-  }, [item.googleBooksId, item.description, catalog])
+  }, [item.googleBooksId, needsEnrichment, isDemo, catalog])
 
   // P2-4: async content (volume description, ReviewsSection) renders ABOVE
   // LendingControls and can shift the section after the one-shot RAF above

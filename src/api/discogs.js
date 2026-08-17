@@ -116,14 +116,49 @@ export async function searchByText(query) {
   }))
 }
 
+// (FEAT-EPIC-5, #276) Phase A blob enrichment caps — bound the payload the
+// detail view merges onto stored items (marketing/gamification §5bis.1). Keep
+// in sync with the server allowlist (netlify/functions/_shared/item-fields.js:
+// ARTISTS_MAX / TRACKLIST_MAX).
+const MAX_DETAIL_ARTISTS = 8
+const MAX_DETAIL_TRACKS = 40
+
+// Defensive cap: never trust the provider's array length; non-arrays → [].
+function capList(value, n) {
+  return Array.isArray(value) ? value.slice(0, n) : []
+}
+
 export async function getReleaseDetail(discogsId) {
   const data = await discogsFetch('release', { id: discogsId })
+  // (FEAT-EPIC-5, #276) Phase A blob enrichment: emit stable, content-bearing
+  // fields (artists/masterId/released) so the detail view can backfill stored
+  // items. artists[]/tracklist are capped defensively, and entries missing the
+  // fields the server requires (artist id+name, track position+title) are
+  // dropped — a malformed entry would otherwise be rejected 400 by the
+  // collection PUT. released is kept only when it matches the server's
+  // 'YYYY[-MM[-DD]]' contract.
+  const artists = capList(data.artists, MAX_DETAIL_ARTISTS)
+    .filter((a) => a && typeof a.id === 'number' && typeof a.name === 'string' && a.name.trim() !== '')
+    .map((a) => ({
+      id: a.id,
+      name: a.name.trim(),
+      ...(typeof a.anv === 'string' && a.anv.trim() !== '' ? { anv: a.anv.trim() } : {}),
+      ...(typeof a.role === 'string' && a.role.trim() !== '' ? { role: a.role.trim() } : {}),
+    }))
+  const tracklist = capList(data.tracklist, MAX_DETAIL_TRACKS)
+    .filter((t) => t
+      && typeof t.position === 'string' && t.position.trim() !== ''
+      && typeof t.title === 'string' && t.title.trim() !== '')
+    .map((t) => ({
+      position: t.position.trim(),
+      title: t.title.trim(),
+      ...(typeof t.duration === 'string' && t.duration.trim() !== '' ? { duration: t.duration.trim() } : {}),
+    }))
   return {
-    tracklist: (data.tracklist || []).map((t) => ({
-      position: t.position,
-      title: t.title,
-      duration: t.duration,
-    })),
+    artists,
+    masterId: typeof data.master_id === 'number' ? data.master_id : null,
+    tracklist,
+    released: typeof data.released === 'string' && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(data.released) ? data.released : '',
     notes: data.notes || '',
     images: (data.images || []).map((i) => i.resource_url),
     ...communityRating(data.community),

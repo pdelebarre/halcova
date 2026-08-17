@@ -1,0 +1,434 @@
+{
+  "schemaVersion": "1.0",
+  "pack": "books-core",
+  "name": "Halcova Library — Books · Core v0.1",
+  "description": "Per-author and canonical-title lore (T1/T2/T7 with a few T6 connections) over the very top of the long-tail curve: the most-collected authors and the books most likely to sit on a shelf. Follows the records-core style/format proof.",
+  "locale": "en",
+  "coverage": {
+    "model": "Each entry keys to author (via splitArtistTitle) and/or a canonical title/publisher. The 30 entries cover the highest-frequency shelf authors (classics, fantasy, sci-fi, mystery, dystopian, contemporary), so a typical mixed shelf should surface a Sourced fact for most of its big names; genre/year fallback to Foundations + Computed metadata covers the rest.",
+    "betaNote": "Validate the ~50–70% item-coverage estimate on a typical mixed 40-item collection before international launch (lore-layer-plan.md §8). Next packs: the rest of the long tail, local-hero books packs per locale (e.g. fr: Proust; es: Borges; de: Mann; it: Calvino; nl: Multatuli; pt-BR: Machado de Assis), and deeper T2 story-behind-the-work entries.",
+    "factsToFlag": "BC-0020 (Christie 'best-selling fiction writer' + The Mousetrap record) and BC-0022 (Morrison 'first Black woman to win Nobel') ship only durable, documented cores."
+  },
+  "entries": [
+    {
+      "id": "BC-0001",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "George Orwell wrote 'Nineteen Eighty-Four' (1949) while living on the remote Scottish island of Jura. The novel's phrases, including 'Big Brother,' entered the English language.",
+        "voice": "Written on a damp Scottish island about a world with no privacy — and then 'Big Brother' moved into the dictionary."
+      },
+      "matchKeys": { "artist": ["George Orwell"], "title": ["Nineteen Eighty-Four", "1984"], "genre": ["Dystopian", "Classic", "Fiction"], "year": 1949 },
+      "flags": ["FACT"],
+      "sources": ["S-0001", "S-0002"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0002",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "'Animal Farm' (1945), Orwell's allegory of the Russian Revolution and the rise of Stalinism, was rejected by several publishers — including Faber and Faber, where T.S. Eliot was an editor — before finding a home.",
+        "voice": "Four legs good, two legs bad — and, as it turned out, a few publishers who said no before yes."
+      },
+      "matchKeys": { "artist": ["George Orwell"], "title": ["Animal Farm"], "genre": ["Fiction", "Classic", "Political"], "year": 1945 },
+      "flags": ["FACT"],
+      "sources": ["S-0003", "S-0004"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0003",
+      "taxonomy": "T1",
+      "kind": "books",
+      "fact": {
+        "text": "Jane Austen's novels were published anonymously during her lifetime, credited only as 'By a Lady.' 'Pride and Prejudice' (1813) was her second published novel, after 'Sense and Sensibility' (1811).",
+        "voice": "Published as 'By a Lady' — the 1810s version of an anonymous username, and a shelf-staple ever since."
+      },
+      "matchKeys": { "artist": ["Jane Austen"], "title": ["Pride and Prejudice", "Sense and Sensibility"], "genre": ["Classic", "Romance", "Literature"], "year": [1811, 1813] },
+      "flags": ["FACT"],
+      "sources": ["S-0005", "S-0006"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0004",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "'Emma' (1815) was dedicated to the Prince Regent — a dedication made at the request of his librarian, not Austen's choice. She was known to dislike him.",
+        "voice": "A dedication the author didn't ask for, to a prince she couldn't stand. Publishing politics, 1815 edition."
+      },
+      "matchKeys": { "artist": ["Jane Austen"], "title": ["Emma"], "genre": ["Classic", "Romance", "Literature"], "year": 1815 },
+      "flags": ["FACT"],
+      "sources": ["S-0007", "S-0008"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0005",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "J.R.R. Tolkien's 'The Lord of the Rings' (1954–55) grew out of 'The Hobbit' (1937), a book he wrote for his own children. He wrote both while a professor at Oxford.",
+        "voice": "A bedtime story for his kids that grew into a whole world — Oxford gave him the library, and the library gave us Middle-earth."
+      },
+      "matchKeys": { "artist": ["J.R.R. Tolkien"], "title": ["The Lord of the Rings", "The Hobbit"], "genre": ["Fantasy", "High Fantasy", "Classic"], "year": [1937, 1955] },
+      "flags": ["FACT"],
+      "sources": ["S-0009", "S-0010"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0006",
+      "taxonomy": "T6",
+      "kind": "books",
+      "fact": {
+        "text": "J.R.R. Tolkien and C.S. Lewis were members of the Inklings, an Oxford literary circle that met to read and discuss works in progress — including each other's manuscripts.",
+        "voice": "An Oxford club where two friends read each other's drafts aloud. The Middle-earth and Narnia connections run deeper than the shelf shows."
+      },
+      "matchKeys": { "artist": ["J.R.R. Tolkien", "C.S. Lewis"], "genre": ["Fantasy", "Classic", "Literature"], "year": [1930, 1949] },
+      "flags": ["FACT"],
+      "sources": ["S-0011", "S-0012"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0007",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "J.K. Rowling's 'Harry Potter and the Philosopher's Stone' was rejected by several publishers before Bloomsbury took it on (1997). It was published in the US as 'Harry Potter and the Sorcerer's Stone' (1998).",
+        "voice": "Twelve rejections, one yes, and a boy wizard who changed publishing forever. Some shelves owe a very specific thanks."
+      },
+      "matchKeys": { "artist": ["J.K. Rowling"], "title": ["Harry Potter and the Philosopher's Stone", "Harry Potter and the Sorcerer's Stone"], "label": ["Bloomsbury", "Scholastic"], "genre": ["Fantasy", "Middle Grade", "Fiction"], "year": [1997, 1998] },
+      "flags": ["FACT"],
+      "sources": ["S-0013", "S-0014"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0008",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Margaret Atwood's 'The Handmaid's Tale' (1985) won the Governor General's Literary Award for fiction in 1985. It was adapted into a television series in 2017.",
+        "voice": "A dystopia that won Canada's top literary prize in 1985 — and found a whole new audience thirty years later on screen."
+      },
+      "matchKeys": { "artist": ["Margaret Atwood"], "title": ["The Handmaid's Tale"], "genre": ["Dystopian", "Science Fiction", "Classic", "Fiction"], "year": 1985 },
+      "flags": ["FACT"],
+      "sources": ["S-0015", "S-0016"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0009",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Stephen King's 'Carrie' (1974) was his first published novel, and it grew out of a short story written at his wife's suggestion. It made him a bestselling author.",
+        "voice": "A story his wife fished out of the trash became the novel that made him famous. Some shelves are built on good advice."
+      },
+      "matchKeys": { "artist": ["Stephen King"], "title": ["Carrie"], "genre": ["Horror", "Fiction", "Thriller"], "year": 1974 },
+      "flags": ["FACT"],
+      "sources": ["S-0017", "S-0018"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0010",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Stephen King's 'The Shining' (1977) was inspired by a stay at the Stanley Hotel in Colorado, and the fictional Overlook Hotel draws on it.",
+        "voice": "A Colorado hotel with a long hallway, an empty ballroom, and a writer who left with a novel. The Overlook thanks it for the material."
+      },
+      "matchKeys": { "artist": ["Stephen King"], "title": ["The Shining"], "genre": ["Horror", "Fiction", "Thriller"], "year": 1977 },
+      "flags": ["FACT"],
+      "sources": ["S-0019", "S-0020"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0011",
+      "taxonomy": "T7",
+      "kind": "books",
+      "fact": {
+        "text": "Ernest Hemingway's 'The Old Man and the Sea' (1952) won the Pulitzer Prize for Fiction in 1953, and the Nobel Prize in Literature was awarded to Hemingway in 1954 citing the novella.",
+        "voice": "An old fisherman, one marlin, and both of literature's biggest prizes in two years."
+      },
+      "matchKeys": { "artist": ["Ernest Hemingway"], "title": ["The Old Man and the Sea"], "genre": ["Classic", "Fiction", "Literature"], "year": 1952 },
+      "flags": ["FACT"],
+      "sources": ["S-0021", "S-0022"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0012",
+      "taxonomy": "T1",
+      "kind": "books",
+      "fact": {
+        "text": "Ernest Hemingway's 'The Sun Also Rises' (1926) was his first novel, capturing the expatriate 'Lost Generation' of 1920s Paris — a circle that included F. Scott Fitzgerald and Gertrude Stein.",
+        "voice": "The novel that gave a name to a generation of expatriates — and the start of a shelf that never stopped growing."
+      },
+      "matchKeys": { "artist": ["Ernest Hemingway"], "title": ["The Sun Also Rises"], "genre": ["Classic", "Fiction", "Literature"], "year": 1926 },
+      "flags": ["FACT"],
+      "sources": ["S-0023", "S-0024"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0013",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "F. Scott Fitzgerald's 'The Great Gatsby' (1925), his portrait of the Jazz Age, sold modestly in his lifetime. It is now a cornerstone of American literature and among the most-taught novels in the US.",
+        "voice": "A novel that flopped and then outlived its own author's fame. Some books just need a few decades to catch on."
+      },
+      "matchKeys": { "artist": ["F. Scott Fitzgerald"], "title": ["The Great Gatsby"], "genre": ["Classic", "Fiction", "Literature"], "year": 1925 },
+      "flags": ["FACT"],
+      "sources": ["S-0025", "S-0026"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0014",
+      "taxonomy": "T1",
+      "kind": "books",
+      "fact": {
+        "text": "F. Scott Fitzgerald's 'This Side of Paradise' (1920), his debut novel, made him famous at 23 and helped define the 'Jazz Age' generation.",
+        "voice": "A debut that made its 23-year-old author a celebrity overnight — and a generation finally had a name for itself."
+      },
+      "matchKeys": { "artist": ["F. Scott Fitzgerald"], "title": ["This Side of Paradise"], "genre": ["Classic", "Fiction", "Literature"], "year": 1920 },
+      "flags": ["FACT"],
+      "sources": ["S-0027", "S-0028"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0015",
+      "taxonomy": "T7",
+      "kind": "books",
+      "fact": {
+        "text": "Gabriel García Márquez was awarded the Nobel Prize in Literature in 1982; the citation recognized his novels and short stories, including 'One Hundred Years of Solitude.'",
+        "voice": "A Nobel for the man who taught the world that one hundred years can pass in a single village — and a single sentence."
+      },
+      "matchKeys": { "artist": ["Gabriel García Márquez"], "title": ["One Hundred Years of Solitude"], "genre": ["Magical Realism", "Classic", "Literature", "Fiction"], "year": 1982 },
+      "flags": ["FACT"],
+      "sources": ["S-0029", "S-0030"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0016",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Gabriel García Márquez's 'One Hundred Years of Solitude' (1967) was first published by Editorial Sudamericana in Buenos Aires, and is widely considered a defining work of magical realism.",
+        "voice": "A village called Macondo, seven generations, and one of the most borrowed phrases in literary criticism. Your shelf keeps the family."
+      },
+      "matchKeys": { "artist": ["Gabriel García Márquez"], "title": ["One Hundred Years of Solitude"], "label": ["Editorial Sudamericana"], "genre": ["Magical Realism", "Classic", "Literature", "Fiction"], "year": 1967 },
+      "flags": ["FACT"],
+      "sources": ["S-0031", "S-0032"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0017",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Haruki Murakami's 'Norwegian Wood' (1987) became a bestseller in Japan, preceding his international fame in the 1990s.",
+        "voice": "A love story that sold out Japan before the rest of the world had heard the author's name. The shelf is rarely first, but it always catches up."
+      },
+      "matchKeys": { "artist": ["Haruki Murakami"], "title": ["Norwegian Wood"], "genre": ["Fiction", "Literature", "Contemporary"], "year": 1987 },
+      "flags": ["FACT"],
+      "sources": ["S-0033", "S-0034"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0018",
+      "taxonomy": "T7",
+      "kind": "books",
+      "fact": {
+        "text": "Ursula K. Le Guin's 'The Left Hand of Darkness' (1969) won both the Hugo and the Nebula awards — a rare double — and is a landmark novel exploring gender and society.",
+        "voice": "Two of science fiction's biggest prizes, one novel, and a question about gender that still hasn't stopped being asked."
+      },
+      "matchKeys": { "artist": ["Ursula K. Le Guin"], "title": ["The Left Hand of Darkness"], "genre": ["Science Fiction", "Classic", "Fiction"], "year": 1969 },
+      "flags": ["FACT"],
+      "sources": ["S-0035", "S-0036"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0019",
+      "taxonomy": "T1",
+      "kind": "books",
+      "fact": {
+        "text": "Ursula K. Le Guin's Earthsea series began with 'A Wizard of Earthsea' (1968) and helped establish fantasy as serious literary territory.",
+        "voice": "A wizard school before the wizard schools, written with a poet's care — Earthsea taught fantasy to behave like literature."
+      },
+      "matchKeys": { "artist": ["Ursula K. Le Guin"], "title": ["A Wizard of Earthsea", "The Earthsea Cycle"], "genre": ["Fantasy", "Classic", "Fiction"], "year": 1968 },
+      "flags": ["FACT"],
+      "sources": ["S-0037", "S-0038"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0020",
+      "taxonomy": "T7",
+      "kind": "books",
+      "fact": {
+        "text": "Agatha Christie is widely cited as the best-selling fiction writer of all time. Her play 'The Mousetrap' has been running continuously in London's West End since 1952 — the longest-running play in history.",
+        "voice": "More mysteries than anyone else, and a play that has simply refused to stop. Some endings are famously hard to keep secret."
+      },
+      "matchKeys": { "artist": ["Agatha Christie"], "title": ["The Mousetrap"], "genre": ["Mystery", "Detective", "Classic", "Fiction"], "year": 1952 },
+      "flags": ["FACT"],
+      "sources": ["S-0039", "S-0040"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0021",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Agatha Christie wrote part of 'Murder on the Orient Express' (1934) at the Pera Palace Hotel in Istanbul, which keeps a room named for her.",
+        "voice": "A train, a hotel room, and a locked-room mystery so good the hotel still names rooms after the author."
+      },
+      "matchKeys": { "artist": ["Agatha Christie"], "title": ["Murder on the Orient Express"], "genre": ["Mystery", "Detective", "Classic", "Fiction"], "year": 1934 },
+      "flags": ["FACT"],
+      "sources": ["S-0041", "S-0042"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0022",
+      "taxonomy": "T7",
+      "kind": "books",
+      "fact": {
+        "text": "Toni Morrison's 'Beloved' (1987) won the Pulitzer Prize for Fiction in 1988. In 1993 she became the first Black woman to receive the Nobel Prize in Literature.",
+        "voice": "A Pulitzer in 1988, a Nobel in 1993, and a shelf that finally had room for a voice that had been waiting too long."
+      },
+      "matchKeys": { "artist": ["Toni Morrison"], "title": ["Beloved"], "genre": ["Classic", "Literature", "Fiction"], "year": 1987 },
+      "flags": ["FACT"],
+      "sources": ["S-0043", "S-0044"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0023",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Virginia Woolf's 'Mrs Dalloway' (1925) unfolds over a single day in London and is a landmark of modernist stream-of-consciousness fiction.",
+        "voice": "One day, one party, and a whole life — all inside a single novel. Some books give you a lifetime between two covers."
+      },
+      "matchKeys": { "artist": ["Virginia Woolf"], "title": ["Mrs Dalloway"], "genre": ["Modernist", "Classic", "Literature", "Fiction"], "year": 1925 },
+      "flags": ["FACT"],
+      "sources": ["S-0045", "S-0046"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0024",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Ray Bradbury wrote much of 'Fahrenheit 451' (1953) in the basement of the UCLA library on a rented typewriter. The title refers to the temperature at which paper catches fire, and the novel imagines a future where books are burned.",
+        "voice": "Written in a library, about a world where libraries burn. The irony is the whole point, and your shelf is the protest."
+      },
+      "matchKeys": { "artist": ["Ray Bradbury"], "title": ["Fahrenheit 451"], "genre": ["Dystopian", "Science Fiction", "Classic", "Fiction"], "year": 1953 },
+      "flags": ["FACT"],
+      "sources": ["S-0047", "S-0048"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0025",
+      "taxonomy": "T1",
+      "kind": "books",
+      "fact": {
+        "text": "Kurt Vonnegut's 'Slaughterhouse-Five' (1969) draws on his experience as a prisoner of war during the firebombing of Dresden in 1945. It is his most famous novel.",
+        "voice": "Written from memory of a night he couldn't forget — and it became the novel that made him a household name."
+      },
+      "matchKeys": { "artist": ["Kurt Vonnegut"], "title": ["Slaughterhouse-Five"], "genre": ["Science Fiction", "Classic", "Fiction"], "year": 1969 },
+      "flags": ["FACT"],
+      "sources": ["S-0049", "S-0050"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0026",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Harper Lee's 'To Kill a Mockingbird' (1960) was her first novel and won the Pulitzer Prize for Fiction in 1961. It is among the most widely read and taught American novels.",
+        "voice": "A first novel, a Pulitzer, and a courtroom that every school has visited since. Some shelves are required reading."
+      },
+      "matchKeys": { "artist": ["Harper Lee"], "title": ["To Kill a Mockingbird"], "genre": ["Classic", "Literature", "Fiction"], "year": 1960 },
+      "flags": ["FACT"],
+      "sources": ["S-0051", "S-0052"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0027",
+      "taxonomy": "T1",
+      "kind": "books",
+      "fact": {
+        "text": "Isaac Asimov's 'Foundation' series grew from stories published in the 1940s into a trilogy of novels in the early 1950s. His robot stories introduced the 'Three Laws of Robotics,' which became a touchstone of science fiction.",
+        "voice": "A galactic empire, a plan for its fall, and three laws of robotics that still make engineers argue."
+      },
+      "matchKeys": { "artist": ["Isaac Asimov"], "title": ["Foundation", "I, Robot"], "genre": ["Science Fiction", "Classic"], "year": [1942, 1953] },
+      "flags": ["FACT"],
+      "sources": ["S-0053", "S-0054"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0028",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Frank Herbert's 'Dune' (1965), set on the desert planet Arrakis, won the Nebula Award and shared the Hugo Award in 1966 — and has been adapted for film multiple times, most recently in 2021.",
+        "voice": "A desert planet, giant worms, and a spice that rules the universe. Dune won both of sci-fi's biggest prizes in 1966."
+      },
+      "matchKeys": { "artist": ["Frank Herbert"], "title": ["Dune"], "genre": ["Science Fiction", "Classic"], "year": [1965, 1966] },
+      "flags": ["FACT"],
+      "sources": ["S-0055", "S-0056"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0029",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Aldous Huxley's 'Brave New World' (1932) takes its title from a line in Shakespeare's 'The Tempest' — a darkly ironic nod for a novel about a sterilized future society.",
+        "voice": "A future where people are bred happy, named after Shakespeare's line about a brave new world. The irony is the point."
+      },
+      "matchKeys": { "artist": ["Aldous Huxley"], "title": ["Brave New World"], "genre": ["Dystopian", "Science Fiction", "Classic"], "year": 1932 },
+      "flags": ["FACT"],
+      "sources": ["S-0057", "S-0058"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "BC-0030",
+      "taxonomy": "T2",
+      "kind": "books",
+      "fact": {
+        "text": "Charles Dickens wrote 'A Christmas Carol' (1843) in about six weeks, publishing it in time for Christmas. It was an immediate success and helped revive interest in Christmas traditions in Victorian Britain.",
+        "voice": "Written in six weeks, in time for Christmas, and it gave the holiday a second wind. Scrooge did the marketing."
+      },
+      "matchKeys": { "artist": ["Charles Dickens"], "title": ["A Christmas Carol"], "genre": ["Classic", "Fiction", "Literature"], "year": 1843 },
+      "flags": ["FACT"],
+      "sources": ["S-0059", "S-0060"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    }
+  ]
+}

@@ -5,6 +5,8 @@ what was checked, by whom, the verdict, and which flags were cleared or left
 open. The quarterly fact-sweep appends a fresh row per live entry
 (`lastVerified` update).
 
+Work item: `(FEAT-EPIC-5, #277)` — Halcova Library lore content packs.
+
 ## Format
 
 ```text
@@ -19,7 +21,8 @@ open. The quarterly fact-sweep appends a fresh row per live entry
 
 ## Initial curation review — 2026-08-17
 
-Scope: all 15 entries in `foundations/pack.json` (F-0001…F-0015).
+Scope: all 31 entries in `foundations/pack.json` (F-0001…F-0031) — the original
+15 plus the expansion batch F-0016…F-0031 below.
 
 | Date | Scope | Checker | Verdict | Flags cleared / notes |
 | --- | --- | --- | --- | --- |
@@ -39,6 +42,27 @@ Scope: all 15 entries in `foundations/pack.json` (F-0001…F-0015).
 | 2026-08-17 | F-0014 (T4 Astérix, fr local hero) | Marketing Manager | PASS | `[FACT]` + `[CULT]` · 1959 Pilote #1 confirmed; pointer to fr local-hero pack |
 | 2026-08-17 | F-0015 (T4 graphic novel) | Marketing Manager | PASS-CORE | `[VALIDATE]` + `[DISPUTED]` · uncontested core ships; "popularized vs predates" pending 3rd source |
 
+### Foundations expansion (F-0016…F-0031) — 2026-08-17
+
+| Date | Scope | Checker | Verdict | Flags cleared / notes |
+| --- | --- | --- | --- | --- |
+| 2026-08-17 | F-0016 (T4 R&B/soul) | Marketing Manager | PASS | `[FACT]` · Wexler coining "late 1940s" framing kept (Britannica + RRHOF); soul-from-gospel confirmed |
+| 2026-08-17 | F-0017 (T4 country origins) | Marketing Manager | PASS | `[FACT]` · Bristol 1927 + Carter Family/Jimmie Rodgers confirmed (CMHOF + LOC) |
+| 2026-08-17 | F-0018 (T4 hip hop) | Marketing Manager | PASS-CORE | `[FACT]` · "widely cited foundational moment" framing; not asserted as the single origin; re-check next sweep |
+| 2026-08-17 | F-0019 (T4 reggae) | Marketing Manager | PASS | `[FACT]` · late-1960s Jamaica from ska/rocksteady confirmed (Britannica + Smithsonian Folkways) |
+| 2026-08-17 | F-0020 (T4 heavy metal) | Marketing Manager | PASS-CORE | `[FACT]` + `[DISPUTED]` · uncontested core (Birmingham bands defined the sound) ships; "first band" contested |
+| 2026-08-17 | F-0021 (T5 Atlantic) | Marketing Manager | PASS | `[FACT]` · 1947 founding + Ertegun/Abramson confirmed (Atlantic/Rhino + RRHOF) |
+| 2026-08-17 | F-0022 (T5 Chess) | Marketing Manager | PASS | `[FACT]` · 1950 founding + Chess brothers + roster confirmed (Britannica + Blues Foundation) |
+| 2026-08-17 | F-0023 (T3 disco era) | Marketing Manager | PASS | `[FACT]` · 1970s rise + 1977 "Saturday Night Fever" peak confirmed (Smithsonian + LOC) |
+| 2026-08-17 | F-0024 (T3 British Invasion) | Marketing Manager | PASS | `[FACT]` · Feb 1964 Ed Sullivan + mid-60s US chart dominance confirmed (RRHOF + Britannica) |
+| 2026-08-17 | F-0025 (T4 Gothic fiction) | Marketing Manager | PASS | `[FACT]` · "The Castle of Otranto" 1764 + subtitle confirmed (British Library + Britannica) |
+| 2026-08-17 | F-0026 (T4 modern fantasy) | Marketing Manager | PASS | `[FACT]` · Tolkien 1937/1954–55 + genre-establishing framing confirmed (Bodleian + Britannica) |
+| 2026-08-17 | F-0027 (T4 Latin American Boom) | Marketing Manager | PASS | `[FACT]` + `[CULT]` · Boom 1960s–70s + author list confirmed (Britannica + Instituto Cervantes); es local-hero note |
+| 2026-08-17 | F-0028 (T5 Faber & Faber) | Marketing Manager | PASS | `[FACT]` · 1929 founding + T.S. Eliot editor/director confirmed (Faber official + Britannica) |
+| 2026-08-17 | F-0029 (T5 Anchor Books) | Marketing Manager | PASS | `[FACT]` · 1953 launch + Jason Epstein + "widely credited" trade-paperback framing (Britannica + NYT) |
+| 2026-08-17 | F-0030 (T4 Beat Generation) | Marketing Manager | PASS | `[FACT]` · 1950s movement + "Howl"/"On the Road" confirmed (Britannica + Ginsberg/Kerouac archives) |
+| 2026-08-17 | F-0031 (T3 Victorian serial era) | Marketing Manager | PASS | `[FACT]` · serial publication + "The Pickwick Papers" 1836–37 confirmed (British Library + Dickens Museum) |
+
 ## Open flags (not cleared)
 
 | Entry | Flag | Why it stays open | Who clears it |
@@ -47,6 +71,10 @@ Scope: all 15 entries in `foundations/pack.json` (F-0001…F-0015).
 | F-0015 | `[VALIDATE]` | "Popularized vs predates" nuance needs a third source | Marketing Manager (next sweep) |
 | F-0015 | `[DISPUTED]` | "First graphic novel" is contested — core-only | Marketing Manager |
 | F-0008 / F-0014 | `[CULT]` | Local-hero / voice handoff to fr + en-GB packs and native testers | Marketing Manager + native testers |
+| F-0018 | `[DISPUTED]` | Hip-hop origin is "widely cited," not singular — stays hedged, re-check each sweep | Marketing Manager |
+| F-0020 | `[DISPUTED]` | "First heavy-metal band" contest is permanent by nature — core-only | Marketing Manager (re-check each sweep) |
+| F-0027 | `[CULT]` | Latin American Boom — local-hero handoff to the es pack + native testers | Marketing Manager + native testers |
+| F-0016…F-0031 (voice) | `[VALIDATE]` | All new voice lines need native-speaker validation per locale before they ship | Native testers |
 
 ## Template for the quarterly fact-sweep (next: 2026-11-01)
 

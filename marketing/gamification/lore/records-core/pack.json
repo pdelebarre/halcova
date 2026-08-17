@@ -1,0 +1,714 @@
+{
+  "schemaVersion": "1.0",
+  "pack": "records-core",
+  "name": "Halcova Library — Records · Core v0.1",
+  "description": "Per-artist and landmark-album lore (T1/T2/T7 with a few T5 label entries) over the very top of the long-tail curve: the most-collected artists in a typical crate. This pack is the style/format proof for the per-artist bank — it sets the tone and structure the rest of the record facts will follow.",
+  "locale": "en",
+  "coverage": {
+    "model": "Each entry keys to artist (via splitArtistTitle) and/or a landmark title/label. The 50 entries cover the highest-frequency crate artists, so a typical mixed record collection should surface at least one Sourced fact for most of its big names; genre/year fallback to Foundations + Computed metadata covers the rest.",
+    "betaNote": "Validate the ~50–70% item-coverage estimate on a typical mixed 40-item collection before international launch (lore-layer-plan.md §8). Next packs: the rest of the long tail (T1/T2/T6), local-hero records packs per locale, and deeper T2 story-behind-the-work entries.",
+    "factsToFlag": "RC-0015 (Nevermind dethroned Dangerous) and RC-0020 (Thriller 'best-selling of all time' + 8 Grammys) ship only their durable, documented cores; RC-0042 (Dock of the Bay) ships the uncontested posthumous-#1 framing."
+  },
+  "entries": [
+    {
+      "id": "RC-0001",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "The Beatles formed in Liverpool in 1960. After early lineups, the classic four — John Lennon, Paul McCartney, George Harrison, and Ringo Starr — settled in 1962, the year their first single 'Love Me Do' was released in the UK.",
+        "voice": "Four lads from Liverpool, one lineup that finally held, and a first single in 1962. History, side A."
+      },
+      "matchKeys": { "artist": ["The Beatles"], "title": ["Love Me Do"], "label": ["Parlophone", "Apple"], "genre": ["Rock", "Pop", "Beat"], "year": [1960, 1962] },
+      "flags": ["FACT"],
+      "sources": ["S-0001", "S-0002"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0002",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "'Sgt. Pepper's Lonely Hearts Club Band' (1967) won Album of the Year at the 1968 Grammy Awards — the first rock album to take the prize.",
+        "voice": "A band in costume, an orchestra in the studio, and a Grammy that had never gone to rock before."
+      },
+      "matchKeys": { "artist": ["The Beatles"], "title": ["Sgt. Pepper's Lonely Hearts Club Band"], "genre": ["Rock", "Psychedelic", "Pop"], "year": 1967 },
+      "flags": ["FACT"],
+      "sources": ["S-0003", "S-0004"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0003",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "'The Dark Side of the Moon' (1973) was recorded at Abbey Road Studios and became Pink Floyd's breakthrough concept album, exploring time, money, and mental strain. Its prism cover was designed by Storm Thorgerson.",
+        "voice": "Life, money, madness — one album, one prism, and a cover that's graced a million dorm-room walls."
+      },
+      "matchKeys": { "artist": ["Pink Floyd"], "title": ["The Dark Side of the Moon"], "label": ["Harvest", "Capitol"], "genre": ["Progressive Rock", "Rock"], "year": 1973 },
+      "flags": ["FACT"],
+      "sources": ["S-0005", "S-0006"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0004",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "'The Dark Side of the Moon' (1973) has logged more than 900 weeks on the Billboard 200 chart — one of the longest chart runs of any album in history.",
+        "voice": "More than 900 weeks on the chart, and the record is still spinning somewhere. Your crate is just the latest stop."
+      },
+      "matchKeys": { "artist": ["Pink Floyd"], "title": ["The Dark Side of the Moon"], "label": ["Harvest", "Capitol"], "genre": ["Progressive Rock", "Rock"], "year": 1973 },
+      "flags": ["FACT"],
+      "sources": ["S-0007", "S-0008"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0005",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Led Zeppelin formed in 1968 out of the remnants of The Yardbirds. The name came from a joke by Keith Moon and John Entwistle about a band going down like a 'lead zeppelin' — with the spelling changed to avoid the 'leed' mispronunciation.",
+        "voice": "Named after a joke about going down like a lead balloon — then they went up instead."
+      },
+      "matchKeys": { "artist": ["Led Zeppelin"], "label": ["Atlantic"], "genre": ["Hard Rock", "Rock", "Blues Rock"], "year": 1968 },
+      "flags": ["FACT"],
+      "sources": ["S-0009", "S-0010"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0006",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Led Zeppelin's fourth album (1971) was released untitled, with no words on the cover. It contains 'Stairway to Heaven,' which the band never released as a single.",
+        "voice": "An untitled album with a song so requested they never made it a single. Rules exist to be bent."
+      },
+      "matchKeys": { "artist": ["Led Zeppelin"], "title": ["Led Zeppelin IV", "Stairway to Heaven"], "label": ["Atlantic"], "genre": ["Hard Rock", "Rock"], "year": 1971 },
+      "flags": ["FACT"],
+      "sources": ["S-0011", "S-0012"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0007",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "The Rolling Stones formed in London in 1962. Brian Jones named the band after Muddy Waters' song 'Rollin' Stone'.",
+        "voice": "A blues song name, a London rhythm-and-blues club, and a band that never gathered moss."
+      },
+      "matchKeys": { "artist": ["The Rolling Stones"], "label": ["Decca", "London", "Rolling Stones Records"], "genre": ["Rock", "Blues Rock", "R&B"], "year": 1962 },
+      "flags": ["FACT"],
+      "sources": ["S-0013", "S-0014"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0008",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "'(I Can't Get No) Satisfaction' (1965), written by Mick Jagger and Keith Richards, became the Rolling Stones' first US number-one single and is one of the most covered songs in rock.",
+        "voice": "A riff that wouldn't leave Keith Richards alone became the Stones' first US #1. Your crate is not the first to get stuck on it."
+      },
+      "matchKeys": { "artist": ["The Rolling Stones"], "title": ["(I Can't Get No) Satisfaction"], "label": ["London", "Decca"], "genre": ["Rock", "R&B"], "year": 1965 },
+      "flags": ["FACT"],
+      "sources": ["S-0015", "S-0016"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0009",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Queen formed in London in 1970, when Freddie Mercury joined guitarist Brian May and drummer Roger Taylor. Bassist John Deacon completed the lineup in 1971 and stayed with the band for two decades.",
+        "voice": "A London band that took its time finding the fourth member — then kept him for twenty years."
+      },
+      "matchKeys": { "artist": ["Queen"], "label": ["EMI", "Elektra", "Hollywood"], "genre": ["Rock", "Glam Rock", "Pop"], "year": [1970, 1971] },
+      "flags": ["FACT"],
+      "sources": ["S-0017", "S-0018"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0010",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "'Bohemian Rhapsody' (1975) was a six-minute single with an operatic middle section — unlike anything radio usually played. It spent nine weeks at number one in the UK, at the time the longest run ever.",
+        "voice": "Six minutes, four movements, and a piano that refuses to play it safe. Radio didn't know what to do, so it played it anyway."
+      },
+      "matchKeys": { "artist": ["Queen"], "title": ["Bohemian Rhapsody", "A Night at the Opera"], "label": ["EMI", "Elektra"], "genre": ["Rock", "Progressive Rock", "Glam Rock"], "year": 1975 },
+      "flags": ["FACT"],
+      "sources": ["S-0019", "S-0020"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0011",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "David Bowie released 'Space Oddity' in July 1969, days before the Apollo 11 Moon landing, and the BBC used the song during its coverage of the mission.",
+        "voice": "Released the same week humanity left the planet — some songs time their arrivals perfectly."
+      },
+      "matchKeys": { "artist": ["David Bowie"], "title": ["Space Oddity", "David Bowie"], "label": ["Philips", "RCA", "Parlophone"], "genre": ["Rock", "Glam Rock", "Art Rock"], "year": 1969 },
+      "flags": ["FACT"],
+      "sources": ["S-0021", "S-0022"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0012",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "David Bowie's 'The Rise and Fall of Ziggy Stardust and the Spiders from Mars' (1972) introduced the alien rock-star alter ego Ziggy Stardust and became a landmark of glam rock.",
+        "voice": "An alter ego from outer space, a red mullet, and one of the defining records of the 1970s."
+      },
+      "matchKeys": { "artist": ["David Bowie"], "title": ["The Rise and Fall of Ziggy Stardust and the Spiders from Mars", "Ziggy Stardust"], "label": ["RCA"], "genre": ["Glam Rock", "Rock", "Art Rock"], "year": 1972 },
+      "flags": ["FACT"],
+      "sources": ["S-0023", "S-0024"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0013",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Miles Davis's 'Kind of Blue' (1959) is a landmark of modal jazz. Recorded in just two sessions with minimal rehearsal, the band improvised on scales rather than chord changes.",
+        "voice": "Two sessions, almost no rehearsal, and the most relaxed revolution in jazz history."
+      },
+      "matchKeys": { "artist": ["Miles Davis"], "title": ["Kind of Blue"], "label": ["Columbia", "Legacy"], "genre": ["Jazz", "Modal Jazz", "Cool Jazz"], "year": 1959 },
+      "flags": ["FACT"],
+      "sources": ["S-0025", "S-0026"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0014",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "'Kind of Blue' (1959) is widely cited as the best-selling jazz album of all time, with multi-platinum US certification.",
+        "voice": "The jazz album that out-sold the skeptics — and it's not even close."
+      },
+      "matchKeys": { "artist": ["Miles Davis"], "title": ["Kind of Blue"], "label": ["Columbia", "Legacy"], "genre": ["Jazz", "Modal Jazz"], "year": 1959 },
+      "flags": ["FACT"],
+      "sources": ["S-0027", "S-0028"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0015",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Nirvana's 'Nevermind' (1991), produced by Butch Vig, reached number one on the Billboard 200 in January 1992 — taking the top spot from Michael Jackson's 'Dangerous'.",
+        "voice": "A loud, honest album from Seattle took the crown from the King of Pop. The 90s had arrived, and your crate noticed."
+      },
+      "matchKeys": { "artist": ["Nirvana"], "title": ["Nevermind"], "label": ["DGC", "Geffen", "Sub Pop"], "genre": ["Grunge", "Alternative", "Rock"], "year": 1991 },
+      "flags": ["FACT"],
+      "sources": ["S-0029", "S-0030"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0016",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Nirvana formed in Aberdeen, Washington in 1987. Drummer Dave Grohl joined in 1990; the band ended after Kurt Cobain died in 1994.",
+        "voice": "Seven years, three albums, and a sound that outlived them all. Their influence still fills crates."
+      },
+      "matchKeys": { "artist": ["Nirvana"], "label": ["Sub Pop", "DGC", "Geffen"], "genre": ["Grunge", "Alternative", "Rock"], "year": [1987, 1994] },
+      "flags": ["FACT"],
+      "sources": ["S-0031", "S-0032"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0017",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Radiohead formed in Abingdon, Oxfordshire in 1985, originally under the name 'On a Friday' before renaming themselves Radiohead.",
+        "voice": "Five school friends, a name from a Talking Heads song, and a decade of redefining what a rock band could be."
+      },
+      "matchKeys": { "artist": ["Radiohead"], "label": ["Parlophone", "XL", "Capitol"], "genre": ["Alternative", "Rock", "Art Rock"], "year": 1985 },
+      "flags": ["FACT"],
+      "sources": ["S-0033", "S-0034"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0018",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Radiohead recorded much of 'OK Computer' (1997) at St Catherine's Court, a mansion in Bath. The album won the 1998 Grammy for Best Alternative Music Album.",
+        "voice": "A stately home, a band at a crossroads, and an album that made 'alternative' feel too small a word."
+      },
+      "matchKeys": { "artist": ["Radiohead"], "title": ["OK Computer"], "label": ["Parlophone", "Capitol"], "genre": ["Alternative", "Art Rock", "Rock"], "year": 1997 },
+      "flags": ["FACT"],
+      "sources": ["S-0035", "S-0036"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0019",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Fleetwood Mac's 'Rumours' (1977) was recorded while both of the band's couples — Stevie Nicks and Lindsey Buckingham, and Christine and John McVie — were breaking up. It won the Grammy for Album of the Year in 1978.",
+        "voice": "Two breakups, one studio, and the best-selling album of their career. Heartbreak, apparently, is good for harmonies."
+      },
+      "matchKeys": { "artist": ["Fleetwood Mac"], "title": ["Rumours"], "label": ["Warner Bros.", "Reprise"], "genre": ["Rock", "Pop", "Soft Rock"], "year": 1977 },
+      "flags": ["FACT"],
+      "sources": ["S-0037", "S-0038"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0020",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Michael Jackson's 'Thriller' (1982) is widely cited as the best-selling album of all time, and won a then-record eight Grammys at the 1984 ceremony.",
+        "voice": "The album that made the 80s loud, shiny, and impossible to leave out of any collection."
+      },
+      "matchKeys": { "artist": ["Michael Jackson"], "title": ["Thriller"], "label": ["Epic"], "genre": ["Pop", "R&B", "Funk"], "year": 1982 },
+      "flags": ["FACT"],
+      "sources": ["S-0039", "S-0040"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0021",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "The 'Thriller' short film (1983), directed by John Landis, ran about 14 minutes and helped define the music-video era of the early MTV years.",
+        "voice": "Fourteen minutes of choreographed zombies, and MTV never quite recovered. Neither did Halloween."
+      },
+      "matchKeys": { "artist": ["Michael Jackson"], "title": ["Thriller"], "label": ["Epic"], "genre": ["Pop", "R&B"], "year": 1983 },
+      "flags": ["FACT"],
+      "sources": ["S-0041", "S-0042"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0022",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Prince released 'Purple Rain' (1984) as both an album and a film. He won the 1985 Academy Award for Best Original Song Score.",
+        "voice": "An album, a movie, an Oscar — one man's purple summer. Some crates are just built differently."
+      },
+      "matchKeys": { "artist": ["Prince"], "title": ["Purple Rain"], "label": ["Warner Bros.", "Paisley Park"], "genre": ["Pop", "Funk", "Rock", "R&B"], "year": 1984 },
+      "flags": ["FACT"],
+      "sources": ["S-0043", "S-0044"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0023",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "The Smiths formed in Manchester in 1982, built on the songwriting partnership of Morrissey and guitarist Johnny Marr.",
+        "voice": "Manchester, 1982: a singer with flowers in his pocket and a guitarist with a jangle. The 80s got clever."
+      },
+      "matchKeys": { "artist": ["The Smiths"], "label": ["Rough Trade", "Sire"], "genre": ["Indie", "Alternative", "Jangle Pop"], "year": 1982 },
+      "flags": ["FACT"],
+      "sources": ["S-0045", "S-0046"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0024",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Talking Heads formed in 1975 at the Rhode Island School of Design, with David Byrne, Tina Weymouth, and Chris Frantz. Jerry Harrison completed the lineup in 1977.",
+        "voice": "Three art students and a guitarist who showed up late — together they made dance music for people who overthink."
+      },
+      "matchKeys": { "artist": ["Talking Heads"], "label": ["Sire", "Warner Bros."], "genre": ["New Wave", "Art Rock", "Post-punk"], "year": [1975, 1977] },
+      "flags": ["FACT"],
+      "sources": ["S-0047", "S-0048"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0025",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "'Stop Making Sense' (1984), a concert film directed by Jonathan Demme, is widely regarded as one of the greatest concert films ever made and was added to the US National Film Registry.",
+        "voice": "A film so good the Library of Congress kept it. Suits, lamps, and a band at the peak of its powers."
+      },
+      "matchKeys": { "artist": ["Talking Heads"], "title": ["Stop Making Sense"], "label": ["Sire", "Warner Bros."], "genre": ["New Wave", "Art Rock", "Post-punk"], "year": 1984 },
+      "flags": ["FACT"],
+      "sources": ["S-0049", "S-0050"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0026",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Marvin Gaye's 'What's Going On' (1971) was a concept album inspired by his brother Frankie's return from the Vietnam War, and became a landmark of socially conscious soul.",
+        "voice": "A brother's letter home, turned into an album that asked a whole country what was going on."
+      },
+      "matchKeys": { "artist": ["Marvin Gaye"], "title": ["What's Going On"], "label": ["Tamla", "Motown"], "genre": ["Soul", "R&B", "Funk"], "year": 1971 },
+      "flags": ["FACT"],
+      "sources": ["S-0051", "S-0052"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0027",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Stevie Wonder won the Grammy for Album of the Year three times — for 'Innervisions' (1974), 'Fulfillingness' First Finale' (1975), and 'Songs in the Key of Life' (1977) — one of the most decorated runs in the award's history.",
+        "voice": "Three Album of the Year Grammys across three albums that each reshaped the decade. Some crates age like wine."
+      },
+      "matchKeys": { "artist": ["Stevie Wonder"], "title": ["Innervisions", "Songs in the Key of Life", "Fulfillingness' First Finale"], "label": ["Tamla", "Motown"], "genre": ["Soul", "R&B", "Funk", "Pop"], "year": [1974, 1977] },
+      "flags": ["FACT"],
+      "sources": ["S-0053", "S-0054"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0028",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Stevie Wonder signed to Tamla/Motown at age 11 as 'Little Stevie Wonder.' His single 'Fingertips' (1963) topped the Hot 100 when he was 13 — then a record for the youngest artist to do so.",
+        "voice": "Signed at eleven, chart-topper at thirteen. The crate just hopes you started collecting at a normal age."
+      },
+      "matchKeys": { "artist": ["Stevie Wonder"], "title": ["Fingertips"], "label": ["Tamla", "Motown"], "genre": ["Soul", "R&B", "Pop"], "year": [1961, 1963] },
+      "flags": ["FACT"],
+      "sources": ["S-0055", "S-0056"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0029",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Bob Dylan was awarded the Nobel Prize in Literature in 2016 — widely reported as the first time the prize went to a songwriter-musician.",
+        "voice": "A Nobel for a man who always insisted his songs were just songs. Literature disagreed."
+      },
+      "matchKeys": { "artist": ["Bob Dylan"], "label": ["Columbia"], "genre": ["Folk", "Rock", "Folk Rock"], "year": 2016 },
+      "flags": ["FACT"],
+      "sources": ["S-0057", "S-0058"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0030",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "'Like a Rolling Stone' (1965), over six minutes long from the album 'Highway 61 Revisited,' is widely credited with changing what a pop single could be.",
+        "voice": "Six minutes on a format built for three — and radio, after some panic, pressed play."
+      },
+      "matchKeys": { "artist": ["Bob Dylan"], "title": ["Like a Rolling Stone", "Highway 61 Revisited"], "label": ["Columbia"], "genre": ["Folk Rock", "Rock"], "year": 1965 },
+      "flags": ["FACT"],
+      "sources": ["S-0059", "S-0060"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0031",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Bob Marley and the Wailers recorded 'Exodus' (1977) in London after the 1976 assassination attempt on Marley in Jamaica. Time named it the album of the century in 1999.",
+        "voice": "Made in exile, named for a journey, and still called one of the century's best. Exodus, indeed."
+      },
+      "matchKeys": { "artist": ["Bob Marley", "Bob Marley and the Wailers"], "title": ["Exodus"], "label": ["Island", "Tuff Gong"], "genre": ["Reggae", "Roots Reggae"], "year": 1977 },
+      "flags": ["FACT"],
+      "sources": ["S-0061", "S-0062"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0032",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Aretha Franklin's version of 'Respect' (1967) reached number one and became an anthem of the civil rights and women's movements. She was the first woman inducted into the Rock & Roll Hall of Fame (1987).",
+        "voice": "Otis wrote the word, Aretha spelled it. An anthem that belonged to a movement, and now to your crate."
+      },
+      "matchKeys": { "artist": ["Aretha Franklin"], "title": ["Respect", "I Never Loved a Man the Way I Love You"], "label": ["Atlantic"], "genre": ["Soul", "R&B", "Gospel"], "year": 1967 },
+      "flags": ["FACT"],
+      "sources": ["S-0063", "S-0064"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0033",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Jimi Hendrix closed the 1969 Woodstock festival with an instrumental version of 'The Star-Spangled Banner' — one of the most discussed performances in rock history.",
+        "voice": "The national anthem, rearranged for a generation that had questions. Nobody at Woodstock forgot it."
+      },
+      "matchKeys": { "artist": ["Jimi Hendrix", "The Jimi Hendrix Experience"], "title": ["Woodstock", "The Star-Spangled Banner"], "label": ["Track", "Reprise"], "genre": ["Rock", "Psychedelic Rock", "Blues Rock"], "year": 1969 },
+      "flags": ["FACT"],
+      "sources": ["S-0065", "S-0066"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0034",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "The Who's 'Tommy' (1969) is a double album telling a single story and is widely regarded as one of the first rock operas.",
+        "voice": "A double album with a plot — pinball, deafness, and one very determined kid. Opera, but with guitars."
+      },
+      "matchKeys": { "artist": ["The Who"], "title": ["Tommy"], "label": ["Track", "Decca", "MCA"], "genre": ["Rock", "Hard Rock"], "year": 1969 },
+      "flags": ["FACT"],
+      "sources": ["S-0067", "S-0068"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0035",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "The Beach Boys' 'Pet Sounds' (1966) was written and produced largely by Brian Wilson. It is often credited with inspiring the Beatles' 'Sgt. Pepper,' which Paul McCartney cited as an influence.",
+        "voice": "A studio built around one man's imagination — and the album that made another band pick up their game."
+      },
+      "matchKeys": { "artist": ["The Beach Boys"], "title": ["Pet Sounds"], "label": ["Capitol"], "genre": ["Pop", "Rock", "Psychedelic Pop"], "year": 1966 },
+      "flags": ["FACT"],
+      "sources": ["S-0069", "S-0070"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0036",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "U2's 'The Joshua Tree' (1987) won the Grammy for Album of the Year in 1988, cementing the band's place as a defining rock act of the 1980s.",
+        "voice": "An album named after a tree, recorded in the desert, and awarded with everything the 80s could give it."
+      },
+      "matchKeys": { "artist": ["U2"], "title": ["The Joshua Tree"], "label": ["Island"], "genre": ["Rock", "Alternative", "Post-punk"], "year": 1987 },
+      "flags": ["FACT"],
+      "sources": ["S-0071", "S-0072"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0037",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Bruce Springsteen's 'Born to Run' (1975) followed a famous 1974 review by critic Jon Landau, who wrote that he had seen rock and roll's future and its name was Bruce Springsteen. The album became a defining record of the decade.",
+        "voice": "One critic, one sentence, one album that lived up to the hype. The crate has believed ever since."
+      },
+      "matchKeys": { "artist": ["Bruce Springsteen"], "title": ["Born to Run"], "label": ["Columbia"], "genre": ["Rock", "Heartland Rock"], "year": 1975 },
+      "flags": ["FACT"],
+      "sources": ["S-0073", "S-0074"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0038",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Bruce Springsteen's 'Born in the U.S.A.' (1984) produced seven top-ten Hot 100 singles — one of the most successful chart runs for any album.",
+        "voice": "Seven top-ten singles from one album. The man basically released a greatest hits as a new record."
+      },
+      "matchKeys": { "artist": ["Bruce Springsteen"], "title": ["Born in the U.S.A."], "label": ["Columbia"], "genre": ["Rock", "Heartland Rock"], "year": 1984 },
+      "flags": ["FACT"],
+      "sources": ["S-0075", "S-0076"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0039",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "The Clash's 'London Calling' (1979) is a double album mixing punk, reggae, and rockabilly. Rolling Stone named it the best album of the 1980s in its 1989 list.",
+        "voice": "Punk's farewell to its own rulebook — and, years later, the record a magazine picked as the decade's best."
+      },
+      "matchKeys": { "artist": ["The Clash"], "title": ["London Calling"], "label": ["CBS", "Epic"], "genre": ["Punk", "Post-punk", "Rock"], "year": 1979 },
+      "flags": ["FACT"],
+      "sources": ["S-0077", "S-0078"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0040",
+      "taxonomy": "T1",
+      "kind": "records",
+      "fact": {
+        "text": "Joy Division formed in Manchester in 1976. Their debut 'Unknown Pleasures' (1979) is famous for its pulsar-based cover art. After Ian Curtis died in 1980, the remaining members became New Order.",
+        "voice": "A band that ended and, without a pause, became another legend. The cover was literally out of this world."
+      },
+      "matchKeys": { "artist": ["Joy Division", "New Order"], "title": ["Unknown Pleasures"], "label": ["Factory", "Qwest"], "genre": ["Post-punk", "New Wave", "Alternative"], "year": [1976, 1980] },
+      "flags": ["FACT"],
+      "sources": ["S-0079", "S-0080"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0041",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Elvis Presley recorded 'That's All Right' in 1954 at Sam Phillips' Sun Studios in Memphis. The session is often cited as the birth of his career — and a cornerstone of early rock and roll.",
+        "voice": "A young man, a Memphis studio, and a recording that made the whole thing real. Rock and roll never looked back."
+      },
+      "matchKeys": { "artist": ["Elvis Presley"], "title": ["That's All Right"], "label": ["Sun", "RCA"], "genre": ["Rock and roll", "Rockabilly", "Country"], "year": 1954 },
+      "flags": ["FACT"],
+      "sources": ["S-0081", "S-0082"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0042",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Otis Redding's '(Sittin' On) The Dock of the Bay' (1968), written with Steve Cropper, became his first US number-one single — released after his death in the December 1967 plane crash, and often cited as the first posthumous number-one of the Hot 100 era.",
+        "voice": "A man whistling his own goodbye. It reached number one after he was gone."
+      },
+      "matchKeys": { "artist": ["Otis Redding"], "title": ["(Sittin' On) The Dock of the Bay", "The Dock of the Bay"], "label": ["Volt", "Atco", "Stax"], "genre": ["Soul", "R&B"], "year": 1968 },
+      "flags": ["FACT"],
+      "sources": ["S-0083", "S-0084"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0043",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "Sam Cooke wrote 'A Change Is Gonna Come' (1964) after being turned away from a Louisiana motel. The song became a landmark of the civil rights era.",
+        "voice": "Written after one door closed, and it opened a thousand more. A change came, slowly, on the back of a song."
+      },
+      "matchKeys": { "artist": ["Sam Cooke"], "title": ["A Change Is Gonna Come", "Ain't That Good News"], "label": ["RCA"], "genre": ["Soul", "R&B", "Gospel"], "year": 1964 },
+      "flags": ["FACT"],
+      "sources": ["S-0085", "S-0086"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0044",
+      "taxonomy": "T2",
+      "kind": "records",
+      "fact": {
+        "text": "The Velvet Underground's debut 'The Velvet Underground & Nico' (1967) was produced by Andy Warhol and is famous for its banana cover. It sold few copies on release but is now regarded as hugely influential.",
+        "voice": "The record that taught every band to come: you don't need to sell many copies to matter. Just be honest and loud."
+      },
+      "matchKeys": { "artist": ["The Velvet Underground", "The Velvet Underground & Nico"], "title": ["The Velvet Underground & Nico"], "label": ["Verve"], "genre": ["Rock", "Art Rock", "Experimental"], "year": 1967 },
+      "flags": ["FACT"],
+      "sources": ["S-0087", "S-0088"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0045",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Daft Punk's 'Random Access Memories' (2013) won the Grammy for Album of the Year in 2014 — a landmark win for an electronic dance-music record.",
+        "voice": "Two robots, one album of live musicians, and a Grammy that finally noticed the dance floor."
+      },
+      "matchKeys": { "artist": ["Daft Punk"], "title": ["Random Access Memories"], "label": ["Columbia", "Daft Life"], "genre": ["Electronic", "Dance", "House"], "year": 2013 },
+      "flags": ["FACT"],
+      "sources": ["S-0089", "S-0090"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0046",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Amy Winehouse's 'Back to Black' (2006) won five Grammys at the 2008 ceremony, including Record of the Year — tying the then-record for most wins by a female artist in a single night.",
+        "voice": "A voice that sounded a hundred years old, and five Grammys in one night to prove it."
+      },
+      "matchKeys": { "artist": ["Amy Winehouse"], "title": ["Back to Black"], "label": ["Island"], "genre": ["Soul", "R&B", "Jazz"], "year": 2006 },
+      "flags": ["FACT"],
+      "sources": ["S-0091", "S-0092"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0047",
+      "taxonomy": "T7",
+      "kind": "records",
+      "fact": {
+        "text": "Adele's '21' (2011) won six Grammys at the 2012 ceremony, including Album of the Year — tying the then-record for a female artist in a single night.",
+        "voice": "Six Grammys for one heartbreak album. Adele turned a breakup into the most-decorated record of its year."
+      },
+      "matchKeys": { "artist": ["Adele"], "title": ["21", "25"], "label": ["XL", "Columbia"], "genre": ["Pop", "Soul"], "year": 2011 },
+      "flags": ["FACT"],
+      "sources": ["S-0093", "S-0094"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0048",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Sub Pop, the Seattle label founded in 1988, released Nirvana's debut album 'Bleach' (1989) and became the label most associated with grunge's rise.",
+        "voice": "A tiny Seattle label with a big idea: make loud, honest records. Nirvana's 'Bleach' was their loudest shout yet."
+      },
+      "matchKeys": { "label": ["Sub Pop"], "artist": ["Nirvana", "Soundgarden"], "title": ["Bleach"], "genre": ["Grunge", "Indie"], "year": [1988, 1989] },
+      "flags": ["FACT"],
+      "sources": ["S-0095", "S-0096"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0049",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Sun Records was founded by Sam Phillips in Memphis in 1952. Its roster came to include Elvis Presley, Johnny Cash, Jerry Lee Lewis, Carl Perkins, and Roy Orbison — a run that shaped early rock and roll.",
+        "voice": "A Memphis studio where a truck driver, a cashier, and a piano player walked in — and rock and roll walked out."
+      },
+      "matchKeys": { "label": ["Sun", "Sun Records"], "artist": ["Elvis Presley", "Johnny Cash", "Jerry Lee Lewis", "Carl Perkins", "Roy Orbison"], "genre": ["Rock and roll", "Rockabilly", "Country"], "year": [1952, 1956] },
+      "flags": ["FACT"],
+      "sources": ["S-0097", "S-0098"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "RC-0050",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Stax Records, Memphis's 'Soulsville USA,' released landmark soul records in the 1960s by artists including Otis Redding and Booker T. & the M.G.'s.",
+        "voice": "South of the river from Sun, another Memphis label was inventing soul. Stax made the city a two-sided coin."
+      },
+      "matchKeys": { "label": ["Stax", "Volt"], "artist": ["Otis Redding", "Booker T. & the M.G.'s", "Isaac Hayes"], "genre": ["Soul", "R&B", "Funk"], "year": [1960, 1969] },
+      "flags": ["FACT"],
+      "sources": ["S-0099", "S-0100"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    }
+  ]
+}

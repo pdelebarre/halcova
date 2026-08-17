@@ -63,6 +63,49 @@ function httpsUrl(url) {
   return url ? url.replace(/^http:\/\//i, 'https://') : ''
 }
 
+// (FEAT-EPIC-5, #276) Phase A blob enrichment caps — keep in sync with the
+// server allowlist (netlify/functions/_shared/item-fields.js: AUTHORS_MAX /
+// SNIPPET_MAX).
+const MAX_DETAIL_AUTHORS = 8
+const SNIPPET_MAX = 400
+
+// Google Books authors are a bare string array (no per-author ids in the
+// volume payload) — keep them structured ({ name, id? }) with the flattened
+// title behavior unchanged, capped defensively. Blank names are dropped (the
+// server requires a non-empty name per entry).
+function authorsList(volumeInfo) {
+  const v = volumeInfo || {}
+  return (Array.isArray(v.authors) ? v.authors : [])
+    .slice(0, MAX_DETAIL_AUTHORS)
+    .filter((name) => typeof name === 'string' && name.trim() !== '')
+    .map((name) => ({ name: name.trim() }))
+}
+
+// volumeInfo.seriesInfo.bookSeriesInfo.seriesDisplayName — a string when the
+// volume belongs to a series, '' otherwise.
+function seriesName(volumeInfo) {
+  return volumeInfo?.seriesInfo?.bookSeriesInfo?.seriesDisplayName || ''
+}
+
+// The primary category: volumeInfo.mainCategory when present, else the first
+// entry of volumeInfo.categories (Google Books usually only provides the
+// latter).
+function mainCategoryOf(volumeInfo) {
+  const v = volumeInfo || {}
+  if (typeof v.mainCategory === 'string' && v.mainCategory.trim() !== '') return v.mainCategory.trim()
+  if (Array.isArray(v.categories) && typeof v.categories[0] === 'string' && v.categories[0].trim() !== '') {
+    return v.categories[0].trim()
+  }
+  return ''
+}
+
+// searchInfo.textSnippet is an HTML-ish blurb (may carry &quot; entities);
+// keep it raw but cap it defensively so the stored payload stays small.
+function snippetFrom(searchInfo) {
+  const raw = typeof searchInfo?.textSnippet === 'string' ? searchInfo.textSnippet : ''
+  return raw.slice(0, SNIPPET_MAX)
+}
+
 function toBookItem(volume, scannedIsbn) {
   const v = volume.volumeInfo || {}
   const isbn = scannedIsbn || pickIsbn(volume)
@@ -89,6 +132,14 @@ function toBookItem(volume, scannedIsbn) {
     language: v.language || '',
     infoLink: volume.selfLink || '',
     resourceUrl: volume.selfLink || '',
+    // (FEAT-EPIC-5, #276) Phase A content fields — authors stay structured
+    // (the flattened title above is unchanged) and subtitle/series/
+    // mainCategory/snippet are surfaced instead of discarded.
+    authorsList: authorsList(v),
+    subtitle: v.subtitle || '',
+    series: seriesName(v),
+    mainCategory: mainCategoryOf(v),
+    snippet: snippetFrom(volume.searchInfo),
   }
   // Google Books volumes carry averageRating (0–5) + ratingsCount — surface
   // them on the item when present (absent or 0 = no community votes).
@@ -110,8 +161,16 @@ export async function searchByText(query) {
 
 export async function getBookDetail(googleBooksId) {
   const data = await booksFetch('detail', { id: googleBooksId })
+  const v = data.volumeInfo || {}
   return {
-    description: data.volumeInfo?.description || '',
-    pageCount: data.volumeInfo?.pageCount || '',
+    description: v.description || '',
+    pageCount: v.pageCount || '',
+    // (FEAT-EPIC-5, #276) Phase A content fields — same shape as toBookItem so
+    // the detail-view merge backfills them onto stored items.
+    authorsList: authorsList(v),
+    subtitle: v.subtitle || '',
+    series: seriesName(v),
+    mainCategory: mainCategoryOf(v),
+    snippet: snippetFrom(data.searchInfo),
   }
 }

@@ -1,10 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import * as discogs from '../api/discogs'
+import { updateItem } from '../api/collection'
 import { splitArtistTitle } from '../utils/match'
 import { t } from '../i18n'
 import LendingControls from './LendingControls'
 import ReviewsSection from './ReviewsSection'
 import './AlbumDetail.css'
+
+// (FEAT-EPIC-5, #276) Phase A blob enrichment: after the release-detail fetch
+// resolves, merge the content-bearing fields (artists/masterId/tracklist/
+// released) back onto the stored item through the normal collection PUT. This
+// is the lazy, self-healing backfill for items added before enrichment —
+// best-effort per detail open, never blocking render, never throwing (no error
+// boundary → dark-screen safety). Only changed fields are written;
+// degraded/empty detail responses are ignored so good data is never clobbered.
+// The normalizer already caps + validates the shapes the server allowlist
+// accepts (netlify item-fields.js).
+function mergeReleaseEnrichment(item, d, isDemo, catalog) {
+  if (!item.discogsId || isDemo || !item.id || !d || typeof d !== 'object') return
+  const merge = {}
+  if (Array.isArray(d.artists) && d.artists.length > 0
+    && JSON.stringify(item.artists) !== JSON.stringify(d.artists)) merge.artists = d.artists
+  if (typeof d.masterId === 'number' && d.masterId !== item.masterId) merge.masterId = d.masterId
+  if (Array.isArray(d.tracklist) && d.tracklist.length > 0
+    && JSON.stringify(item.tracklist) !== JSON.stringify(d.tracklist)) merge.tracklist = d.tracklist
+  if (typeof d.released === 'string' && d.released && d.released !== item.released) merge.released = d.released
+  if (Object.keys(merge).length === 0) return
+  try {
+    // Best-effort PUT through the existing collection path — failures
+    // (offline, quota) are swallowed so a backfill can never crash the sheet.
+    Promise.resolve(updateItem(item.id, merge, catalog?.storage || 'records')).catch(() => {})
+  } catch { /* never throw from enrichment */ }
+}
 
 export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTogglePinned, catalog, lendingEnabled, lendingGate = false, onLend, onReturn, showToast, isDemo = false, onOpenPaywall, focusSection }) {
   const { artist, album: albumTitle } = splitArtistTitle(item.title)
@@ -78,11 +105,24 @@ export default function AlbumDetail({ item, onClose, onDelete, onSaveNotes, onTo
   const [confirmDelete, setConfirmDelete] = useState(false)
   const confirmTimer = useRef(null)
 
+  // (FEAT-EPIC-5, #276) Latest merge inputs, read from a ref inside the fetch
+  // effect. The effect stays keyed on discogsId alone — a pin/notes/lend
+  // update replaces the item object and must NOT re-fetch the release detail
+  // (that would burn Discogs quota) — while the merge still sees the current
+  // item. The ref is only read from the async .then callback, never render.
+  const enrichRef = useRef({ item, isDemo, catalog })
+  enrichRef.current = { item, isDemo, catalog }
+
   useEffect(() => {
     let cancelled = false
     if (item.discogsId) {
       discogs.getReleaseDetail(item.discogsId)
-        .then((d) => { if (!cancelled) setTracklist(d.tracklist) })
+        .then((d) => {
+          if (cancelled) return
+          setTracklist(Array.isArray(d?.tracklist) ? d.tracklist : [])
+          const ctx = enrichRef.current
+          mergeReleaseEnrichment(ctx.item, d, ctx.isDemo, ctx.catalog)
+        })
         .catch((err) => { if (!cancelled) setTrackError(err.message) })
     }
     return () => { cancelled = true }

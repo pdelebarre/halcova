@@ -142,6 +142,70 @@ describe('searchByBarcode', () => {
     expect(results[0].rating).toBeUndefined()
     expect(results[0].ratingCount).toBeUndefined()
   })
+
+  it('emits authorsList/subtitle/series/mainCategory/snippet from the volume (FEAT-EPIC-5 #276)', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{
+        id: 'vol-s',
+        volumeInfo: {
+          title: 'A Wizard of Earthsea',
+          authors: ['Ursula K. Le Guin', 'Someone Else'],
+          subtitle: 'The First Book of Earthsea',
+          seriesInfo: { bookSeriesInfo: { seriesDisplayName: 'Earthsea Cycle' } },
+          categories: ['Fantasy', 'Young Adult'],
+        },
+        searchInfo: { textSnippet: 'A brief blurb about the book.' },
+      }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0]).toMatchObject({
+      // The flattened title behavior is unchanged.
+      title: 'Ursula K. Le Guin, Someone Else - A Wizard of Earthsea',
+      authorsList: [{ name: 'Ursula K. Le Guin' }, { name: 'Someone Else' }],
+      subtitle: 'The First Book of Earthsea',
+      series: 'Earthsea Cycle',
+      mainCategory: 'Fantasy',
+      snippet: 'A brief blurb about the book.',
+    })
+  })
+
+  it('falls back to the first category for mainCategory when volumeInfo.mainCategory is absent', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-mc', volumeInfo: { title: 'T', mainCategory: 'Explicit', categories: ['Cat'] } }],
+    }))
+    const results = await books.searchByBarcode('123')
+    expect(results[0].mainCategory).toBe('Explicit')
+
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-mc2', volumeInfo: { title: 'T2', categories: ['Cat'] } }],
+    }))
+    const results2 = await books.searchByBarcode('123')
+    expect(results2[0].mainCategory).toBe('Cat')
+  })
+
+  it('caps authorsList at 8 and snippet at 400 chars (FEAT-EPIC-5 #276)', async () => {
+    const authors = Array.from({ length: 12 }, (_, i) => `Author ${i + 1}`)
+    const longSnippet = 'x'.repeat(500)
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-cap', volumeInfo: { title: 'T', authors }, searchInfo: { textSnippet: longSnippet } }],
+    }))
+    const results = await books.searchByBarcode('123')
+    expect(results[0].authorsList).toHaveLength(8)
+    expect(results[0].snippet).toHaveLength(400)
+  })
+
+  it('degrades the enrichment fields when the volume omits them (FEAT-EPIC-5 #276)', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-bare', volumeInfo: { title: 'Plain' } }],
+    }))
+    const results = await books.searchByBarcode('123')
+    expect(results[0].authorsList).toEqual([])
+    expect(results[0].subtitle).toBe('')
+    expect(results[0].series).toBe('')
+    expect(results[0].mainCategory).toBe('')
+    expect(results[0].snippet).toBe('')
+  })
 })
 
 describe('searchByText', () => {
@@ -160,9 +224,17 @@ describe('searchByText', () => {
 })
 
 describe('getBookDetail', () => {
-  it('returns description and pageCount', async () => {
+  it('returns description, pageCount and the Phase-A enrichment fields (FEAT-EPIC-5 #276)', async () => {
     global.fetch.mockResolvedValue(okJson({
-      volumeInfo: { description: 'Full desc', pageCount: 300 },
+      volumeInfo: {
+        description: 'Full desc',
+        pageCount: 300,
+        authors: ['Ursula K. Le Guin'],
+        subtitle: 'A Wizard of Earthsea',
+        seriesInfo: { bookSeriesInfo: { seriesDisplayName: 'Earthsea Cycle' } },
+        categories: ['Fantasy'],
+      },
+      searchInfo: { textSnippet: 'A boy learns magic.' },
     }))
     const detail = await books.getBookDetail('vol1')
     const url = new URL(global.fetch.mock.calls[0][0], 'http://localhost')
@@ -170,13 +242,29 @@ describe('getBookDetail', () => {
     expect(url.searchParams.get('action')).toBe('detail')
     expect(url.searchParams.get('id')).toBe('vol1')
     expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${SESSION_TOKEN}` })
-    expect(detail).toEqual({ description: 'Full desc', pageCount: 300 })
+    expect(detail).toEqual({
+      description: 'Full desc',
+      pageCount: 300,
+      authorsList: [{ name: 'Ursula K. Le Guin' }],
+      subtitle: 'A Wizard of Earthsea',
+      series: 'Earthsea Cycle',
+      mainCategory: 'Fantasy',
+      snippet: 'A boy learns magic.',
+    })
   })
 
-  it('defaults when volumeInfo is missing', async () => {
+  it('defaults the enrichment fields when the volume is bare', async () => {
     global.fetch.mockResolvedValue(okJson({}))
     const detail = await books.getBookDetail('vol1')
-    expect(detail).toEqual({ description: '', pageCount: '' })
+    expect(detail).toEqual({
+      description: '',
+      pageCount: '',
+      authorsList: [],
+      subtitle: '',
+      series: '',
+      mainCategory: '',
+      snippet: '',
+    })
   })
 })
 

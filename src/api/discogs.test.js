@@ -129,15 +129,27 @@ describe('searchByText', () => {
 })
 
 describe('getReleaseDetail', () => {
-  it('normalizes tracklist, notes and images', async () => {
+  it('normalizes tracklist, notes, images and the Phase-A enrichment fields (FEAT-EPIC-5 #276)', async () => {
     global.fetch.mockResolvedValue(okJson({
+      artists: [
+        { id: 9, name: 'Miles Davis', anv: 'Miles', role: 'Main' },
+        { id: 10, name: 'John Coltrane' },
+      ],
+      master_id: 201,
       tracklist: [{ position: 'A1', title: 'So What', duration: '9:22' }],
+      released: '1959-08-17',
       notes: 'Mono pressing',
       images: [{ resource_url: 'https://img/1.jpg' }, { resource_url: 'https://img/2.jpg' }],
     }))
     const detail = await discogs.getReleaseDetail(101)
     expect(detail).toEqual({
+      artists: [
+        { id: 9, name: 'Miles Davis', anv: 'Miles', role: 'Main' },
+        { id: 10, name: 'John Coltrane' },
+      ],
+      masterId: 201,
       tracklist: [{ position: 'A1', title: 'So What', duration: '9:22' }],
+      released: '1959-08-17',
       notes: 'Mono pressing',
       images: ['https://img/1.jpg', 'https://img/2.jpg'],
     })
@@ -148,12 +160,50 @@ describe('getReleaseDetail', () => {
     expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${SESSION_TOKEN}` })
   })
 
-  it('defaults missing tracklist and images', async () => {
+  it('caps artists at 8 and tracklist at 40 (FEAT-EPIC-5 #276)', async () => {
+    const artists = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: `Artist ${i + 1}` }))
+    const tracklist = Array.from({ length: 45 }, (_, i) => ({ position: `A${i + 1}`, title: `Track ${i + 1}` }))
+    global.fetch.mockResolvedValue(okJson({ artists, tracklist }))
+    const detail = await discogs.getReleaseDetail(101)
+    expect(detail.artists).toHaveLength(8)
+    expect(detail.tracklist).toHaveLength(40)
+  })
+
+  it('drops malformed artist/track entries instead of emitting them (server 400 guard)', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      artists: [
+        { name: 'No id' }, // missing numeric id → dropped
+        { id: 'not-a-number', name: 'Bad id' }, // non-numeric id → dropped
+        { id: 7, name: '   ' }, // blank name → dropped
+        { id: 8, name: 'Kept Artist', anv: 'KA', role: 'Composer' },
+      ],
+      tracklist: [
+        { position: 'A1', title: 'Kept' },
+        { title: 'No position' }, // missing position → dropped
+        { position: 'A3' }, // missing title → dropped
+      ],
+    }))
+    const detail = await discogs.getReleaseDetail(101)
+    expect(detail.artists).toEqual([{ id: 8, name: 'Kept Artist', anv: 'KA', role: 'Composer' }])
+    expect(detail.tracklist).toEqual([{ position: 'A1', title: 'Kept' }])
+  })
+
+  it('defaults the enrichment fields when the detail is bare', async () => {
     global.fetch.mockResolvedValue(okJson({}))
     const detail = await discogs.getReleaseDetail(101)
     expect(detail.tracklist).toEqual([])
     expect(detail.images).toEqual([])
     expect(detail.notes).toBe('')
+    expect(detail.artists).toEqual([])
+    expect(detail.masterId).toBeNull()
+    expect(detail.released).toBe('')
+  })
+
+  it('keeps released only when it matches the YYYY[-MM[-DD]] contract', async () => {
+    global.fetch.mockResolvedValue(okJson({ released: '19??-08-17' })) // garbage → dropped
+    expect((await discogs.getReleaseDetail(101)).released).toBe('')
+    global.fetch.mockResolvedValue(okJson({ released: '1959-08' })) // partial date is fine
+    expect((await discogs.getReleaseDetail(101)).released).toBe('1959-08')
   })
 
   it('surfaces the nested community rating from a release detail', async () => {

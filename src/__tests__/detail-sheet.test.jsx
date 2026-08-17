@@ -1,14 +1,40 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AlbumDetail from '../components/AlbumDetail'
 import BookDetail from '../components/BookDetail'
 import ReviewsSection from '../components/ReviewsSection'
 import { booksCatalog, recordsCatalog } from '../catalog'
+import * as discogsApi from '../api/discogs'
+import * as booksApi from '../api/books'
+import * as collectionApi from '../api/collection'
 
 // AlbumDetail fetches a tracklist for items with a discogsId — stub it out.
 vi.mock('../api/discogs', () => ({
   getReleaseDetail: vi.fn().mockResolvedValue({ tracklist: [] }),
 }))
+
+// (FEAT-EPIC-5, #276) BookDetail fetches the volume detail to backfill the
+// Phase-A enrichment fields — stub the books API so mount tests stay hermetic.
+vi.mock('../api/books', () => ({
+  searchByBarcode: vi.fn(),
+  searchByText: vi.fn(),
+  getBookDetail: vi.fn(),
+}))
+
+// (FEAT-EPIC-5, #276) The detail sheets persist enrichment backfills through
+// the collection PUT — stub it so merge tests can assert the write without
+// hitting the network.
+vi.mock('../api/collection', () => ({
+  updateItem: vi.fn(),
+}))
+
+// (FEAT-EPIC-5, #276) Safe defaults for the detail-fetch + enrichment mocks,
+// reset per test so a mockResolvedValue override never leaks across tests.
+beforeEach(() => {
+  discogsApi.getReleaseDetail.mockReset().mockResolvedValue({ tracklist: [] })
+  booksApi.getBookDetail.mockReset().mockResolvedValue({})
+  collectionApi.updateItem.mockReset().mockResolvedValue({})
+})
 
 // The detail sheets mount the shared ReviewsSection — stub its hook so the
 // mount tests never hit the network and the section renders a quiet empty
@@ -157,6 +183,66 @@ describe('Detail sheet (records)', () => {
     renderDetail({ ...RECORD, rating: 0, ratingCount: 0 })
     expect(screen.queryByText('Community rating')).not.toBeInTheDocument()
   })
+
+  // (FEAT-EPIC-5, #276) Phase A blob enrichment: after the release-detail
+  // fetch resolves, changed content-bearing fields are PUT back onto the
+  // stored item — the lazy, self-healing backfill.
+  it('merges release enrichment fields onto the stored item (FEAT-EPIC-5 #276)', async () => {
+    const detail = {
+      artists: [{ id: 9, name: 'Miles Davis', role: 'Main' }],
+      masterId: 201,
+      tracklist: [{ position: 'A1', title: 'So What', duration: '9:22' }],
+      released: '1959-08-17',
+    }
+    discogsApi.getReleaseDetail.mockResolvedValue(detail)
+    const { unmount } = renderDetail(RECORD)
+    await waitFor(() => expect(collectionApi.updateItem).toHaveBeenCalled())
+    expect(collectionApi.updateItem).toHaveBeenCalledWith('r1', detail, 'records')
+    unmount()
+  })
+
+  it('does not PUT enrichment when the item already carries the same fields (FEAT-EPIC-5 #276)', async () => {
+    const detail = {
+      artists: [{ id: 9, name: 'Miles Davis' }],
+      masterId: 201,
+      tracklist: [{ position: 'A1', title: 'So What' }],
+      released: '1959-08-17',
+    }
+    discogsApi.getReleaseDetail.mockResolvedValue(detail)
+    renderDetail({ ...RECORD, ...detail })
+    // Let the detail fetch resolve + the merge settle.
+    await waitFor(() => expect(discogsApi.getReleaseDetail).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(collectionApi.updateItem).not.toHaveBeenCalled()
+  })
+
+  it('swallows a failed enrichment PUT — the sheet stays interactive (FEAT-EPIC-5 #276)', async () => {
+    discogsApi.getReleaseDetail.mockResolvedValue({
+      artists: [{ id: 9, name: 'Miles Davis' }],
+      masterId: 201,
+      tracklist: [{ position: 'A1', title: 'So What' }],
+      released: '1959-08-17',
+    })
+    collectionApi.updateItem.mockRejectedValue(new Error('offline'))
+    const { unmount } = renderDetail(RECORD)
+    await waitFor(() => expect(collectionApi.updateItem).toHaveBeenCalled())
+    // The rejected PUT was swallowed — the sheet is still mounted.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    unmount()
+  })
+
+  it('skips the enrichment merge for demo items (nothing is persisted) (FEAT-EPIC-5 #276)', async () => {
+    discogsApi.getReleaseDetail.mockResolvedValue({
+      artists: [{ id: 9, name: 'Miles Davis' }],
+      masterId: 201,
+      tracklist: [{ position: 'A1', title: 'So What' }],
+      released: '1959-08-17',
+    })
+    renderDetail(RECORD, { isDemo: true })
+    await waitFor(() => expect(discogsApi.getReleaseDetail).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(collectionApi.updateItem).not.toHaveBeenCalled()
+  })
 })
 
 describe('Detail sheet (books)', () => {
@@ -302,5 +388,70 @@ describe('Detail sheet (books)', () => {
     )
     expect(container.querySelector('.lending')).toBeNull()
     expect(container.querySelector('.sheet-close')).toHaveFocus()
+  })
+
+  // (FEAT-EPIC-5, #276) Phase A blob enrichment: BookDetail backfills the
+  // content-bearing fields through the collection PUT after the detail fetch.
+  it('merges book enrichment fields onto the stored item (FEAT-EPIC-5 #276)', async () => {
+    booksApi.getBookDetail.mockResolvedValue({
+      description: 'Full desc',
+      pageCount: 300,
+      authorsList: [{ name: 'Ursula K. Le Guin' }],
+      subtitle: 'A Wizard of Earthsea',
+      series: 'Earthsea Cycle',
+      mainCategory: 'Fantasy',
+      snippet: 'A boy learns magic.',
+    })
+    const { unmount } = render(
+      <BookDetail item={BOOK} catalog={booksCatalog} onClose={() => {}} onDelete={() => {}} onSaveNotes={() => {}} />
+    )
+    await waitFor(() => expect(collectionApi.updateItem).toHaveBeenCalled())
+    expect(collectionApi.updateItem).toHaveBeenCalledWith('b1', {
+      authorsList: [{ name: 'Ursula K. Le Guin' }],
+      subtitle: 'A Wizard of Earthsea',
+      series: 'Earthsea Cycle',
+      mainCategory: 'Fantasy',
+      snippet: 'A boy learns magic.',
+    }, 'books')
+    unmount()
+  })
+
+  it('does not fetch the volume detail when the book is already fully enriched (FEAT-EPIC-5 #276)', async () => {
+    render(
+      <BookDetail
+        item={{
+          ...BOOK,
+          authorsList: [{ name: 'Ursula K. Le Guin' }],
+          subtitle: 'A Wizard of Earthsea',
+          series: 'Earthsea Cycle',
+          mainCategory: 'Fantasy',
+          snippet: 'A boy learns magic.',
+        }}
+        catalog={booksCatalog}
+        onClose={() => {}}
+        onDelete={() => {}}
+        onSaveNotes={() => {}}
+      />
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(booksApi.getBookDetail).not.toHaveBeenCalled()
+    expect(collectionApi.updateItem).not.toHaveBeenCalled()
+  })
+
+  it('swallows a failed book enrichment PUT — the sheet stays interactive (FEAT-EPIC-5 #276)', async () => {
+    booksApi.getBookDetail.mockResolvedValue({
+      authorsList: [{ name: 'Ursula K. Le Guin' }],
+      subtitle: 'A Wizard of Earthsea',
+      series: 'Earthsea Cycle',
+      mainCategory: 'Fantasy',
+      snippet: 'A boy learns magic.',
+    })
+    collectionApi.updateItem.mockRejectedValue(new Error('offline'))
+    const { unmount } = render(
+      <BookDetail item={BOOK} catalog={booksCatalog} onClose={() => {}} onDelete={() => {}} onSaveNotes={() => {}} />
+    )
+    await waitFor(() => expect(collectionApi.updateItem).toHaveBeenCalled())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    unmount()
   })
 })
