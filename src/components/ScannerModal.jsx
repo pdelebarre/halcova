@@ -45,6 +45,12 @@ const WATCHDOG_MS = 9000
 // (black/frozen stream, e.g. an iOS Safari re-acquisition), bail to the error
 // path instead of silently spinning on 1×1 frames forever.
 const VIDEO_READY_TIMEOUT_MS = 8000
+// How many CONSECUTIVE readBarcodes failures (each ~180ms apart) we tolerate
+// before surfacing the retry UI. A single transient throw — e.g. getImageData
+// briefly throwing "canvas not ready" on iOS, or a one-off decoder hiccup —
+// must never kill an otherwise-working scanner, but a persistent failure
+// (wasm not loading/instantiating) still surfaces after ~1s.
+const MAX_CONSECUTIVE_DECODE_FAILURES = 5
 
 export default function ScannerModal({ onDetected, onClose, active = true }) {
   const videoRef = useRef(null)
@@ -77,7 +83,6 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
     let cancelled = false
     let mediaStream = null
     let rafId = 0
-    let hardErrors = 0
     let watchdogShown = false
     let armedAt = 0
 
@@ -109,7 +114,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
       const srcW = video.videoWidth
       const srcH = video.videoHeight
       // Guard the video-readiness race: never decode a 0-dims / 1×1 frame.
-      if (!srcW || !srcH) return
+      if (!srcW || !srcH) return null
 
       const scale = Math.min(1, MAX_DECODE_WIDTH / srcW)
       const width = Math.max(1, Math.round(srcW * scale))
@@ -118,14 +123,22 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
       if (canvas.height !== height) canvas.height = height
       ctx.drawImage(video, 0, 0, width, height)
 
-      // getImageData can throw if the canvas/context is lost — that's a HARD
-      // error, not a normal no-barcode frame. It propagates to the loop's
-      // catch, which surfaces it (with retry) instead of silently continuing.
-      const imageData = ctx.getImageData(0, 0, width, height)
+      // getImageData can throw TRANSIENTLY on iOS Safari right after the first
+      // video frames are drawn ("canvas not ready yet") or when the canvas is
+      // mid-resize. That's a normal skip-this-frame condition, never fatal:
+      // return null and keep scanning (the original code tolerated this).
+      let imageData
+      try {
+        imageData = ctx.getImageData(0, 0, width, height)
+      } catch {
+        return null
+      }
 
-      // readBarcodes only throws on real failures (wasm not loaded /
-      // instantiated, bad imageData). An EMPTY array is a normal "no barcode
-      // in frame" — that stays silent by design.
+      // readBarcodes only throws on real failures (e.g. the wasm failing to
+      // load/instantiate). An EMPTY array is a normal "no barcode in frame"
+      // and stays silent. Exceptions propagate to the loop, which only halts
+      // after several consecutive failures so a one-off throw never breaks an
+      // otherwise-working scanner.
       const results = await readBarcodes(imageData, READER_OPTIONS)
       if (cancelled) return results
       if (results.length > 0 && results[0].text) {
@@ -185,6 +198,7 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         let decoding = false
         let lastDecode = 0
+        let consecutiveDecodeFailures = 0
 
         // Detect torch capability on the first video track and cache the track.
         try {
@@ -225,14 +239,18 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
             lastDecode = now
             decoding = true
             try {
+              // A normal return — null (a transient skipped frame) or a results
+              // array — means the decode path is healthy, so reset the failure
+              // counter. Only a thrown exception counts against us.
               await decodeFrame(video, canvas, ctx)
+              consecutiveDecodeFailures = 0
             } catch (err) {
-              // A hard error — surface it once and halt the loop (retry re-arms
-              // fresh). Distinguish it from a normal no-barcode frame, which
-              // resolves to an empty array and never reaches here.
-              hardErrors += 1
-              if (hardErrors === 1) {
-                console.warn('[scanner] decode failed', err?.message || err)
+              // readBarcodes threw (e.g. wasm not loaded/instantiated). A single
+              // transient throw must not kill an otherwise-working scanner, so
+              // surface the retry UI only after several CONSECUTIVE failures.
+              consecutiveDecodeFailures += 1
+              console.warn('[scanner] decode failed', err?.message || err)
+              if (consecutiveDecodeFailures >= MAX_CONSECUTIVE_DECODE_FAILURES) {
                 hardStopWithError(t('scan.decodeError'))
                 return
               }

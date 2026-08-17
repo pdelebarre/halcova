@@ -83,23 +83,75 @@ function makeReadyMedia(container) {
 }
 
 describe('ScannerModal decode hardening', () => {
-  // The user's bug: a hard decode failure (e.g. the self-hosted wasm failing
-  // to load/instantiate at runtime) used to be swallowed by decodeFrame's
-  // catch, so the user sat on "Aim at the barcode" forever with no feedback.
-  // Now a hard error surfaces the existing retry UI instead of spinning.
-  it('surfaces a decode error + retry when the decoder throws, instead of silently spinning', async () => {
-    const onDetected = vi.fn()
-    const onClose = vi.fn()
-    const utils = render(<ScannerModal onDetected={onDetected} onClose={onClose} active={false} />)
-    makeReadyMedia(utils.container)
+  // The regression we must never reintroduce: a single TRANSIENT frame failure
+  // (e.g. iOS getImageData throwing "canvas not ready" right after the first
+  // video frames are drawn) must be skipped and scanning must continue — it
+  // must NOT surface the error UI or stop the camera.
+  it('tolerates a transient getImageData throw and keeps scanning (no error)', async () => {
+    vi.useFakeTimers()
+    try {
+      const onDetected = vi.fn()
+      const onClose = vi.fn()
+      const utils = render(<ScannerModal onDetected={onDetected} onClose={onClose} active={false} />)
+      const ctx = makeReadyMedia(utils.container)
 
-    readBarcodes.mockRejectedValueOnce(new Error('wasm load failed'))
+      // iOS "canvas not ready": getImageData throws on the very first frame
+      // only, then returns normal (empty) frames. readBarcodes finds no code.
+      let calls = 0
+      ctx.getImageData = vi.fn(() => {
+        calls += 1
+        if (calls === 1) throw new Error('canvas not ready')
+        return { width: 1, height: 1, data: new Uint8ClampedArray(4) }
+      })
+      readBarcodes.mockResolvedValue([])
 
-    utils.rerender(<ScannerModal onDetected={onDetected} onClose={onClose} active />)
+      utils.rerender(<ScannerModal onDetected={onDetected} onClose={onClose} active />)
 
-    expect(await screen.findByText(/Couldn't read the camera feed/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /retry camera/i })).toBeTruthy()
-    expect(onDetected).not.toHaveBeenCalled()
+      // Run several decode iterations. The transient first-frame throw must
+      // neither surface the error nor stop scanning.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+
+      expect(screen.queryByText(/Couldn't read the camera feed/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /retry camera/i })).not.toBeInTheDocument()
+      expect(calls).toBeGreaterThan(1) // scanning kept going after the hiccup
+      expect(onDetected).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // A PERSISTENT decoder failure (e.g. the self-hosted wasm never loading)
+  // still surfaces the retry UI — but only after several CONSECUTIVE failures,
+  // never on a single transient throw.
+  it('surfaces a decode error + retry after persistent decoder failures (not on the first throw)', async () => {
+    vi.useFakeTimers()
+    try {
+      const onDetected = vi.fn()
+      const onClose = vi.fn()
+      const utils = render(<ScannerModal onDetected={onDetected} onClose={onClose} active={false} />)
+      makeReadyMedia(utils.container)
+
+      // Persistently reject (like a wasm that never loads/instantiates).
+      readBarcodes.mockRejectedValue(new Error('wasm load failed'))
+
+      utils.rerender(<ScannerModal onDetected={onDetected} onClose={onClose} active />)
+
+      // Each decode attempt is ~180ms apart (DECODE_INTERVAL_MS); well past the
+      // 5-consecutive-failure threshold the retry UI must appear.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+
+      expect(screen.getByText(/Couldn't read the camera feed/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: /retry camera/i })).toBeTruthy()
+      expect(onDetected).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+      readBarcodes.mockReset()
+      readBarcodes.mockResolvedValue([])
+    }
   })
 
   // No-detection watchdog: after ~9s of armed scanning with normal empty
