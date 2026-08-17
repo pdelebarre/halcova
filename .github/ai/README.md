@@ -82,3 +82,63 @@ The owning agent MUST route such changes to the `Security Auditor` (or
 `Multi-tenant Security` for tenant isolation) for a blocking review. This gate
 is **blocking** — security review may not be skipped, deferred, or waived by
 an implementer.
+
+## Supply-chain & secrets security (SEC-EPIC-5)
+
+Advisory, non-blocking scanning is wired into CI so supply-chain findings
+surface without gating the launch branch. The blocking security CI merge gate
+is a later milestone (#213) — nothing in these workflows fails a build.
+
+- **Dependency/SCA scanning (#208)** — Dependabot (`.github/dependabot.yml`)
+  opens weekly update PRs for npm and GitHub Actions; an advisory
+  `npm audit --audit-level=high` step runs on every PR/push in `sonarcloud.yml`
+  (`continue-on-error: true`). Remediation SLAs once a finding is filed:
+  - **Critical** — fix within **7 days**.
+  - **High** — fix within **30 days**.
+  - Moderate/low — next regular dependency update.
+- **SAST (#209)** — CodeQL (`.github/workflows/codeql.yml`) runs
+  `security-extended` on JavaScript/TypeScript for every PR and push to `main`
+  in advisory mode (`continue-on-error: true` on the analyze step). Findings
+  appear in the workflow log / code scanning results; they do not block merges.
+- **Secret scanning (#210)** — an advisory Gitleaks scan
+  (`.github/workflows/secret-scan.yml`, config in `.gitleaks.toml`) runs on
+  every PR/push in report-only mode. Real-time secret scanning + push
+  protection is a **repo-level GitHub setting the owner must enable** (below).
+
+### Owner actions (required, one-time)
+
+1. In the GitHub repo **Settings → Code security and analysis**, enable
+   **Secret scanning** and **Push protection** (blocks known secrets pushed to
+   the repo in real time). Optionally enable **Dependabot alerts** and
+   **Dependabot security updates** to complement the weekly PRs.
+2. Follow-up for #208: commit a `package-lock.json` so the npm ecosystem
+   (Dependabot + `npm audit`) resolves pinned versions.
+
+### Secret-leak response & rotation procedure
+
+If a secret is detected (push protection, secret scanning, Gitleaks, or code
+review):
+
+1. **Contain** — treat the leaked value as compromised immediately; do not
+   assume deletion removed it (assume it was copied).
+2. **Rotate** — replace and revoke the old value at its source:
+   - `RUNOUT_ADMIN_KEY` — generate a new random value, update the Netlify
+     environment variable and any local `.env` files, and invalidate sessions.
+   - Access codes (`RU-XXXX-XXXX-XXXX`) — revoke and re-issue codes for
+     affected members from the admin panel.
+   - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — rotate in the Stripe
+     dashboard and update Netlify.
+   - `GOOGLE_BOOKS_API_KEY` — regenerate in Google Cloud Console and update
+     Netlify.
+   - `RUNOUT_DISCOGS_TOKEN` — reset the Discogs token and update Netlify.
+3. **Purge** — remove the leaked value from git history (e.g. `git filter-repo`
+   or a GitHub support request) and from the Netlify Blob cache if it was ever
+   stored there.
+4. **Verify** — confirm the old value no longer works (401/403) and the new
+   value is env-only in production (no dev fallback).
+5. **Record** — note the incident, rotate any other secrets that shared the
+   exposure window, and route the incident to the `Security Auditor` for
+   sign-off.
+
+> Never put actual secret values in code, docs, logs, issues, or PRs. Only
+> reference the variable names listed above.

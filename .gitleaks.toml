@@ -1,0 +1,19 @@
+# Gitleaks config for the advisory secret scan
+# (.github/workflows/secret-scan.yml). Extends Gitleaks' default rule set and
+# excludes test fixtures / generated output that intentionally contain fake or
+# placeholder secrets (never real values — no secrets live in this repo).
+title = "Runout gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, generated reports, and build output with example/placeholder values."
+paths = [
+  '''\.test\.(js|jsx|mjs|ts|tsx)$''',
+  '''\.spec\.(js|jsx|mjs|ts|tsx)$''',
+  '''(^|/)__tests__/''',
+  '''(^|/)test-results/''',
+  '''(^|/)coverage/''',
+  '''(^|/)dist/''',
+]

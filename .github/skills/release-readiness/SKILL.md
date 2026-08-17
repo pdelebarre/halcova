@@ -32,6 +32,9 @@ APIs, or databases:
       output.
 - [ ] **Dependencies (SCA/CVE)** — `npm audit` / SCA scan passes, or known
       risk is recorded and explicitly accepted.
+- [ ] **Secret scanning** — repo-level secret scanning + push protection are
+      active and `.github/workflows/secret-scan.yml` (advisory) shows no new
+      findings (procedure in `.github/ai/README.md`).
 - [ ] **CSP / security headers** — Content-Security-Policy and security
       headers are present and correct for the deployed origin.
 - [ ] **Logging safety** — logs contain no secrets or PII; access codes and
