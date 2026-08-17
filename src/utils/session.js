@@ -33,3 +33,44 @@ export function getSessionToken() {
 export function getUserId() {
   return getSession()?.user?.id || ''
 }
+
+// --- Per-account local data isolation (SEC-EPIC-2, #192) -------------------
+//
+// `runout.session` is the only localStorage key namespaced by nothing — it
+// holds the CURRENT account and is cleared on sign-out. But several feature
+// keys are keyed by COLLECTION KIND, not by user id:
+//   runout.recentSearches.<kind>   recent search terms
+//   runout.views.<kind>            saved smart views (filter queries)
+//   runout.browse.<kind>           browse/filter/sort state
+//   runout.gamif.*                 local gameplay progression (ledger, level,
+//                                  badges-seen)
+// Left in place, switching accounts would surface the previous account's
+// browsing/search/view/progression state to the next user. `clearLocalUserData`
+// removes exactly those per-kind keys on sign-out and on account switch so one
+// user's local data can never appear for another. (runout.view.<kind> — a pure
+// list/grid display preference — and runout.locale.<userId> are left intact:
+// they are cosmetic and, in the locale case, already user-namespaced.)
+//
+// It deliberately does NOT touch runout.session (that's saveSession(null)'s
+// job) and never throws — a storage failure must not dark-screen the app.
+const USER_SCOPED_KEY_PREFIXES = [
+  'runout.recentSearches.',
+  'runout.views.',
+  'runout.browse.',
+  'runout.gamif.',
+]
+
+export function clearLocalUserData() {
+  try {
+    const toRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && USER_SCOPED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+        toRemove.push(key)
+      }
+    }
+    for (const key of toRemove) {
+      try { localStorage.removeItem(key) } catch { /* ignore */ }
+    }
+  } catch { /* never throw */ }
+}

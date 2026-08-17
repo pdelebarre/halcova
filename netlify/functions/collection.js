@@ -7,6 +7,7 @@ import { storeNameFor } from './_shared/users'
 import { parsePagination, sliceIds, isDefaultPage } from './_shared/pagination'
 import { ensureOwnedCount, adjustOwnedCount, wishlistToggleDelta } from './_shared/counts'
 import { readListCache, writeListCache, invalidateListCache } from './_shared/list-cache'
+import { pickItemFields } from './_shared/item-fields'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { isPostgresConfigured } from './_shared/postgres'
 import { handlePostgres } from './_shared/collection-postgres'
@@ -73,8 +74,13 @@ async function handleBlobs(req, { user, collection, id, url }) {
         }
       }
 
+      // SEC-EPIC-2 (#188): only allowlisted item fields are written. A crafted
+      // body (ownerId/userId/role/plan/collections/id/…) is dropped here — the
+      // stored object is built from the allowlist + the server-assigned id, so
+      // a client can never change ownership or escalate privileges via a POST.
+      const picked = pickItemFields(body)
       const newId = randomUUID()
-      const item = { ...body, id: newId, dateAdded: body.dateAdded || new Date().toISOString() }
+      const item = { ...picked, id: newId, dateAdded: picked.dateAdded || new Date().toISOString() }
       await store.setJSON(`item:${newId}`, item)
       const ids = await readIndex(store)
       ids.unshift(newId)
@@ -92,7 +98,10 @@ async function handleBlobs(req, { user, collection, id, url }) {
       if (!id) return json(400, { error: 'Missing id' })
       const existing = await store.get(`item:${id}`, { type: 'json' })
       if (!existing) return json(404, { error: 'Not found' })
-      const patch = await req.json()
+      // SEC-EPIC-2 (#188): the PUT patch is narrowed to the item allowlist
+      // before the merge, so a spoofed ownerId/userId/role/plan/id in the body
+      // is dropped and can never change ownership or escalate privileges.
+      const patch = pickItemFields(await req.json())
 
       // S4 (#58): converting a wishlist item to owned ({ wishlist: false } on a
       // stored wishlist item) is an ADD for cap purposes — it consumes the
