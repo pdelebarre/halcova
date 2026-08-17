@@ -8,6 +8,11 @@
 // Security properties:
 //   - HMAC-SHA256 with a server-only secret (RUNOUT_MAGIC_LINK_SECRET, falling
 //     back to the admin key — already server-only and never logged).
+//   - FAILS CLOSED (CWE-287/346): when neither env provides a secret — e.g. a
+//     production deploy with RUNOUT_ADMIN_KEY unset, where ADMIN_KEY is ''
+//     (SEC-1.5, #180) — magicLinkSecret() returns '' and isMagicLinkConfigured()
+//     is false, so verifyMagicLinkToken refuses every token and the auth.js
+//     handlers return 503 instead of accepting a forgeable empty-key HMAC.
 //   - Verified with a constant-time compare (timingSafeEqual over the raw
 //     32-byte digest).
 //   - TTL ≤ 30 minutes (RUNOUT_MAGIC_LINK_TTL_MINUTES, hard-capped at 30).
@@ -25,9 +30,18 @@ export const DEFAULT_TTL_MS = 30 * 60 * 1000
 
 // Server-only HMAC secret. A dedicated env keeps the token space independent
 // of the admin key; the admin key is an acceptable fallback (dev + prod) since
-// it is already env-only and never logged.
+// it is already env-only and never logged. FAILS CLOSED (CWE-287/346, #184):
+// when neither env provides a secret the result is '' — never a dev fallback
+// of its own — so no token can ever be signed or verified in that state.
 export function magicLinkSecret() {
-  return process.env.RUNOUT_MAGIC_LINK_SECRET || ADMIN_KEY
+  return process.env.RUNOUT_MAGIC_LINK_SECRET || ADMIN_KEY || ''
+}
+
+// True when a magic-link signing/verification secret is configured. Mirrors
+// isMailConfigured() in mailer.js — callers (auth.js handlers) must fail
+// closed when this is false, before signing or verifying anything.
+export function isMagicLinkConfigured() {
+  return !!magicLinkSecret()
 }
 
 // The link TTL in ms, hard-capped at 30 minutes no matter what the env says.
@@ -52,6 +66,10 @@ export function signMagicLink({ email, expiresAt, jti, secret }) {
 // consumeMagicLink (it needs the blob store for the single-use marker).
 export function verifyMagicLinkToken(token, { secret, now = Date.now() } = {}) {
   if (typeof token !== 'string') return { ok: false, code: 'LINK_INVALID' }
+  // Fail closed on an empty secret: HMAC-SHA256 with a '' key is forgeable, so
+  // a token verified with no secret is NEVER valid (CWE-287/346, #184). This
+  // is defense in depth behind the auth.js isMagicLinkConfigured() gate.
+  if (!secret) return { ok: false, code: 'LINK_INVALID' }
   const sep = token.indexOf('.')
   if (sep <= 0) return { ok: false, code: 'LINK_INVALID' }
   const payload = token.slice(0, sep)

@@ -13,7 +13,7 @@ import { getStore } from '@netlify/blobs'
 import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, generateAccessCode, isDemoCode, publicUser } from './_shared/auth'
 import { normalizeCode } from './_shared/codes'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
-import { consumeMagicLink, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
+import { consumeMagicLink, isMagicLinkConfigured, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
 import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
 import { resolveSession } from './_shared/session-auth'
 import { createSession, revokeSession } from './_shared/sessions'
@@ -233,8 +233,16 @@ async function handleRequestMagicLink(body, req) {
   // BEFORE issuing a token or recording a request, so a misconfigured prod can
   // never mint a sign-in link (which would let an attacker rotate a member's
   // code for any email). Dev keeps the no-op mailer + devLink echo below.
-  if (!isMailConfigured() && !isDevEmailMode()) {
-    return json(503, { error: "Sign-in email isn't configured yet — try again shortly.", code: 'MAIL_NOT_CONFIGURED' })
+  if (!isDevEmailMode()) {
+    if (!isMailConfigured()) {
+      return json(503, { error: "Sign-in email isn't configured yet — try again shortly.", code: 'MAIL_NOT_CONFIGURED' })
+    }
+    // CWE-287 (#184): the signing secret is required too. With no secret (prod
+    // missing both RUNOUT_MAGIC_LINK_SECRET and RUNOUT_ADMIN_KEY) no token can
+    // ever be valid, so refuse before minting/emailing a dead, forgeable link.
+    if (!isMagicLinkConfigured()) {
+      return json(503, { error: "Sign-in links aren't configured yet — try again shortly.", code: 'MAGIC_LINK_NOT_CONFIGURED' })
+    }
   }
 
   // Reuse the existing pending `request:<id>` flow (ADR-0003 §2.2): the request
@@ -267,6 +275,16 @@ async function handleRequestMagicLink(body, req) {
 }
 
 async function handleVerifyMagicLink(body) {
+  // CWE-287/346 (#184): FAIL CLOSED when no magic-link secret is configured
+  // (e.g. a prod deploy missing both RUNOUT_MAGIC_LINK_SECRET and
+  // RUNOUT_ADMIN_KEY — ADMIN_KEY is '' there). Refuse BEFORE any token parsing
+  // or verification, so a token forged with an empty HMAC key can never rotate
+  // a member's code or mint a session. Mirrors the M3 gate in
+  // requestMagicLink / mailer.js.
+  if (!isMagicLinkConfigured()) {
+    return json(503, { error: "Sign-in links aren't configured yet — try again shortly.", code: 'MAGIC_LINK_NOT_CONFIGURED' })
+  }
+
   const token = String(body.token || '').trim()
   if (!token) return json(400, { error: 'Missing magic link token.' })
 

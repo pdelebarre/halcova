@@ -49,10 +49,13 @@ export const DEMO_USER = {
   status: 'active',
 }
 
-// Pull the Bearer token out of an Authorization header, if present.
+// Pull the Bearer token out of an Authorization header, if present. The auth
+// scheme is case-insensitive per RFC 7235 (`bearer`, `Bearer`, `BEARER` all
+// work), but the token's OWN case is preserved — session tokens are
+// case-sensitive (FINDING-2).
 export function bearer(req) {
   const header = req.headers.get('authorization') || ''
-  return header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  return header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : ''
 }
 
 // Fields that must NEVER reach the client: the access code, its sha256 hash,

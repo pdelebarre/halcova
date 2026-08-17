@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_TTL_MS,
   consumeMagicLink,
+  isMagicLinkConfigured,
   issueMagicLink,
   magicLinkSecret,
   magicLinkTtlMs,
@@ -94,6 +95,18 @@ describe('signMagicLink + verifyMagicLinkToken', () => {
     expect(result.ok).toBe(false)
     expect(result.code).toBe('LINK_EXPIRED')
   })
+
+  it('never verifies with an empty secret — a link signed with "" is unusable (CWE-287/346)', () => {
+    const now = Date.now()
+    // The exact CWE-287 attack shape: a well-formed, unexpired token signed
+    // with '' — what a misconfigured prod secret would be.
+    const forged = signMagicLink({ email: 'victim@example.com', expiresAt: now + DEFAULT_TTL_MS, jti: 'j1', secret: '' })
+    const result = verifyMagicLinkToken(forged, { secret: '', now })
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('LINK_INVALID')
+    // Even a non-empty-signature token can never verify against ''.
+    expect(verifyMagicLinkToken('Zm9v.YmFy', { secret: '', now }).code).toBe('LINK_INVALID')
+  })
 })
 
 describe('consumeMagicLink — single-use (replay-safe)', () => {
@@ -138,5 +151,56 @@ describe('magicLinkTtlMs', () => {
   it('honors a shorter configured TTL', () => {
     process.env.RUNOUT_MAGIC_LINK_TTL_MINUTES = '10'
     expect(magicLinkTtlMs()).toBe(10 * 60_000)
+  })
+})
+
+// CWE-287 (#184) — magicLinkSecret() must FAIL CLOSED (empty, never a dev
+// fallback of its own) when no secret is configured, and isMagicLinkConfigured()
+// must report false so callers refuse before signing/verifying. ADMIN_KEY is a
+// module-level constant, so each case re-imports the module with the desired
+// env (same pattern as auth.test.js).
+describe('magicLinkSecret — fails closed when unconfigured (#184)', () => {
+  const ORIGINAL_ENV = { ...process.env }
+
+  beforeEach(() => {
+    vi.resetModules()
+    delete process.env.RUNOUT_MAGIC_LINK_SECRET
+    delete process.env.RUNOUT_ADMIN_KEY
+    delete process.env.NODE_ENV
+    delete process.env.RUNOUT_DEV_MODE
+    delete process.env.NETLIFY
+    delete process.env.NETLIFY_LOCAL
+    delete process.env.NETLIFY_DEV
+  })
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  async function loadMagicLink() {
+    return import('./magic-link')
+  }
+
+  it('returns "" (never a dev fallback) and reports not configured in production with no secret', async () => {
+    process.env.NODE_ENV = 'production'
+    const mod = await loadMagicLink()
+    expect(mod.magicLinkSecret()).toBe('')
+    expect(mod.isMagicLinkConfigured()).toBe(false)
+  })
+
+  it('uses RUNOUT_MAGIC_LINK_SECRET when set (configured)', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.RUNOUT_MAGIC_LINK_SECRET = 'prod-magic-secret'
+    const mod = await loadMagicLink()
+    expect(mod.magicLinkSecret()).toBe('prod-magic-secret')
+    expect(mod.isMagicLinkConfigured()).toBe(true)
+  })
+
+  it('falls back to the admin key when set (still configured)', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.RUNOUT_ADMIN_KEY = 'prod-admin-key'
+    const mod = await loadMagicLink()
+    expect(mod.magicLinkSecret()).toBe('prod-admin-key')
+    expect(mod.isMagicLinkConfigured()).toBe(true)
   })
 })

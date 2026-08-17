@@ -310,3 +310,67 @@ describe('end-to-end: request → click the devLink → session', () => {
     expect((await listRequests())[0].status).toBe('approved')
   })
 })
+
+// SEC-EPIC-1 / CWE-287 (#184) — a production deploy with BOTH the magic-link
+// secret and RUNOUT_ADMIN_KEY unset must FAIL CLOSED on BOTH sides of the
+// magic-link flow. ADMIN_KEY is a module-level constant, so these cases
+// re-import the handler with NODE_ENV=production (ADMIN_KEY → '') to simulate
+// the misconfigured deploy — same pattern as auth.test.js.
+describe('magic link — fails closed when the secret is unconfigured (CWE-287)', () => {
+  beforeEach(() => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.RUNOUT_ADMIN_KEY
+    delete process.env.RUNOUT_MAGIC_LINK_SECRET
+    delete process.env.RUNOUT_DEV_EMAIL
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    delete process.env.NODE_ENV
+    delete process.env.RUNOUT_ADMIN_KEY
+    delete process.env.RUNOUT_MAGIC_LINK_SECRET
+    delete process.env.RUNOUT_MAIL_API_KEY
+    delete process.env.RUNOUT_DEV_EMAIL
+    vi.resetModules()
+  })
+
+  // Forge the exact CWE-287 attack: a well-formed, unexpired token signed with
+  // the empty secret a misconfigured prod would have (HMAC-SHA256('', payload)).
+  function forgedToken(email) {
+    return signMagicLink({ email, expiresAt: Date.now() + 60_000, jti: 'j-attack', secret: '' })
+  }
+
+  it('verifyMagicLink refuses the forged token (503) and never rotates the victim code', async () => {
+    await saveUser(RETURNING)
+    const mod = await import('../auth')
+    const res = await mod.default(req({ action: 'verifyMagicLink', token: forgedToken(RETURNING.email) }))
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(body.code).toBe('MAGIC_LINK_NOT_CONFIGURED')
+    // No account was created and the victim's code was NOT rotated.
+    const users = await listUsers()
+    expect(users).toHaveLength(1)
+    expect((await getUser(RETURNING.id)).code).toBe(RETURNING.code)
+  })
+
+  it('verifyMagicLink for a brand-new email creates no user and no request', async () => {
+    const mod = await import('../auth')
+    const res = await mod.default(req({ action: 'verifyMagicLink', token: forgedToken('ghost@example.com') }))
+    expect(res.status).toBe(503)
+    expect(await listUsers()).toHaveLength(0)
+    expect(await listRequests()).toHaveLength(0)
+  })
+
+  it('requestMagicLink fails closed (503 MAGIC_LINK_NOT_CONFIGURED) even when the mail key IS configured', async () => {
+    process.env.RUNOUT_MAIL_API_KEY = 're_fake_key'
+    const mod = await import('../auth')
+    const res = await mod.default(req({ action: 'requestMagicLink', email: 'ada@example.com' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(body.code).toBe('MAGIC_LINK_NOT_CONFIGURED')
+    // No link/token was minted and no pending request was recorded.
+    expect(await listRequests()).toHaveLength(0)
+  })
+})

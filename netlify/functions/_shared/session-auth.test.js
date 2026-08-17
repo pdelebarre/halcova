@@ -221,3 +221,28 @@ describe('Privilege escalation — members can never become admin', () => {
     expect(out.error.status).toBe(403)
   })
 })
+
+// FINDING-2 — RFC 7235: the auth-scheme is case-insensitive. A client that
+// sends `authorization: bearer <token>` (lowercase scheme) must resolve the
+// same live session as `Bearer `.
+describe('Bearer scheme normalization (RFC 7235) — case-insensitive', () => {
+  it('resolves a session token sent with a lowercase "bearer " scheme', async () => {
+    seedMember(U1)
+    const { token } = await createSession({ userId: U1, role: 'member' })
+
+    const lowercaseReq = {
+      method: 'GET',
+      url: 'http://localhost/.netlify/functions/collection?collection=records',
+      headers: {
+        get: (k) => (String(k).toLowerCase() === 'authorization' ? `bearer ${token}` : null),
+      },
+      json: async () => ({}),
+    }
+
+    const out = await resolveSession(lowercaseReq)
+    expect(out.error).toBeUndefined()
+    expect(out.user.id).toBe(U1)
+    // The credential round-trips intact — its case is never lowercased.
+    expect(out.token).toBe(token)
+  })
+})

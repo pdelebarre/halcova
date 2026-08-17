@@ -7,7 +7,7 @@
 // features, collections).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { publicUser } from './auth'
+import { bearer, publicUser } from './auth'
 
 const MEMBER = {
   id: 'u1',
@@ -67,6 +67,28 @@ describe('publicUser — strips secrets, keeps client-facing fields', () => {
   })
 })
 
+// FINDING-2 — the Authorization auth-scheme is case-insensitive per RFC 7235,
+// but the token's own case is preserved (session tokens are case-sensitive).
+describe('bearer — case-insensitive auth scheme (RFC 7235)', () => {
+  const authHeader = (value) => ({ headers: { get: () => value } })
+
+  it('extracts the token for Bearer / bearer / BEARER alike', () => {
+    const token = 'AbC123_xYz'
+    for (const scheme of ['Bearer ', 'bearer ', 'BEARER ']) {
+      expect(bearer(authHeader(`${scheme}${token}`))).toBe(token)
+    }
+  })
+
+  it('preserves the credential case and trims surrounding whitespace', () => {
+    expect(bearer(authHeader('Bearer  AbC_xYz  '))).toBe('AbC_xYz')
+  })
+
+  it('returns "" for a missing or non-bearer header', () => {
+    expect(bearer(authHeader(null))).toBe('')
+    expect(bearer(authHeader('Basic abc'))).toBe('')
+  })
+})
+
 // SEC-1.5 (#180) — ADMIN_KEY must FAIL CLOSED in production-like environments.
 // ADMIN_KEY is a module-level constant, so each case re-imports the module with
 // the desired env (vi.resetModules + dynamic import).
@@ -103,6 +125,11 @@ describe('ADMIN_KEY — fail closed in production (#180)', () => {
 
   it('is EMPTY when NETLIFY_LOCAL is set with no key', async () => {
     process.env.NETLIFY_LOCAL = 'true'
+    expect(await loadAdminKey()).toBe('')
+  })
+
+  it('is EMPTY when NETLIFY_DEV is set with no key', async () => {
+    process.env.NETLIFY_DEV = 'true'
     expect(await loadAdminKey()).toBe('')
   })
 
