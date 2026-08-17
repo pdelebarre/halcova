@@ -468,6 +468,99 @@ describe('portal — Stripe Billing Portal', () => {
   })
 })
 
+describe('SEC-6.2 (#216) — status bound to the authenticated context', () => {
+  // A second, distinct member whose checkout session must be unreadable by Ada.
+  const B = { ...MEMBER, id: 'u-b', email: 'bob@example.com', name: 'Bob' }
+  let B_TOKEN = ''
+
+  beforeEach(async () => {
+    B_TOKEN = await sessionTokenFor({ userId: 'u-b', role: 'member' })
+  })
+
+  it('rejects a signed-in user polling ANOTHER user\u2019s already-materialized session (fast path) with 403', async () => {
+    // Bob's checkout is materialized (webhook landed); Ada (a different member)
+    // tries to read its status/code with her own session token.
+    await saveUser(MEMBER) // Ada must resolve as a live member for her Bearer
+    await saveUser({ ...B, plan: 'lifetime', stripeCheckoutSessionId: 'cs_test_b', stripeCustomerId: 'cus_b', codeDelivered: false, codeDeliverableUntil: new Date(Date.now() + 3600_000).toISOString() })
+
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_b' }, { token: MEMBER_TOKEN })
+    expect(status).toBe(403)
+    expect(body.code).toBe('SESSION_MISMATCH')
+    // No delivered access code and no session token are leaked.
+    expect(JSON.stringify(body)).not.toMatch(/RU-[A-Z0-9]{4}-/)
+    expect(body).not.toHaveProperty('session')
+    // Bob's code was NOT delivered and Bob was NOT signed in by Ada's poll.
+    expect(stripe.retrieveSession).not.toHaveBeenCalled()
+  })
+
+  it('rejects a signed-in user polling ANOTHER user\u2019s session on the reconcile path with 403', async () => {
+    await saveUser(MEMBER) // Ada must resolve as a live member for her Bearer
+    stripe.retrieveSession.mockResolvedValue({
+      id: 'cs_test_b',
+      client_reference_id: 'request:req-b',
+      customer_email: 'bob@example.com',
+      customer: 'cus_b',
+      mode: 'payment',
+      payment_status: 'paid',
+      status: 'complete',
+    })
+    await saveRequest({ id: 'req-b', name: 'Bob', email: 'bob@example.com', status: 'pending', createdAt: new Date().toISOString() })
+
+    // Ada polls Bob's session id — must be 403 BEFORE materializing Bob.
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_b' }, { token: MEMBER_TOKEN })
+    expect(status).toBe(403)
+    expect(body.code).toBe('SESSION_MISMATCH')
+    // Bob was never materialized by Ada's attempt.
+    expect(await findUserByStripeSession('cs_test_b')).toBeNull()
+  })
+
+  it('allows a signed-in member to poll their OWN session (status complete, no code)', async () => {
+    await saveUser({ ...MEMBER, plan: 'lifetime', stripeCheckoutSessionId: 'cs_test_1', stripeCustomerId: 'cus_123' })
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { token: MEMBER_TOKEN })
+    expect(status).toBe(200)
+    expect(body.status).toBe('complete')
+    expect(body.user.id).toBe(MEMBER.id)
+    expect(body).not.toHaveProperty('code')
+  })
+
+  it('never returns the code from a STALE session whose delivery window has passed', async () => {
+    // A materialized prospect whose 24h code-delivery window has elapsed,
+    // code never collected.
+    await saveUser({
+      ...MEMBER,
+      id: 'u-stale',
+      plan: 'lifetime',
+      stripeCheckoutSessionId: 'cs_test_stale',
+      stripeCustomerId: 'cus_stale',
+      codeDelivered: false,
+      codeDeliverableUntil: new Date(Date.now() - 1000).toISOString(), // expired 1s ago
+    })
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_stale' })
+    expect(status).toBe(200)
+    expect(body.status).toBe('complete')
+    // The window has passed — no code, even though it was never delivered.
+    expect(body).not.toHaveProperty('code')
+    // The user is still signed straight in via a fresh session token.
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+  })
+
+  it('delivers the code exactly once within the window, never after (already delivered = no code)', async () => {
+    await saveUser({
+      ...MEMBER,
+      id: 'u-once',
+      plan: 'lifetime',
+      stripeCheckoutSessionId: 'cs_test_once',
+      stripeCustomerId: 'cus_once',
+      codeDelivered: true, // already delivered
+      codeDeliverableUntil: new Date(Date.now() + 3600_000).toISOString(),
+    })
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_once' })
+    expect(status).toBe(200)
+    expect(body.status).toBe('complete')
+    expect(body).not.toHaveProperty('code')
+  })
+})
+
 describe('dispatch', () => {
   it('rejects an unknown action', async () => {
     const { status } = await call({ action: 'refund' })

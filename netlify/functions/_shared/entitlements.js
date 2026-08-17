@@ -17,6 +17,12 @@ export function isPaidPlan(user) {
   return !!user && PAID_PLANS.includes(user.plan)
 }
 
+// SEC-6.2 (#216): how long a newly-issued access code stays collectable via the
+// unauthenticated `status` poll (a leaked `?session_id=…` URL is a bounded
+// capability). After this window the code is never returned again, even on the
+// first poll — a stale sessionId stops being a usable backdoor.
+export const CODE_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000 // 24 hours
+
 // ---- S3: payment entitlement materialization (ADR-0003 §2.3) ---------------
 
 import { randomUUID } from 'node:crypto'
@@ -162,6 +168,9 @@ export async function materializeCheckoutSession(session, deps = {}) {
       // token) receives it, then flips to `true` so a leaked `?session_id=…`
       // URL can never read it again.
       codeDelivered: false,
+      // SEC-6.2 (#216): the code is only collectable within a bounded window
+      // after materialization, so a stale leaked sessionId stops working too.
+      codeDeliverableUntil: new Date(Date.now() + CODE_DELIVERY_WINDOW_MS).toISOString(),
     }
   } else {
     // Existing member keeps their code, collections and feature flags — they
