@@ -76,6 +76,11 @@ export default function App() {
   // on the Toolbar Loans button. Refetched on sign-in / plan change / return.
   const [overdueCount, setOverdueCount] = useState(0)
   const loansButtonRef = useRef(null)
+  // (ADMIN-EPIC-1, #263) — the owner's glanceable pending-request badge. App
+  // owns a LIGHTWEIGHT pending-count fetch (the ?dashboard=1 counts block,
+  // never the full adminList — PWA battery) and hands it to Header.
+  const [pendingCount, setPendingCount] = useState(0)
+  const isAdmin = session?.user?.role === 'admin'
 
   // S6 paywall: CollectionView reports WHY it's blocked ({ reason, kind,
   // feature? }); App owns the modal and decides what to render.
@@ -111,6 +116,49 @@ export default function App() {
       .catch(() => { if (!cancelled) setOverdueCount(0) })
     return () => { cancelled = true }
   }, [session?.user, refreshTick])
+
+  // (ADMIN-EPIC-1, #263) — pending-request badge, three surfaces, one fetch.
+  // Reads counts.pendingRequests from GET /admin?dashboard=1 (a cheap,
+  // requireAdmin-gated aggregates call — never the full adminList), refreshed
+  // on app foreground + a modest 60s interval. Failures/offline degrade to 0
+  // (never throw), and non-admins never fetch.
+  const refreshPending = useCallback(() => {
+    authApi.adminDashboard()
+      .then((res) => {
+        const n = Number(res?.counts?.pendingRequests)
+        setPendingCount(Number.isFinite(n) && n > 0 ? n : 0)
+      })
+      .catch(() => setPendingCount(0))
+  }, [])
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setPendingCount(0)
+      return undefined
+    }
+    let cancelled = false
+    const tick = () => { if (!cancelled) refreshPending() }
+    tick()
+    const id = window.setInterval(tick, 60000)
+    const onVisible = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [isAdmin, refreshPending])
+
+  // Refresh the badge the moment the admin panel closes — an approve/reject
+  // inside the panel should decrement the avatar badge immediately, not on the
+  // next 60s poll. A ref tracks whether it was previously open so the mount
+  // (panel already closed) doesn't double-fetch alongside the effect above.
+  const adminWasOpen = useRef(adminOpen)
+  useEffect(() => {
+    const wasOpen = adminWasOpen.current
+    adminWasOpen.current = adminOpen
+    if (wasOpen && !adminOpen && isAdmin) refreshPending()
+  }, [adminOpen, isAdmin, refreshPending])
 
   // Stable App toast: auto-dismissing feedback used by the magic-link and
   // checkout-return flows above the collection shell.
@@ -339,6 +387,7 @@ export default function App() {
         onOpenCredits={() => setCreditOpen(true)}
         showAdmin={user.role === 'admin'}
         user={user}
+        pendingCount={pendingCount}
         onLogout={logout}
       />
 

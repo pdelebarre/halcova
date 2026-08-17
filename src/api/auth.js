@@ -124,6 +124,16 @@ export async function adminList() {
   return getJson(ADMIN_URL, getSessionToken())
 }
 
+// Admin Dashboard aggregates (ADMIN-EPIC-1, #260): GET /admin?dashboard=1 is
+// the same requireAdmin-gated endpoint as adminList(), with an opt-in `counts`
+// block appended (T1 backend). Returns the full payload
+// `{ requests, users, counts }` — aggregates only, never identities. The
+// counts block is the cheap call the App-level pending badge also uses (T3
+// #263), which is why it's separate from adminList().
+export async function adminDashboard() {
+  return getJson(`${ADMIN_URL}?dashboard=1`, getSessionToken())
+}
+
 export async function adminApprove({ requestId, collections, features, plan }) {
   return postJson(ADMIN_URL, { action: 'approve', requestId, collections, features, plan }, getSessionToken())
 }
