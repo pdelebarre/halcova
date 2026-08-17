@@ -134,6 +134,20 @@ describe('issueMagicLink', () => {
     expect(expiresAt).toBeGreaterThan(Date.now())
     expect(expiresAt - Date.now()).toBeLessThanOrEqual(DEFAULT_TTL_MS)
   })
+
+  it('carries a HIGH-ENTROPY jti — a random UUID v4, unique per issue (SEC-1.7, #182)', () => {
+    const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    const a = issueMagicLink('ada@example.com')
+    const b = issueMagicLink('ada@example.com')
+    const ja = verifyMagicLinkToken(a.token, { secret: magicLinkSecret() })
+    const jb = verifyMagicLinkToken(b.token, { secret: magicLinkSecret() })
+    // The HMAC is over a random 122-bit jti — two links for the SAME email are
+    // unrelated, so guessing one gives an attacker nothing about another.
+    expect(ja.jti).toMatch(UUID_V4)
+    expect(jb.jti).toMatch(UUID_V4)
+    expect(ja.jti).not.toBe(jb.jti)
+    expect(a.token).not.toBe(b.token)
+  })
 })
 
 describe('magicLinkTtlMs', () => {

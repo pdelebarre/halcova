@@ -21,13 +21,17 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { getRepository } from './repository'
 
-// Fixed session TTL, capped at 90 days no matter what the env says. A sliding
-// renewal (extend on activity) is a deliberate P1 follow-up — see the
-// SEC-EPIC-1 report.
+// The absolute maximum lifetime of any session record — 90 days from CREATION,
+// no matter what the env says (SEC-1.3, #178). `sessionTtlMs()` (the per-renewal
+// TTL) is capped at this too, and sliding renewal never pushes a session's
+// expiresAt past createdAt + SESSION_HARD_CAP_MS.
+export const SESSION_HARD_CAP_MS = 90 * 24 * 60 * 60 * 1000
+
+// Fixed session TTL, capped at 90 days no matter what the env says.
 export function sessionTtlMs() {
   const days = Number(process.env.RUNOUT_SESSION_TTL_DAYS)
   const ms = Number.isFinite(days) && days > 0 ? Math.floor(days * 24 * 60 * 60 * 1000) : 30 * 24 * 60 * 60 * 1000
-  return Math.min(ms, 90 * 24 * 60 * 60 * 1000)
+  return Math.min(ms, SESSION_HARD_CAP_MS)
 }
 
 // The canonical key for a session token: sha256 — the raw token is never
@@ -69,6 +73,38 @@ export async function createSession({ userId, role, status = 'active', now = Dat
   }
   await getRepository().sessions.save(record)
   return { token, record }
+}
+
+// SEC-1.3 (#178) — SLIDING RENEWAL with replay safety.
+//
+// A live session whose remaining lifetime has dropped below half the TTL is
+// extended server-side to `now + TTL`, re-saved under the SAME token hash —
+// so the client keeps the same token (no churn, no session proliferation) and
+// the token is never minted fresh on ordinary requests (replay-safe: it is
+// still the same opaque credential, revocable and expiry-capped). Renewal
+// NEVER pushes expiry past the absolute hard cap of 90 days from CREATION
+// (SESSION_HARD_CAP_MS), so a stolen token can never be kept alive forever.
+// Fixation protection is untouched: a fresh random token is still minted on
+// every LOGIN, never by renewal.
+//
+// Renewal is invoked from resolveSession, so it is bounded — a write happens
+// at most every ~half-TTL of active use (after an extension the remaining
+// lifetime is again above the window, so the next request is a no-op read).
+//
+// Returns { renewed, session }: `session` is the (possibly extended) record.
+// A revoked/expired session is never renewed — dead stays dead.
+export async function renewSessionIfNeeded(session, { now = Date.now() } = {}) {
+  if (!session || !session.expiresAt || !isSessionLive(session, { now })) {
+    return { renewed: false, session }
+  }
+  const remaining = new Date(session.expiresAt).getTime() - now
+  // Renew only once the remaining lifetime drops below half the TTL.
+  if (remaining >= sessionTtlMs() / 2) return { renewed: false, session }
+  const createdAt = new Date(session.createdAt).getTime()
+  const next = Math.min(now + sessionTtlMs(), createdAt + SESSION_HARD_CAP_MS)
+  const renewed = { ...session, expiresAt: new Date(next).toISOString() }
+  await getRepository().sessions.save(renewed)
+  return { renewed: true, session: renewed }
 }
 
 export async function getSessionByToken(token) {

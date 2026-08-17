@@ -14,9 +14,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getStore } from '@netlify/blobs'
 import {
+  SESSION_HARD_CAP_MS,
   createSession,
   getSessionByToken,
   isSessionLive,
+  renewSessionIfNeeded,
   revokeAllForUser,
   revokeSession,
   sessionTokenHash,
@@ -158,6 +160,68 @@ describe('sessionTtlMs — env-tunable but hard-capped', () => {
 
   it('is hard-capped at 90 days regardless of env', () => {
     process.env.RUNOUT_SESSION_TTL_DAYS = '365'
-    expect(sessionTtlMs()).toBe(90 * 24 * 60 * 60 * 1000)
+    expect(sessionTtlMs()).toBe(SESSION_HARD_CAP_MS)
+  })
+})
+
+// SEC-1.3 (#178) — sliding renewal. A live session whose remaining lifetime
+// has dropped below half the TTL is extended server-side under the SAME token
+// hash (no client churn, no new token minted on requests); a session outside
+// the renewal window, revoked, or expired is never renewed; and renewal never
+// pushes expiry past the 90-day hard cap from CREATION.
+describe('renewSessionIfNeeded — sliding renewal (SEC-1.3)', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  it('extends a live session whose remaining lifetime is below half the TTL', async () => {
+    const created = await createSession({ userId: 'u1', role: 'member', now: Date.now() - 20 * DAY })
+    // 20 days into a 30-day TTL → 10 days left < 15 (half) → renewal window.
+    const before = created.record.expiresAt
+    const { renewed, session } = await renewSessionIfNeeded(created.record, { now: Date.now() })
+    expect(renewed).toBe(true)
+    expect(new Date(session.expiresAt).getTime()).toBeGreaterThan(new Date(before).getTime())
+    // The SAME token hash is kept — renewal never mints a new token.
+    expect(session.tokenHash).toBe(created.record.tokenHash)
+    // It persists server-side — the store now holds the extended expiry.
+    expect((await getSessionByToken(created.token)).expiresAt).toBe(session.expiresAt)
+  })
+
+  it('does NOT renew a session whose remaining lifetime is at/above half the TTL', async () => {
+    const created = await createSession({ userId: 'u1', role: 'member', now: Date.now() - 5 * DAY })
+    // 5 days into a 30-day TTL → 25 days left ≥ 15 → outside the window.
+    const before = created.record.expiresAt
+    const { renewed, session } = await renewSessionIfNeeded(created.record, { now: Date.now() })
+    expect(renewed).toBe(false)
+    expect(session.expiresAt).toBe(before)
+  })
+
+  it('never renews a REVOKED session — dead stays dead (replay safety)', async () => {
+    const created = await createSession({ userId: 'u1', role: 'member', now: Date.now() - 20 * DAY })
+    await revokeSession(created.token)
+    const revoked = await getSessionByToken(created.token)
+    const { renewed } = await renewSessionIfNeeded(revoked, { now: Date.now() })
+    expect(renewed).toBe(false)
+    expect((await getSessionByToken(created.token)).status).toBe('revoked')
+  })
+
+  it('never renews an EXPIRED session', async () => {
+    const created = await createSession({ userId: 'u1', role: 'member', now: Date.now() - 40 * DAY })
+    const { renewed, session } = await renewSessionIfNeeded(created.record, { now: Date.now() })
+    expect(renewed).toBe(false)
+    expect(session.expiresAt).toBe(created.record.expiresAt)
+  })
+
+  it('never pushes expiry past the 90-day hard cap from CREATION', async () => {
+    // A long-lived active session (90d TTL) already deep into its life: the
+    // renewal target (now + 90d) would exceed createdAt + 90d, so it must cap
+    // at createdAt + SESSION_HARD_CAP_MS — never beyond.
+    process.env.RUNOUT_SESSION_TTL_DAYS = '90'
+    const createdAt = Date.now() - 80 * DAY
+    const created = await createSession({ userId: 'u1', role: 'member', now: createdAt })
+    const { renewed, session } = await renewSessionIfNeeded(created.record, { now: Date.now() })
+    expect(renewed).toBe(true)
+    expect(new Date(session.expiresAt).getTime()).toBeLessThanOrEqual(createdAt + SESSION_HARD_CAP_MS)
+    // The absolute ceiling, not the uncapped now + 90d.
+    expect(new Date(session.expiresAt).getTime()).not.toBeGreaterThan(Date.now() + sessionTtlMs())
+    delete process.env.RUNOUT_SESSION_TTL_DAYS
   })
 })

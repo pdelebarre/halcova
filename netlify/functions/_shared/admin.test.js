@@ -23,6 +23,7 @@ import { adminSessionToken } from './session-test-helpers'
 import { createMemDb } from './repositories/test-helpers'
 import { createFeedbackRepo } from './repositories/feedback-repo'
 import { createReviewsRepo } from './repositories/reviews-repo'
+import { createSession, getSessionByToken } from './sessions'
 
 const usersMock = vi.hoisted(() => ({
   listUsers: vi.fn(async () => []),
@@ -299,6 +300,41 @@ describe('plan enum (S2 — premium / lifetime / unlimited / free)', () => {
     const res = await post({ action: 'updateUser', userId: 'owner', plan: 'premium' })
     expect(res.status).toBe(400)
     expect(usersMock.saveUser).not.toHaveBeenCalled()
+  })
+})
+
+describe('SEC-1.4 (#179) — disabling a member kills their live sessions immediately', () => {
+  it('updateUser status=disabled revokes every live session server-side (not just the status check)', async () => {
+    usersMock.getUser.mockResolvedValue({ ...MEMBER })
+    const { token } = await createSession({ userId: 'u1', role: 'member' })
+    expect((await getSessionByToken(token)).status).toBe('active')
+
+    const res = await post({ action: 'updateUser', userId: 'u1', status: 'disabled' })
+    expect(res.status).toBe(200)
+
+    // The session record is REVOKED now — the token is dead immediately, on
+    // every device, even before any per-request user.status re-check.
+    expect((await getSessionByToken(token)).status).toBe('revoked')
+  })
+
+  it('re-enabling does not resurrect the revoked sessions — the member must sign in again', async () => {
+    usersMock.getUser.mockResolvedValue({ ...MEMBER })
+    const { token } = await createSession({ userId: 'u1', role: 'member' })
+    await post({ action: 'updateUser', userId: 'u1', status: 'disabled' })
+    await post({ action: 'updateUser', userId: 'u1', status: 'active' })
+    // Disable revoked them; enable does NOT flip them back to live.
+    expect((await getSessionByToken(token)).status).toBe('revoked')
+  })
+
+  it('the disable revocation is scoped to the member — other users\' sessions survive', async () => {
+    usersMock.getUser.mockResolvedValue({ ...MEMBER })
+    const disabledUser = await createSession({ userId: 'u1', role: 'member' })
+    const otherUser = await createSession({ userId: 'u2', role: 'member' })
+
+    await post({ action: 'updateUser', userId: 'u1', status: 'disabled' })
+
+    expect((await getSessionByToken(disabledUser.token)).status).toBe('revoked')
+    expect((await getSessionByToken(otherUser.token)).status).toBe('active')
   })
 })
 

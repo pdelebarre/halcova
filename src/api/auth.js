@@ -104,6 +104,20 @@ export async function logout() {
   saveSession(null)
 }
 
+// SEC-1.4 (#179) — "sign out all devices": revoke EVERY session for the signed
+// in user (the current one included) server-side, then clear the local session.
+// After this, every prior token for this account returns 401. The local clear
+// always happens — revocation is best-effort against the network.
+export async function logoutAll() {
+  const token = getSessionToken()
+  if (token) {
+    try {
+      await postJson(AUTH_URL, { action: 'logoutAll' }, token)
+    } catch { /* ignore network/revocation failures */ }
+  }
+  saveSession(null)
+}
+
 // ---- Admin endpoints (Authorization must be the owner's admin session) ----
 
 export async function adminList() {

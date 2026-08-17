@@ -16,7 +16,7 @@ import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { consumeMagicLink, isMagicLinkConfigured, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
 import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
 import { resolveSession } from './_shared/session-auth'
-import { createSession, revokeSession } from './_shared/sessions'
+import { createSession, revokeAllForUser, revokeSession } from './_shared/sessions'
 import {
   findPendingRequestByEmail,
   findUserByCode,
@@ -43,6 +43,11 @@ const ME_LIMIT = Number(process.env.RUNOUT_AUTH_ME_RATE_LIMIT) || 60
 // source; per-email bounds one inbox being hammered.
 const MAGIC_LINK_IP_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_IP_RATE_LIMIT) || 10
 const MAGIC_LINK_EMAIL_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_RATE_LIMIT) || 5
+// SEC-1.7 (#182): verify is the real brute-force surface for magic links — a
+// wrong guess costs the verify round-trip, so per-IP throttling here bounds
+// the cost of hammering tokens (the HMAC + randomUUID jti makes a practical
+// brute force infeasible; this is defense in depth, like the login limiter).
+export const MAGIC_LINK_VERIFY_IP_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_VERIFY_IP_RATE_LIMIT) || 20
 
 // A light shape check before we email someone — enough to reject obvious
 // garbage without a backtracking-prone regex.
@@ -201,6 +206,20 @@ async function handleLogout(req) {
   return json(200, { ok: true })
 }
 
+// SEC-1.4 (#179) — "sign out all devices": revoke EVERY live session for the
+// resolved user (the current one included), so a stolen token on any other
+// device dies server-side immediately. Scope is the session's OWN user — a
+// member can never revoke another member's sessions (resolveSession binds the
+// request to the token's userId). The owner (userId 'owner') is revocable too:
+// owner sessions are stored like any other, so revokeAllForUser('owner') kills
+// them. Idempotent: revoking an already-dead set is a safe no-op.
+async function handleLogoutAll(req) {
+  const resolved = await resolveSession(req)
+  if (resolved.error) return resolved.error
+  await revokeAllForUser(resolved.user.id)
+  return json(200, { ok: true })
+}
+
 // ---- Self-serve signup via email magic link (ADR-0003, S1) ----------------
 //
 // No admin in the loop: the visitor proves they own the email by clicking the
@@ -274,7 +293,18 @@ async function handleRequestMagicLink(body, req) {
   })
 }
 
-async function handleVerifyMagicLink(body) {
+async function handleVerifyMagicLink(body, req) {
+  // SEC-1.7 (#182): rate-limit the VERIFY path (previously unthrottled) before
+  // any token parsing — the real brute-force surface for magic links. Per-IP
+  // bounds one source hammering tokens; a legitimate click is 1-2 requests.
+  const ip = clientIp(req)
+  if (ip) {
+    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:magiclink:verify:ip', limit: MAGIC_LINK_VERIFY_IP_LIMIT })(ip)
+    if (byIp.limited) {
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byIp.retryAfter) })
+    }
+  }
+
   // CWE-287/346 (#184): FAIL CLOSED when no magic-link secret is configured
   // (e.g. a prod deploy missing both RUNOUT_MAGIC_LINK_SECRET and
   // RUNOUT_ADMIN_KEY — ADMIN_KEY is '' there). Refuse BEFORE any token parsing
@@ -356,8 +386,9 @@ export default async (req) => {
       if (body.action === 'request') return handleRequest(body)
       if (body.action === 'login') return handleLogin(body, req)
       if (body.action === 'requestMagicLink') return handleRequestMagicLink(body, req)
-      if (body.action === 'verifyMagicLink') return handleVerifyMagicLink(body)
+      if (body.action === 'verifyMagicLink') return handleVerifyMagicLink(body, req)
       if (body.action === 'logout') return handleLogout(req)
+      if (body.action === 'logoutAll') return handleLogoutAll(req)
       return json(400, { error: 'Unknown action.' })
     }
 

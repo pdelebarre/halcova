@@ -93,6 +93,24 @@ describe('auth API', () => {
     expect(getSession()).toBeNull()
   })
 
+  it('logoutAll() revokes ALL sessions server-side then clears local storage (SEC-1.4)', async () => {
+    saveSession({ user: MEMBER, session: MEMBER_TOKEN })
+    global.fetch.mockResolvedValue(res(200, { ok: true }))
+    await auth.logoutAll()
+    const [url, init] = global.fetch.mock.calls[0]
+    expect(url).toContain('/.netlify/functions/auth')
+    expect(JSON.parse(init.body)).toEqual({ action: 'logoutAll' })
+    expect(init.headers.Authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+    expect(getSession()).toBeNull()
+  })
+
+  it('logoutAll() clears local storage even when the revocation call fails (offline)', async () => {
+    saveSession({ user: MEMBER, session: MEMBER_TOKEN })
+    global.fetch.mockRejectedValue(new Error('offline'))
+    await auth.logoutAll()
+    expect(getSession()).toBeNull()
+  })
+
   it('adminList sends the owner admin session as Bearer', async () => {
     saveSession({ user: { id: 'owner', role: 'admin' }, session: ADMIN_TOKEN })
     global.fetch.mockResolvedValue(res(200, { requests: [], users: [] }))

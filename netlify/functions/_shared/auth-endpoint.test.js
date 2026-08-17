@@ -28,8 +28,10 @@
 // rejected with a 422 "Incorrect function names" error on deploy.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import handler from '../auth'
+import handler, { MAGIC_LINK_VERIFY_IP_LIMIT } from '../auth'
 import { signMagicLink } from './magic-link'
+import { resolveSession } from './session-auth'
+import { createSession, getSessionByToken } from './sessions'
 import { getUser, listRequests, listUsers, saveUser } from './users'
 
 const { stores, createStore } = vi.hoisted(() => {
@@ -59,13 +61,20 @@ vi.mock('@netlify/blobs', () => ({
 
 const SECRET = 'test-magic-secret'
 
-function req(body, { method = 'POST' } = {}) {
+function req(body, { method = 'POST', token = '', ip = '' } = {}) {
   return {
     method,
     // No origin/host → siteUrl falls back to http://localhost:8888; no IP
-    // headers → the per-IP rate limiter is skipped (the per-email limiter
+    // headers → the per-IP rate limiters are skipped (the per-email limiter
     // still runs, at its default 5/window — each test stays well under).
-    headers: { get: () => null },
+    headers: {
+      get: (k) => {
+        const key = String(k).toLowerCase()
+        if (key === 'authorization' && token) return `Bearer ${token}`
+        if (key === 'x-nf-client-connection-ip' && ip) return ip
+        return null
+      },
+    },
     json: async () => body,
   }
 }
@@ -308,6 +317,103 @@ describe('end-to-end: request → click the devLink → session', () => {
     expect(body).not.toHaveProperty('code')
     // The request used for the checkout identity is now approved.
     expect((await listRequests())[0].status).toBe('approved')
+  })
+})
+
+// SEC-1.4 (#179) — "sign out all devices" endpoint.
+describe('logoutAll — sign out all devices', () => {
+  async function seedMember(id, email) {
+    await saveUser({
+      id, name: id, email, code: `RU-${id.toUpperCase()}-XXXX-XXXX`,
+      collections: { records: true, books: true }, role: 'member', status: 'active', features: {},
+    })
+  }
+
+  function sessionReq(token) {
+    return {
+      method: 'GET',
+      url: 'http://localhost/.netlify/functions/auth',
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${token}` : null) },
+      json: async () => ({}),
+    }
+  }
+
+  it('revokes EVERY session for the signed-in user (current one included) and returns { ok: true }', async () => {
+    await seedMember('u-member', 'ada@example.com')
+    const s1 = await createSession({ userId: 'u-member', role: 'member' })
+    const s2 = await createSession({ userId: 'u-member', role: 'member' })
+
+    const { status, body } = await call({ action: 'logoutAll' }, { token: s1.token })
+    expect(status).toBe(200)
+    expect(body).toEqual({ ok: true })
+
+    for (const { token } of [s1, s2]) {
+      expect((await getSessionByToken(token)).status).toBe('revoked')
+      expect((await resolveSession(sessionReq(token))).error.status).toBe(401)
+    }
+  })
+
+  it('401s without a valid session (logoutAll must be authorized)', async () => {
+    const { status } = await call({ action: 'logoutAll' })
+    expect(status).toBe(401)
+  })
+
+  it('a member logoutAll cannot revoke another member\'s sessions', async () => {
+    await seedMember('u1', 'ada@example.com')
+    await seedMember('u2', 'bob@example.com')
+    const mine = await createSession({ userId: 'u1', role: 'member' })
+    const theirs = await createSession({ userId: 'u2', role: 'member' })
+
+    expect((await call({ action: 'logoutAll' }, { token: mine.token })).status).toBe(200)
+    // u1's session is dead; u2's is untouched.
+    expect((await getSessionByToken(mine.token)).status).toBe('revoked')
+    expect((await getSessionByToken(theirs.token)).status).toBe('active')
+    expect((await resolveSession(sessionReq(theirs.token))).error).toBeUndefined()
+  })
+
+  it('the OWNER session is revocable via logoutAll too', async () => {
+    const { token } = await createSession({ userId: 'owner', role: 'admin' })
+    const { status } = await call({ action: 'logoutAll' }, { token })
+    expect(status).toBe(200)
+    expect((await getSessionByToken(token)).status).toBe('revoked')
+    expect((await resolveSession(sessionReq(token))).error.status).toBe(401)
+  })
+})
+
+// SEC-1.7 (#182) — the VERIFY path is rate-limited (the real brute-force
+// surface for magic links), and requestMagicLink stays enumeration-neutral.
+describe('SEC-1.7 (#182) — verify-path rate limit', () => {
+  it('returns 429 once a client exceeds the per-IP verify limit (invalid-token hammering)', async () => {
+    const ip = '203.0.113.7'
+    // The limiter allows `limit` requests per window; the (limit+1)-th is 429.
+    for (let i = 0; i < MAGIC_LINK_VERIFY_IP_LIMIT; i++) {
+      const { status } = await call({ action: 'verifyMagicLink', token: `forged-${i}` }, { ip })
+      expect(status).toBe(401) // every allowed call is a genuine invalid-token 401…
+    }
+    const { status, body } = await call({ action: 'verifyMagicLink', token: 'forged-limit' }, { ip })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(await listUsers()).toHaveLength(0)
+  })
+})
+
+describe('SEC-1.7 (#182) — requestMagicLink is enumeration-neutral', () => {
+  it('a known member email and an unknown email get the SAME response shape (no membership leak)', async () => {
+    await saveUser(RETURNING) // ada@example.com is a real, active member
+
+    const member = await call({ action: 'requestMagicLink', email: 'ada@example.com' })
+    const ghost = await call({ action: 'requestMagicLink', email: 'ghost@example.com' })
+
+    expect(member.status).toBe(200)
+    expect(ghost.status).toBe(200)
+    // Identical observable shape — nothing reveals that one email is a member.
+    expect(Object.keys(member.body).sort()).toEqual(Object.keys(ghost.body).sort())
+    expect(member.body).toMatchObject({ ok: true })
+    expect(ghost.body).toMatchObject({ ok: true })
+    expect(typeof member.body.expiresAt).toBe('number')
+    expect(typeof ghost.body.expiresAt).toBe('number')
+    expect(member.body).not.toHaveProperty('member')
+    expect(ghost.body).not.toHaveProperty('member')
   })
 })
 

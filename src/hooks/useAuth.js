@@ -51,5 +51,12 @@ export function useAuth() {
     setSession(null)
   }, [])
 
-  return { session, ready, login, logout, refresh, requestAccess, setSession }
+  // SEC-1.4 (#179): revoke EVERY session for this user (all devices, current
+  // one included) server-side, then clear the local session.
+  const logoutAll = useCallback(() => {
+    authApi.logoutAll()
+    setSession(null)
+  }, [])
+
+  return { session, ready, login, logout, logoutAll, refresh, requestAccess, setSession }
 }

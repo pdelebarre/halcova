@@ -21,7 +21,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../collection'
-import { createSession, getSessionByToken, revokeSession } from './sessions'
+import { createSession, getSessionByToken, revokeAllForUser, revokeSession } from './sessions'
 import { requireAdmin, resolveSession } from './session-auth'
 
 const { stores, createStore } = vi.hoisted(() => {
@@ -179,6 +179,91 @@ describe('Logout invalidation — the token is dead server-side after logout', (
     await revokeSession(token) // logout()
 
     expect((await handler(req('GET', token))).status).toBe(401)
+  })
+})
+
+describe('SEC-1.3 (#178) — sliding renewal happens server-side during resolveSession', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  it('extends a session inside the renewal window (same token, new expiry)', async () => {
+    seedMember(U1)
+    const { token, record } = await createSession({ userId: U1, role: 'member', now: Date.now() - 20 * DAY })
+    const out = await resolveSession(req('GET', token))
+    expect(out.error).toBeUndefined()
+    expect(out.user.id).toBe(U1)
+    // The client keeps the SAME token — no churn, no session proliferation.
+    expect(out.token).toBe(token)
+    // The stored record's expiry was extended server-side.
+    expect(new Date(out.session.expiresAt).getTime()).toBeGreaterThan(new Date(record.expiresAt).getTime())
+    expect((await getSessionByToken(token)).expiresAt).toBe(out.session.expiresAt)
+  })
+
+  it('leaves expiry untouched for a session outside the renewal window', async () => {
+    seedMember(U1)
+    const { token, record } = await createSession({ userId: U1, role: 'member', now: Date.now() - 5 * DAY })
+    const out = await resolveSession(req('GET', token))
+    expect(out.error).toBeUndefined()
+    expect(out.session.expiresAt).toBe(record.expiresAt)
+  })
+
+  it('never renews a session for a DISABLED account (a 403 request is not an activity signal)', async () => {
+    seedMember(U1, { status: 'active' })
+    const { token, record } = await createSession({ userId: U1, role: 'member', now: Date.now() - 20 * DAY })
+    seedMember(U1, { status: 'disabled' })
+    const out = await resolveSession(req('GET', token))
+    expect(out.error.status).toBe(403)
+    expect((await getSessionByToken(token)).expiresAt).toBe(record.expiresAt)
+  })
+})
+
+describe('SEC-1.4 (#179) — logout-all / server-side bulk revocation', () => {
+  it('after logoutAll, EVERY prior token for that user is dead (401)', async () => {
+    seedMember(U1)
+    const s1 = await createSession({ userId: U1, role: 'member' })
+    const s2 = await createSession({ userId: U1, role: 'member' })
+
+    // What the auth `logoutAll` action does server-side:
+    await revokeAllForUser(U1)
+
+    for (const { token } of [s1, s2]) {
+      expect((await getSessionByToken(token)).status).toBe('revoked')
+      const out = await resolveSession(req('GET', token))
+      expect(out.error.status).toBe(401)
+      expect((await out.error.json()).code).toBe('SESSION_INVALID')
+    }
+  })
+
+  it('a member logoutAll cannot touch another member\'s sessions (isolation)', async () => {
+    seedMember(U1)
+    seedMember(U2)
+    const mine = await createSession({ userId: U1, role: 'member' })
+    const theirs = await createSession({ userId: U2, role: 'member' })
+
+    await revokeAllForUser(U1) // u1 signs out all their own devices
+
+    expect((await resolveSession(req('GET', mine.token))).error.status).toBe(401)
+    // u2's session is untouched and still resolves.
+    const out = await resolveSession(req('GET', theirs.token))
+    expect(out.error).toBeUndefined()
+    expect(out.user.id).toBe(U2)
+    expect((await getSessionByToken(theirs.token)).status).toBe('active')
+  })
+
+  it('logoutAll is idempotent — a second bulk revoke is a safe no-op', async () => {
+    seedMember(U1)
+    const { token } = await createSession({ userId: U1, role: 'member' })
+    await revokeAllForUser(U1)
+    await revokeAllForUser(U1) // again — no error, no resurrect
+    expect((await getSessionByToken(token)).status).toBe('revoked')
+  })
+
+  it('the owner session is revocable too (logoutAll works for the owner)', async () => {
+    const { token } = await createSession({ userId: 'owner', role: 'admin' })
+    expect((await resolveSession(req('GET', token))).error).toBeUndefined()
+    await revokeAllForUser('owner')
+    const out = await resolveSession(req('GET', token))
+    expect(out.error.status).toBe(401)
+    expect((await out.error.json()).code).toBe('SESSION_INVALID')
   })
 })
 

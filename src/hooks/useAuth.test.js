@@ -9,6 +9,7 @@ vi.mock('../api/auth', () => ({
   me: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  logoutAll: vi.fn(),
   requestAccess: vi.fn(),
 }))
 
@@ -99,6 +100,21 @@ describe('useAuth.refresh', () => {
     })
 
     expect(authApi.logout).toHaveBeenCalled()
+    expect(result.current.session).toBeNull()
+  })
+
+  it('signs the user out of ALL devices on logoutAll (SEC-1.4)', async () => {
+    saveSession(SESSION)
+    authApi.me.mockResolvedValue({ ...MEMBER }) // keep the startup effect quiet
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.ready).toBe(true))
+
+    act(() => {
+      result.current.logoutAll()
+    })
+
+    expect(authApi.logoutAll).toHaveBeenCalled()
     expect(result.current.session).toBeNull()
   })
 })

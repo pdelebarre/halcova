@@ -12,7 +12,7 @@
 // code → user lookup now lives only in the login exchange (auth.js).
 
 import { DEMO_USER, OWNER_ID, bearer } from './auth'
-import { getSessionByToken, isSessionLive } from './sessions'
+import { getSessionByToken, isSessionLive, renewSessionIfNeeded } from './sessions'
 import { getUser } from './users'
 
 const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
@@ -63,7 +63,12 @@ export async function resolveSession(req) {
   if (user.status !== 'active') {
     return { error: json(403, { error: 'This account is disabled.' }) }
   }
-  return { user, session, token }
+  // SEC-1.3 (#178): sliding renewal. Only a request that actually resolved to a
+  // live session + active user can extend the session (a disabled account's
+  // session is never renewed), the token is unchanged (no client churn), and
+  // the expiry never passes the 90-day hard cap.
+  const { session: liveSession } = await renewSessionIfNeeded(session)
+  return { user, session: liveSession, token }
 }
 
 // Admin-gate a request: resolve the session AND require the resolved user's
