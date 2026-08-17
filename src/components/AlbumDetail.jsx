@@ -21,7 +21,10 @@ function mergeReleaseEnrichment(item, d, isDemo, catalog) {
   const merge = {}
   if (Array.isArray(d.artists) && d.artists.length > 0
     && JSON.stringify(item.artists) !== JSON.stringify(d.artists)) merge.artists = d.artists
-  if (typeof d.masterId === 'number' && d.masterId !== item.masterId) merge.masterId = d.masterId
+  // (FEAT-EPIC-5, #276) F1 defense-in-depth: only merge a positive masterId.
+  // A 0 (or any falsy) value must never be sent — the server validator rejects
+  // 0 and would 400 + drop the whole enrichment backfill.
+  if (typeof d.masterId === 'number' && d.masterId > 0 && d.masterId !== item.masterId) merge.masterId = d.masterId
   if (Array.isArray(d.tracklist) && d.tracklist.length > 0
     && JSON.stringify(item.tracklist) !== JSON.stringify(d.tracklist)) merge.tracklist = d.tracklist
   if (typeof d.released === 'string' && d.released && d.released !== item.released) merge.released = d.released

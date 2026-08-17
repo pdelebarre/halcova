@@ -156,7 +156,11 @@ export async function getReleaseDetail(discogsId) {
     }))
   return {
     artists,
-    masterId: typeof data.master_id === 'number' ? data.master_id : null,
+    // (FEAT-EPIC-5, #276) F1: Discogs returns master_id: 0 for masterless
+    // releases; the server validator only accepts `null` (or a positive id) as
+    // the "no master" sentinel, so map anything <= 0 to null — otherwise the
+    // enrichment backfill 400s and is dropped for the whole item.
+    masterId: typeof data.master_id === 'number' && data.master_id > 0 ? data.master_id : null,
     tracklist,
     released: typeof data.released === 'string' && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(data.released) ? data.released : '',
     notes: data.notes || '',

@@ -575,3 +575,176 @@ describe('SEC-3.2 (#195) — oversized payloads are rejected cleanly', () => {
     expect(stores[`collection-${USER_ID}-records`].data.has('index')).toBe(false)
   })
 })
+
+// (FEAT-EPIC-5, #276) Phase A enrichment — endpoint-level security-gate tests
+// for the BLOBS write path (POST/PUT). The pure validator is already covered in
+// item-fields.test.js; these prove the HANDLER wires validateItem into the
+// write path: a hostile enriched body → 400 with a code and NOTHING stored, a
+// valid enriched body persists, and protected identity/privilege fields are
+// still stripped alongside the new enrichment fields.
+describe('Phase A enrichment — endpoint-level, Blobs write path (FEAT-EPIC-5 #276)', () => {
+  const enrichedRecord = {
+    title: 'The Artist - Album',
+    artists: [
+      { id: 123, name: 'The Artist', anv: 'T.A.', role: 'Main' },
+      { id: 456, name: 'Guest' },
+    ],
+    masterId: 999,
+    tracklist: [
+      { position: 'A1', title: 'Song One', duration: '3:45' },
+      { position: 'A2', title: 'Song Two' },
+    ],
+    released: '1987-05-15',
+  }
+  const enrichedBook = {
+    title: 'Author - Book',
+    authorsList: [{ name: 'Jane Doe', id: 'book-1' }, { name: 'John Roe' }],
+    subtitle: 'A Subtitle',
+    series: 'The Series',
+    mainCategory: 'Fiction',
+    snippet: 'A short blurb about the book.',
+  }
+
+  const storedItemKeys = (store) => [...store.data.keys()].filter((k) => k.startsWith('item:'))
+
+  it('POST persists a well-formed enriched record (artists, masterId, tracklist, released)', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', enrichedRecord)
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.artists).toEqual(enrichedRecord.artists)
+    expect(body.masterId).toBe(999)
+    expect(body.tracklist).toHaveLength(2)
+    expect(body.released).toBe('1987-05-15')
+    const stored = store.data.get(`item:${body.id}`)
+    expect(stored.artists).toEqual(enrichedRecord.artists)
+    expect(stored.tracklist[1]).toEqual({ position: 'A2', title: 'Song Two' })
+    expect(stored.masterId).toBe(999)
+    expect(stored.released).toBe('1987-05-15')
+  })
+
+  it('POST persists a well-formed enriched book (authorsList, subtitle, series, mainCategory, snippet)', async () => {
+    seedMember()
+    const store = createStore()
+    stores[`collection-${USER_ID}-books`] = store
+    store.data.set('index', [])
+    const res = await call('POST', '?collection=books', enrichedBook)
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.authorsList).toEqual(enrichedBook.authorsList)
+    expect(body.subtitle).toBe('A Subtitle')
+    expect(body.snippet).toBe('A short blurb about the book.')
+    const stored = store.data.get(`item:${body.id}`)
+    expect(stored.authorsList[0]).toEqual({ name: 'Jane Doe', id: 'book-1' })
+    expect(stored.series).toBe('The Series')
+    expect(stored.mainCategory).toBe('Fiction')
+    expect(stored.snippet).toBe('A short blurb about the book.')
+  })
+
+  it('PUT partially patches enriched fields onto an existing item (merged, not replaced)', async () => {
+    seedMember()
+    const store = collectionStore([{ id: 'r1', title: 'The Artist - Album', year: 2000 }])
+    const res = await call('PUT', '?collection=records&id=r1', {
+      artists: enrichedRecord.artists,
+      masterId: 999,
+      tracklist: enrichedRecord.tracklist,
+      released: '1987-05-15',
+    })
+    expect(res.status).toBe(200)
+    const stored = store.data.get('item:r1')
+    expect(stored.artists).toHaveLength(2)
+    expect(stored.masterId).toBe(999)
+    expect(stored.released).toBe('1987-05-15')
+    expect(stored.title).toBe('The Artist - Album') // merged, not replaced
+  })
+
+  it('POST rejects an oversized artists array (9) with 400 TOO_LONG and stores nothing', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', {
+      title: 'A',
+      artists: Array.from({ length: 9 }, (_, i) => ({ id: i + 1, name: `A${i}` })),
+    })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TOO_LONG')
+    expect(storedItemKeys(store)).toEqual([])
+  })
+
+  it('POST rejects a deep/nested hostile object inside artists[] with 400 TYPE_ERROR and stores nothing', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', {
+      title: 'A',
+      artists: [{ id: 1, name: { nested: true } }],
+    })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TYPE_ERROR')
+    expect(storedItemKeys(store)).toEqual([])
+  })
+
+  it('POST rejects an unknown sub-key inside a tracklist entry with 400 UNKNOWN_FIELD and stores nothing', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', {
+      title: 'A',
+      tracklist: [{ position: 'A1', title: 'T', lyrics: 'x' }],
+    })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('UNKNOWN_FIELD')
+    expect(storedItemKeys(store)).toEqual([])
+  })
+
+  it('POST rejects a non-string snippet with 400 TYPE_ERROR and stores nothing', async () => {
+    seedMember()
+    const store = createStore()
+    stores[`collection-${USER_ID}-books`] = store
+    store.data.set('index', [])
+    const res = await call('POST', '?collection=books', { title: 'B', snippet: ['x'] })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TYPE_ERROR')
+    expect(storedItemKeys(store)).toEqual([])
+  })
+
+  it('POST rejects a type-mismatch masterId ("x") with 400 TYPE_ERROR and stores nothing', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', { title: 'A', masterId: 'x' })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TYPE_ERROR')
+    expect(storedItemKeys(store)).toEqual([])
+  })
+
+  it('PUT rejects a hostile enriched patch and leaves the existing item untouched', async () => {
+    seedMember()
+    const store = collectionStore([{ id: 'r1', title: 'A - B', year: 2000 }])
+    const res = await call('PUT', '?collection=records&id=r1', {
+      artists: [{ id: 1, name: 'X', role: { deep: true } }],
+    })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('TYPE_ERROR')
+    expect(store.data.get('item:r1').artists).toBeUndefined()
+  })
+
+  it('persists the new enrichment fields while STILL stripping protected identity/privilege fields', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', {
+      ...enrichedRecord,
+      ownerId: 'attacker',
+      role: 'admin',
+      code: 'RU-SECRET',
+      email: 'attacker@example.com',
+    })
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.artists).toEqual(enrichedRecord.artists)
+    const stored = store.data.get(`item:${body.id}`)
+    expect(stored.artists).toEqual(enrichedRecord.artists)
+    expect(stored.masterId).toBe(999)
+    expect(stored.ownerId).toBeUndefined()
+    expect(stored.role).toBeUndefined()
+    expect(stored.code).toBeUndefined()
+    expect(stored.email).toBeUndefined()
+  })
+})
