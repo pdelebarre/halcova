@@ -1,0 +1,102 @@
+// @vitest-environment node
+//
+// SSRF regression suite for the Google Books lookup proxy (netlify/functions/
+// books.js, SEC-6.3 #217). The lookup actions (searchBarcode / searchText /
+// detail) build their endpoint from a FIXED GOOGLE_BASE — user input only rides
+// as encoded query/path params, never as the host — which is asserted here
+// against a mocked global fetch. The public cover action is also exercised
+// through this handler (the pure allowlist lives in _shared/cover.test.js).
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import booksHandler from '../books'
+import { adminSessionToken } from './session-test-helpers'
+
+const { stores, createStore } = vi.hoisted(() => {
+  const stores = {}
+  function createStore() {
+    const data = new Map()
+    return {
+      data,
+      async get(key) { const v = this.data.get(String(key)); return v === undefined ? null : JSON.parse(JSON.stringify(v)) },
+      async setJSON(key, value) { this.data.set(String(key), JSON.parse(JSON.stringify(value))) },
+      async delete(key) { this.data.delete(String(key)) },
+      async list() { return { keys: [...this.data.keys()].map((key) => ({ key })) } },
+    }
+  }
+  return { stores, createStore }
+})
+
+vi.mock('@netlify/blobs', () => ({ getStore: (name) => stores[name] || (stores[name] = createStore()) }))
+
+const originalFetch = global.fetch
+let TOKEN = ''
+
+beforeEach(async () => {
+  for (const key of Object.keys(stores)) delete stores[key]
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ items: [] }),
+    headers: { get: () => 'application/json' },
+  })
+  TOKEN = await adminSessionToken()
+})
+
+afterEach(() => {
+  global.fetch = originalFetch
+})
+
+function req(path, token = TOKEN) {
+  return {
+    method: 'GET',
+    url: `http://localhost${path}`,
+    headers: { get: (n) => (String(n).toLowerCase() === 'authorization' ? `Bearer ${token}` : '') },
+  }
+}
+
+describe('lookup actions — fixed base host only (no host injection)', () => {
+  it('searchText with a URL-shaped query still fetches only the Google Books base', async () => {
+    await booksHandler(req(`/.netlify/functions/books?action=searchText&q=${encodeURIComponent('https://evil.example.com/steal')}`))
+    const fetched = String(global.fetch.mock.calls[0][0])
+    const parsed = new URL(fetched)
+    // The HOST is always the fixed Google Books API — the malicious string only
+    // ever rides as an encoded query-param VALUE, never as the connect host.
+    expect(parsed.hostname).toBe('www.googleapis.com')
+    expect(parsed.origin + parsed.pathname).toBe('https://www.googleapis.com/books/v1/volumes')
+  })
+
+  it('detail id is URL-encoded into the fixed path — no host/path escape', async () => {
+    await booksHandler(req(`/.netlify/functions/books?action=detail&id=${encodeURIComponent('../@evil.com/x')}`))
+    const fetched = String(global.fetch.mock.calls[0][0])
+    const parsed = new URL(fetched)
+    // Host is fixed; the malicious value is a SINGLE percent-encoded path
+    // segment (..%2F… won't decode into a traversal or a new host).
+    expect(parsed.hostname).toBe('www.googleapis.com')
+    expect(parsed.pathname.startsWith('/books/v1/volumes/')).toBe(true)
+    expect(fetched).not.toContain('@evil.com')
+    expect(parsed.pathname).not.toContain('/../')
+  })
+
+  it('searchBarcode sends only the fixed base with the digits as a param', async () => {
+    await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780140328721'))
+    const fetched = String(global.fetch.mock.calls[0][0])
+    expect(fetched.startsWith('https://www.googleapis.com/books/v1/')).toBe(true)
+  })
+})
+
+describe('cover action — public SSRF surface (via the books handler)', () => {
+  const malicious = [
+    'https://127.0.0.1/x.png',
+    'https://169.254.169.254/latest/meta-data/',
+    'https://books.google.com.evil.com/x.jpg',
+    'https://evil-discogs.com/x.jpg',
+    'http://books.google.com/x.jpg',
+    'https://[::1]/x.jpg',
+  ]
+  for (const url of malicious) {
+    it(`rejects ${url} with 400 and never touches the network`, async () => {
+      const res = await booksHandler(req(`/.netlify/functions/books?action=cover&url=${encodeURIComponent(url)}`))
+      expect(res.status).toBe(400)
+      expect(global.fetch).not.toHaveBeenCalled()
+    })
+  }
+})

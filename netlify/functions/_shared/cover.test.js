@@ -53,6 +53,80 @@ describe('isAllowedCoverUrl', () => {
     expect(isAllowedCoverUrl(undefined)).toBe(false)
     expect(isAllowedCoverUrl('not a url')).toBe(false)
   })
+
+  // ---- SEC-6.3 (#217) — comprehensive SSRF edge cases. ----
+  it('rejects scheme confusion and protocol-relative URLs', () => {
+    expect(isAllowedCoverUrl('//i.discogs.com/x.jpg')).toBe(false) // protocol-relative (invalid)
+    expect(isAllowedCoverUrl('http://i.discogs.com/x.jpg')).toBe(false) // downgraded
+    expect(isAllowedCoverUrl('ftp://i.discogs.com/x.jpg')).toBe(false)
+    // NOTE: WHATWG normalizes a single-slash "https:/host" to "https://host",
+    // and the ALLOWLIST is then applied to the NORMALIZED hostname (i.discogs.com),
+    // so it is allowed but the connect host is still i.discogs.com — not a bypass.
+    expect(isAllowedCoverUrl('https:/i.discogs.com/x.jpg')).toBe(true)
+  })
+
+  it('rejects private / link-local / loopback IP hosts', () => {
+    const ipTargets = [
+      'https://127.0.0.1/x.png',
+      'https://localhost/x.png',
+      'https://0.0.0.0/x.png',
+      'https://169.254.169.254/latest/meta-data/', // cloud metadata
+      'https://10.0.0.1/x.png', // RFC1918
+      'https://192.168.1.1/x.png',
+      'https://172.16.0.1/x.png',
+      'https://[::1]/x.png', // IPv6 loopback
+      'https://[fd00::1]/x.png', // IPv6 ULA
+      // Percent-encoded dots in an IP host are normalized, then still rejected.
+      'https://127%2e0%2e0%2e1/x.png',
+    ]
+    for (const url of ipTargets) expect(isAllowedCoverUrl(url)).toBe(false)
+  })
+
+  it('rejects look-alike / suffix-bypass hosts', () => {
+    const lookalikes = [
+      'https://evil-discogs.com/x.jpg',
+      'https://discogs.com.evil.com/x.jpg',
+      'https://i.discogs.com.evil.com/x.jpg',
+      'https://notdiscogs.com/x.jpg',
+      'https://discogs.com.attacker.io/x.jpg',
+      'https://books.google.com.evil.com/x.jpg',
+      'https://m.media-amazon.com.attacker.io/x.jpg',
+    ]
+    for (const url of lookalikes) expect(isAllowedCoverUrl(url)).toBe(false)
+  })
+
+  it('rejects encoded/punycode/trailing-dot host tricks', () => {
+    // Encoded dots in a NON-allowlisted host normalize to the evil host and are
+    // rejected by the allowlist.
+    expect(isAllowedCoverUrl('https://i.discogs.com%2eevil.com/x.jpg')).toBe(false)
+    // Punycode / trailing-dot hosts are never allowlisted.
+    expect(isAllowedCoverUrl('https://xn--i-9qba.example/x.jpg')).toBe(false)
+    expect(isAllowedCoverUrl('https://i.discogs.com./x.jpg')).toBe(false)
+    expect(isAllowedCoverUrl('https://i.discogs.com%2e/x.jpg')).toBe(false)
+    // NOTE: an encoded dot WITHIN an allowlisted host normalizes to a real dot
+    // (i%2ediscogs.com -> i.discogs.com), so it is allowed — but the connect
+    // host is still the allowlisted domain (normalization is applied before the
+    // allowlist check), so this is not a bypass.
+    expect(isAllowedCoverUrl('https://i%2ediscogs.com/x.jpg')).toBe(true)
+  })
+
+  it('does NOT let userinfo (user@host) smuggle a different connect host', () => {
+    // userinfo points at an evil host but the actual connect host is evil.com —
+    // must be rejected.
+    expect(isAllowedCoverUrl('https://i.discogs.com@evil.com/x.jpg')).toBe(false)
+    // userinfo on an allowed host does not change the connect host (still
+    // i.discogs.com) — not a bypass, but document the behavior.
+    expect(isAllowedCoverUrl('https://attacker@i.discogs.com/x.jpg')).toBe(true)
+  })
+
+  it('treats backslashes as slashes (WHATWG) without changing the connect host', () => {
+    // For special schemes WHATWG normalizes backslashes to slashes, so the
+    // host is still i.discogs.com (allowlisted) and the path gets the rest.
+    expect(isAllowedCoverUrl('https://i.discogs.com\\@evil.com/x.jpg')).toBe(true)
+    // But a backslash that ends the authority keeps the allowed host; the
+    // alternate form below resolves to an evil HOST and must be rejected.
+    expect(isAllowedCoverUrl('https://evil.com\\@i.discogs.com/x.jpg')).toBe(false)
+  })
 })
 
 describe('coverCacheKey', () => {
