@@ -1,6 +1,7 @@
-// One-shot seeder for the public demo space. Reachable ONLY with the admin key
-// (`Authorization: Bearer RUNOUT_ADMIN_KEY` — a 401 otherwise). Seeds the
-// shared demo stores (collection-demo-records / collection-demo-books, via
+// One-shot seeder for the public demo space. Reachable ONLY with the owner's
+// admin SESSION (`Authorization: Bearer <sessionToken>` — SEC-1.6, #181: the
+// admin key only minted this session at login). Seeds the shared demo stores
+// (collection-demo-records / collection-demo-books, via
 // storeNameFor('demo', kind)) with a curated fixed set of well-known records
 // and books so every demo visitor sees the same items rendered by the shared
 // CollectionView flow.
@@ -15,9 +16,13 @@
 //
 // How to run:
 //   1. Start the functions locally:  netlify dev   (functions on :8888)
-//   2. Either curl it:
+//   2. Exchange the admin key for an admin session, then call it:
+//        SESSION=$(curl -s -X POST http://localhost:8888/.netlify/functions/auth \
+//                   -H "Content-Type: application/json" \
+//                   -d "{\"action\":\"login\",\"code\":\"$RUNOUT_ADMIN_KEY\"}" \
+//                   | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).session))")
 //        curl -X POST http://localhost:8888/.netlify/functions/seed-demo \
-//             -H "Authorization: Bearer $RUNOUT_ADMIN_KEY"
+//             -H "Authorization: Bearer $SESSION"
 //      or use the thin wrapper:  node scripts/seed-demo.mjs
 //   In production, trigger it once after deploy (RUNOUT_ADMIN_KEY is required
 //   and never ships to the client; RUNOUT_DEMO_CODE is public by design).

@@ -10,7 +10,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, DEMO_CODE, DEMO_USER, OWNER_ID, bearer, generateAccessCode, isDemoCode, publicUser } from './_shared/auth'
+import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, generateAccessCode, isDemoCode, publicUser } from './_shared/auth'
 import { normalizeCode } from './_shared/codes'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { consumeMagicLink, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
