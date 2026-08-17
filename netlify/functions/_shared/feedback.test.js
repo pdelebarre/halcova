@@ -22,14 +22,14 @@
 //   - a Postgres outage degrades to the Blobs store instead of 500ing
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import handler, { FEEDBACK_RATE_LIMIT, FEEDBACK_RATE_WINDOW_MS } from './feedback'
-import { ADMIN_KEY } from './_shared/auth'
-import { adminSessionToken, demoSessionToken, sessionTokenFor } from './_shared/session-test-helpers'
-import { createFeedbackRepo } from './_shared/repositories/feedback-repo'
-import { createMemDb } from './_shared/repositories/test-helpers'
-import { createUsersRepo } from './_shared/repositories/users-repo'
-import { windowIndex } from './_shared/rate-limit'
-import { __resetRepositoryForTests } from './_shared/repository'
+import handler, { FEEDBACK_RATE_LIMIT, FEEDBACK_RATE_WINDOW_MS } from '../feedback'
+import { ADMIN_KEY } from './auth'
+import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
+import { createFeedbackRepo } from './repositories/feedback-repo'
+import { createMemDb } from './repositories/test-helpers'
+import { createUsersRepo } from './repositories/users-repo'
+import { windowIndex } from './rate-limit'
+import { __resetRepositoryForTests } from './repository'
 
 // Hoisted so the @netlify/blobs mock (registered before the module under test
 // is imported) can share the in-memory store registry.
@@ -63,7 +63,7 @@ vi.mock('@netlify/blobs', () => ({
 // the Blobs path (default), the Postgres path (pg-mem), and the fallback —
 // repository.js / postgres-repository.js import ./postgres, which this mocks.
 const pgRef = vi.hoisted(() => ({ configured: false, db: null }))
-vi.mock('./_shared/postgres', () => ({
+vi.mock('./postgres', () => ({
   isPostgresConfigured: () => pgRef.configured,
   get db() { return pgRef.db },
 }))

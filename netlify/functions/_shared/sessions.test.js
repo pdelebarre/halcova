@@ -64,7 +64,14 @@ describe('createSession — opaque, hash-only, role-captured', () => {
   it('returns an opaque token and stores ONLY its sha256 hash — never the raw token', async () => {
     const { token, record } = await createSession({ userId: 'u1', role: 'member' })
     expect(token).toMatch(/^[A-Za-z0-9_-]{20,}$/)
-    expect(token).not.toContain('u1')
+    // Opaque: 32 random bytes → exactly 43 base64url chars, and it is NOT a
+    // trivially-derived encoding of the userId — so no identity is embedded.
+    // (We assert equality against derivations rather than `not.toContain('u1')`,
+    // which is flaky because a random 43-char string can coincidentally contain
+    // the 2-char substring.)
+    expect(token).toHaveLength(43)
+    expect(token).not.toBe(Buffer.from('u1').toString('base64url'))
+    expect(token).not.toBe(Buffer.from(`u1:${record.role}`).toString('base64url'))
 
     const sessions = stores['runout-sessions']
     // The raw token must not appear as a key or inside any stored value.
