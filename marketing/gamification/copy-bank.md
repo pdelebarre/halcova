@@ -4,6 +4,13 @@ Copy for the gamification suite. EN master first; translation notes + `[VALIDATE
 flags per the localization rules (en, en-GB, fr, nl, pt-BR, de, es, it).
 
 **Rules:**
+- **Contents-first:** games run on *what the records/books mean* — artist and
+  author, story, era, genre, label, connection — never on *when you added them*.
+  All `dateAdded`-based trivia is retired (see §12 and `lore-layer-plan.md`).
+- **The Halcova Library:** lore lines are **Sourced** from the curated,
+  fact-checked Halcova Library (ledger-tracked, two-source minimum) or
+  **Computed** from the player's own item data — never invented. Sourced lines
+  carry "From the Halcova Library" (`lore.attribution`).
 - Jokes tease the *collection*, never the person.
 - No references that don't travel (no US-only "flea market"/"mail carrier" in
   locales where it reads oddly — flag `[VALIDATE]`).
@@ -35,13 +42,13 @@ Structure: **Archetype name** · verdict line (1–2 sentences) · suggested sta
 | The Time Traveler | Your crate is a time machine with a serious bias. `{year}` called, it wants its shelf back. | `{n}%` from the `{year}s` · `{n}` decades · 1 jazz record you bought to look smart |
 | The Genre Tourist | `{n}` genres and zero commitments. We respect the chaos. | `{n}` genres · `{n}` labels · `{n}` countries |
 | The Completist | `{artist}` has a full discography in here. Somewhere, a stranger just felt a chill. | `{n}/{n}` albums · `{n}` pressings of one · `{n}` notes |
-| The Impulse Buyer | You added `{n}` records in one day. Your delivery person knows your name. `[VALIDATED]` — see §11 (L1) | `{n}` in one day · busiest month · `{n}` total |
-
-> EN master de-US'd in the Phase 0 pass: "mail carrier" → "delivery person"
-> (neutral, travels); local forms per §11.1–11.6 (L1).
 | The One-Timer | You own exactly one record by `{artist}`. That's not a collection, that's a teaser. | 1 by `{artist}` · `{n}` total artists · gap since `{year}` |
 | The Variant Collector | Two pressings of the same album? That's not duplication, that's commitment. | `{n}` pressings of one · `{n}` albums owned twice · `{n}` total |
 | The Sophisticate | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` jazz · `{n}` genres · notes on `{n}` items |
+
+> ~~The Impulse Buyer~~ — **retired** in the contents-first pivot (2026-08-17):
+> the whole archetype ran on `dateAdded` bursts (`{n}` in one day · busiest
+> month). See §10 and `lore-layer-plan.md`.
 
 ### Books ("shelf")
 | Archetype | Verdict (EN) | Suggested stats |
@@ -51,7 +58,7 @@ Structure: **Archetype name** · verdict line (1–2 sentences) · suggested sta
 | The Genre Hedonist | Cozy mystery beside dense theory. The shelf has no rules. Good. | `{n}` categories · `{n}` authors · `{n}` pages |
 | The Page Counter | `{n}` pages and counting. Your shelf is a gym membership for your brain. | `{n}` pages · `{n}` books · longest book `{title}` |
 | The One-Series Wonder | `{author}` wrote `{n}%` of your shelf. Branch out — we'll still be here. | `{n}%` one author · `{n}` authors · `{n}` books |
-| The First-Edition Idealist | You'd trade a couch for a first edition. Priorities. `[VALIDATED]` — see §11 (L2) | `{n}` books · `{n}` publishers · `{n}` categories |
+| The First-Edition Idealist | You'd trade a couch for a first edition. Priorities. `[VALIDATED]` — see §11 (L1) | `{n}` books · `{n}` publishers · `{n}` categories |
 
 **Fallback (both kinds):** *Your collection is still young — and already
 talking.* (shown before enough data exists)
@@ -61,13 +68,21 @@ talking.* (shown before enough data exists)
 ## 3. The Crate Quiz copy
 
 ### Question prompts
-| Key | EN (master) |
-| --- | --- |
-| `quiz.guessYear` | Which year is this from? |
-| `quiz.nameArtist` | Who's behind this cover? |
-| `quiz.newestOldest` | Which did you add first? |
-| `quiz.stillYours` | Do you still own this? |
-| `quiz.sortShelf` | Put these in year order. |
+
+| Key | EN (master) | Notes |
+| --- | --- | --- |
+| `quiz.guessYear` | Which year is this from? | Computed |
+| `quiz.nameArtist` | Who's behind this cover? | Computed |
+| `quiz.loreFact` | Which of these is the real story behind `{title}`? | Sourced (T2) — `[FACT]`; Computed fallback |
+| `quiz.artistFact` | Which of these is true about `{artist}`? | Sourced (T1) — `[FACT]`; Computed fallback |
+| `quiz.yearContext` | What else was going on in `{year}`? | Sourced (T3) — `[FACT]`; Computed fallback |
+| `quiz.connection` | Which of these belongs next to `{title}`? | Sourced (T6) — `[FACT]`; Computed fallback |
+| `quiz.stillYours` | Do you still own this? | **Keep-optional warm-up.** Its reveal teaches *lore*, not add-dates — product call pending |
+| `quiz.sortShelf` | Put these in year order. | Computed |
+
+> `quiz.newestOldest` ("Which did you add first?") — **retired** in the
+> contents-first pivot: it read `dateAdded`, and trivia about *when you added*
+> an item is off the table.
 
 ### Correct-answer feedback (rotating)
 - You remembered. The crate is proud.
@@ -76,9 +91,19 @@ talking.* (shown before enough data exists)
 
 ### Wrong-answer feedback (rotating) — always followed by the reveal
 - You own `{n}` records from the `{year}s` and you missed that. The vinyl heard.
-- Wrong — but the real answer is better: you added `{title}` in `{date}`. Your notes say: "{notes}".
 - To be fair, `{title}` has been hiding behind `{otherTitle}` for a while.
 - Not quite. But now you'll never forget you own `{title}` again.
+
+> The "you added `{title}` in `{date}`" reveal clause — **retired** in the
+> contents-first pivot. The teaching reveal is now the *story* (see below), never
+> the add-date.
+
+### Lore miss reveal (contents-first) — the reveal teaches the story, not the date
+
+| Key | EN (master) | Notes |
+| --- | --- | --- |
+| `quiz.missLore` | Not quite — but the story is better: `{lore}`. | Story-based miss reveal. `{lore}` is a **Sourced** Halcova Library fact (T2, `[FACT]`) or the **Computed** fallback — never invented |
+| `quiz.missNotes` | Your notes say: "{notes}". | **Only shown when the user wrote notes.** Reuses the validated notes line (§11, L13); never fabricates notes |
 
 ### Streak / day-complete copy
 - `{n}`-day streak. Don't make the crate sad tomorrow.
@@ -90,14 +115,18 @@ talking.* (shown before enough data exists)
 
 | Key | Quest | EN (master) | Reward |
 | --- | --- | --- | --- |
-| `quest.discography` | Finish the discography | You own `{n}/{n}` by `{artist}`. Hunt the rest. `[VALIDATED]` — see §11 (L3) | XP + "Completist" progress |
+| `quest.discography` | Finish the discography | You own `{n}/{n}` by `{artist}`. Hunt the rest. `[VALIDATED]` — see §11 (L2) | XP + "Completist" progress |
 | `quest.decadeGap` | The `{decade}` Gap | Your `{decade}s` are thin. Add `{n}` more. | XP |
 | `quest.sameArtist` | Same-artist blind spots | You love `{artist}` — go grab the one you're missing. | XP |
 | `quest.variants` | The Variant Shelf | You own `{title}` twice. Commit to the variants or let one go. | XP + "Variant Hoarder" |
 | `quest.lend` | Lend a record, make a friend | Lend something from your crate and get it back. | XP + "Friend of the Crate" |
 | `quest.return` | Bring it home | That overdue book has a family. Get it returned. | XP |
 | `quest.notes` | Notes for future you | Add notes to `{n}` items. Future you will thank you. | XP |
-| `quest.scanRecent` | The recent you forgot | You bought `{title}` recently and never scanned it. Fix that. | XP |
+| `quest.lorePick` | The Library's next chapter | The lore says `{title}` is the piece your `{artist}` story is missing. Go find it. `[FACT]` — Sourced (T2/T6) | XP |
+| `quest.genreExplorer` | Genre Explorer | You collect `{genre}` — but not its origin story. Add something from where it started. `[FACT]` — Sourced (T4) | XP |
+
+> `quest.scanRecent` ("the recent you forgot") — **retired** in the
+> contents-first pivot: it relied on `dateAdded` ("bought recently").
 
 ### Quest-complete toast
 - Quest complete. The crate grows stronger.
@@ -115,13 +144,16 @@ talking.* (shown before enough data exists)
 | `badge.genreTourist` | Genre Tourist | 10+ genres/categories | Ten genres and no regrets. |
 | `badge.timeTraveler` | Time Traveler | Items from 5+ decades | Five decades in one crate. History buff. |
 | `badge.completist` | Completist | Full artist discography | `{artist}` complete. We heard the completionist choir. |
-| `badge.impulseBuyer` | Impulse Buyer | 10 added in a day `[VALIDATE]` *(data-feasibility — req §11.2, not humor)* | Ten in one day. Your wallet's on a break. `[VALIDATED]` — see §11 (L14) |
 | `badge.sleeveSleuth` | Sleeve Sleuth | Notes on 10 items | Ten notes. The collection finally has opinions. |
 | `badge.balancedDiet` | Balanced Diet | Records **and** books | Records and books. Culture, properly balanced. |
 | `badge.onetimer` | One-Timer | Single item by a legend | One `{artist}`. Bold. Mysterious. |
 | `badge.variantHoarder` | Variant Hoarder | 2+ pressings, one album | Two pressings of one album. Commitment issues? No — commitment. |
 | `badge.friendOfCrate` | Friend of the Crate | First lend + return | You lent and it came home. Friendship: unlocked. |
 | `badge.quizWhiz` | Quiz Whiz | Perfect quiz day | Perfect quiz. The crate is officially intimidated. |
+
+> `badge.impulseBuyer` — **retired** in the contents-first pivot (2026-08-17):
+> the "10 added in a day" unlock ran on `dateAdded` and its data-feasibility
+> flag is moot. See §10.
 
 ---
 
@@ -171,10 +203,11 @@ covers in bulk, no codes.
   register works best).
 - **"You bought it to look smart"** lines: universally funny, but soften the
   "smart" in FR ("pour faire chic") and IT ("per fare scena").
-- **Local idioms to avoid**: "flea market", "mail carrier", "gym membership" —
-  resolved in the Phase 0 pass (see §11): "mail carrier" → local delivery figure
-  (L1), "gym membership" → local gym-abonnement gag (L4). "Flea market" appears
-  only inside *user-written notes* (never in copy) — leave user content untouched.
+- **Local idioms to avoid**: "flea market", "gym membership" — resolved in the
+  Phase 0 pass (see §11): "gym membership" → local gym-abonnement gag (L3).
+  "Flea market" appears only inside *user-written notes* (never in copy) — leave
+  user content untouched. ("Mail carrier" was retired with the Impulse Buyer
+  line in the contents-first pivot, 2026-08-17.)
 - **Numbers/plurals**: use ICU pluralization (already the app's pattern) for
   every `{n}` line.
 
@@ -184,12 +217,17 @@ All archetype verdicts · quiz feedback lines · badge names/lines · quest name
 fun-fact templates — **native-speaker check in fr, nl, pt-BR, de, es, it**
 before the feature ships to those locales.
 
-**Phase 0 humor pass (2026-08-14):** see §11. The three line-level `[VALIDATE]`
-flags on humor (L1 Impulse Buyer, L2 First-Edition Idealist, L3
-quest.discography) are cleared to `[VALIDATED]`. `badge.impulseBuyer`'s unlock
-stays `[VALIDATE]` — that flag is data-feasibility (req §11.2), not humor. 15
-humor lines were translated + annotated for all six locales; ~49 further lines
-were validated as clean-travel without change.
+**Contents-first pivot (2026-08-17):** all `dateAdded`-based trivia is retired —
+`quiz.newestOldest`, the "you added `{title}` in `{date}`" reveal clause, the
+Impulse Buyer persona + badge, the add-streak, `quest.scanRecent`. In their
+place, lore lines come from the **Halcova Library** and carry `[FACT]` (sourced,
+ledger-tracked) or `[VALIDATE]`/`[CULT]` for voice/local-hero — see §12.
+
+**Phase 0 humor pass (2026-08-14):** see §11. The line-level `[VALIDATE]` flags
+on humor (L1 First-Edition Idealist, L2 quest.discography — the L1 Impulse
+Buyer flag was retired in the contents-first pivot) are cleared to
+`[VALIDATED]`. 13 humor lines were translated + annotated for all six locales;
+~49 further lines were validated as clean-travel without change.
 
 ---
 
@@ -199,6 +237,13 @@ were validated as clean-travel without change.
 `[VALIDATE]` line in this bank plus every line carrying a US-only or
 locale-specific reference, per `requirements.md` §10.
 
+**Updated for the contents-first pivot (2026-08-17):** the two
+`dateAdded`-based lines — L1 (Impulse Buyer verdict) and L14 (Impulse Buyer
+badge line) — were **retired** with the rest of the `dateAdded` trivia. This
+pass now covers **13 lines (L1–L13)** per locale; the rows were renumbered and
+the remaining flags are all humor/voice (the sole data-feasibility flag,
+`badge.impulseBuyer`'s unlock, is gone with the badge).
+
 The translations below are the **working handoff** for the i18n locales and the
 catalog `.copy`; the private circle's native testers do final sign-off on the
 remaining flags (§11.9). Computed placeholders (`{n}`, `{year}`, `{artist}`,
@@ -206,21 +251,22 @@ remaining flags (§11.9). Computed placeholders (`{n}`, `{year}`, `{artist}`,
 
 **Counts (per locale, this pass):**
 
-| Locale | Flagged lines translated (L1–L15) | Clean-travel lines validated (§11.8) | Not cleared |
+| Locale | Flagged lines translated (L1–L13) | Clean-travel lines validated (§11.8) | Not cleared |
 | --- | --- | --- | --- |
-| fr | 15 | ~49 | 1 (data flag) |
-| nl | 15 | ~49 | 1 (data flag) |
-| pt-BR | 15 | ~49 | 1 (data flag) |
-| de | 15 | ~49 | 1 (data flag) |
-| es | 15 | ~49 | 1 (data flag) |
-| it | 15 | ~49 | 1 (data flag) |
+| fr | 13 | ~49 | 0 |
+| nl | 13 | ~49 | 0 |
+| pt-BR | 13 | ~49 | 0 |
+| de | 13 | ~49 | 0 |
+| es | 13 | ~49 | 0 |
+| it | 13 | ~49 | 0 |
 
-> The single line kept `[VALIDATE]` in every locale is `badge.impulseBuyer`'s
-> unlock condition — a **data-feasibility** flag (req §11.2), not humor.
+> No data-feasibility flag remains in this pass — the `badge.impulseBuyer`
+> unlock was retired with the badge. Every remaining `[VALIDATE]` is
+> humor/voice or a §12 lore gate.
 
 **en-GB micro-note:** the EN master is already UK-safe after the de-US pass
-("delivery person"), but "couch" reads US — en-GB should render *sofa* (L2),
-and "grocery run" → *the weekly shop* (L6) if a UK variant is ever shipped.
+("delivery person"), but "couch" reads US — en-GB should render *sofa* (L1),
+and "grocery run" → *the weekly shop* (L5) if a UK variant is ever shipped.
 
 ### 11.1 fr
 
@@ -229,21 +275,19 @@ collection, never the person.
 
 | Id | EN (master) | FR (native) | Validation note |
 | --- | --- | --- | --- |
-| L1 | You added `{n}` records in one day. Your delivery person knows your name. | Tu as ajouté `{n}` disques en une journée. Ton facteur connaît ton nom. | "mail carrier" → *facteur* (classic FR comic figure; *livreur* also works). Humor travels cleanly. |
-| L2 | You'd trade a couch for a first edition. Priorities. | Tu troquerais un canapé contre une première édition. Priorités. | "trade a couch" reads naturally; one-word *Priorités.* lands. |
-| L3 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Tu possèdes `{n}/{n}` de `{artist}`. Chasse les autres. | *chasse* keeps the hunt gag. |
-| L4 | Your shelf is a gym membership for your brain. | Ton étagère est un abonnement de salle de sport pour ton cerveau. | Unused-gym-membership gag is very FR (*l'abonnement jamais utilisé*). |
-| L5 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Ton étagère se lit comme un programme de cours pour un diplôme que tu n'as jamais fini — dans le bon sens. | "syllabus" has no direct FR word → *programme de cours*; unfinished-studies gag is relatable. |
-| L6 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Tu achètes des disques comme d'autres font les courses — chaque semaine, et toujours plus que prévu. | "grocery run" → *faire les courses*; universal. |
-| L7 | Twenty-five books. Somewhere, a TBR pile is jealous. | Vingt-cinq livres. Quelque part, une pile à lire est jalouse. | **"TBR" must not ship as-is** → *pile à lire* (standard FR reading-community term). |
-| L8 | Five decades in one crate. History buff. | Cinq décennies dans un seul bac. Mordu d'histoire. | "history buff" → *mordu d'histoire* (*mordu de* = obsessed). |
-| L9 | `{artist}` complete. We heard the completionist choir. | `{artist}` au complet. On a entendu le chœur des collectionneurs. | No single FR word for "completionist" here → *chœur des collectionneurs*. |
-| L10 | Nailed it. | En plein dans le mille. | Bullseye idiom; the books aside ("applauds — quietly") travels cleanly. |
-| L11 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` de ton bac, c'est du jazz acheté pour faire chic. Ça a marché. | Per §9, soften "smart" → *pour faire chic*. |
-| L12 | 1 jazz record you bought to look smart | 1 disque de jazz acheté pour faire chic | Same softening as L11. |
-| L13 | You just made `{artist}` your most-cataloged artist. Nice. | Tu viens de faire de `{artist}` ton artiste le plus catalogué. Sympa. | Deadpan "Nice." → *Sympa.* (dry register works). |
-| L14 | Ten in one day. Your wallet's on a break. | Dix en un jour. Ton portefeuille est en pause. | "on a break" → *en pause*. |
-| L15 | Your notes say: "{notes}". | Tes notes disent : « {notes} ». | Travels; open flag is data (notes presence — req §11.7), not humor. |
+| L1 | You'd trade a couch for a first edition. Priorities. | Tu troquerais un canapé contre une première édition. Priorités. | "trade a couch" reads naturally; one-word *Priorités.* lands. |
+| L2 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Tu possèdes `{n}/{n}` de `{artist}`. Chasse les autres. | *chasse* keeps the hunt gag. |
+| L3 | Your shelf is a gym membership for your brain. | Ton étagère est un abonnement de salle de sport pour ton cerveau. | Unused-gym-membership gag is very FR (*l'abonnement jamais utilisé*). |
+| L4 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Ton étagère se lit comme un programme de cours pour un diplôme que tu n'as jamais fini — dans le bon sens. | "syllabus" has no direct FR word → *programme de cours*; unfinished-studies gag is relatable. |
+| L5 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Tu achètes des disques comme d'autres font les courses — chaque semaine, et toujours plus que prévu. | "grocery run" → *faire les courses*; universal. |
+| L6 | Twenty-five books. Somewhere, a TBR pile is jealous. | Vingt-cinq livres. Quelque part, une pile à lire est jalouse. | **"TBR" must not ship as-is** → *pile à lire* (standard FR reading-community term). |
+| L7 | Five decades in one crate. History buff. | Cinq décennies dans un seul bac. Mordu d'histoire. | "history buff" → *mordu d'histoire* (*mordu de* = obsessed). |
+| L8 | `{artist}` complete. We heard the completionist choir. | `{artist}` au complet. On a entendu le chœur des collectionneurs. | No single FR word for "completionist" here → *chœur des collectionneurs*. |
+| L9 | Nailed it. | En plein dans le mille. | Bullseye idiom; the books aside ("applauds — quietly") travels cleanly. |
+| L10 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` de ton bac, c'est du jazz acheté pour faire chic. Ça a marché. | Per §9, soften "smart" → *pour faire chic*. |
+| L11 | 1 jazz record you bought to look smart | 1 disque de jazz acheté pour faire chic | Same softening as L10. |
+| L12 | You just made `{artist}` your most-cataloged artist. Nice. | Tu viens de faire de `{artist}` ton artiste le plus catalogué. Sympa. | Deadpan "Nice." → *Sympa.* (dry register works). |
+| L13 | Your notes say: "{notes}". | Tes notes disent : « {notes} ». | Travels; open flag is data (notes presence — req §11.7), not humor. |
 
 Clean-travel in fr: the §11.8 list with no changes needed.
 
@@ -254,21 +298,19 @@ directness is fine.
 
 | Id | EN (master) | NL (native) | Validation note |
 | --- | --- | --- | --- |
-| L1 | You added `{n}` records in one day. Your delivery person knows your name. | Je hebt `{n}` platen in één dag toegevoegd. Je pakketbezorger kent je naam. | "mail carrier" → *pakketbezorger* (parcel delivery — the modern NL reality); *postbode* alternative. |
-| L2 | You'd trade a couch for a first edition. Priorities. | Je zou je bank inruilen voor een eerste druk. Prioriteiten. | *bank inruilen* — very natural. |
-| L3 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Je hebt `{n}/{n}` van `{artist}`. Ga op jacht naar de rest. | Hunt gag travels. |
-| L4 | Your shelf is a gym membership for your brain. | Je plank is een sportschoolabonnement voor je brein. | Unused-gym-membership gag is universal in NL. |
-| L5 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Je plank leest als een studiegids voor een studie die je nooit afmaakte — in de goede zin. | "syllabus" → *studiegids* (no exact NL word); unfinished-studies gag relatable. |
-| L6 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Je koopt platen zoals anderen boodschappen doen — wekelijks, en altijd meer dan je van plan was. | Universal. |
-| L7 | Twenty-five books. Somewhere, a TBR pile is jealous. | Vijfentwintig boeken. Ergens is een nog-te-lezen-stapel jaloers. | **"TBR" → native *nog-te-lezen-stapel*** (communities do say "TBR", but native is safer). |
-| L8 | Five decades in one crate. History buff. | Vijf decennia in één krat. Geschiedenisfanaat. | *-fanaat* is the natural NL suffix idiom. |
-| L9 | `{artist}` complete. We heard the completionist choir. | `{artist}` compleet. We hoorden het completistenkoor. | *completenkoor* is a light coinage; *koor van de verzamelaars* alternative. |
-| L10 | Nailed it. | Gelukt! | NL has no bullseye idiom here → plain *Gelukt!*; the anti-climax carries it. |
-| L11 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` van je krat is jazz die je kocht om indruk te maken. Het werkt. | Per §9, soften "look smart" → *om indruk te maken* (impress). |
-| L12 | 1 jazz record you bought to look smart | 1 jazzplaat die je kocht om indruk te maken | As L11. |
-| L13 | You just made `{artist}` your most-cataloged artist. Nice. | Je maakte zojuist van `{artist}` je meest gecatalogiseerde artiest. Mooi. | Deadpan *Mooi.* |
-| L14 | Ten in one day. Your wallet's on a break. | Tien op één dag. Je portemonnee staat op pauze. | *staat op pauze*. |
-| L15 | Your notes say: "{notes}". | Je notities zeggen: "{notes}". | Travels; data flag only (req §11.7). |
+| L1 | You'd trade a couch for a first edition. Priorities. | Je zou je bank inruilen voor een eerste druk. Prioriteiten. | *bank inruilen* — very natural. |
+| L2 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Je hebt `{n}/{n}` van `{artist}`. Ga op jacht naar de rest. | Hunt gag travels. |
+| L3 | Your shelf is a gym membership for your brain. | Je plank is een sportschoolabonnement voor je brein. | Unused-gym-membership gag is universal in NL. |
+| L4 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Je plank leest als een studiegids voor een studie die je nooit afmaakte — in de goede zin. | "syllabus" → *studiegids* (no exact NL word); unfinished-studies gag relatable. |
+| L5 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Je koopt platen zoals anderen boodschappen doen — wekelijks, en altijd meer dan je van plan was. | Universal. |
+| L6 | Twenty-five books. Somewhere, a TBR pile is jealous. | Vijfentwintig boeken. Ergens is een nog-te-lezen-stapel jaloers. | **"TBR" → native *nog-te-lezen-stapel*** (communities do say "TBR", but native is safer). |
+| L7 | Five decades in one crate. History buff. | Vijf decennia in één krat. Geschiedenisfanaat. | *-fanaat* is the natural NL suffix idiom. |
+| L8 | `{artist}` complete. We heard the completionist choir. | `{artist}` compleet. We hoorden het completistenkoor. | *completenkoor* is a light coinage; *koor van de verzamelaars* alternative. |
+| L9 | Nailed it. | Gelukt! | NL has no bullseye idiom here → plain *Gelukt!*; the anti-climax carries it. |
+| L10 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` van je krat is jazz die je kocht om indruk te maken. Het werkt. | Per §9, soften "look smart" → *om indruk te maken* (impress). |
+| L11 | 1 jazz record you bought to look smart | 1 jazzplaat die je kocht om indruk te maken | As L10. |
+| L12 | You just made `{artist}` your most-cataloged artist. Nice. | Je maakte zojuist van `{artist}` je meest gecatalogiseerde artiest. Mooi. | Deadpan *Mooi.* |
+| L13 | Your notes say: "{notes}". | Je notities zeggen: "{notes}". | Travels; data flag only (req §11.7). |
 
 Clean-travel in nl: the §11.8 list with no changes needed.
 
@@ -278,21 +320,19 @@ Register per §9: warm, *você*, self-deprecating; playful idioms land well.
 
 | Id | EN (master) | PT-BR (native) | Validation note |
 | --- | --- | --- | --- |
-| L1 | You added `{n}` records in one day. Your delivery person knows your name. | Você adicionou `{n}` discos em um dia. O carteiro já sabe seu nome. | *carteiro* classic; *entregador* modern alternative. |
-| L2 | You'd trade a couch for a first edition. Priorities. | Você trocaria um sofá por uma primeira edição. Prioridades. | Natural. |
-| L3 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Você tem `{n}/{n}` de `{artist}`. Vá caçar o resto. | Natural. |
-| L4 | Your shelf is a gym membership for your brain. | Sua estante é uma academia para o seu cérebro. | *academia* — the pay-and-never-go gag is very BR. |
-| L5 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Sua estante parece a grade curricular de um curso que você nunca terminou — no bom sentido. | *grade curricular* is the natural BR term. |
-| L6 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Você compra discos como quem faz a feira — toda semana, e sempre mais do que planejou. | *fazer a feira* = weekly market run — very BR and warm. |
-| L7 | Twenty-five books. Somewhere, a TBR pile is jealous. | Vinte e cinco livros. Em algum lugar, uma pilha de leitura está com inveja. | **"TBR" → *pilha de leitura*** (the standard BR reading-community term). |
-| L8 | Five decades in one crate. History buff. | Cinco décadas em uma caixa. Rato de história. | *rato de X* = passionate about X — BR idiom. |
-| L9 | `{artist}` complete. We heard the completionist choir. | `{artist}` completo. A gente ouviu o coro dos completistas. | *a gente ouviu* casual register; *completista* works. |
-| L10 | Nailed it. | Na mosca! | Bullseye idiom, perfect. |
-| L11 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` da sua caixa é jazz comprado pra parecer cult. Funcionou. | *pra parecer cult* — BR slang for the intellectual pose. |
-| L12 | 1 jazz record you bought to look smart | 1 disco de jazz comprado pra parecer cult | As L11. |
-| L13 | You just made `{artist}` your most-cataloged artist. Nice. | Você acabou de fazer do `{artist}` seu artista mais catalogado. Show! | Deadpan *Show!* works. |
-| L14 | Ten in one day. Your wallet's on a break. | Dez em um dia. Sua carteira tá de folga. | *de folga* (off work) — very BR. |
-| L15 | Your notes say: "{notes}". | Suas notas dizem: "{notes}". | Travels. |
+| L1 | You'd trade a couch for a first edition. Priorities. | Você trocaria um sofá por uma primeira edição. Prioridades. | Natural. |
+| L2 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Você tem `{n}/{n}` de `{artist}`. Vá caçar o resto. | Natural. |
+| L3 | Your shelf is a gym membership for your brain. | Sua estante é uma academia para o seu cérebro. | *academia* — the pay-and-never-go gag is very BR. |
+| L4 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Sua estante parece a grade curricular de um curso que você nunca terminou — no bom sentido. | *grade curricular* is the natural BR term. |
+| L5 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Você compra discos como quem faz a feira — toda semana, e sempre mais do que planejou. | *fazer a feira* = weekly market run — very BR and warm. |
+| L6 | Twenty-five books. Somewhere, a TBR pile is jealous. | Vinte e cinco livros. Em algum lugar, uma pilha de leitura está com inveja. | **"TBR" → *pilha de leitura*** (the standard BR reading-community term). |
+| L7 | Five decades in one crate. History buff. | Cinco décadas em uma caixa. Rato de história. | *rato de X* = passionate about X — BR idiom. |
+| L8 | `{artist}` complete. We heard the completionist choir. | `{artist}` completo. A gente ouviu o coro dos completistas. | *a gente ouviu* casual register; *completista* works. |
+| L9 | Nailed it. | Na mosca! | Bullseye idiom, perfect. |
+| L10 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` da sua caixa é jazz comprado pra parecer cult. Funcionou. | *pra parecer cult* — BR slang for the intellectual pose. |
+| L11 | 1 jazz record you bought to look smart | 1 disco de jazz comprado pra parecer cult | As L10. |
+| L12 | You just made `{artist}` your most-cataloged artist. Nice. | Você acabou de fazer do `{artist}` seu artista mais catalogado. Show! | Deadpan *Show!* works. |
+| L13 | Your notes say: "{notes}". | Suas notas dizem: "{notes}". | Travels. |
 
 Clean-travel in pt-BR: the §11.8 list with no changes needed.
 
@@ -302,21 +342,19 @@ Register per §9: warm but direct; avoid sarcasm that reads as insult; *du*.
 
 | Id | EN (master) | DE (native) | Validation note |
 | --- | --- | --- | --- |
-| L1 | You added `{n}` records in one day. Your delivery person knows your name. | Du hast `{n}` Platten an einem Tag hinzugefügt. Dein Paketbote kennt deinen Namen. | *Paketbote* (parcel courier) — everyone gets parcels; *Postbote* alternative. |
-| L2 | You'd trade a couch for a first edition. Priorities. | Du würdest dein Sofa gegen eine Erstausgabe eintauschen. Prioritäten. | Natural. |
-| L3 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Du hast `{n}/{n}` von `{artist}`. Jag die restlichen. | *jagen* keeps the hunt gag. |
-| L4 | Your shelf is a gym membership for your brain. | Dein Regal ist ein Fitnessstudio-Abo für dein Gehirn. | The never-used-gym *Abo* gag is very DE. |
-| L5 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Dein Regal liest sich wie ein Studienplan für einen Abschluss, den du nie gemacht hast — im positiven Sinne. | "syllabus" → *Studienplan* (no exact word); unfinished-degree gag relatable. |
-| L6 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Du kaufst Platten wie andere Leute einkaufen gehen — jede Woche, und immer mehr als geplant. | Universal. |
-| L7 | Twenty-five books. Somewhere, a TBR pile is jealous. | Fünfundzwanzig Bücher. Irgendwo ist ein Stapel ungelesener Bücher neidisch. | **"TBR" → *Stapel ungelesener Bücher* — DE readers literally use the acronym "SUB"**; a nice wink if kept. |
-| L8 | Five decades in one crate. History buff. | Fünf Jahrzehnte in einer Kiste. Geschichtsfan. | *Geschichtsfan* direct. |
-| L9 | `{artist}` complete. We heard the completionist choir. | `{artist}` komplett. Wir haben den Chor der Komplettisten gehört. | *Komplettist* is an accepted gamer term in DE. |
-| L10 | Nailed it. | Volltreffer. | Bullseye idiom, natural. |
-| L11 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` deiner Kiste ist Jazz, den du gekauft hast, um klug zu wirken. Hat funktioniert. | Per §9, soften "look smart" → *um klug zu wirken* (avoid mocky *schlau tun*). |
-| L12 | 1 jazz record you bought to look smart | 1 Jazzplatte, gekauft um klug zu wirken | As L11. |
-| L13 | You just made `{artist}` your most-cataloged artist. Nice. | Du hast `{artist}` gerade zu deinem meistkatalogisierten Künstler gemacht. Schön. | Deadpan *Schön.* |
-| L14 | Ten in one day. Your wallet's on a break. | Zehn an einem Tag. Dein Geldbeutel macht Pause. | *macht Pause*. |
-| L15 | Your notes say: "{notes}". | Deine Notizen sagen: "{notes}". | Travels. |
+| L1 | You'd trade a couch for a first edition. Priorities. | Du würdest dein Sofa gegen eine Erstausgabe eintauschen. Prioritäten. | Natural. |
+| L2 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Du hast `{n}/{n}` von `{artist}`. Jag die restlichen. | *jagen* keeps the hunt gag. |
+| L3 | Your shelf is a gym membership for your brain. | Dein Regal ist ein Fitnessstudio-Abo für dein Gehirn. | The never-used-gym *Abo* gag is very DE. |
+| L4 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Dein Regal liest sich wie ein Studienplan für einen Abschluss, den du nie gemacht hast — im positiven Sinne. | "syllabus" → *Studienplan* (no exact word); unfinished-degree gag relatable. |
+| L5 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Du kaufst Platten wie andere Leute einkaufen gehen — jede Woche, und immer mehr als geplant. | Universal. |
+| L6 | Twenty-five books. Somewhere, a TBR pile is jealous. | Fünfundzwanzig Bücher. Irgendwo ist ein Stapel ungelesener Bücher neidisch. | **"TBR" → *Stapel ungelesener Bücher* — DE readers literally use the acronym "SUB"**; a nice wink if kept. |
+| L7 | Five decades in one crate. History buff. | Fünf Jahrzehnte in einer Kiste. Geschichtsfan. | *Geschichtsfan* direct. |
+| L8 | `{artist}` complete. We heard the completionist choir. | `{artist}` komplett. Wir haben den Chor der Komplettisten gehört. | *Komplettist* is an accepted gamer term in DE. |
+| L9 | Nailed it. | Volltreffer. | Bullseye idiom, natural. |
+| L10 | `{n}%` of your crate is jazz you bought to look smart. It worked. | `{n}%` deiner Kiste ist Jazz, den du gekauft hast, um klug zu wirken. Hat funktioniert. | Per §9, soften "look smart" → *um klug zu wirken* (avoid mocky *schlau tun*). |
+| L11 | 1 jazz record you bought to look smart | 1 Jazzplatte, gekauft um klug zu wirken | As L10. |
+| L12 | You just made `{artist}` your most-cataloged artist. Nice. | Du hast `{artist}` gerade zu deinem meistkatalogisierten Künstler gemacht. Schön. | Deadpan *Schön.* |
+| L13 | Your notes say: "{notes}". | Deine Notizen sagen: "{notes}". | Travels. |
 
 Clean-travel in de: the §11.8 list with no changes needed.
 
@@ -326,21 +364,19 @@ Register per §9: warm, *tú*; note Spain vs LatAm variants where they differ.
 
 | Id | EN (master) | ES (native) | Validation note |
 | --- | --- | --- | --- |
-| L1 | You added `{n}` records in one day. Your delivery person knows your name. | Añadiste `{n}` discos en un día. El cartero ya sabe tu nombre. | *cartero* universal. |
-| L2 | You'd trade a couch for a first edition. Priorities. | Cambiarías un sofá por una primera edición. Prioridades. | Natural. |
-| L3 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Tienes `{n}/{n}` de `{artist}`. Ve a por el resto. | "a por" is Spain; LatAm *Ve por el resto*. |
-| L4 | Your shelf is a gym membership for your brain. | Tu estante es un gimnasio para tu cerebro. | The never-used-gym gag is universal in ES. |
-| L5 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Tu estante parece un programa de estudios para una carrera que nunca terminaste — en el buen sentido. | *programa de estudios* natural. |
-| L6 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Compras discos como otros hacen la compra — cada semana, y siempre más de lo previsto. | Spain *hacer la compra*; LatAm *hacer el súper*. |
-| L7 | Twenty-five books. Somewhere, a TBR pile is jealous. | Veinticinco libros. En algún lugar, una pila de pendientes está celosa. | **"TBR" → *pendientes*** (reading-community term for the to-read pile). |
-| L8 | Five decades in one crate. History buff. | Cinco décadas en una caja. Friki de la historia. | Playful; LatAm safer *amante de la historia*. |
-| L9 | `{artist}` complete. We heard the completionist choir. | `{artist}` completo. Hemos oído el coro de los completistas. | *completista* works (gaming). |
-| L10 | Nailed it. | ¡En el clavo! | Bullseye idiom. |
-| L11 | `{n}%` of your crate is jazz you bought to look smart. It worked. | El `{n}%` de tu caja es jazz que compraste para parecer culto. Funcionó. | Per §9, soften "smart" → *parecer culto*. |
-| L12 | 1 jazz record you bought to look smart | 1 disco de jazz comprado para parecer culto | As L11. |
-| L13 | You just made `{artist}` your most-cataloged artist. Nice. | Acabas de convertir a `{artist}` en tu artista más catalogado. Bonito. | Dry *Bonito.* (Spain *Mola.* alternative). |
-| L14 | Ten in one day. Your wallet's on a break. | Diez en un día. Tu cartera está de descanso. | *de descanso*. |
-| L15 | Your notes say: "{notes}". | Tus notas dicen: "{notes}". | Travels. |
+| L1 | You'd trade a couch for a first edition. Priorities. | Cambiarías un sofá por una primera edición. Prioridades. | Natural. |
+| L2 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Tienes `{n}/{n}` de `{artist}`. Ve a por el resto. | "a por" is Spain; LatAm *Ve por el resto*. |
+| L3 | Your shelf is a gym membership for your brain. | Tu estante es un gimnasio para tu cerebro. | The never-used-gym gag is universal in ES. |
+| L4 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Tu estante parece un programa de estudios para una carrera que nunca terminaste — en el buen sentido. | *programa de estudios* natural. |
+| L5 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Compras discos como otros hacen la compra — cada semana, y siempre más de lo previsto. | Spain *hacer la compra*; LatAm *hacer el súper*. |
+| L6 | Twenty-five books. Somewhere, a TBR pile is jealous. | Veinticinco libros. En algún lugar, una pila de pendientes está celosa. | **"TBR" → *pendientes*** (reading-community term for the to-read pile). |
+| L7 | Five decades in one crate. History buff. | Cinco décadas en una caja. Friki de la historia. | Playful; LatAm safer *amante de la historia*. |
+| L8 | `{artist}` complete. We heard the completionist choir. | `{artist}` completo. Hemos oído el coro de los completistas. | *completista* works (gaming). |
+| L9 | Nailed it. | ¡En el clavo! | Bullseye idiom. |
+| L10 | `{n}%` of your crate is jazz you bought to look smart. It worked. | El `{n}%` de tu caja es jazz que compraste para parecer culto. Funcionó. | Per §9, soften "smart" → *parecer culto*. |
+| L11 | 1 jazz record you bought to look smart | 1 disco de jazz comprado para parecer culto | As L10. |
+| L12 | You just made `{artist}` your most-cataloged artist. Nice. | Acabas de convertir a `{artist}` en tu artista más catalogado. Bonito. | Dry *Bonito.* (Spain *Mola.* alternative). |
+| L13 | Your notes say: "{notes}". | Tus notas dicen: "{notes}". | Travels. |
 
 Clean-travel in es: the §11.8 list with no changes needed.
 
@@ -350,21 +386,19 @@ Register per §9: warm, self-deprecating, expressive; *tu*.
 
 | Id | EN (master) | IT (native) | Validation note |
 | --- | --- | --- | --- |
-| L1 | You added `{n}` records in one day. Your delivery person knows your name. | Hai aggiunto `{n}` dischi in un giorno. Il postino ormai ti conosce. | *postino* classic — warm via the film *Il Postino*. |
-| L2 | You'd trade a couch for a first edition. Priorities. | Scambieresti un divano per una prima edizione. Priorità. | Natural. |
-| L3 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Hai `{n}/{n}` di `{artist}`. Vai a caccia del resto. | Hunting gag travels. |
-| L4 | Your shelf is a gym membership for your brain. | Il tuo scaffale è un abbonamento in palestra per il cervello. | Unused-gym gag universal in IT. |
-| L5 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Il tuo scaffale sembra il programma di studi di una laurea che non hai mai finito — nel senso buono. | *programma di studi* natural; unfinished-laurea gag relatable. |
-| L6 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Compri dischi come gli altri fanno la spesa — ogni settimana, e sempre più del previsto. | Universal. |
-| L7 | Twenty-five books. Somewhere, a TBR pile is jealous. | Venticinque libri. Da qualche parte, una pila di libri da leggere è gelosa. | **"TBR" → *pila di libri da leggere*** ("TBR" is used, but native is safer). |
-| L8 | Five decades in one crate. History buff. | Cinque decenni in una cassa. Appassionato di storia. | Direct; *secchione di storia* is harsher — keep warm. |
-| L9 | `{artist}` complete. We heard the completionist choir. | `{artist}` completo. Abbiamo sentito il coro dei completisti. | *completista* works (gaming). |
-| L10 | Nailed it. | Centrato! | Bullseye. |
-| L11 | `{n}%` of your crate is jazz you bought to look smart. It worked. | Il `{n}%` della tua cassa è jazz comprato per fare scena. Ha funzionato. | Per §9, soften "look smart" → *per fare scena*. |
-| L12 | 1 jazz record you bought to look smart | 1 disco jazz comprato per fare scena | As L11. |
-| L13 | You just made `{artist}` your most-cataloged artist. Nice. | Hai appena reso `{artist}` il tuo artista più catalogato. Bello. | Dry *Bello.* |
-| L14 | Ten in one day. Your wallet's on a break. | Dieci in un giorno. Il tuo portafoglio è in pausa. | *in pausa*. |
-| L15 | Your notes say: "{notes}". | Le tue note dicono: "{notes}". | Travels. |
+| L1 | You'd trade a couch for a first edition. Priorities. | Scambieresti un divano per una prima edizione. Priorità. | Natural. |
+| L2 | You own `{n}/{n}` by `{artist}`. Hunt the rest. | Hai `{n}/{n}` di `{artist}`. Vai a caccia del resto. | Hunting gag travels. |
+| L3 | Your shelf is a gym membership for your brain. | Il tuo scaffale è un abbonamento in palestra per il cervello. | Unused-gym gag universal in IT. |
+| L4 | Your shelf reads like a syllabus for a degree you never finished — in a good way. | Il tuo scaffale sembra il programma di studi di una laurea che non hai mai finito — nel senso buono. | *programma di studi* natural; unfinished-laurea gag relatable. |
+| L5 | You buy records the way other people buy groceries — weekly, and always more than you planned. | Compri dischi come gli altri fanno la spesa — ogni settimana, e sempre più del previsto. | Universal. |
+| L6 | Twenty-five books. Somewhere, a TBR pile is jealous. | Venticinque libri. Da qualche parte, una pila di libri da leggere è gelosa. | **"TBR" → *pila di libri da leggere*** ("TBR" is used, but native is safer). |
+| L7 | Five decades in one crate. History buff. | Cinque decenni in una cassa. Appassionato di storia. | Direct; *secchione di storia* is harsher — keep warm. |
+| L8 | `{artist}` complete. We heard the completionist choir. | `{artist}` completo. Abbiamo sentito il coro dei completisti. | *completista* works (gaming). |
+| L9 | Nailed it. | Centrato! | Bullseye. |
+| L10 | `{n}%` of your crate is jazz you bought to look smart. It worked. | Il `{n}%` della tua cassa è jazz comprato per fare scena. Ha funzionato. | Per §9, soften "look smart" → *per fare scena*. |
+| L11 | 1 jazz record you bought to look smart | 1 disco jazz comprato per fare scena | As L10. |
+| L12 | You just made `{artist}` your most-cataloged artist. Nice. | Hai appena reso `{artist}` il tuo artista più catalogato. Bello. | Dry *Bello.* |
+| L13 | Your notes say: "{notes}". | Le tue note dicono: "{notes}". | Travels. |
 
 Clean-travel in it: the §11.8 list with no changes needed.
 
@@ -382,7 +416,6 @@ name has no good translation, use a short evocative local equivalent.
 | The Time Traveler | Le Voyageur du temps | De Tijdreiziger | O Viajante do Tempo | Der Zeitreisende | El Viajero del Tiempo | Il Viaggiatore del Tempo |
 | The Genre Tourist | Le Touriste des genres | De Genrereiziger | O Turista de Gêneros | Der Genre-Tourist | El Turista de Géneros | Il Turista dei Generi |
 | The Completist | Le Complétiste | De Completist | O Completista | Der Komplettist | El Completista | Il Completista |
-| The Impulse Buyer | L'Acheteur impulsif | De Impulsaankoper | O Comprador Impulsivo | Der Impulskäufer | El Comprador Impulsivo | L'Acquirente Impulsivo |
 | The One-Timer | Le Fan d'un seul | De Eenmalige | O Fã de um Só | Der Eine-Platten-Fan | El Fan de un Solo Disco | Il Fan di un Solo Disco |
 | The Variant Collector | Le Collectionneur de variantes | De Variantenverzamelaar | O Colecionador de Variantes | Der Variantensammler | El Coleccionista de Variantes | Il Collezionista di Varianti |
 | The Sophisticate | L'Esthète | De Fijnproever | O Sofisticado | Der Feingeist | El Sofisticado | L'Esteta |
@@ -451,9 +484,8 @@ pt-BR, de, es, it as-is. Listed so the native testers know they were reviewed:
 - **Quest-complete toasts:** incl. "one (1) warm feeling" — keep the "(1)"
   enumeration gag in every locale.
 - **Quests:** decade Gap, same-artist blind spots, Variant Shelf, lend, return,
-  notes, recent-you-forgot — soften "Fix that." per locale: FR "Règle ça." · NL
-  "Los dat op." · PT "Resolve isso." · DE "Hol das nach." · ES "Arrégialo." · IT
-  "Sistemalo."
+  notes — soften "Fix that." per locale: FR "Règle ça." · NL "Los dat op." · PT
+  "Resolve isso." · DE "Hol das nach." · ES "Arrégialo." · IT "Sistemalo."
 - **Badges:** digger, genre-tourist, sleeve-sleuth, balanced-diet, one-timer,
   variant-hoarder, friend-of-crate, quiz-whiz.
 - **Level toasts:** "…salutes you." / "…rearranges itself in your honor."
@@ -464,11 +496,11 @@ pt-BR, de, es, it as-is. Listed so the native testers know they were reviewed:
 
 | Flag | Why it stays open / risk | Owner |
 | --- | --- | --- |
-| `badge.impulseBuyer` unlock "10 added in a day" | Not humor — data feasibility (event log vs `dateAdded` bucketing). Keep `[VALIDATE]`. | Netlify Backend / product |
-| "Your notes say…" (quiz miss) | The *sentence* is validated (L15); whether notes are present in the client model stays open. | Front End Developer (req §11.7) |
+| "Your notes say…" (quiz miss, L13) | The *sentence* is validated; whether notes are present in the client model stays open. | Front End Developer (req §11.7) |
 | Archetype / level **names** | Adaptations recommended (§11.7); final sign-off by native testers before they ship outside EN. EN names stay on share cards. | Native testers |
 | Fun-fact kind mismatch | "That's `{n}` records added this month. **The shelf** is thriving." — for records it must read *crate*; needs `{collectionLabel}` parameterization (copy bug, not humor). | Front End Developer |
-| "TBR" (L7) | Must ship the localized "to-read pile" form in every locale; never the acronym. | i18n handoff |
+| "TBR" (L6) | Must ship the localized "to-read pile" form in every locale; never the acronym. | i18n handoff |
+| §12 lore gates | `[FACT]` sourcing, `[CULT]` local-hero packs, `[VALIDATE]` voice + enriched-id/precache handoffs — see §12.3. | Marketing Manager + Front End / Netlify |
 
 **Copy risks for later phases:** the time-machine "…called, it wants its shelf
 back" gag is the most culturally-anchored of the clean lines — it translates
@@ -476,3 +508,56 @@ literally in all six but should be re-checked in real usage. Locking persona
 names to EN on share cards is a brand decision to fix early (affects the SVG
 render + i18n). Keep or drop the "(1)" enumeration gag consistently across
 locales.
+
+**Contents-first pivot (2026-08-17):** `dateAdded`-based copy is retired —
+`quiz.newestOldest`, the "you added `{title}` in `{date}`" reveal clause, the
+Impulse Buyer persona + badge, the add-streak, and `quest.scanRecent`. Any
+surviving reference to an add-date in a game surface is a bug. Lore lines must
+come from the Halcova Library (§12) or the Computed fallback — never invented.
+
+---
+
+## 12. Halcova Library — contents-first lore copy
+
+Lore lines are **Sourced** from the curated, fact-checked Halcova Library
+(precached, ledger-tracked, two-source minimum — see `lore-layer-plan.md` and
+the working pack under `lore/`) or **Computed** from the player's own item
+data. Never invented. Slots below carry the flags: `[FACT]` (verified truth),
+`[VALIDATE]` (voice/native check or product-data gate), `[CULT]` (local-hero
+pack), `[DISPUTED]` (contested — uncontested core only).
+
+### 12.1 Attribution & disclaimer
+
+| Key | EN (master) | Notes |
+| --- | --- | --- |
+| `lore.attribution` | From the Halcova Library | Shown on every Sourced line, lore question, and lore story card. Keep short in all locales. `[VALIDATE]` for the library-name localization |
+| `lore.disclaimer` | Collection lore comes from the Halcova Library — sourced and fact-checked, never invented. Spot a mistake? Tell us and we'll check the ledger. | Footer/onboarding line. `[VALIDATE]` per locale |
+
+### 12.2 Lore story slots (Shelf Stories tier)
+
+Structure matches the existing story cards (headline + body). `{lore}`,
+`{era}`, `{connection}`, `{labelLore}`, `{genreOrigin}` are **Sourced** facts —
+or the **Computed** fallback.
+
+| Key | Headline (EN) | Body (EN) | Notes |
+| --- | --- | --- | --- |
+| `story.lore` | The story behind `{title}` | `{lore}` | T2 — `[FACT]` |
+| `story.era` | `{year}: a snapshot` | What `{year}` sounded like (read like): `{era}`. | T3 — `[FACT]`; Computed fallback when no era fact |
+| `story.connection` | The `{artist}` line | Your collection connects `{title}` to `{otherTitle}`: `{connection}`. | T6 — `[FACT]` |
+| `story.labelLore` | On the `{label}` imprint | `{labelLore}`. | T5 — `[FACT]`; `[CULT]` when the label is locale-specific |
+| `story.genreOrigin` | Where `{genre}` began | `{genreOrigin}`. | T4 — `[FACT]` |
+
+### 12.3 Lore flags, translation & handoffs
+
+- **Facts universal, voice localizes:** the fact string is the single source of
+  truth in every locale; only the wrapper/humor localizes (`[VALIDATE]` per
+  locale, native-speaker check before it ships). en-GB is a canon variant.
+- **`[CULT]`** entries belong to a **local-hero pack** (fr/nl/pt-BR/de/es/it),
+  never a straight translation — see `lore/foundations/localization-notes.md`.
+- **`[VALIDATE]` product gates:** enriched stable-id matching (`discogsId` /
+  author id) and the Library precache location are Front End / Netlify
+  handoffs — the *content* ships regardless, matching by `splitArtistTitle` +
+  label/genre/year.
+- **Quiz fallback contract:** every lore question deals either from a Sourced
+  Library fact or the Computed metadata fallback — the quiz never dead-ends on
+  a missing fact.
