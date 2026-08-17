@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
 import CreditModal from './components/CreditModal'
+import FeedbackModal from './components/FeedbackModal'
 import LoansDashboard from './components/LoansDashboard'
 import DemoBanner from './components/DemoBanner'
 import CollectionView from './CollectionView'
@@ -63,6 +64,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
+  // In-app feedback (epic #74, T5 #82): null = closed, { initialType } = open.
+  // Settings opens a suggestion; the ErrorBoundary crash card pre-fills a bug.
+  const [feedbackOpen, setFeedbackOpen] = useState(null)
   // W7: loans dashboard — owns whether the global overlay is open and a
   // counter that bumps whenever a loan is returned so the visible collection
   // re-fetches and stays in sync.
@@ -363,7 +367,10 @@ export default function App() {
           the boundary/CollectionView keys, so each tab swap gets a fresh
           accent scope. */}
       <ThemeProvider theme={catalog?.theme}>
-        <ErrorBoundary key={`boundary-${catalog.kind}`}>
+        <ErrorBoundary
+          key={`boundary-${catalog.kind}`}
+          onReport={() => setFeedbackOpen({ initialType: 'bug' })}
+        >
           <CollectionView
             key={catalog.kind}
             catalog={catalog}
@@ -384,9 +391,23 @@ export default function App() {
         </ErrorBoundary>
       </ThemeProvider>
 
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          onOpenFeedback={() => {
+            setSettingsOpen(false)
+            setFeedbackOpen({ initialType: 'suggestion' })
+          }}
+        />
+      )}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}
       {creditOpen && <CreditModal onClose={() => setCreditOpen(false)} />}
+      {feedbackOpen && (
+        <FeedbackModal
+          initialType={feedbackOpen.initialType}
+          onClose={() => setFeedbackOpen(null)}
+        />
+      )}
       {lendingEnabled && loansOpen && (
         <LoansDashboard
           open={loansOpen}

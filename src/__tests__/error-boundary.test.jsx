@@ -48,6 +48,23 @@ describe('ErrorBoundary — no more dark blank screen (T7)', () => {
     expect(reload).toHaveBeenCalledTimes(1)
   })
 
+  it('shows a Report a problem button on the crash card (feat/feedback #82)', () => {
+    render(<ErrorBoundary><Bomb /></ErrorBoundary>)
+
+    // The old static claim was false (nothing auto-reported) — the button is
+    // the real report path now, and the false copy is gone.
+    expect(screen.getByRole('button', { name: 'Report a problem' })).toBeInTheDocument()
+    expect(screen.queryByText(/this error has been reported/i)).not.toBeInTheDocument()
+  })
+
+  it('opens the feedback report via onReport when Report a problem is tapped', () => {
+    const report = vi.fn()
+    render(<ErrorBoundary onReport={report}><Bomb /></ErrorBoundary>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Report a problem' }))
+    expect(report).toHaveBeenCalledTimes(1)
+  })
+
   it('clears the error state when remounted with a new key — the kind-switch reset', () => {
     // App.jsx keys the boundary by catalog.kind (`key={boundary-${kind}}`), so
     // switching records -> books remounts a fresh boundary. A failure in one

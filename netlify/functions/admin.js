@@ -13,6 +13,8 @@ import { parsePagination } from './_shared/pagination'
 import { db, isPostgresConfigured } from './_shared/postgres'
 import { createReviewsRepo } from './_shared/repositories/reviews-repo'
 import { createReviewsBlobStore } from './_shared/reviews-blob'
+import { createFeedbackRepo } from './_shared/repositories/feedback-repo'
+import { createFeedbackBlobStore } from './_shared/feedback-blob'
 import {
   deleteUserCollections,
   getRequest,
@@ -197,19 +199,48 @@ async function deleteMemberReviews(userId) {
   } catch { /* the authoritative Postgres cleanup already succeeded */ }
 }
 
+// T8 (H1) — deleteUser feedback cleanup. The member's feedback is PRIVATE to
+// them + the owner (authored message, author_name, url, user_agent), so it
+// must go when the member is deleted — GDPR right-to-erasure parity with the
+// reviews cleanup above. Same structure as deleteMemberReviews:
+//   - Blobs path (DATABASE_URL unset): the shared runout-feedback Blobs store
+//     is the only home of feedback — clean it.
+//   - Postgres path (DATABASE_URL set): Postgres is the authoritative home.
+//     The Postgres cleanup MUST succeed — falling back to a Blobs-only cleanup
+//     (as withReviews would on a Postgres error) would leave the Postgres rows
+//     orphaned once the member is deleted. A Postgres failure therefore
+//     surfaces: the whole deleteUser 500s and the member is NOT deleted (see
+//     the ordering in handleDeleteUser). A best-effort Blobs sweep then catches
+//     any read-through writes that landed in Blobs while Postgres was down.
+// Idempotent in both backends (a member with no feedback is a no-op).
+async function deleteMemberFeedback(userId) {
+  if (!isPostgresConfigured()) {
+    await createFeedbackBlobStore().deleteByAuthor(userId)
+    return
+  }
+  const repo = createFeedbackRepo(db)
+  await repo.deleteByAuthor(userId)
+  try {
+    await createFeedbackBlobStore().deleteByAuthor(userId)
+  } catch { /* the authoritative Postgres cleanup already succeeded */ }
+}
+
 async function handleDeleteUser(body) {
   if (!body.userId) return json(400, { error: 'Missing userId.' })
   if (body.userId === OWNER_ID) return json(400, { error: 'The owner account cannot be deleted.' })
   const user = await getUser(body.userId)
   if (!user) return json(404, { error: 'User not found.' })
 
-  // Task 7 (M2): a member's reviews go with them. This runs FIRST, before the
-  // user record is removed, so a failed reviews cleanup aborts the whole delete
-  // — a member is never left deleted with orphaned reviews pointing at a
-  // removed user. Cleanup is idempotent in both backends, so a retry after a
-  // partial failure is safe. NOTE: reviews belong to the RELEASE, not the copy
-  // — this runs only on user deletion, never on item removal from a collection.
+  // Task 7 (M2) + T8 (H1): a member's reviews AND feedback go with them. This
+  // runs FIRST, before the user record is removed, so a failed cleanup aborts
+  // the whole delete — a member is never left deleted with orphaned rows
+  // (reviews pointing at a removed author, or feedback retaining the member's
+  // PII) on either backend. Cleanup is idempotent in both backends, so a retry
+  // after a partial failure is safe. NOTE: reviews belong to the RELEASE and
+  // feedback to the AUTHOR — these run only on user deletion, never on item
+  // removal from a collection.
   await deleteMemberReviews(user.id)
+  await deleteMemberFeedback(user.id)
   await deleteUserCollections(user.id)
   await removeUserRecord(user.id)
   return json(200, { ok: true })

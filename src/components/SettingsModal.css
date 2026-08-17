@@ -111,3 +111,40 @@
   outline: 2px solid var(--jacket-kraft);
   outline-offset: 1px;
 }
+
+/* Feedback card (feat/feedback #82) — a full-width tappable action row that
+   opens the FeedbackModal. ≥48px, gold focus ring, chevron affordance. */
+.settings-feedback-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  min-height: 60px;
+}
+.settings-feedback-card:active { background: var(--vinyl-groove); }
+.settings-feedback-card:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: 1px;
+}
+.settings-feedback-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.settings-feedback-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+}
+.settings-feedback-subtitle {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--static-grey);
+}
+.settings-feedback-arrow {
+  color: var(--static-grey);
+  font-size: 16px;
+}

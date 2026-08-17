@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as authApi from './api/auth'
+import * as feedbackApi from './api/feedback'
 import { t, getLocale } from './i18n'
+import { deviceLabel } from './utils/appInfo'
 import './AdminPanel.css'
 
 const KIND_LABELS = { records: () => t('kind.records'), books: () => t('kind.books') }
 const KIND_ACCESS_LABELS = { records: () => t('kind.recordsAccess'), books: () => t('kind.booksAccess') }
 const KINDS = ['records', 'books']
+
+// Feedback inbox (epic #74, T6 #75) — mirror the allow-lists in
+// netlify/functions/feedback.js so a junk value from the server renders a
+// safe fallback instead of an unlabeled tag or a crash (no error boundary).
+const FB_STATUSES = ['open', 'in_progress', 'done', 'wontfix', 'duplicate']
+const FB_TYPES = ['suggestion', 'bug']
+const FB_CATEGORIES = new Set(['records', 'books', 'scanner', 'auth', 'billing', 'games', 'lending', 'other'])
 
 function fmtDate(iso) {
   if (!iso) return ''
@@ -14,6 +23,38 @@ function fmtDate(iso) {
   } catch {
     return ''
   }
+}
+
+// Timestamp for the inbox rows (date + time, locale-aware). Guarded — a junk or
+// missing ISO string degrades to '' instead of throwing.
+function fmtDateTime(iso) {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleString(getLocale(), {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return ''
+  }
+}
+
+// Feedback fields are untrusted server data — every read goes through a guard
+// so a malformed item can never dark-screen the panel. Unknown status/type
+// fall back to a safe, labeled default rather than leaking a raw value.
+function fbText(v) {
+  return typeof v === 'string' ? v : ''
+}
+function fbStatusLabel(item) {
+  const s = FB_STATUSES.includes(item?.status) ? item.status : 'open'
+  return t(`admin.feedback.status.${s}`)
+}
+function fbTypeLabel(item) {
+  const ty = FB_TYPES.includes(item?.type) ? item.type : 'suggestion'
+  return t(`admin.feedback.type.${ty}`)
 }
 
 // Switch-style plan toggle (§4.16): a button with role="switch" so the
@@ -51,6 +92,19 @@ export default function AdminPanel({ onClose }) {
   const [rotated, setRotated] = useState(null) // { user, code } from a rotate — returned exactly once
   const [copied, setCopied] = useState(null) // which code was just copied
 
+  // Feedback inbox (epic #74, T6 #75). Loaded on mount so the Feedback tab's
+  // unread badge (open items) is correct before the owner ever clicks it.
+  const [tab, setTab] = useState('members') // 'members' | 'feedback'
+  const [allItems, setAllItems] = useState([]) // full newest-first inbox (badge source)
+  const [fbLoading, setFbLoading] = useState(true)
+  const [fbError, setFbError] = useState('')
+  const [fbStatus, setFbStatus] = useState('') // '' = all statuses
+  const [fbType, setFbType] = useState('') // '' = all types
+  const [expandedId, setExpandedId] = useState(null) // expanded feedback id
+  const [noteDraft, setNoteDraft] = useState('') // admin note draft for the expanded item
+  const [fbBusy, setFbBusy] = useState(null) // id with a status/note/delete in flight
+  const [noteSaved, setNoteSaved] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -65,6 +119,31 @@ export default function AdminPanel({ onClose }) {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Load the full inbox once — the badge (open count) and the filterable list
+  // both derive from it, so a triage action updates both in one place.
+  const loadFeedback = useCallback(async () => {
+    setFbLoading(true)
+    setFbError('')
+    try {
+      const items = await feedbackApi.listFeedback()
+      setAllItems(Array.isArray(items) ? items : [])
+    } catch (err) {
+      // Coded failure (NO_TOKEN without a session, HTTP_ERROR, …) degrades to
+      // an empty inbox + an in-tab error state — never an uncaught throw.
+      setAllItems([])
+      setFbError(err?.message || '')
+    } finally {
+      setFbLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadFeedback() }, [loadFeedback])
+
+  const unread = allItems.filter((i) => i?.status === 'open').length
+  const visibleItems = allItems.filter((i) =>
+    (!fbStatus || i?.status === fbStatus) && (!fbType || i?.type === fbType)
+  )
 
   async function approve() {
     setError('')
@@ -223,6 +302,79 @@ export default function AdminPanel({ onClose }) {
     window.setTimeout(() => setCopied(null), 1500)
   }
 
+  function toggleExpand(item) {
+    if (expandedId === item.id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(item.id)
+    setNoteDraft(fbText(item?.adminNote))
+    setNoteSaved(false)
+  }
+
+  // Triage actions — each PATCH/DELETE is guarded by fbBusy (double-tap) and
+  // updates allItems in place from the server's response so the badge + list
+  // stay consistent; a malformed response falls back to a full reload.
+  function replaceItem(updated) {
+    if (updated?.id) {
+      setAllItems((items) => items.map((i) => (i.id === updated.id ? updated : i)))
+      return true
+    }
+    return false
+  }
+
+  async function changeStatus(item, status) {
+    if (fbBusy) return
+    setError('')
+    setFbBusy(item.id)
+    try {
+      const updated = await feedbackApi.updateFeedback({ id: item.id, status })
+      if (!replaceItem(updated)) await loadFeedback()
+    } catch (err) {
+      setError(err?.message || '')
+    } finally {
+      setFbBusy(null)
+    }
+  }
+
+  async function saveNote(item) {
+    if (fbBusy) return
+    setError('')
+    setFbBusy(item.id)
+    setNoteSaved(false)
+    try {
+      const updated = await feedbackApi.updateFeedback({ id: item.id, adminNote: noteDraft })
+      if (!replaceItem(updated)) await loadFeedback()
+      setNoteDraft(fbText(updated?.adminNote))
+      setNoteSaved(true)
+    } catch (err) {
+      setError(err?.message || '')
+    } finally {
+      setFbBusy(null)
+    }
+  }
+
+  // Two-step delete, mirroring member delete: a confirm() gate before the call.
+  async function deleteItem(item) {
+    if (fbBusy) return
+    if (!window.confirm(t('admin.feedback.deleteConfirm'))) return
+    setError('')
+    setFbBusy(item.id)
+    try {
+      await feedbackApi.deleteFeedback(item.id)
+      setAllItems((items) => items.filter((i) => i.id !== item.id))
+      if (expandedId === item.id) {
+        setExpandedId(null)
+        setNoteDraft('')
+        setNoteSaved(false)
+      }
+    } catch (err) {
+      setError(err?.message || '')
+    } finally {
+      setFbBusy(null)
+    }
+  }
+
   const pending = data.requests.filter((r) => r.status === 'pending')
   const members = data.users.filter((u) => u.role !== 'admin')
 
@@ -236,8 +388,36 @@ export default function AdminPanel({ onClose }) {
 
         {error && <p className="sheet-error admin-error">{error}</p>}
 
+        <div className="admin-tabs" role="tablist" aria-label={t('common.adminPanel')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'members'}
+            className={`admin-tab${tab === 'members' ? ' active' : ''}`}
+            onClick={() => setTab('members')}
+          >
+            {t('admin.tab.members')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'feedback'}
+            className={`admin-tab${tab === 'feedback' ? ' active' : ''}`}
+            onClick={() => setTab('feedback')}
+          >
+            {t('admin.tab.feedback')}
+            {unread > 0 && (
+              <span className="admin-badge" aria-label={t('admin.feedback.unread', { n: unread })}>
+                {unread}
+              </span>
+            )}
+          </button>
+        </div>
+
         <div className="admin-scroll">
-          <section>
+          {tab === 'members' ? (
+            <>
+              <section>
             <h3 className="admin-h3">{t('admin.pendingRequests')}{pending.length ? ` (${pending.length})` : ''}</h3>
             {loading ? (
               <p className="sheet-status">{t('common.loading')}</p>
@@ -405,6 +585,183 @@ export default function AdminPanel({ onClose }) {
               </ul>
             )}
           </section>
+            </>
+          ) : (
+            <section>
+              {/* Feedback inbox — owner-only triage (epic #74, T6 #75) */}
+              <h3 className="admin-h3">{t('admin.tab.feedback')}</h3>
+
+              <div className="admin-fb-filters" role="group" aria-label={t('admin.feedback.filterStatus')}>
+                <button
+                  type="button"
+                  aria-pressed={fbStatus === ''}
+                  className={`admin-fb-chip${fbStatus === '' ? ' active' : ''}`}
+                  onClick={() => setFbStatus('')}
+                >
+                  {t('admin.feedback.allStatuses')}
+                </button>
+                {FB_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={fbStatus === s}
+                    className={`admin-fb-chip${fbStatus === s ? ' active' : ''}`}
+                    onClick={() => setFbStatus(s)}
+                  >
+                    {t(`admin.feedback.status.${s}`)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="admin-fb-filters" role="group" aria-label={t('admin.feedback.filterType')}>
+                <button
+                  type="button"
+                  aria-pressed={fbType === ''}
+                  className={`admin-fb-chip${fbType === '' ? ' active' : ''}`}
+                  onClick={() => setFbType('')}
+                >
+                  {t('admin.feedback.allTypes')}
+                </button>
+                {FB_TYPES.map((ty) => (
+                  <button
+                    key={ty}
+                    type="button"
+                    aria-pressed={fbType === ty}
+                    className={`admin-fb-chip${fbType === ty ? ' active' : ''}`}
+                    onClick={() => setFbType(ty)}
+                  >
+                    {t(`admin.feedback.type.${ty}`)}
+                  </button>
+                ))}
+              </div>
+
+              {fbLoading ? (
+                <p className="sheet-status">{t('common.loading')}</p>
+              ) : fbError ? (
+                <p className="sheet-error" role="alert">
+                  {fbError}
+                  <button type="button" className="btn btn-ghost btn-sm admin-fb-retry" onClick={loadFeedback}>
+                    {t('admin.feedback.retry')}
+                  </button>
+                </p>
+              ) : visibleItems.length === 0 ? (
+                <p className="sheet-empty">
+                  {allItems.length === 0 ? t('admin.feedback.empty') : t('admin.feedback.emptyFiltered')}
+                </p>
+              ) : (
+                <ul className="admin-list">
+                  {visibleItems.map((item) => (
+                    <li key={item.id} className="admin-fb-item">
+                      <button
+                        type="button"
+                        className="admin-fb-head"
+                        aria-expanded={expandedId === item.id}
+                        onClick={() => toggleExpand(item)}
+                      >
+                        <span className="admin-fb-tags">
+                          <span className={`admin-fb-tag is-${item?.type === 'bug' ? 'bug' : 'suggestion'}`}>
+                            {fbTypeLabel(item)}
+                          </span>
+                          <span className={`admin-fb-tag is-status is-${item?.status || 'open'}`}>
+                            {fbStatusLabel(item)}
+                          </span>
+                          {FB_CATEGORIES.has(item?.category) && (
+                            <span className="admin-fb-tag">{t(`feedback.category.${item.category}`)}</span>
+                          )}
+                        </span>
+                        <span className="admin-fb-snippet">
+                          {fbText(item?.message).slice(0, 140) || t('feedback.contextEmpty')}
+                        </span>
+                        <span className="admin-fb-meta">
+                          {t('admin.feedback.from', { name: fbText(item?.authorName) || t('feedback.contextEmpty') })}
+                          {fmtDateTime(item?.createdAt) ? ` · ${fmtDateTime(item?.createdAt)}` : ''}
+                        </span>
+                        <span className="admin-fb-chevron" aria-hidden="true">
+                          {expandedId === item.id ? '▾' : '▸'}
+                        </span>
+                      </button>
+
+                      {expandedId === item.id && (
+                        <div className="admin-fb-detail">
+                          <p className="admin-fb-message">{fbText(item?.message) || t('feedback.contextEmpty')}</p>
+
+                          <dl className="admin-fb-context">
+                            <div>
+                              <dt>{t('admin.feedback.route')}</dt>
+                              <dd>{fbText(item?.url) || t('feedback.contextEmpty')}</dd>
+                            </div>
+                            <div>
+                              <dt>{t('admin.feedback.version')}</dt>
+                              <dd>{fbText(item?.appVersion) || t('feedback.contextEmpty')}</dd>
+                            </div>
+                            <div>
+                              <dt>{t('admin.feedback.device')}</dt>
+                              <dd>{deviceLabel(fbText(item?.userAgent)) || t('feedback.contextEmpty')}</dd>
+                            </div>
+                            <div>
+                              <dt>{t('admin.feedback.agent')}</dt>
+                              <dd>{fbText(item?.userAgent) || t('feedback.contextEmpty')}</dd>
+                            </div>
+                          </dl>
+
+                          <div className="admin-fb-status" role="group" aria-label={t('admin.feedback.statusActions')}>
+                            {FB_STATUSES.map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                aria-pressed={item?.status === s}
+                                className={`admin-fb-chip${item?.status === s ? ' active' : ''}`}
+                                disabled={fbBusy === item.id}
+                                onClick={() => changeStatus(item, s)}
+                              >
+                                {t(`admin.feedback.status.${s}`)}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="admin-fb-note">
+                            <label className="admin-fb-note-label" htmlFor={`fb-note-${item.id}`}>
+                              {t('admin.feedback.noteLabel')}
+                            </label>
+                            <textarea
+                              id={`fb-note-${item.id}`}
+                              className="admin-fb-note-input"
+                              rows={3}
+                              value={noteDraft}
+                              placeholder={t('admin.feedback.notePlaceholder')}
+                              onChange={(e) => {
+                                setNoteDraft(e.target.value)
+                                setNoteSaved(false)
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              disabled={fbBusy === item.id}
+                              onClick={() => saveNote(item)}
+                            >
+                              {fbBusy === item.id
+                                ? t('admin.feedback.saving')
+                                : noteSaved ? t('admin.feedback.noteSaved') : t('admin.feedback.saveNote')}
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            disabled={fbBusy === item.id}
+                            onClick={() => deleteItem(item)}
+                          >
+                            {t('admin.feedback.delete')}
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>

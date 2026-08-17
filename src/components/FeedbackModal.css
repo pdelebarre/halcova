@@ -1,0 +1,227 @@
+/* FeedbackModal — on-theme bottom sheet (feat/feedback #82). Reuses the shared
+   .sheet-overlay/.sheet pattern; the inner region scrolls so the header and
+   the submit action stay reachable. Gold `--runout-gold` accents on the dark
+   #16130F theme; touch targets ≥44px (WCAG 2.5.5). */
+
+.feedback-sheet {
+  overflow-y: auto;
+  gap: 14px;
+}
+
+.feedback-subtitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--jacket-kraft-dim);
+}
+
+/* Segmented Suggestion / Report a problem toggle — gold active state. */
+.feedback-type {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.feedback-type-btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--jacket-kraft-dim);
+}
+.feedback-type-btn.active {
+  background: var(--runout-gold);
+  color: var(--sleeve-black);
+}
+.feedback-type-btn:active { filter: brightness(1.06); }
+.feedback-type-btn:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: 1px;
+}
+
+/* Field groups */
+.feedback-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.feedback-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--static-grey);
+}
+
+/* Category chips — wrap, ≥44px, gold when active. */
+.feedback-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.feedback-chip {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove-2);
+  color: var(--jacket-kraft-dim);
+  font-size: 14px;
+  font-family: var(--font-mono);
+}
+.feedback-chip.active {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.12);
+}
+.feedback-chip:active { filter: brightness(1.08); }
+.feedback-chip:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: 1px;
+}
+
+/* Message label + live char counter. */
+.feedback-message-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--static-grey);
+}
+.feedback-counter {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.feedback-counter.at-max {
+  color: var(--danger-bright);
+}
+
+.feedback-textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  font-family: var(--font-mono);
+  color: var(--jacket-kraft);
+}
+.feedback-textarea::placeholder { color: var(--static-grey); }
+.feedback-textarea:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: 1px;
+}
+
+/* Auto-context row — a full-width tappable checkbox card (≥48px). */
+.feedback-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--vinyl-groove-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-height: 48px;
+}
+.feedback-context input {
+  width: 20px;
+  height: 20px;
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--runout-gold);
+}
+.feedback-context-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.feedback-context-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--jacket-kraft);
+}
+.feedback-context-detail {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--static-grey);
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+/* Error + success states. */
+.feedback-error {
+  margin: 0;
+  padding: 12px 14px;
+  background: rgba(194, 75, 63, 0.12);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger-bright);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.feedback-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.feedback-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 0 8px;
+  text-align: center;
+}
+.feedback-success-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(201, 162, 39, 0.14);
+  border: 1px solid var(--runout-gold);
+  color: var(--runout-gold);
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.feedback-success-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--jacket-kraft);
+}
+.feedback-success-body {
+  margin: 0 0 4px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--jacket-kraft-dim);
+}
+.feedback-success-ref {
+  margin: 6px 0 18px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--runout-gold);
+}
+.feedback-done {
+  width: 100%;
+  min-height: 48px;
+}

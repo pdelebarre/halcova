@@ -360,6 +360,80 @@ const de = {
   'demo.readOnlyNotice': 'Dies ist die schreibgeschützte Demo-Sammlung — melden Sie sich an, um eigene hinzuzufügen.',
   'demo.readOnlyToast': 'Die Demo-Sammlung ist schreibgeschützt.',
   'demo.notesReadOnly': 'Notizen sind in der Demo schreibgeschützt.',
+
+  // §19 In-app feedback (epic #74, T5 #82 → T7 #79) — FeedbackModal + admin
+  // inbox. EN master from the localization baseline (en.js). The glossary
+  // (marketing/localization-dictionary.md + addendum) has no feedback section,
+  // so per localization-plan.md these strings stay EN and are flagged
+  // [VALIDATE] for the native-tester pass — do NOT ship before the pass. Keys
+  // reusing an already-validated glossary term (Records/Books/Account/Done/
+  // Members/Retry) take this locale's value below; the rest are EN until a
+  // native tester translates them. `{n}`/`{max}`/`{ref}`/`{route}`/
+  // `{version}`/`{device}`/`{name}`/`{agent}` are interpolation placeholders.
+  'feedback.title': 'Feedback',
+  'feedback.subtitle': 'Suggest an idea or report a problem — we read everything.',
+  'feedback.typeLabel': 'Feedback type',
+  'feedback.type.suggestion': 'Suggestion',
+  'feedback.type.bug': 'Report a problem',
+  'feedback.categoryLabel': 'What\'s it about? (optional)',
+  'feedback.category.records': 'Platten',
+  'feedback.category.books': 'Bücher',
+  'feedback.category.scanner': 'Scanner',
+  'feedback.category.auth': 'Konto',
+  'feedback.category.billing': 'Billing',
+  'feedback.category.games': 'Games',
+  'feedback.category.lending': 'Lending',
+  'feedback.category.other': 'Other',
+  'feedback.messageLabel': 'Your message',
+  'feedback.messagePlaceholder': 'What happened, or what would you love to see?',
+  'feedback.charCount': '{n} / {max}',
+  'feedback.contextLabel': 'Include app info',
+  'feedback.contextDetail': '{route} · v{version} · {device}',
+  'feedback.contextEmpty': '—',
+  'feedback.submit': 'Send feedback',
+  'feedback.submitting': 'Sending…',
+  'feedback.successTitle': 'Thanks — we got it.',
+  'feedback.successBody': 'Reference {ref}. It goes straight to the team — we read everything.',
+  'feedback.referenceUnknown': '#fb-…',
+  'feedback.done': 'Fertig',
+  'feedback.error.generic': 'Couldn\'t send your feedback — check your connection and try again.',
+  'feedback.error.NO_TOKEN': 'Sign in to send feedback — the team reads member reports.',
+  'feedback.error.RATE_LIMITED': 'You\'ve sent a lot recently — take a breath and try again in a minute.',
+  'feedback.error.MESSAGE_TOO_LONG': 'That message is too long — keep it under 4000 characters.',
+  'feedback.error.DEMO_READONLY': 'The demo is read-only — sign in to send feedback.',
+
+  // Admin feedback inbox (epic #74, T6 #75 → T7 #79) — owner-only triage;
+  // same [VALIDATE] status as the modal keys above.
+  'admin.tab.members': 'Mitglieder',
+  'admin.tab.feedback': 'Feedback',
+  'admin.feedback.unread': '{n} unread',
+  'admin.feedback.filterStatus': 'Filter by status',
+  'admin.feedback.filterType': 'Filter by type',
+  'admin.feedback.allStatuses': 'All statuses',
+  'admin.feedback.allTypes': 'All types',
+  'admin.feedback.status.open': 'Open',
+  'admin.feedback.status.in_progress': 'In progress',
+  'admin.feedback.status.done': 'Fertig',
+  'admin.feedback.status.wontfix': 'Won\'t fix',
+  'admin.feedback.status.duplicate': 'Duplicate',
+  'admin.feedback.type.suggestion': 'Suggestion',
+  'admin.feedback.type.bug': 'Bug',
+  'admin.feedback.statusActions': 'Change status',
+  'admin.feedback.empty': 'No feedback yet — the inbox is quiet.',
+  'admin.feedback.emptyFiltered': 'Nothing matches those filters.',
+  'admin.feedback.retry': 'Erneut versuchen',
+  'admin.feedback.from': 'From {name}',
+  'admin.feedback.route': 'Route: {route}',
+  'admin.feedback.version': 'Version: {version}',
+  'admin.feedback.device': 'Device: {device}',
+  'admin.feedback.agent': 'User agent: {agent}',
+  'admin.feedback.noteLabel': 'Admin note',
+  'admin.feedback.notePlaceholder': 'Internal note — only you see this.',
+  'admin.feedback.saveNote': 'Save note',
+  'admin.feedback.noteSaved': 'Saved ✓',
+  'admin.feedback.saving': 'Saving…',
+  'admin.feedback.delete': 'Delete report',
+  'admin.feedback.deleteConfirm': 'Delete this feedback report? This cannot be undone.',
 }
 
 export default de
