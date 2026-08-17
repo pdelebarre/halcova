@@ -351,17 +351,23 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
     expect((await call('PUT', '', {}, `Bearer ${ADMIN_KEY}`)).status).toBe(405)
   })
 
-  it('never leaks the access code, the admin key, or code_hash', async () => {
-    seedMemberBlobs()
+  it('never leaks the access code, the admin key, code_hash, or PII beyond the session', async () => {
+    seedMemberBlobs() // seeded member email is u1@example.com
     const post = await call('POST', '', submitBody(), `Bearer ${CODE}`)
     const postText = await post.text()
     expect(postText).not.toContain(CODE)
     expect(postText).not.toContain('code_hash')
     expect(postText).not.toContain(ADMIN_KEY)
+    // Only the public display name is stamped on feedback — the member's email
+    // (PII beyond the session) must never appear in a submission response.
+    expect(postText).not.toContain('u1@example.com')
+    expect(postText).not.toContain('email')
     const list = await call('GET', '', null, `Bearer ${ADMIN_KEY}`)
     const listText = await list.text()
     expect(listText).not.toContain(CODE)
     expect(listText).not.toContain('code_hash')
+    expect(listText).not.toContain('u1@example.com')
+    expect(listText).not.toContain('email')
   })
 })
 

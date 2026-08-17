@@ -21,6 +21,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler, { KNOWN_FEATURES, sanitizeFeatures } from '../admin'
 import { ADMIN_KEY } from './auth'
 import { createMemDb } from './repositories/test-helpers'
+import { createFeedbackRepo } from './repositories/feedback-repo'
 import { createReviewsRepo } from './repositories/reviews-repo'
 
 const usersMock = vi.hoisted(() => ({
@@ -152,6 +153,36 @@ async function seedPgReviews(db, reviews) {
         [r.createdAt, r.kind, r.sourceId, r.authorId],
       )
     }
+  }
+}
+
+// Seed the shared runout-feedback blob store directly (the same layout
+// createFeedbackBlobStore uses: `fb:<id>` -> object, `index:open` -> id list)
+// so the deleteUser cascade can assert on the store contents.
+function seedBlobFeedback(items) {
+  const store = stores['runout-feedback'] || createStore()
+  stores['runout-feedback'] = store
+  const ids = []
+  for (const f of items) {
+    const obj = {
+      type: 'suggestion', category: 'other', message: 'seed message', status: 'open',
+      adminNote: '', url: '', appVersion: '', userAgent: '',
+      authorId: 'u1', authorName: 'Ada', ...f,
+    }
+    store.data.set(`fb:${obj.id}`, obj)
+    ids.push(obj.id)
+  }
+  store.data.set('index:open', ids)
+}
+
+// Seed the Postgres feedback table via the real repo (parity with seedPgReviews).
+async function seedPgFeedback(db, items) {
+  const repo = createFeedbackRepo(db)
+  for (const f of items) {
+    await repo.createFeedback({
+      type: 'suggestion', category: 'other', message: 'seed message',
+      authorId: 'u1', authorName: 'Ada', ...f,
+    })
   }
 }
 
@@ -519,5 +550,56 @@ describe('deleteUser — the member\'s reviews are removed too (Task 7)', () => 
     expect(await res.json()).toEqual({ ok: true })
     expect(usersMock.removeUserRecord).toHaveBeenCalledWith('u1')
     expect(usersMock.deleteUserCollections).toHaveBeenCalledWith('u1')
+  })
+})
+
+// REGRESSION (T8 #78, epic #74): deleting a member must also remove their
+// FEEDBACK on both backends. The repo layer already has deleteByAuthor (see
+// feedback-repo.test.js / feedback-blob.test.js), but the member-delete path
+// in admin.js never wires it — so these tests FAIL against the current code.
+// They are kept (skipped) as the repro handed back to the implementer: wire
+// feedback cleanup into handleDeleteUser (parity with deleteMemberReviews:
+// Blobs-only on the Blobs path, Postgres-authoritative + best-effort Blobs
+// sweep on the Postgres path, ordered BEFORE removeUserRecord) and un-skip.
+describe('deleteUser — the member\'s feedback is removed too (T8 #78)', () => {
+  // Skipped until admin.js wires feedback cleanup into handleDeleteUser (see
+  // the REGRESSION note above). Un-skip to assert the member-delete cascade.
+  it.skip('removes the member\'s feedback on the Blobs path and leaves others alone', async () => {
+    seedBlobFeedback([
+      { id: '10000000-0000-4000-8000-000000000001', authorId: 'u1', message: 'member suggestion' },
+      { id: '10000000-0000-4000-8000-000000000002', authorId: 'u2', type: 'bug', message: 'other member bug' },
+    ])
+    usersMock.getUser.mockResolvedValue(MEMBER)
+
+    const res = await post({ action: 'deleteUser', userId: 'u1' })
+    expect(res.status).toBe(200)
+    expect((await res.json()).ok).toBe(true)
+    expect(usersMock.removeUserRecord).toHaveBeenCalledWith('u1')
+
+    // The member's feedback is gone from the shared runout-feedback store;
+    // the other member's survives, and index:open only holds the survivor.
+    const store = stores['runout-feedback']
+    expect(store.data.has('fb:10000000-0000-4000-8000-000000000001')).toBe(false)
+    expect(store.data.has('fb:10000000-0000-4000-8000-000000000002')).toBe(true)
+    expect(JSON.parse(store.data.get('index:open'))).toEqual(['10000000-0000-4000-8000-000000000002'])
+  })
+
+  // Skipped until admin.js wires feedback cleanup into handleDeleteUser (see
+  // the REGRESSION note above). Un-skip to assert the Postgres cascade.
+  it.skip('removes the member\'s feedback rows on the Postgres path (pg-mem)', async () => {
+    pgRef.configured = true
+    pgRef.db = await createMemDb()
+    await seedPgFeedback(pgRef.db, [
+      { id: '10000000-0000-4000-8000-000000000001', authorId: 'u1' },
+      { id: '10000000-0000-4000-8000-000000000002', authorId: 'u2', type: 'bug' },
+    ])
+    usersMock.getUser.mockResolvedValue(MEMBER)
+
+    const res = await post({ action: 'deleteUser', userId: 'u1' })
+    expect(res.status).toBe(200)
+    expect((await res.json()).ok).toBe(true)
+
+    const { rows } = await pgRef.db.query('SELECT author_id FROM feedback')
+    expect(rows.map((r) => r.author_id)).toEqual(['u2'])
   })
 })
