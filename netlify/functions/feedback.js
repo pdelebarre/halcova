@@ -19,10 +19,10 @@
 //   DELETE — admin removal (admin key only): ?id= -> 204 (404 unknown)
 //
 // The data layer is reached through the repository seam (repository.js) —
-// Postgres when DATABASE_URL is set, Blobs otherwise — with the same
-// degrade-to-Blobs-on-error behavior as collection.js / reviews.js, so a
-// Postgres outage behaves like today instead of 500ing (the Blobs store is the
-// safety net).
+// Postgres when DATABASE_URL is set, Blobs otherwise. On a Postgres ERROR (an
+// outage) the handler returns a controlled 503 DATA_SOURCE_UNAVAILABLE rather
+// than masking the outage with a Blobs mirror (SEC-4.1 #202 — parity with
+// collection.js / reviews.js).
 //
 // Security: no access code / admin key / code_hash is ever read, logged or
 // returned here. Feedback objects carry only the author's public display name
@@ -32,10 +32,9 @@
 import { getStore } from '@netlify/blobs'
 import { authorize, json } from './_shared/collection-store'
 import { requireAdmin } from './_shared/session-auth'
-import { createFeedbackBlobStore } from './_shared/feedback-blob'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { getRepository } from './_shared/repository'
-import { safeError } from './_shared/security'
+import { readJsonBody, safeError } from './_shared/security'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 
@@ -75,11 +74,11 @@ function authorNameFor(user) {
 // Read a JSON body, tolerating a malformed/absent one (→ {}) so junk input is
 // rejected by validation with a clean 400, never a 500.
 async function readBody(req) {
-  try {
-    return await req.json()
-  } catch {
-    return {}
-  }
+  // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap);
+  // malformed JSON -> 400. Returns { value } on success or { error: <Response> }.
+  const parsed = await readJsonBody(req)
+  if (parsed.error) return parsed
+  return { value: parsed.value ?? {} }
 }
 
 // Validate a POST submission. Returns { …fields } on success, or
@@ -195,17 +194,24 @@ async function submissionGuardError(req, user) {
 }
 
 // Run one op against the repository seam's feedback store. When Postgres is
-// the active backend and an op throws (an outage), the whole request degrades
-// to the shared Blobs store — parity with collection.js / reviews.js. Blobs
-// errors propagate to the handler's outer catch (→ 500).
+// the active backend and an op throws (an outage), the request returns a
+// controlled 503 DATA_SOURCE_UNAVAILABLE — the outage is NOT masked by serving
+// a possibly-divergent Blobs mirror (SEC-4.1 #202). Blobs errors propagate to
+// the handler's outer catch (→ 500).
 async function dispatch(op) {
   const repo = getRepository()
   try {
     return await op(repo.feedback)
   } catch (err) {
     if (repo.backend === 'postgres') {
-      console.error('feedback: Postgres path failed, falling back to Blobs:', err?.message || err)
-      return op(createFeedbackBlobStore())
+      // SEC-4.1 (#202): a Postgres outage is NOT masked by serving a Blobs
+      // mirror (which could diverge) — surface a controlled 503; the real
+      // detail goes to the log only (message, never a secret/stack).
+      console.error('feedback: Postgres data source unavailable (503):', err?.message || err)
+      return json(503, {
+        error: 'The feedback service is temporarily unavailable. Please try again shortly.',
+        code: 'DATA_SOURCE_UNAVAILABLE',
+      })
     }
     throw err
   }
@@ -216,7 +222,9 @@ async function dispatch(op) {
 async function routeAdmin(req, url) {
   if (req.method === 'GET') return dispatch((feedback) => handleList(feedback, url))
   if (req.method === 'PATCH') {
-    const body = await readBody(req)
+    const parsed = await readBody(req)
+    if (parsed.error) return parsed.error
+    const body = parsed.value
     const v = validateTriage(body, url)
     if (v.error) return v.error
     return dispatch((feedback) => handleUpdate(feedback, v.id, v.patch))
@@ -252,7 +260,9 @@ export default async function feedbackHandler(req) {
     }
     const guardErr = await submissionGuardError(req, user)
     if (guardErr) return guardErr
-    const body = await readBody(req)
+    const parsed = await readBody(req)
+    if (parsed.error) return parsed.error
+    const body = parsed.value
     const v = validateSubmission(body)
     if (v.error) return v.error
     return dispatch((feedback) => handleCreate(req, feedback, user, v))

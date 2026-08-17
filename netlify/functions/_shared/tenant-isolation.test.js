@@ -423,3 +423,28 @@ describe('#191 — server-side plan/feature authorization (frontend flags are no
     expect(stores[`collection-${A}-${RECORDS}`]).toBeUndefined()
   })
 })
+
+// ---------------------------------------------------------------------------
+// SEC-3.2 (#195) — payload-size cap on the lending POST path (raw body with
+// `.text()` so the real byte-cap path in readJsonBody runs; the shared `req`
+// helper only exposes `.json()`).
+// ---------------------------------------------------------------------------
+describe('SEC-3.2 (#195) — payload-size cap on the lending POST path', () => {
+  it('413s PAYLOAD_TOO_LARGE on a lend body over the byte cap (nothing lent)', async () => {
+    seedMember(B, { features: { lending: true } })
+    collectionStore(B, RECORDS, [item('a1')])
+    const big = JSON.stringify({ action: 'lend', collection: RECORDS, itemId: 'a1', borrower: { name: 'x'.repeat(70 * 1024) } })
+    const r = {
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/lending',
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${B_TOKEN}` : null) },
+      text: async () => big,
+      json: async () => JSON.parse(big),
+    }
+    const res = await lendingHandler(r)
+    expect(res.status).toBe(413)
+    expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
+    // The item was NOT lent (the cap rejected before any write).
+    expect(stores[`collection-${B}-${RECORDS}`].data.get('item:a1').lending).toBeUndefined()
+  })
+})

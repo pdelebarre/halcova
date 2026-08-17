@@ -443,3 +443,51 @@ describe('method not allowed', () => {
     expect((await call('PATCH', '?collection=records')).status).toBe(405)
   })
 })
+
+describe('SEC-3.2 (#195) — payload-size cap + malformed JSON on the Postgres write path', () => {
+  // A raw-body req (with `.text()`) so the REAL byte-cap path in readJsonBody
+  // runs — the shared `req()` helper only exposes `.json()`.
+  function rawReq(method, path, raw) {
+    return {
+      method,
+      url: `http://localhost/.netlify/functions/collection${path}`,
+      headers: { get: () => null },
+      text: async () => raw,
+      json: async () => JSON.parse(raw),
+    }
+  }
+
+  it('413s PAYLOAD_TOO_LARGE on a POST body over the byte cap (nothing written)', async () => {
+    const raw = JSON.stringify({ title: 'Big - Add', year: 2020, notes: 'x'.repeat(70 * 1024) })
+    const r = rawReq('POST', '?collection=records', raw)
+    const res = await handlePostgres(r, { user: MEMBER, collection: 'records', id: null, url: new URL(r.url) })
+    expect(res.status).toBe(413)
+    expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
+    // The oversized body never reached the DB.
+    expect(await repo.items.listItems(MEMBER.id, 'records')).toHaveLength(0)
+  })
+
+  it('413s PAYLOAD_TOO_LARGE on a PUT body over the byte cap (item untouched)', async () => {
+    await repo.items.insertItem(MEMBER.id, 'records', item(1))
+    const raw = JSON.stringify({ notes: 'x'.repeat(70 * 1024) })
+    const r = rawReq('PUT', `?collection=records&id=${item(1).id}`, raw)
+    const res = await handlePostgres(r, { user: MEMBER, collection: 'records', id: item(1).id, url: new URL(r.url) })
+    expect(res.status).toBe(413)
+    expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
+    expect((await repo.items.getItem(MEMBER.id, 'records', item(1).id)).notes).toBeUndefined()
+  })
+
+  it('400s INVALID_JSON on a malformed POST body (never a 500)', async () => {
+    const r = {
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/collection?collection=records',
+      headers: { get: () => null },
+      text: async () => '{not json',
+      json: async () => { throw new SyntaxError('bad json') },
+    }
+    const res = await handlePostgres(r, { user: MEMBER, collection: 'records', id: null, url: new URL(r.url) })
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('INVALID_JSON')
+    expect(await repo.items.listItems(MEMBER.id, 'records')).toHaveLength(0)
+  })
+})

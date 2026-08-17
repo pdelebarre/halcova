@@ -388,21 +388,60 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
   })
 })
 
-describe('Postgres outage → Blobs fallback (never 500s)', () => {
-  it('serves the admin inbox from the Blobs store when Postgres errors', async () => {
+describe('Postgres outage → controlled 503 (SEC-4.1 #202)', () => {
+  function downDb() {
+    return {
+      query: async () => { throw new Error('connection refused') },
+      connect: async () => { throw new Error('connection refused') },
+    }
+  }
+
+  it('returns 503 DATA_SOURCE_UNAVAILABLE for a GET (admin inbox) when Postgres errors, not masked Blobs data', async () => {
     await seedFeedback('blobs', [
       { id: ID_1, message: 'fallback item', createdAt: '2026-01-01T00:00:00.000Z' },
     ])
     pgRef.configured = true
-    pgRef.db = {
-      query: async () => { throw new Error('connection refused') },
-      connect: async () => { throw new Error('connection refused') },
-    }
+    pgRef.db = downDb()
     __resetRepositoryForTests()
     const res = await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(503)
     const body = await res.json()
-    expect(body.items).toHaveLength(1)
-    expect(body.items[0].message).toBe('fallback item')
+    expect(body.code).toBe('DATA_SOURCE_UNAVAILABLE')
+    // The outage is NOT masked by the Blobs mirror.
+    expect(body.items).toBeUndefined()
+    // No leaked DB detail / stack.
+    expect(body.error).not.toContain('connection refused')
+    expect(body.error).not.toContain('ECONNREFUSED')
+  })
+
+  it('returns 503 DATA_SOURCE_UNAVAILABLE for a POST (member submit) when Postgres errors', async () => {
+    seedMemberBlobs()
+    pgRef.configured = true
+    pgRef.db = downDb()
+    __resetRepositoryForTests()
+    const res = await call('POST', '', submitBody(), `Bearer ${MEMBER_TOKEN}`)
+    expect(res.status).toBe(503)
+    expect((await res.json()).code).toBe('DATA_SOURCE_UNAVAILABLE')
+    // Nothing was written to the Blobs feedback store (no masked write).
+    expect(stores['runout-feedback']).toBeUndefined()
+  })
+})
+
+describe('SEC-3.2 (#195) — payload-size cap on the feedback POST path', () => {
+  it('413s PAYLOAD_TOO_LARGE on a submission body over the byte cap', async () => {
+    seedMemberBlobs()
+    const big = JSON.stringify(submitBody({ message: 'x'.repeat(70 * 1024) }))
+    const r = {
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/feedback',
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${MEMBER_TOKEN}` : null) },
+      text: async () => big,
+      json: async () => JSON.parse(big),
+    }
+    const res = await handler(r)
+    expect(res.status).toBe(413)
+    expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
+    // Nothing was written to the feedback store.
+    expect(stores['runout-feedback']).toBeUndefined()
   })
 })

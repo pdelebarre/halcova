@@ -32,7 +32,7 @@ import { adjustOwnedCount, ensureOwnedCount, wishlistToggleDelta } from './count
 import { invalidateListCache } from './list-cache'
 import { pickItemFields, validateItem } from './item-fields'
 import { getRepository } from './repository'
-import { badRequest } from './security'
+import { badRequest, readJsonBody } from './security'
 
 function planLimitError(limit) {
   const err = new Error(`You've reached the free plan limit of ${limit} items. Ask the admin to upgrade your plan.`)
@@ -151,7 +151,11 @@ async function mirrorDelete(userId, collection, id, existing) {
 // --- Writes ---
 
 async function handlePost(req, { user, collection }) {
-  const body = await req.json()
+  // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap) —
+  // parity with the Blobs POST path in collection.js.
+  const parsed = await readJsonBody(req)
+  if (parsed.error) return parsed.error
+  const body = parsed.value
   // SEC-3.1 (#194): type + length validate the allowlisted fields (parity with
   // the Blobs path). Junk is rejected 400 before any DB write.
   const v = validateItem(body)
@@ -223,8 +227,12 @@ async function handlePut(req, { user, collection, id }) {
   }
   if (!existing) return json(404, { error: 'Not found' })
 
+  // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap) —
+  // parity with the Blobs PUT path in collection.js.
+  const parsed = await readJsonBody(req)
+  if (parsed.error) return parsed.error
   // SEC-3.1 (#194): partial validation (a PUT may patch any subset).
-  const v = validateItem(await req.json(), { partial: true })
+  const v = validateItem(parsed.value, { partial: true })
   if (v.error) return badRequest(v.error)
   const patch = pickItemFields(v.item)
   const convertingToOwned = wishlistToggleDelta(patch, existing).delta === 1

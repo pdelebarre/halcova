@@ -142,36 +142,37 @@ beforeEach(async () => {
   MEMBER_TOKEN = await sessionTokenFor({ userId: USER_ID, role: 'member' })
 })
 
-describe('default export — Postgres → Blobs read-through fallback', () => {
-  it('serves a POST through the Blobs fallback when the Postgres path throws (201 create)', async () => {
+describe('default export — Postgres outage returns a controlled 503 (SEC-4.1 #202)', () => {
+  it('a POST during a Postgres outage returns 503 DATA_SOURCE_UNAVAILABLE, not masked Blobs data', async () => {
     seedMember()
     pgRef.configured = true
     pgRef.db = downDb
 
     const res = await call('POST', '', { kind: 'records', sourceId: SOURCE_ID, rating: 5, body: 'Love it.' })
-    expect(res.status).toBe(201)
-    const { review: created } = await res.json()
-    expect(created).toMatchObject({ kind: 'records', sourceId: SOURCE_ID, authorId: USER_ID, rating: 5, status: 'published' })
-    // The fallback wrote to the SHARED Blobs store, never to Postgres.
-    const stored = stores['runout-reviews'].data.get(`release:records:${SOURCE_ID}`).reviews
-    expect(stored).toHaveLength(1)
-    expect(stored[0].id).toBe(created.id)
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body.code).toBe('DATA_SOURCE_UNAVAILABLE')
+    // The outage is NOT masked by a Blobs write: the shared store is untouched.
+    expect(stores['runout-reviews']).toBeUndefined()
+    // No leaked DB detail / stack.
+    expect(body.error).not.toContain('connection refused')
+    expect(body.error).not.toContain('ECONNREFUSED')
   })
 
-  it('serves a GET through the Blobs fallback when the Postgres path throws (200 read)', async () => {
+  it('a GET during a Postgres outage returns 503 DATA_SOURCE_UNAVAILABLE, not masked Blobs data', async () => {
     seedMember()
     pgRef.configured = true
     pgRef.db = downDb
+    // The Blobs store holds a review — what a silent fallback would have served.
     seedBlobReviews([review()])
 
     const res = await call('GET', `?kind=records&sourceId=${SOURCE_ID}`)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(503)
     const body = await res.json()
-    // L1 — u2 is another reviewer (the caller has no review here), so the list
-    // entry's authorId is stripped.
-    expect(body.reviews.map((r) => r.authorId)).toEqual([undefined])
-    expect(body.aggregate).toEqual({ avg: 4, count: 1 })
-    expect(body.mine).toBeNull() // the caller has no review on this release
+    expect(body.code).toBe('DATA_SOURCE_UNAVAILABLE')
+    expect(body.reviews).toBeUndefined() // never the Blobs mirror
+    expect(body.error).not.toContain('connection refused')
+    expect(body.error).not.toContain('ECONNREFUSED')
   })
 
   it('does not consult the Blobs fallback at all when Postgres succeeds', async () => {
@@ -201,12 +202,12 @@ describe('default export — Postgres → Blobs read-through fallback', () => {
 })
 
 describe('default export — malformed body and a failing Blobs store', () => {
-  it('treats a malformed JSON POST body as an empty body (400 INVALID_KIND, never a 500)', async () => {
+  it('400s INVALID_JSON on a malformed JSON POST body (never a 500)', async () => {
     seedMember()
     const res = await call('POST', '', undefined, `Bearer ${MEMBER_TOKEN}`, async () => { throw new SyntaxError('bad json') })
     expect(res.status).toBe(400)
     const body = await res.json()
-    expect(body.code).toBe('INVALID_KIND') // empty body → no kind
+    expect(body.code).toBe('INVALID_JSON')
   })
 
   it('500s when the Blobs store itself throws (handleBlobs catch)', async () => {
@@ -226,5 +227,24 @@ describe('default export — malformed body and a failing Blobs store', () => {
     expect(body.code).toBe('INTERNAL')
     expect(body.error).not.toContain('blob store unavailable')
     expect(body.error).toBe('Something went wrong. Please try again.')
+  })
+})
+
+describe('default export — payload-size cap (SEC-3.2 #195)', () => {
+  it('413s PAYLOAD_TOO_LARGE on a POST body over the byte cap', async () => {
+    seedMember()
+    const big = JSON.stringify({ kind: 'records', sourceId: SOURCE_ID, rating: 5, body: 'x'.repeat(70 * 1024) })
+    const r = {
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/reviews',
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${MEMBER_TOKEN}` : null) },
+      text: async () => big,
+      json: async () => JSON.parse(big),
+    }
+    const res = await handler(r)
+    expect(res.status).toBe(413)
+    expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
+    // No Blobs store was written.
+    expect(stores['runout-reviews']).toBeUndefined()
   })
 })
