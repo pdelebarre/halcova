@@ -13,7 +13,7 @@ function errorJson(status, body) {
 describe('reviews API', () => {
   beforeEach(() => {
     global.fetch = vi.fn()
-    saveSession({ user: { id: 'u1', name: 'Miles' }, code: 'RU-AAAA-BBBB-CCCC' })
+    saveSession({ user: { id: 'u1', name: 'Miles' }, session: 'tok-reviews-session-abc123' })
   })
 
   it('lists a release thread with kind and sourceId params and unwraps the payload', async () => {
@@ -39,11 +39,11 @@ describe('reviews API', () => {
     expect(data.mine).toBeNull()
   })
 
-  it('sends the signed-in access code as a Bearer header on reads', async () => {
+  it('sends the signed-in session token as a Bearer header on reads', async () => {
     global.fetch.mockResolvedValue(okJson({ reviews: [] }))
     await reviews.listReviews('records', '1')
     const [, init] = global.fetch.mock.calls[0]
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe('Bearer tok-reviews-session-abc123')
   })
 
   it('upserts a review with POST and a JSON body', async () => {

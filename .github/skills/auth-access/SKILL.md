@@ -19,31 +19,36 @@ whole auth subsystem.
 ## Files
 | File | Role |
 |------|------|
-| `netlify/functions/auth.js` | Public: `request`, `login`, `me` |
+| `netlify/functions/auth.js` | Public: `request`, `login`, `me`, `logout` |
 | `netlify/functions/admin.js` | Owner-only: `approve`, `reject`, `updateUser`, `deleteUser`, list |
-| `netlify/functions/_shared/auth.js` | `ADMIN_KEY`, `OWNER_ID`, `bearer`, `publicUser`, `generateAccessCode` |
+| `netlify/functions/_shared/auth.js` | `ADMIN_KEY` (fail-closed), `OWNER_ID`, `bearer`, `publicUser`, `generateAccessCode` |
+| `netlify/functions/_shared/sessions.js` | Server-managed session tokens: create/validate/revoke (SEC-EPIC-1) |
+| `netlify/functions/_shared/session-auth.js` | `resolveSession` / `requireAdmin` — Bearer session → identity / admin gate |
 | `netlify/functions/_shared/users.js` | Identity blob store CRUD + `storeNameFor` + `deleteUserCollections` |
 | `src/api/auth.js` | Client for the auth + admin functions |
 | `src/hooks/useAuth.js` | Session state, login/logout/refresh, startup revalidation |
-| `src/utils/session.js` | Persist/read `localStorage.runout.session` |
+| `src/utils/session.js` | Persist/read `localStorage.runout.session` (token only, never the code) |
 | `src/AuthScreen.jsx`, `src/AdminPanel.jsx` | Sign-in UI + admin UI |
 
 ## The Flow
 1. **Request**: a visitor calls `requestAccess({ name, email })`. A pending
    `request:<id>` is created (deduped by email while pending).
-2. **Approve**: the admin (admin key as Bearer) approves, choosing which
+2. **Approve**: the admin (admin session as Bearer) approves, choosing which
    collections to grant (`{ records, books }`). `generateAccessCode()` mints a
    `RU-XXXX-XXXX-XXXX` code (no I/O/0/1 characters) and a member
    `user:<id>` record is saved; the request is marked `approved`.
-3. **Sign in**: `login(code)` exchanges the code for a session and persists
-   `{ user, code }` to `localStorage.runout.session`. The admin key also signs
-   in as the owner.
+3. **Sign in** (SEC-EPIC-1, #176): `login(code)` exchanges the code for a
+   server-managed **session token** and persists `{ user, session }` to
+   `localStorage.runout.session` — the access code is an exchange credential
+   only and is **never** stored client-side (#177). The admin key (and the
+   demo code) also sign in as a session.
 4. **Authorized calls**: every function call sends
-   `Authorization: Bearer <code>`; functions resolve it via `bearer(req)` and
-   `findUserByCode` (or match `ADMIN_KEY` for the owner).
+   `Authorization: Bearer <sessionToken>`; functions resolve it via
+   `resolveSession()` (validates the session server-side → owner / demo /
+   member). The access code → user lookup lives ONLY in the login exchange.
 5. **Revalidation**: `useAuth` calls `me()` on startup. A 401/403 clears the
    session; a network failure (offline) keeps the cached session so the shell
-   still works.
+   still works. `logout()` revokes the token server-side.
 
 ## Roles & Plans
 - **Owner** (`OWNER_ID = 'owner'`): signs in with `ADMIN_KEY`; owns all
@@ -94,16 +99,23 @@ in `src/App.jsx` → `gamificationEnabled` for `CollectionView`'s Play entry).
 > `toggleFeature`/`toggleGames`); keep that invariant in any new callers.
 
 ## Security Rules (non-negotiable)
-- NEVER log or return access codes or the admin key.
+- NEVER log or return access codes, session tokens, or the admin key.
 - Always send users to the client through `publicUser` (strips `code` AND
   `code_hash`).
 - `RUNOUT_ADMIN_KEY` comes from the Netlify env (or `.env` for `netlify dev`).
-  The dev fallback `runout-dev-admin-key` must NEVER reach production.
+  It **fails closed** in production (SEC-1.5, #180): a missing key yields an
+  empty key (401/403), never the dev default `runout-dev-admin-key`.
+- The access code is an exchange credential ONLY — it must never be persisted
+  client-side or accepted as a Bearer. Sessions are revocable/expiring.
+- Admin endpoints authorize by the session's `role` (SEC-1.6, #181), never by
+  re-checking a bearer string against `ADMIN_KEY`.
 - The owner account cannot be edited or deleted via the admin API.
-- Deleting a member removes their request, user record, AND their collection
-  stores (`deleteUserCollections`) — do this atomically, never half.
-- Auth goes through the shared `bearer()` helper — don't hand-parse headers.
-- New function endpoints must call `authorize`/validate the admin key before
+- Deleting a member removes their request, user record, their sessions, AND
+  their collection stores (`deleteUserCollections`) — do this atomically,
+  never half.
+- Auth goes through the shared `bearer()` + `resolveSession`/`requireAdmin`
+  helpers — don't hand-parse headers or resolve codes outside login.
+- New function endpoints must call `resolveSession`/`requireAdmin` before
   doing any work (see the `netlify-collection` skill).
 
 ## Identity Store Layout (`runout-identity` blob store)
@@ -121,7 +133,8 @@ index:requests  -> ordered list of request ids
   send the FULL map (see the full-map rule above). The admin panel's member
   row exposes Lending and Games switches that do this.
 - **Disable a member**: `adminUpdateUser({ userId, status: 'disabled' })`
-  (their code stops working — `me`/`login` return 403).
+  (their code stops working AND their live sessions are revoked — `me`/`login`
+  return 403).
 - **Delete a member**: `adminDeleteUser({ userId })` — also wipes their stores.
 - **Rotate a lost code**: `POST { action: 'rotate', userId }` to the admin
   function (admin key as Bearer) — it mints a NEW `RU-…` code, stores its

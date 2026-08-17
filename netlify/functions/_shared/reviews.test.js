@@ -13,6 +13,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler, { REVIEWS_DISTINCT_LIMIT } from '../reviews'
 import { windowIndex } from './rate-limit'
+import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
 
 // Hoisted so the @netlify/blobs mock (registered before the module under test
 // is imported) can share the in-memory store registry.
@@ -46,9 +47,15 @@ const CODE = 'RU-AAAA-BBBB-CCCC'
 const CODE_BOB = 'RU-BBBB-CCCC-DDDD'
 const USER_ID = 'u1'
 const BOB_ID = 'u2'
-const ADMIN_KEY = 'runout-dev-admin-key' // dev fallback, matches _shared/auth.js
-const DEMO_CODE = 'RUNOUT-DEMO-0000'
+const ADMIN_KEY = 'runout-dev-admin-key' // used ONLY for the secret-hygiene assertion below
 const SOURCE_ID = '372469'
+
+// Session tokens minted per-test (SEC-EPIC-1): the Bearer is a server-managed
+// session token, not the access code / admin key / demo code.
+let MEMBER_TOKEN = ''
+let BOB_TOKEN = ''
+let ADMIN_TOKEN = ''
+let DEMO_TOKEN = ''
 
 // Seed a member in the runout-identity store so the REAL authorize ->
 // findUserByCode resolves them (the same trick collection.test.js uses).
@@ -100,7 +107,7 @@ const review = (overrides = {}) => ({
   ...overrides,
 })
 
-function req(method, path = '', body, auth = `Bearer ${CODE}`) {
+function req(method, path = '', body, auth = `Bearer ${MEMBER_TOKEN}`) {
   return {
     method,
     url: `http://localhost/.netlify/functions/reviews${path}`,
@@ -115,11 +122,16 @@ function call(method, path = '', body, auth) {
 
 const postBody = (overrides = {}) => ({ kind: 'records', sourceId: SOURCE_ID, rating: 5, body: 'Love it.', ...overrides })
 
-beforeEach(() => {
+beforeEach(async () => {
   for (const key of Object.keys(stores)) delete stores[key]
   // Force the Blobs backend: reviews.js routes on DATABASE_URL (via the real
   // isPostgresConfigured). The test env never sets it, but be hermetic anyway.
   delete process.env.DATABASE_URL
+  // Mint fresh session tokens for the identities the tests use (SEC-EPIC-1).
+  MEMBER_TOKEN = await sessionTokenFor({ userId: USER_ID, role: 'member' })
+  BOB_TOKEN = await sessionTokenFor({ userId: BOB_ID, role: 'member' })
+  ADMIN_TOKEN = await adminSessionToken()
+  DEMO_TOKEN = await demoSessionToken()
 })
 
 describe('auth — every request needs a valid, active access code', () => {
@@ -158,8 +170,8 @@ describe('plan gate — the member must hold the kind\'s plan', () => {
     expect((await res.json()).code).toBe('PLAN_FORBIDDEN')
   })
 
-  it('never gates the owner (admin key — every collection granted)', async () => {
-    const res = await call('GET', `?kind=books&sourceId=xyz`, null, `Bearer ${ADMIN_KEY}`)
+  it('never gates the owner (admin session — every collection granted)', async () => {
+    const res = await call('GET', `?kind=books&sourceId=xyz`, null, `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(200)
   })
 })
@@ -219,8 +231,8 @@ describe('POST — upsert the caller\'s review (one per member per release)', ()
   it('keeps two DIFFERENT authors on the same release as separate reviews', async () => {
     seedMember()
     seedMember({ id: BOB_ID, name: 'Bob', code: CODE_BOB })
-    await call('POST', '', postBody({ rating: 5, body: 'Love it.' }), `Bearer ${CODE}`)
-    await call('POST', '', postBody({ rating: 4, body: 'Solid.' }), `Bearer ${CODE_BOB}`)
+    await call('POST', '', postBody({ rating: 5, body: 'Love it.' }), `Bearer ${MEMBER_TOKEN}`)
+    await call('POST', '', postBody({ rating: 4, body: 'Solid.' }), `Bearer ${BOB_TOKEN}`)
     const stored = stores['runout-reviews'].data.get(`release:records:${SOURCE_ID}`).reviews
     expect(stored).toHaveLength(2)
   })
@@ -279,8 +291,8 @@ describe('POST — upsert the caller\'s review (one per member per release)', ()
     expect((await bad.json()).code).toBe('INVALID_SOURCE_ID')
   })
 
-  it('defaults the owner (admin key) authorName to a fixed label — never the admin key', async () => {
-    const res = await call('POST', '', postBody({ rating: 4 }), `Bearer ${ADMIN_KEY}`)
+  it('defaults the owner (admin session) authorName to a fixed label — never a secret', async () => {
+    const res = await call('POST', '', postBody({ rating: 4 }), `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(201)
     const { review } = await res.json()
     expect(review.authorName).toBe('Admin')
@@ -384,10 +396,10 @@ describe('DELETE — only the author (or the owner)', () => {
     expect((await res.json()).code).toBe('MISSING_ID')
   })
 
-  it('lets the owner (admin key) delete anyone\'s review', async () => {
+  it('lets the owner (admin session) delete anyone\'s review', async () => {
     const id = '00000000-0000-0000-0000-000000000001'
     seedBlobReviews([review({ id, authorId: BOB_ID, authorName: 'Bob', rating: 4 })])
-    const res = await call('DELETE', `?kind=records&sourceId=${SOURCE_ID}&id=${id}`, null, `Bearer ${ADMIN_KEY}`)
+    const res = await call('DELETE', `?kind=records&sourceId=${SOURCE_ID}&id=${id}`, null, `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)
   })
@@ -444,13 +456,13 @@ describe('rate limit — writes only', () => {
 describe('demo — read-only on the shared reviews store', () => {
   it('lets the demo read reviews', async () => {
     seedBlobReviews([review({ id: '00000000-0000-0000-0000-000000000001', authorId: BOB_ID, authorName: 'Bob', rating: 4 })])
-    const res = await call('GET', `?kind=records&sourceId=${SOURCE_ID}`, null, `Bearer ${DEMO_CODE}`)
+    const res = await call('GET', `?kind=records&sourceId=${SOURCE_ID}`, null, `Bearer ${DEMO_TOKEN}`)
     expect(res.status).toBe(200)
     expect((await res.json()).reviews).toHaveLength(1)
   })
 
   it('rejects demo writes with DEMO_READONLY so the shared store is never polluted', async () => {
-    const res = await call('POST', '', postBody({ rating: 5 }), `Bearer ${DEMO_CODE}`)
+    const res = await call('POST', '', postBody({ rating: 5 }), `Bearer ${DEMO_TOKEN}`)
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('DEMO_READONLY')
   })

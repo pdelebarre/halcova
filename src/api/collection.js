@@ -1,13 +1,13 @@
-import { getAccessCode } from '../utils/session'
+import { getSessionToken } from '../utils/session'
 
 const FN_BASE = '/.netlify/functions/collection'
 
 // The collection API is shared by records and books — the Netlify function
 // uses this to pick which blob store to read/write. Every call authenticates
-// with the signed-in user's access code.
+// with the signed-in user's session token (SEC-EPIC-1, #176).
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 function fnUrl(collection, extra = {}) {

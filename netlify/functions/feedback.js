@@ -30,8 +30,8 @@
 // any work runs.
 
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, bearer } from './_shared/auth'
 import { authorize, json } from './_shared/collection-store'
+import { requireAdmin } from './_shared/session-auth'
 import { createFeedbackBlobStore } from './_shared/feedback-blob'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { getRepository } from './_shared/repository'
@@ -232,12 +232,11 @@ export default async function feedbackHandler(req) {
   try {
     const url = new URL(req.url)
 
-    // Admin inbox operations (GET/PATCH/DELETE) require the admin key — gated
-    // before any work runs, exactly like admin.js.
+    // Admin inbox operations (GET/PATCH/DELETE) require an admin SESSION — gated
+    // before any work runs, exactly like admin.js (SEC-1.6, #181).
     if (req.method !== 'POST') {
-      if (bearer(req) !== ADMIN_KEY) {
-        return json(401, { error: 'Admin key required. Set RUNOUT_ADMIN_KEY and sign in as the owner.' })
-      }
+      const admin = await requireAdmin(req)
+      if (admin.error) return admin.error
       return routeAdmin(req, url)
     }
 

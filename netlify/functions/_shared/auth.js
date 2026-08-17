@@ -5,10 +5,22 @@
 import { randomBytes } from 'node:crypto'
 
 // The site owner signs in with this key. Set RUNOUT_ADMIN_KEY in your Netlify
-// environment (or .env for `netlify dev`). A well-known dev fallback keeps
-// local development usable; ALWAYS set a real, long random value in
-// production.
-export const ADMIN_KEY = process.env.RUNOUT_ADMIN_KEY || 'runout-dev-admin-key'
+// environment (or .env for `netlify dev`).
+//
+// SEC-1.5 (#180): FAIL CLOSED in production-like environments. When
+// RUNOUT_ADMIN_KEY is absent the key is EMPTY (never the well-known dev
+// default), so every admin authentication refuses (401/403) instead of
+// silently accepting `runout-dev-admin-key`. The dev fallback exists ONLY for
+// local development: no NODE_ENV=production AND no Netlify CLI context, unless
+// the explicit RUNOUT_DEV_MODE=1 dev flag opts back in.
+function devAdminKeyAllowed() {
+  if (process.env.RUNOUT_DEV_MODE === '1' || process.env.RUNOUT_DEV_MODE === 'true') return true
+  if (process.env.NODE_ENV === 'production') return false
+  if (process.env.NETLIFY || process.env.NETLIFY_LOCAL || process.env.NETLIFY_DEV) return false
+  return true
+}
+
+export const ADMIN_KEY = process.env.RUNOUT_ADMIN_KEY || (devAdminKeyAllowed() ? 'runout-dev-admin-key' : '')
 
 // The owner's identity is a constant. Their collections stay in the original
 // blob stores (runout-collection / runout-library) so nothing needs migrating.
@@ -37,10 +49,13 @@ export const DEMO_USER = {
   status: 'active',
 }
 
-// Pull the Bearer token out of an Authorization header, if present.
+// Pull the Bearer token out of an Authorization header, if present. The auth
+// scheme is case-insensitive per RFC 7235 (`bearer`, `Bearer`, `BEARER` all
+// work), but the token's OWN case is preserved — session tokens are
+// case-sensitive (FINDING-2).
 export function bearer(req) {
   const header = req.headers.get('authorization') || ''
-  return header.startsWith('Bearer ') ? header.slice(7).trim() : ''
+  return header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : ''
 }
 
 // Fields that must NEVER reach the client: the access code, its sha256 hash,

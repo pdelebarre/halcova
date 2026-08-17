@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../payment'
 import * as stripe from './stripe'
 import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
+import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
 import { findUserByStripeSession, listRequests, listUsers, saveRequest, saveUser } from './users'
 
 const { stores, createStore } = vi.hoisted(() => {
@@ -63,13 +64,13 @@ vi.mock('./stripe', async (importActual) => {
 const PREMIUM_PRICE = 'price_premium_pay'
 const LIFETIME_PRICE = 'price_lifetime_pay'
 
-function req(body, { method = 'POST', code, ip } = {}) {
+function req(body, { method = 'POST', token, ip } = {}) {
   return {
     method,
     headers: {
       get: (name) => {
         const key = String(name).toLowerCase()
-        if (key === 'authorization' && code) return `Bearer ${code}`
+        if (key === 'authorization' && token) return `Bearer ${token}`
         if (key === 'x-nf-client-connection-ip' && ip) return ip
         return ''
       },
@@ -97,7 +98,13 @@ const MEMBER = {
   createdAt: '2026-01-01T00:00:00.000Z',
 }
 
-beforeEach(() => {
+// Session tokens minted per-test (SEC-EPIC-1): the Bearer is a server-managed
+// session token, not the access code / admin key / demo code.
+let MEMBER_TOKEN = ''
+let ADMIN_TOKEN = ''
+let DEMO_TOKEN = ''
+
+beforeEach(async () => {
   process.env.STRIPE_PRICE_PREMIUM = PREMIUM_PRICE
   process.env.STRIPE_PRICE_LIFETIME = LIFETIME_PRICE
   process.env.STRIPE_SECRET_KEY = 'sk_test_pay'
@@ -105,6 +112,9 @@ beforeEach(() => {
   stripe.createCheckoutSession.mockResolvedValue({ id: 'cs_test_1', url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
   stripe.retrieveSession.mockResolvedValue({ id: 'cs_test_1', status: 'complete', payment_status: 'paid' })
   stripe.createPortalSession.mockResolvedValue({ url: 'https://billing.stripe.com/session/xyz' })
+  MEMBER_TOKEN = await sessionTokenFor({ userId: 'u-member', role: 'member' })
+  ADMIN_TOKEN = await adminSessionToken()
+  DEMO_TOKEN = await demoSessionToken()
 })
 
 afterEach(() => {
@@ -118,9 +128,9 @@ afterEach(() => {
 })
 
 describe('checkout — create a Checkout session', () => {
-  it('creates a session for a Bearer-authenticated member (kind=member)', async () => {
+  it('creates a session for a session-authenticated member (kind=member)', async () => {
     await saveUser(MEMBER)
-    const { status, body } = await call({ action: 'checkout', plan: 'lifetime' }, { code: 'RU-AAAA-BBBB-CCCC' })
+    const { status, body } = await call({ action: 'checkout', plan: 'lifetime' }, { token: MEMBER_TOKEN })
     expect(status).toBe(200)
     expect(body).toEqual({ url: 'https://checkout.stripe.com/c/pay/cs_test_1', sessionId: 'cs_test_1' })
 
@@ -167,21 +177,21 @@ describe('checkout — create a Checkout session', () => {
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled()
   })
 
-  it('rejects the owner (admin key) with 403 PAYMENT_REQUIRED', async () => {
-    const { status, body } = await call({ action: 'checkout', plan: 'lifetime' }, { code: 'runout-dev-admin-key' })
+  it('rejects the owner (admin session) with 403 PAYMENT_REQUIRED', async () => {
+    const { status, body } = await call({ action: 'checkout', plan: 'lifetime' }, { token: ADMIN_TOKEN })
     expect(status).toBe(403)
     expect(body.code).toBe('PAYMENT_REQUIRED')
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled()
   })
 
   it('rejects the demo identity with 403 PAYMENT_REQUIRED', async () => {
-    const { status } = await call({ action: 'checkout', plan: 'lifetime' }, { code: 'RUNOUT-DEMO-0000' })
+    const { status } = await call({ action: 'checkout', plan: 'lifetime' }, { token: DEMO_TOKEN })
     expect(status).toBe(403)
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled()
   })
 
-  it('rejects an unrecognized access code with 401', async () => {
-    const { status } = await call({ action: 'checkout', plan: 'lifetime' }, { code: 'RU-NOPE-NOPE-NOPE' })
+  it('rejects an unrecognized session token with 401', async () => {
+    const { status } = await call({ action: 'checkout', plan: 'lifetime' }, { token: 'invalid-opaque-session-token' })
     expect(status).toBe(401)
   })
 
@@ -326,6 +336,9 @@ describe('status — one-time code delivery (M2, #54)', () => {
     expect(first.status).toBe(200)
     expect(first.body.status).toBe('complete')
     expect(first.body.code).toMatch(/^RU-/)
+    // SEC-EPIC-1 (#176/#177): the brand-new prospect is signed STRAIGHT IN with
+    // a fresh session token — the client never has to persist the code.
+    expect(first.body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
 
     // The SAME sessionId can no longer read the code — the delivery marker is
     // persisted at materialization + on the first poll.
@@ -352,25 +365,26 @@ describe('status — one-time code delivery (M2, #54)', () => {
     expect(stripe.retrieveSession).not.toHaveBeenCalled()
   })
 
-  it('never returns the code to a signed-in member (they already hold it in their session)', async () => {
-    await saveUser({ ...MEMBER, id: 'u-paid', plan: 'lifetime', stripeCheckoutSessionId: 'cs_test_1', stripeCustomerId: 'cus_123' })
-    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'RU-AAAA-BBBB-CCCC' })
+  it('never returns the code to a signed-in member (they already hold a session)', async () => {
+    await saveUser({ ...MEMBER, plan: 'lifetime', stripeCheckoutSessionId: 'cs_test_1', stripeCustomerId: 'cus_123' })
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { token: MEMBER_TOKEN })
     expect(status).toBe(200)
     expect(body.status).toBe('complete')
-    expect(body.user.id).toBe('u-paid')
+    expect(body.user.id).toBe(MEMBER.id)
     expect(body).not.toHaveProperty('code')
+    expect(body).not.toHaveProperty('session')
   })
 
-  it('requires a valid Bearer when one is presented on status', async () => {
-    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'RU-NOPE-NOPE-NOPE' })
+  it('requires a valid Bearer session when one is presented on status', async () => {
+    const { status, body } = await call({ action: 'status', sessionId: 'cs_test_1' }, { token: 'invalid-opaque-session-token' })
     expect(status).toBe(401)
     expect(body.error).toBeTruthy()
   })
 
   it('rejects the owner / demo Bearer on status (nothing to collect)', async () => {
-    const owner = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'runout-dev-admin-key' })
+    const owner = await call({ action: 'status', sessionId: 'cs_test_1' }, { token: ADMIN_TOKEN })
     expect(owner.status).toBe(403)
-    const demo = await call({ action: 'status', sessionId: 'cs_test_1' }, { code: 'RUNOUT-DEMO-0000' })
+    const demo = await call({ action: 'status', sessionId: 'cs_test_1' }, { token: DEMO_TOKEN })
     expect(demo.status).toBe(403)
   })
 })
@@ -426,7 +440,7 @@ describe('rate limiting (M1, #54)', () => {
 describe('portal — Stripe Billing Portal', () => {
   it('opens the portal for a paying member and returns { url }', async () => {
     await saveUser({ ...MEMBER, stripeCustomerId: 'cus_123' })
-    const { status, body } = await call({ action: 'portal' }, { code: 'RU-AAAA-BBBB-CCCC' })
+    const { status, body } = await call({ action: 'portal' }, { token: MEMBER_TOKEN })
     expect(status).toBe(200)
     expect(body).toEqual({ url: 'https://billing.stripe.com/session/xyz' })
     expect(stripe.createPortalSession).toHaveBeenCalledWith(
@@ -436,7 +450,7 @@ describe('portal — Stripe Billing Portal', () => {
 
   it('returns PAYMENT_INCOMPLETE (409) for a member with no Stripe customer yet', async () => {
     await saveUser(MEMBER) // free member, no billing
-    const { status, body } = await call({ action: 'portal' }, { code: 'RU-AAAA-BBBB-CCCC' })
+    const { status, body } = await call({ action: 'portal' }, { token: MEMBER_TOKEN })
     expect(status).toBe(409)
     expect(body.code).toBe('PAYMENT_INCOMPLETE')
     expect(stripe.createPortalSession).not.toHaveBeenCalled()
@@ -449,7 +463,7 @@ describe('portal — Stripe Billing Portal', () => {
   })
 
   it('rejects the owner with 403', async () => {
-    const { status } = await call({ action: 'portal' }, { code: 'runout-dev-admin-key' })
+    const { status } = await call({ action: 'portal' }, { token: ADMIN_TOKEN })
     expect(status).toBe(403)
   })
 })

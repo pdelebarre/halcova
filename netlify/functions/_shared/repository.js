@@ -4,12 +4,13 @@
 // backed impl when it is set (read DB first, fall back to Blobs on miss/error).
 //
 // The repository object is shaped as:
-//   { backend: 'blobs'|'postgres', users, feedback, items?, lookupCache? }
-// where `users` mirrors the identity functions from _shared/users.js, `feedback`
-// is the feedback repo (createFeedbackRepo on Postgres, the lazy Blobs fallback
-// on the Blobs backend — same op surface either way), `items` is the Postgres
-// items repository (null on the Blobs backend), and `lookupCache` is the
-// Postgres lookup cache (null on Blobs).
+//   { backend: 'blobs'|'postgres', users, sessions, feedback, items?, lookupCache? }
+// where `users` mirrors the identity functions from _shared/users.js, `sessions`
+// is the server-managed session-token store (SEC-EPIC-1, #176 — same op surface
+// on both backends), `feedback` is the feedback repo (createFeedbackRepo on
+// Postgres, the lazy Blobs fallback on the Blobs backend — same op surface
+// either way), `items` is the Postgres items repository (null on the Blobs
+// backend), and `lookupCache` is the Postgres lookup cache (null on Blobs).
 
 import { isPostgresConfigured } from './postgres'
 import { createBlobRepository } from './repositories/blob-repository'

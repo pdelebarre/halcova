@@ -13,7 +13,7 @@ function errorJson(status, body) {
 describe('collection API', () => {
   beforeEach(() => {
     global.fetch = vi.fn()
-    saveSession({ user: { id: 'u1' }, code: 'RU-AAAA-BBBB-CCCC' })
+    saveSession({ user: { id: 'u1' }, session: 'tok-collection-session-abc123' })
   })
 
   it('lists items with the collection param', async () => {
@@ -25,11 +25,11 @@ describe('collection API', () => {
     expect(url).toContain('collection=books')
   })
 
-  it('sends the signed-in access code as a Bearer header on every call', async () => {
+  it('sends the signed-in session token as a Bearer header on every call', async () => {
     global.fetch.mockResolvedValue(okJson({ items: [] }))
     await collection.listItems('records')
     const [, init] = global.fetch.mock.calls[0]
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe('Bearer tok-collection-session-abc123')
   })
 
   it('defaults listItems to records and maps missing items to []', async () => {

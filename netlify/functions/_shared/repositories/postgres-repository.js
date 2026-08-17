@@ -28,7 +28,9 @@ import { createUsersRepo } from './users-repo'
 import { createItemsRepo } from './items-repo'
 import { createLookupCacheRepo } from './lookup-cache-repo'
 import { createFeedbackRepo } from './feedback-repo'
+import { createSessionsRepo } from './sessions-repo'
 import * as blobUsers from './blob-users'
+import * as blobSessions from './blob-sessions'
 
 // Wrap a read so a Postgres miss or error falls back to the Blobs impl.
 function readThrough(fn, fallback) {
@@ -159,8 +161,111 @@ function authWriteFailClosed(db, method, blobFn, idOf) {
   }
 }
 
+// --- Sessions (SEC-EPIC-1, #176) -------------------------------------------
+//
+// Same auth hardening as users: a session-token READ is Postgres-authoritative
+// (a record-miss is a definitive "invalid/revoked/expired token" — never fall
+// back to the Blobs mirror on a miss, only on a true DB unavailability, so a
+// stale mirror can never re-validate a revoked/expired session). Session
+// WRITES fail closed: the Postgres write and the Blobs mirror are
+// both-or-neither (snapshot → mirror → restore on mirror failure), so a logout
+// / revoke / delete is never half-applied across the two stores.
+
+const SESSION_ROW_COLUMNS = `token_hash, user_id, role, status, created_at, expires_at, revoked_at`
+
+async function readSessionRow(db, tokenHash) {
+  const { rows } = await db.query(`SELECT ${SESSION_ROW_COLUMNS} FROM sessions WHERE token_hash = $1 LIMIT 1`, [tokenHash])
+  return rows[0] || null
+}
+
+async function readSessionRowsForUser(db, userId) {
+  const { rows } = await db.query(`SELECT ${SESSION_ROW_COLUMNS} FROM sessions WHERE user_id = $1`, [userId])
+  return rows
+}
+
+async function writeSessionRow(db, row) {
+  await db.query(
+    `INSERT INTO sessions (${SESSION_ROW_COLUMNS}) VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT (token_hash) DO UPDATE SET
+       user_id = EXCLUDED.user_id, role = EXCLUDED.role, status = EXCLUDED.status,
+       expires_at = EXCLUDED.expires_at, revoked_at = EXCLUDED.revoked_at`,
+    [row.token_hash, row.user_id, row.role, row.status, row.created_at, row.expires_at, row.revoked_at],
+  )
+}
+
+async function deleteSessionRow(db, tokenHash) {
+  await db.query(`DELETE FROM sessions WHERE token_hash = $1`, [tokenHash])
+}
+
+// Fail-closed write for a single session op (save / revokeByTokenHash): the
+// Postgres write and the Blobs mirror are both-or-neither. A mirror failure
+// restores the pre-write Postgres row and the operation throws (the caller
+// surfaces a 5xx) so a revocation is never half-applied. A Postgres failure
+// also throws — auth writes never degrade to a Blobs-only write.
+function sessionWriteFailClosed(db, method, blobFn) {
+  return async (...args) => {
+    // save(session) -> tokenHash = session.tokenHash; revokeByTokenHash(tokenHash)
+    const tokenHash = args[0]?.tokenHash || args[0]
+    const before = await readSessionRow(db, tokenHash)
+    const result = await createSessionsRepo(db)[method](...args)
+    try {
+      await blobFn(...args)
+    } catch (err) {
+      try {
+        if (before) await writeSessionRow(db, before)
+        else await deleteSessionRow(db, tokenHash)
+      } catch (restoreErr) {
+        err.restoreError = restoreErr // best effort; keep the original failure
+      }
+      const wrapped = new Error(`Session write failed (change not applied): ${err?.message || err}`)
+      wrapped.cause = err
+      throw wrapped
+    }
+    return result
+  }
+}
+
+// Fail-closed bulk write for a user's sessions (revokeAllForUser /
+// deleteAllForUser): snapshot the user's rows, run the Postgres op, mirror to
+// Blobs, and restore every pre-write row on a mirror failure.
+function sessionBulkWriteFailClosed(db, method, blobFn) {
+  return async (...args) => {
+    const userId = args[0]
+    const before = await readSessionRowsForUser(db, userId)
+    const result = await createSessionsRepo(db)[method](...args)
+    try {
+      await blobFn(...args)
+    } catch (err) {
+      try {
+        for (const row of before) await writeSessionRow(db, row)
+      } catch (restoreErr) {
+        err.restoreError = restoreErr
+      }
+      const wrapped = new Error(`Session write failed (change not applied): ${err?.message || err}`)
+      wrapped.cause = err
+      throw wrapped
+    }
+    return result
+  }
+}
+
+// AUTH session-token read: Postgres-authoritative — a record-miss is returned
+// as-is (the token was revoked/expired/deleted in the system of record); we
+// fall back to the Blobs mirror ONLY on a true DB unavailability so an outage
+// still lets a genuinely-live session through.
+function authGetSessionByTokenHash(postgresFn, blobFn) {
+  return async (tokenHash) => {
+    try {
+      return await postgresFn(tokenHash)
+    } catch {
+      return blobFn(tokenHash)
+    }
+  }
+}
+
 export function createPostgresRepository({ db = postgresDb } = {}) {
   const usersPg = createUsersRepo(db)
+  const sessionsPg = createSessionsRepo(db)
   const items = createItemsRepo(db)
   const lookupCache = createLookupCacheRepo(db)
   const feedback = createFeedbackRepo(db)
@@ -185,9 +290,21 @@ export function createPostgresRepository({ db = postgresDb } = {}) {
     removeRequest: writeThrough(usersPg.removeRequest, blobUsers.removeRequest),
   }
 
+  const sessions = {
+    // Auth read — Postgres-authoritative (miss = invalid session; fallback to
+    // the mirror only on a true DB unavailability).
+    getByTokenHash: authGetSessionByTokenHash(sessionsPg.getByTokenHash, blobSessions.getSessionByTokenHash),
+    // Auth writes — FAIL CLOSED: both-or-neither across Postgres + the mirror.
+    save: sessionWriteFailClosed(db, 'save', blobSessions.saveSession),
+    revokeByTokenHash: sessionWriteFailClosed(db, 'revokeByTokenHash', blobSessions.revokeSessionByTokenHash),
+    revokeAllForUser: sessionBulkWriteFailClosed(db, 'revokeAllForUser', blobSessions.revokeAllForUser),
+    deleteAllForUser: sessionBulkWriteFailClosed(db, 'deleteAllForUser', blobSessions.deleteAllForUser),
+  }
+
   return {
     backend: 'postgres',
     users,
+    sessions,
     feedback,
     items,
     lookupCache,

@@ -11,7 +11,7 @@ const ITEM = { id: 'r1', title: 'Miles Davis - Kind of Blue', year: 1959, label:
 
 // Route mock fetches: /auth returns the user (session revalidation), /collection returns one item.
 function mockSignedIn(user, code = 'RU-AAAA-BBBB-CCCC') {
-  saveSession({ user, code })
+  saveSession({ user, session: 'tok-session-abc123' })
   global.fetch = vi.fn((url) => {
     if (String(url).includes('/functions/auth')) return Promise.resolve(res(200, { user }))
     if (String(url).includes('/functions/collection')) return Promise.resolve(res(200, { items: [ITEM] }))
@@ -106,7 +106,7 @@ describe('App — theme room scope (epic #95, T2 #110)', () => {
 // C2.1 (issue #86): the first-run tab default needs to distinguish the Books
 // store's emptiness, so mock the collection response per `collection` param.
 function mockSignedInWithBooks(user, booksItems = []) {
-  saveSession({ user, code: 'RU-AAAA-BBBB-CCCC' })
+  saveSession({ user, session: 'tok-session-abc123' })
   global.fetch = vi.fn((url) => {
     const u = String(url)
     if (u.includes('/functions/auth')) return Promise.resolve(res(200, { user }))

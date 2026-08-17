@@ -1,14 +1,22 @@
-// Auth API: request access, sign in with an access code (member or admin),
-// and validate an existing session. No passwords — access is granted by the
-// admin from the admin panel, and the admin key comes from RUNOUT_ADMIN_KEY.
+// Auth API: request access, sign in with an access code (member or admin) or a
+// magic link, and validate / revoke a server-managed SESSION token.
+//
+// SEC-EPIC-1 (#176): the access code and the admin key are now EXCHANGE
+// credentials ONLY — a successful login mints an opaque, expiring, revocable
+// session token (never the code) that the client persists and sends as
+// `Authorization: Bearer <sessionToken>` on every later call. The code → user
+// lookup lives ONLY here at login; every other function validates the session
+// token via resolveSession().
 
 import { randomUUID } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, DEMO_CODE, DEMO_USER, OWNER_ID, bearer, generateAccessCode, isDemoCode, publicUser } from './_shared/auth'
+import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, generateAccessCode, isDemoCode, publicUser } from './_shared/auth'
 import { normalizeCode } from './_shared/codes'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
-import { consumeMagicLink, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
+import { consumeMagicLink, isMagicLinkConfigured, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
 import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
+import { resolveSession } from './_shared/session-auth'
+import { createSession, revokeAllForUser, revokeSession } from './_shared/sessions'
 import {
   findPendingRequestByEmail,
   findUserByCode,
@@ -35,6 +43,11 @@ const ME_LIMIT = Number(process.env.RUNOUT_AUTH_ME_RATE_LIMIT) || 60
 // source; per-email bounds one inbox being hammered.
 const MAGIC_LINK_IP_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_IP_RATE_LIMIT) || 10
 const MAGIC_LINK_EMAIL_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_RATE_LIMIT) || 5
+// SEC-1.7 (#182): verify is the real brute-force surface for magic links — a
+// wrong guess costs the verify round-trip, so per-IP throttling here bounds
+// the cost of hammering tokens (the HMAC + randomUUID jti makes a practical
+// brute force infeasible; this is defense in depth, like the login limiter).
+export const MAGIC_LINK_VERIFY_IP_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_VERIFY_IP_RATE_LIMIT) || 20
 
 // A light shape check before we email someone — enough to reject obvious
 // garbage without a backtracking-prone regex.
@@ -157,41 +170,54 @@ async function handleLogin(body, req) {
   const user = await profileForCode(code)
   if (!user) return json(401, { error: "That access code isn't recognized. Check it and try again." })
   if (user.status !== 'active') return json(403, { error: 'This account is disabled. Ask the admin to re-enable it.' })
-  return json(200, sessionPayload(user, normalizeCode(code)))
-}
-
-// The canonical code for a session: the admin key for the owner, the public
-// demo code for the demo identity, or the member's stored (uppercase) code.
-// Storing this client-side means every later API call authenticates no matter
-// how the code was typed at sign-in.
-//
-// `fallbackCode` covers the Postgres path: since Part B stores only the sha256
-// hash, a Postgres-backed user has no plaintext `code` to return. The client
-// already typed/holds the code, so we hand back the normalized (trim+uppercase)
-// form of what it sent — byte-identical to the Blobs path for real codes.
-function sessionPayload(user, fallbackCode) {
-  const code = user.role === 'admin' ? ADMIN_KEY : (user.role === 'demo' ? DEMO_CODE : (user.code || fallbackCode))
-  return {
-    user: publicUser(user),
-    code,
-  }
+  // The access code is an EXCHANGE credential only (SEC-EPIC-1, #176): a
+  // successful login mints a fresh, opaque, expiring SESSION token — never the
+  // code — which the client persists and sends on every later call. The raw
+  // token is returned exactly once here and only its hash is stored server-side.
+  const { token } = await createSession({ userId: user.id, role: user.role })
+  return json(200, { user: publicUser(user), session: token })
 }
 
 async function handleMe(req) {
-  const code = bearer(req)
-  if (!code) return json(401, { error: 'Not signed in.' })
+  const token = bearer(req)
+  if (!token) return json(401, { error: 'Not signed in.' })
 
   // Session-validation is called on app load; a runaway client can't spam it.
   const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:me', limit: ME_LIMIT })
-  const rl = await limiter(normalizeCode(code))
+  const rl = await limiter(token)
   if (rl.limited) {
     return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
   }
 
-  const user = await profileForCode(code)
-  if (!user) return json(401, { error: 'Not signed in.' })
-  if (user.status !== 'active') return json(403, { error: 'This account is disabled.' })
-  return json(200, sessionPayload(user, normalizeCode(code)))
+  // The Bearer is now a session token, not an access code — a live session
+  // resolves to the user (disabled accounts are rejected here too, SEC-1.9).
+  const resolved = await resolveSession(req)
+  if (resolved.error) return resolved.error
+  return json(200, { user: publicUser(resolved.user), session: token })
+}
+
+// Server-side logout (SEC-1.9, #184): revoke the session token so it is dead
+// server-side even if a copy was cached elsewhere. Revoking an already-dead
+// token is a no-op success.
+async function handleLogout(req) {
+  const token = bearer(req)
+  if (!token) return json(400, { error: 'Not signed in.' })
+  await revokeSession(token)
+  return json(200, { ok: true })
+}
+
+// SEC-1.4 (#179) — "sign out all devices": revoke EVERY live session for the
+// resolved user (the current one included), so a stolen token on any other
+// device dies server-side immediately. Scope is the session's OWN user — a
+// member can never revoke another member's sessions (resolveSession binds the
+// request to the token's userId). The owner (userId 'owner') is revocable too:
+// owner sessions are stored like any other, so revokeAllForUser('owner') kills
+// them. Idempotent: revoking an already-dead set is a safe no-op.
+async function handleLogoutAll(req) {
+  const resolved = await resolveSession(req)
+  if (resolved.error) return resolved.error
+  await revokeAllForUser(resolved.user.id)
+  return json(200, { ok: true })
 }
 
 // ---- Self-serve signup via email magic link (ADR-0003, S1) ----------------
@@ -226,8 +252,16 @@ async function handleRequestMagicLink(body, req) {
   // BEFORE issuing a token or recording a request, so a misconfigured prod can
   // never mint a sign-in link (which would let an attacker rotate a member's
   // code for any email). Dev keeps the no-op mailer + devLink echo below.
-  if (!isMailConfigured() && !isDevEmailMode()) {
-    return json(503, { error: "Sign-in email isn't configured yet — try again shortly.", code: 'MAIL_NOT_CONFIGURED' })
+  if (!isDevEmailMode()) {
+    if (!isMailConfigured()) {
+      return json(503, { error: "Sign-in email isn't configured yet — try again shortly.", code: 'MAIL_NOT_CONFIGURED' })
+    }
+    // CWE-287 (#184): the signing secret is required too. With no secret (prod
+    // missing both RUNOUT_MAGIC_LINK_SECRET and RUNOUT_ADMIN_KEY) no token can
+    // ever be valid, so refuse before minting/emailing a dead, forgeable link.
+    if (!isMagicLinkConfigured()) {
+      return json(503, { error: "Sign-in links aren't configured yet — try again shortly.", code: 'MAGIC_LINK_NOT_CONFIGURED' })
+    }
   }
 
   // Reuse the existing pending `request:<id>` flow (ADR-0003 §2.2): the request
@@ -259,7 +293,28 @@ async function handleRequestMagicLink(body, req) {
   })
 }
 
-async function handleVerifyMagicLink(body) {
+async function handleVerifyMagicLink(body, req) {
+  // SEC-1.7 (#182): rate-limit the VERIFY path (previously unthrottled) before
+  // any token parsing — the real brute-force surface for magic links. Per-IP
+  // bounds one source hammering tokens; a legitimate click is 1-2 requests.
+  const ip = clientIp(req)
+  if (ip) {
+    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:magiclink:verify:ip', limit: MAGIC_LINK_VERIFY_IP_LIMIT })(ip)
+    if (byIp.limited) {
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byIp.retryAfter) })
+    }
+  }
+
+  // CWE-287/346 (#184): FAIL CLOSED when no magic-link secret is configured
+  // (e.g. a prod deploy missing both RUNOUT_MAGIC_LINK_SECRET and
+  // RUNOUT_ADMIN_KEY — ADMIN_KEY is '' there). Refuse BEFORE any token parsing
+  // or verification, so a token forged with an empty HMAC key can never rotate
+  // a member's code or mint a session. Mirrors the M3 gate in
+  // requestMagicLink / mailer.js.
+  if (!isMagicLinkConfigured()) {
+    return json(503, { error: "Sign-in links aren't configured yet — try again shortly.", code: 'MAGIC_LINK_NOT_CONFIGURED' })
+  }
+
   const token = String(body.token || '').trim()
   if (!token) return json(400, { error: 'Missing magic link token.' })
 
@@ -318,7 +373,10 @@ async function handleVerifyMagicLink(body) {
 
   await saveRequest({ ...request, status: 'approved', approvedAt: new Date().toISOString() })
 
-  return json(200, { user: publicUser(user), code })
+  // The auto-issued access code is exchanged for a fresh session token exactly
+  // like a manual login — the client never persists the code (SEC-1.1/1.2).
+  const { token: sessionToken } = await createSession({ userId: user.id, role: user.role })
+  return json(200, { user: publicUser(user), session: sessionToken })
 }
 
 export default async (req) => {
@@ -328,7 +386,9 @@ export default async (req) => {
       if (body.action === 'request') return handleRequest(body)
       if (body.action === 'login') return handleLogin(body, req)
       if (body.action === 'requestMagicLink') return handleRequestMagicLink(body, req)
-      if (body.action === 'verifyMagicLink') return handleVerifyMagicLink(body)
+      if (body.action === 'verifyMagicLink') return handleVerifyMagicLink(body, req)
+      if (body.action === 'logout') return handleLogout(req)
+      if (body.action === 'logoutAll') return handleLogoutAll(req)
       return json(400, { error: 'Unknown action.' })
     }
 

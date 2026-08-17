@@ -1,7 +1,7 @@
-import { getAccessCode } from '../utils/session'
+import { getSessionToken } from '../utils/session'
 
 // Client for the community-reviews Netlify function. Mirrors
-// src/api/collection.js conventions — same `Authorization: Bearer <code>`
+// src/api/collection.js conventions — same `Authorization: Bearer <token>`
 // header, `{ error, code }` unwrap into a thrown Error on non-200, and a
 // shared query-param helper. Reviews are public (the list + aggregate load
 // without a session); writes (POST/DELETE) require a signed-in member.
@@ -10,10 +10,10 @@ const FN_BASE = '/.netlify/functions/reviews'
 
 // The reviews API is shared by records and books — the function uses `kind` +
 // `sourceId` (discogsId / googleBooksId) to pick which review thread to read
-// or write. Every write authenticates with the signed-in user's access code.
+// or write. Every write authenticates with the signed-in user's session token.
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 function fnUrl(extra = {}) {

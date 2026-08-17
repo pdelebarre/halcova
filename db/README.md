@@ -18,7 +18,8 @@ Functions and API contract. `src/api/*` and the client are untouched.
   (today's behavior) or the Postgres impl when it is set (read DB first, fall
   back to Blobs on miss/error).
 - `../netlify/functions/_shared/repositories/` — the repositories:
-  `users-repo.js`, `items-repo.js`, `lookup-cache-repo.js`,
+  `users-repo.js`, `items-repo.js`, `lookup-cache-repo.js`, `sessions-repo.js`
+  (SEC-EPIC-1 session tokens, migration `007_sessions.sql`),
   `blob-users.js` (the legacy identity impl), `blob-repository.js`,
   `postgres-repository.js`.
 - `../netlify/functions/_shared/collection-postgres.js` — the Postgres

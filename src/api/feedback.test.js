@@ -18,10 +18,12 @@ function errorJson(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body }
 }
 
+const SESSION_TOKEN = 'tok-feedback-session-abc123'
+
 describe('feedback API', () => {
   beforeEach(() => {
     global.fetch = vi.fn()
-    saveSession({ user: { id: 'u1', name: 'Ada', role: 'member' }, code: 'RU-AAAA-BBBB-CCCC' })
+    saveSession({ user: { id: 'u1', name: 'Ada', role: 'member' }, session: SESSION_TOKEN })
   })
 
   it('submits feedback with POST and a JSON body, and returns the created item', async () => {
@@ -39,7 +41,7 @@ describe('feedback API', () => {
     expect(url).toContain('/.netlify/functions/feedback')
     expect(init.method).toBe('POST')
     expect(init.headers['Content-Type']).toBe('application/json')
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`)
     expect(JSON.parse(init.body)).toEqual({
       type: 'bug',
       category: 'scanner',
@@ -60,7 +62,7 @@ describe('feedback API', () => {
     expect(url).toContain('type=bug')
     // GET is the default method — no method key in the init (collection.js convention).
     expect(init.method).toBeUndefined()
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`)
   })
 
   it('maps a missing items key to an empty list', async () => {
@@ -85,7 +87,7 @@ describe('feedback API', () => {
     expect(url).toContain('/.netlify/functions/feedback')
     expect(init.method).toBe('PATCH')
     expect(init.headers['Content-Type']).toBe('application/json')
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`)
     expect(JSON.parse(init.body)).toEqual({ id: 'fb-1', status: 'done', adminNote: 'Fixed in 1.3' })
   })
 
@@ -104,7 +106,7 @@ describe('feedback API', () => {
     const [url, init] = global.fetch.mock.calls[0]
     expect(init.method).toBe('DELETE')
     expect(url).toContain('id=fb-9')
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`)
   })
 
   it('surfaces a server-provided error message and its code (429 RATE_LIMITED)', async () => {

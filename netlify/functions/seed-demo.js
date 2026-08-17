@@ -1,6 +1,7 @@
-// One-shot seeder for the public demo space. Reachable ONLY with the admin key
-// (`Authorization: Bearer RUNOUT_ADMIN_KEY` — a 401 otherwise). Seeds the
-// shared demo stores (collection-demo-records / collection-demo-books, via
+// One-shot seeder for the public demo space. Reachable ONLY with the owner's
+// admin SESSION (`Authorization: Bearer <sessionToken>` — SEC-1.6, #181: the
+// admin key only minted this session at login). Seeds the shared demo stores
+// (collection-demo-records / collection-demo-books, via
 // storeNameFor('demo', kind)) with a curated fixed set of well-known records
 // and books so every demo visitor sees the same items rendered by the shared
 // CollectionView flow.
@@ -15,16 +16,21 @@
 //
 // How to run:
 //   1. Start the functions locally:  netlify dev   (functions on :8888)
-//   2. Either curl it:
+//   2. Exchange the admin key for an admin session, then call it:
+//        SESSION=$(curl -s -X POST http://localhost:8888/.netlify/functions/auth \
+//                   -H "Content-Type: application/json" \
+//                   -d "{\"action\":\"login\",\"code\":\"$RUNOUT_ADMIN_KEY\"}" \
+//                   | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).session))")
 //        curl -X POST http://localhost:8888/.netlify/functions/seed-demo \
-//             -H "Authorization: Bearer $RUNOUT_ADMIN_KEY"
+//             -H "Authorization: Bearer $SESSION"
 //      or use the thin wrapper:  node scripts/seed-demo.mjs
 //   In production, trigger it once after deploy (RUNOUT_ADMIN_KEY is required
 //   and never ships to the client; RUNOUT_DEMO_CODE is public by design).
 
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, DEMO_USER, bearer } from './_shared/auth'
+import { DEMO_USER } from './_shared/auth'
 import { json } from './_shared/collection-store'
+import { requireAdmin } from './_shared/session-auth'
 import { DEMO_RECORDS, DEMO_BOOKS, seedDemoStore } from './_shared/demo-data'
 import { storeNameFor } from './_shared/users'
 
@@ -33,9 +39,10 @@ import { storeNameFor } from './_shared/users'
 // uses, so the demo always shows the same fixed set). Harmless to re-run — it
 // skips a kind whose store index is already non-empty.
 export default async (req) => {
-  if (bearer(req) !== ADMIN_KEY) {
-    return json(401, { error: 'Admin key required. Set RUNOUT_ADMIN_KEY and sign in as the owner.' })
-  }
+  // SEC-1.6 (#181): authorize by the session's role (the owner's admin
+  // session), never by re-checking a bearer string against ADMIN_KEY.
+  const admin = await requireAdmin(req)
+  if (admin.error) return admin.error
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
 
   const records = await seedDemoStore(getStore(storeNameFor(DEMO_USER.id, 'records')), DEMO_RECORDS)

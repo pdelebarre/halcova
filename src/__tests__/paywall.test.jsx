@@ -289,7 +289,7 @@ describe('Paywall triggers', () => {
 
 describe('Checkout return & magic link', () => {
   it('polls the S3 status after a successful checkout, strips the URL and shows the success toast', async () => {
-    saveSession({ user: currentUser, code: 'RU-TEST' })
+    saveSession({ user: currentUser, session: 'tok-session-abc123' })
     window.history.replaceState({}, '', '/?checkout=success&session_id=cs_test')
     paymentApi.getCheckoutStatus.mockResolvedValue({
       status: 'complete',
@@ -306,7 +306,7 @@ describe('Checkout return & magic link', () => {
   })
 
   it('shows the "still confirming" notice while the payment is pending', async () => {
-    saveSession({ user: currentUser, code: 'RU-TEST' })
+    saveSession({ user: currentUser, session: 'tok-session-abc123' })
     window.history.replaceState({}, '', '/?upgrade=success&session_id=cs_test')
     paymentApi.getCheckoutStatus.mockResolvedValue({ status: 'pending' })
 
@@ -318,7 +318,7 @@ describe('Checkout return & magic link', () => {
   })
 
   it('exchanges a magic-link token on mount and strips the token from the URL', async () => {
-    saveSession({ user: currentUser, code: 'RU-TEST' })
+    saveSession({ user: currentUser, session: 'tok-session-abc123' })
     window.history.replaceState({}, '', '/?magic-link=abc123')
     authApi.verifyMagicLink.mockResolvedValue({ ...currentUser, name: 'New Member' })
 

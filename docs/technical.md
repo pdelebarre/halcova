@@ -327,38 +327,45 @@ chip/select filters.
 ### 6.3 API clients
 
 - **`api/discogs.js`** — calls the `discogs` function proxy
-  (`/.netlify/functions/discogs`) with the access code as
-  `Authorization: Bearer <code>`; it no longer calls `https://api.discogs.com`
-  directly or carries any per-user token. The proxy owns the single
-  `RUNOUT_DISCOGS_TOKEN`, sends the `User-Agent`, and caches in the shared
-  `discogs-cache` blob store. This module maps the proxy's errors
-  (`SERVER_NO_TOKEN`, `BAD_TOKEN`, `RATE_LIMIT`, `HTTP_ERROR`) and normalizes
-  the returned JSON into the item shape (search results and release details —
-  tracklist, notes, images). `parseFormatType` infers a coarse
+  (`/.netlify/functions/discogs`) with the session token as
+  `Authorization: Bearer <sessionToken>` (SEC-EPIC-1); it no longer calls
+  `https://api.discogs.com` directly or carries any per-user token. The proxy
+  owns the single `RUNOUT_DISCOGS_TOKEN`, sends the `User-Agent`, and caches
+  in the shared `discogs-cache` blob store. This module maps the proxy's
+  errors (`SERVER_NO_TOKEN`, `BAD_TOKEN`, `RATE_LIMIT`, `HTTP_ERROR`) and
+  normalizes the returned JSON into the item shape (search results and release
+  details — tracklist, notes, images). `parseFormatType` infers a coarse
   `LP/EP/CD/7"/12"/Other` from the raw format array.
 - **`api/books.js`** — calls the `books` function proxy
-  (`/.netlify/functions/books`) with the access code as Bearer; the proxy hits
-  the public Google Books `v1` endpoints (optionally with the server-side
-  `GOOGLE_BOOKS_API_KEY`, plus a transient retry on 429/5xx/network
-  errors) and serves from the shared `books-cache` blob store. This module
-  normalizes the returned volumes into
-  the shared item shape, upgrades thumbnail URLs `http → https`
-  (mixed-content), and reduces published dates to the year.
+  (`/.netlify/functions/books`) with the session token as Bearer; the proxy
+  hits the public Google Books `v1` endpoints (optionally with the server-side
+  `GOOGLE_BOOKS_API_KEY`, plus a transient retry on 429/5xx/network errors)
+  and serves from the shared `books-cache` blob store. This module normalizes
+  the returned volumes into the shared item shape, upgrades thumbnail URLs
+  `http → https` (mixed-content), and reduces published dates to the year.
 - **`api/collection.js`** — thin `fetch` wrapper around the Netlify Function;
   builds the URL with `collection` and `id` params, attaches
-  `Authorization: Bearer <code>` (from `utils/session`), and unwraps error
-  bodies.
+  `Authorization: Bearer <sessionToken>` (from `utils/session`), and unwraps
+  error bodies.
 - **`api/auth.js`** — client for the `auth` + `admin` functions: request
-  access, login (code in the body — pre-auth), `me()` (revalidate + persist
-  session), logout, and the admin actions (`adminList`, `adminApprove`,
+  access, login (code in the body — pre-auth, exchanged for a session token),
+  `me()` (revalidate + persist session), logout (revokes the session
+  server-side), and the admin actions (`adminList`, `adminApprove`,
   `adminReject`, `adminUpdateUser`, `adminDeleteUser`), all of which send the
-  admin key as a Bearer header.
+  owner's admin session token as a Bearer header.
 
 ### 6.4 Sessions & token management
 
-- **Session** — `utils/session.js` persists `{ user, code }` at
-  `localStorage.runout.session`. `getAccessCode()` feeds the Bearer header on
-  every API call; `getUserId()` namespaces per-user settings.
+- **Session** — SEC-EPIC-1 (#176/#177): the access code / admin key is only an
+  **exchange credential** at login; the server mints an opaque, random,
+  expiring **session token** (only its sha256 hash is stored server-side, in a
+  `sessions` repository behind the same Blobs↔Postgres seam as users).
+  `utils/session.js` persists `{ user, session }` at
+  `localStorage.runout.session` — the access code is **never** stored.
+  `getSessionToken()` feeds the Bearer header on every API call; `getUserId()`
+  namespaces per-user settings. Logout revokes the token server-side; a
+  revoked/expired/disabled token is rejected on every call and on
+  revalidation (`me()`).
 - **Discogs token** — centralized: the site owns a single
   `RUNOUT_DISCOGS_TOKEN` env var, set **server-side** on the `discogs` lookup
   proxy (`netlify/functions/discogs.js`). Users never bring or paste tokens
@@ -571,18 +578,34 @@ skips functions), or Git-connected import.
 - **No passwords** — members sign in with an `RU-…` access code that the admin
   issues; the owner signs in with the `RUNOUT_ADMIN_KEY`. There is no signup
   without admin approval.
+- **Server-managed sessions (SEC-EPIC-1, #176)** — the access code / admin key
+  is only an **exchange credential at login**. A successful login mints an
+  opaque, random, expiring **session token**; every protected call sends
+  `Authorization: Bearer <sessionToken>` and the server validates it against a
+  live session record (only the token's sha256 hash is stored, in a `sessions`
+  table / `runout-sessions` Blob store). Sessions are revocable (logout,
+  disable, rotate, delete), expire by default after 30 days
+  (`RUNOUT_SESSION_TTL_DAYS`, hard-capped at 90), and are fixation-proof (a
+  fresh token per login). The access code is **never** persisted client-side
+  (#177) — `localStorage.runout.session` holds only `{ user, session }`.
+- **Role-based admin auth (SEC-1.6, #181)** — admin endpoints authorize by the
+  resolved session's `role` (captured server-side at login), never by
+  re-checking a bearer string against `ADMIN_KEY`. Members can never self-
+  promote.
 - **Per-user isolation** — every collection call is authenticated
-  (`Authorization: Bearer <code>`) and served from the caller's own blob store
-  (`collection-<userId>-<kind>`); a member can't read or write another user's
-  data. Collection access is additionally gated by the member's granted
-  collections (Records / Books).
+  (`Authorization: Bearer <sessionToken>`) and served from the caller's own
+  blob store (`collection-<userId>-<kind>`); a member can't read or write
+  another user's data. Collection access is additionally gated by the member's
+  granted collections (Records / Books).
 - **The admin key and access codes are secrets** — `publicUser` strips the
   `code` field (and its `code_hash`) before any user object reaches the client;
   functions never log them. On Postgres (Phase 1) only `sha256(normalize(code))`
   is stored — a lost code can't be re-revealed, only **rotated** (mint a new
   one via the admin `rotate` action). The legacy Blobs identity store keeps
   plaintext during read-through (reversible cutover), and codes are stripped by
-  `publicUser` before any response.
+  `publicUser` before any response. The global `ADMIN_KEY` **fails closed** in
+  production (SEC-1.5, #180): a missing `RUNOUT_ADMIN_KEY` yields an empty key
+  (401/403 everywhere), never the dev default.
 - The **Discogs token is server-only** — the single `RUNOUT_DISCOGS_TOKEN` env
   var lives on the `discogs` lookup proxy and never reaches the browser.
 - The **Google Books API key is server-only too** — `GOOGLE_BOOKS_API_KEY`

@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../collection'
 import { LIST_CACHE_KEY } from './list-cache'
 import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
+import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
 
 // Hoisted so the @netlify/blobs mock (which must be registered before the
 // module under test is imported) can share the in-memory store registry.
@@ -48,7 +49,12 @@ vi.mock('@netlify/blobs', () => ({
 
 const CODE = 'RU-AAAA-BBBB-CCCC'
 const USER_ID = 'u1'
-const ADMIN_KEY = 'runout-dev-admin-key' // dev fallback, matches _shared/auth.js
+
+// Session tokens minted per-test (SEC-EPIC-1): the Bearer is now a
+// server-managed session token, not the access code / admin key.
+let MEMBER_TOKEN = ''
+let ADMIN_TOKEN = ''
+let DEMO_TOKEN = ''
 
 function seedMember({ collections = { records: true, books: true }, plan = 'free' } = {}) {
   const identity = stores['runout-identity'] || createStore()
@@ -77,7 +83,7 @@ function collectionStore(items = []) {
   return store
 }
 
-function req(method, path = '', body, auth = `Bearer ${CODE}`) {
+function req(method, path = '', body, auth = `Bearer ${MEMBER_TOKEN}`) {
   return {
     method,
     url: `http://localhost/.netlify/functions/collection${path}`,
@@ -94,8 +100,12 @@ function call(method, path = '', body, auth) {
 
 const items = (ids) => ids.map((id) => ({ id, title: `Title ${id}`, year: 2000 }))
 
-beforeEach(() => {
+beforeEach(async () => {
   for (const key of Object.keys(stores)) delete stores[key]
+  // Mint fresh session tokens for the identities the tests use (SEC-EPIC-1).
+  MEMBER_TOKEN = await sessionTokenFor({ userId: USER_ID, role: 'member' })
+  ADMIN_TOKEN = await adminSessionToken()
+  DEMO_TOKEN = await demoSessionToken()
 })
 
 describe('GET /collection pagination (T2)', () => {
@@ -267,7 +277,7 @@ describe('owned-count transitions (T3)', () => {
       'POST',
       '?collection=records',
       { title: 'Owner - Add', wishlist: false },
-      `Bearer ${ADMIN_KEY}`,
+      `Bearer ${ADMIN_TOKEN}`,
     )
     expect(res.status).toBe(201)
     // Uncapped owner: the count is not denormalized on a store that never had one.
@@ -280,7 +290,7 @@ describe('owned-count transitions (T3)', () => {
     store.data.set('index', [])
     store.data.set('count:owned', 999)
 
-    const res = await call('POST', '?collection=records', { title: 'Owner - Add' }, `Bearer ${ADMIN_KEY}`)
+    const res = await call('POST', '?collection=records', { title: 'Owner - Add' }, `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(201)
     expect(store.data.get('count:owned')).toBe(1000)
   })
@@ -344,7 +354,7 @@ describe('convert-to-owned cap (S4 / #58)', () => {
     store.data.set('item:w1', { id: 'w1', title: 'Wish - List', wishlist: true })
     store.data.set('count:owned', 50)
 
-    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false }, `Bearer ${ADMIN_KEY}`)
+    const res = await call('PUT', '?collection=records&id=w1', { wishlist: false }, `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(200)
     expect(store.data.get('item:w1').wishlist).toBe(false)
     expect(store.data.get('count:owned')).toBe(51)
@@ -460,7 +470,7 @@ describe('collection rate limiting (T5)', () => {
       'POST',
       '?collection=records',
       { title: 'Demo - Add' },
-      'Bearer RUNOUT-DEMO-0000',
+      `Bearer ${DEMO_TOKEN}`,
     )
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('DEMO_READONLY')
@@ -470,7 +480,7 @@ describe('collection rate limiting (T5)', () => {
     const demoStore = createStore()
     stores['collection-demo-records'] = demoStore // demo id => collection-demo-records
 
-    const res = await call('GET', '?collection=records', undefined, 'Bearer RUNOUT-DEMO-0000')
+    const res = await call('GET', '?collection=records', undefined, `Bearer ${DEMO_TOKEN}`)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.items.length).toBeGreaterThan(0)

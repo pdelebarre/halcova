@@ -28,8 +28,10 @@
 // rejected with a 422 "Incorrect function names" error on deploy.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import handler from '../auth'
+import handler, { MAGIC_LINK_VERIFY_IP_LIMIT } from '../auth'
 import { signMagicLink } from './magic-link'
+import { resolveSession } from './session-auth'
+import { createSession, getSessionByToken } from './sessions'
 import { getUser, listRequests, listUsers, saveUser } from './users'
 
 const { stores, createStore } = vi.hoisted(() => {
@@ -59,13 +61,20 @@ vi.mock('@netlify/blobs', () => ({
 
 const SECRET = 'test-magic-secret'
 
-function req(body, { method = 'POST' } = {}) {
+function req(body, { method = 'POST', token = '', ip = '' } = {}) {
   return {
     method,
     // No origin/host → siteUrl falls back to http://localhost:8888; no IP
-    // headers → the per-IP rate limiter is skipped (the per-email limiter
+    // headers → the per-IP rate limiters are skipped (the per-email limiter
     // still runs, at its default 5/window — each test stays well under).
-    headers: { get: () => null },
+    headers: {
+      get: (k) => {
+        const key = String(k).toLowerCase()
+        if (key === 'authorization' && token) return `Bearer ${token}`
+        if (key === 'x-nf-client-connection-ip' && ip) return ip
+        return null
+      },
+    },
     json: async () => body,
   }
 }
@@ -188,7 +197,10 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
 
     const { status, body } = await call({ action: 'verifyMagicLink', token: validToken('ada@example.com') })
     expect(status).toBe(200)
-    expect(body.code).toMatch(/^RU-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)
+    // SEC-EPIC-1 (#176/#177): the response is { user, session } — an opaque
+    // session token, never the access code.
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect(body).not.toHaveProperty('code')
     // Self-serve members start on the free tier with both collections and no
     // manual feature flags (no lending).
     expect(body.user).toMatchObject({
@@ -199,15 +211,15 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
       collections: { records: true, books: true },
       features: {},
     })
-    // The code lives ONLY at the top level, exactly once — never inside the
-    // public user object.
+    // The code is never inside the public user object either.
     expect(body.user).not.toHaveProperty('code')
     expect(body.user).not.toHaveProperty('stripeCustomerId')
 
-    // The issued code matches the stored member, and the request flipped.
+    // The member was created with a freshly-issued RU- code (stored, never
+    // returned again), and the request flipped to approved.
     const users = await listUsers()
     expect(users).toHaveLength(1)
-    expect(users[0].code).toBe(body.code)
+    expect(users[0].code).toMatch(/^RU-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)
     expect((await listRequests())[0].status).toBe('approved')
   })
 
@@ -223,8 +235,8 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
 
     const { status, body } = await call({ action: 'verifyMagicLink', token: validToken('ada@example.com') })
     expect(status).toBe(200)
-    expect(body.code).toMatch(/^RU-/)
-    expect(body.code).not.toBe(RETURNING.code)
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect(body).not.toHaveProperty('code')
     // Plan + collections + billing fields survive the rotation.
     expect(body.user.plan).toBe('premium')
     expect(body.user.collections).toEqual({ records: true, books: false })
@@ -233,13 +245,15 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
     // Exactly one account — no duplicate.
     const users = await listUsers()
     expect(users).toHaveLength(1)
-    expect(users[0].code).toBe(body.code)
+    expect(users[0].code).toMatch(/^RU-/)
+    expect(users[0].code).not.toBe(RETURNING.code)
     // The OLD code stops working; the NEW one signs in (rotation semantics).
     const oldLogin = await call({ action: 'login', code: 'RU-OLD-OLD-OLD' })
     expect(oldLogin.status).toBe(401)
-    const newLogin = await call({ action: 'login', code: body.code })
+    const newLogin = await call({ action: 'login', code: users[0].code })
     expect(newLogin.status).toBe(200)
     expect(newLogin.body.user.id).toBe('u-member')
+    expect(newLogin.body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
   })
 
   it('never re-enables a disabled member (403) and does not rotate their code', async () => {
@@ -299,8 +313,170 @@ describe('end-to-end: request → click the devLink → session', () => {
     const { status, body } = await call({ action: 'verifyMagicLink', token })
     expect(status).toBe(200)
     expect(body.user.email).toBe('ada@example.com')
-    expect(body.code).toMatch(/^RU-/)
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect(body).not.toHaveProperty('code')
     // The request used for the checkout identity is now approved.
     expect((await listRequests())[0].status).toBe('approved')
+  })
+})
+
+// SEC-1.4 (#179) — "sign out all devices" endpoint.
+describe('logoutAll — sign out all devices', () => {
+  async function seedMember(id, email) {
+    await saveUser({
+      id, name: id, email, code: `RU-${id.toUpperCase()}-XXXX-XXXX`,
+      collections: { records: true, books: true }, role: 'member', status: 'active', features: {},
+    })
+  }
+
+  function sessionReq(token) {
+    return {
+      method: 'GET',
+      url: 'http://localhost/.netlify/functions/auth',
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${token}` : null) },
+      json: async () => ({}),
+    }
+  }
+
+  it('revokes EVERY session for the signed-in user (current one included) and returns { ok: true }', async () => {
+    await seedMember('u-member', 'ada@example.com')
+    const s1 = await createSession({ userId: 'u-member', role: 'member' })
+    const s2 = await createSession({ userId: 'u-member', role: 'member' })
+
+    const { status, body } = await call({ action: 'logoutAll' }, { token: s1.token })
+    expect(status).toBe(200)
+    expect(body).toEqual({ ok: true })
+
+    for (const { token } of [s1, s2]) {
+      expect((await getSessionByToken(token)).status).toBe('revoked')
+      expect((await resolveSession(sessionReq(token))).error.status).toBe(401)
+    }
+  })
+
+  it('401s without a valid session (logoutAll must be authorized)', async () => {
+    const { status } = await call({ action: 'logoutAll' })
+    expect(status).toBe(401)
+  })
+
+  it('a member logoutAll cannot revoke another member\'s sessions', async () => {
+    await seedMember('u1', 'ada@example.com')
+    await seedMember('u2', 'bob@example.com')
+    const mine = await createSession({ userId: 'u1', role: 'member' })
+    const theirs = await createSession({ userId: 'u2', role: 'member' })
+
+    expect((await call({ action: 'logoutAll' }, { token: mine.token })).status).toBe(200)
+    // u1's session is dead; u2's is untouched.
+    expect((await getSessionByToken(mine.token)).status).toBe('revoked')
+    expect((await getSessionByToken(theirs.token)).status).toBe('active')
+    expect((await resolveSession(sessionReq(theirs.token))).error).toBeUndefined()
+  })
+
+  it('the OWNER session is revocable via logoutAll too', async () => {
+    const { token } = await createSession({ userId: 'owner', role: 'admin' })
+    const { status } = await call({ action: 'logoutAll' }, { token })
+    expect(status).toBe(200)
+    expect((await getSessionByToken(token)).status).toBe('revoked')
+    expect((await resolveSession(sessionReq(token))).error.status).toBe(401)
+  })
+})
+
+// SEC-1.7 (#182) — the VERIFY path is rate-limited (the real brute-force
+// surface for magic links), and requestMagicLink stays enumeration-neutral.
+describe('SEC-1.7 (#182) — verify-path rate limit', () => {
+  it('returns 429 once a client exceeds the per-IP verify limit (invalid-token hammering)', async () => {
+    const ip = '203.0.113.7'
+    // The limiter allows `limit` requests per window; the (limit+1)-th is 429.
+    for (let i = 0; i < MAGIC_LINK_VERIFY_IP_LIMIT; i++) {
+      const { status } = await call({ action: 'verifyMagicLink', token: `forged-${i}` }, { ip })
+      expect(status).toBe(401) // every allowed call is a genuine invalid-token 401…
+    }
+    const { status, body } = await call({ action: 'verifyMagicLink', token: 'forged-limit' }, { ip })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(await listUsers()).toHaveLength(0)
+  })
+})
+
+describe('SEC-1.7 (#182) — requestMagicLink is enumeration-neutral', () => {
+  it('a known member email and an unknown email get the SAME response shape (no membership leak)', async () => {
+    await saveUser(RETURNING) // ada@example.com is a real, active member
+
+    const member = await call({ action: 'requestMagicLink', email: 'ada@example.com' })
+    const ghost = await call({ action: 'requestMagicLink', email: 'ghost@example.com' })
+
+    expect(member.status).toBe(200)
+    expect(ghost.status).toBe(200)
+    // Identical observable shape — nothing reveals that one email is a member.
+    expect(Object.keys(member.body).sort()).toEqual(Object.keys(ghost.body).sort())
+    expect(member.body).toMatchObject({ ok: true })
+    expect(ghost.body).toMatchObject({ ok: true })
+    expect(typeof member.body.expiresAt).toBe('number')
+    expect(typeof ghost.body.expiresAt).toBe('number')
+    expect(member.body).not.toHaveProperty('member')
+    expect(ghost.body).not.toHaveProperty('member')
+  })
+})
+
+// SEC-EPIC-1 / CWE-287 (#184) — a production deploy with BOTH the magic-link
+// secret and RUNOUT_ADMIN_KEY unset must FAIL CLOSED on BOTH sides of the
+// magic-link flow. ADMIN_KEY is a module-level constant, so these cases
+// re-import the handler with NODE_ENV=production (ADMIN_KEY → '') to simulate
+// the misconfigured deploy — same pattern as auth.test.js.
+describe('magic link — fails closed when the secret is unconfigured (CWE-287)', () => {
+  beforeEach(() => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.RUNOUT_ADMIN_KEY
+    delete process.env.RUNOUT_MAGIC_LINK_SECRET
+    delete process.env.RUNOUT_DEV_EMAIL
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    delete process.env.NODE_ENV
+    delete process.env.RUNOUT_ADMIN_KEY
+    delete process.env.RUNOUT_MAGIC_LINK_SECRET
+    delete process.env.RUNOUT_MAIL_API_KEY
+    delete process.env.RUNOUT_DEV_EMAIL
+    vi.resetModules()
+  })
+
+  // Forge the exact CWE-287 attack: a well-formed, unexpired token signed with
+  // the empty secret a misconfigured prod would have (HMAC-SHA256('', payload)).
+  function forgedToken(email) {
+    return signMagicLink({ email, expiresAt: Date.now() + 60_000, jti: 'j-attack', secret: '' })
+  }
+
+  it('verifyMagicLink refuses the forged token (503) and never rotates the victim code', async () => {
+    await saveUser(RETURNING)
+    const mod = await import('../auth')
+    const res = await mod.default(req({ action: 'verifyMagicLink', token: forgedToken(RETURNING.email) }))
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(body.code).toBe('MAGIC_LINK_NOT_CONFIGURED')
+    // No account was created and the victim's code was NOT rotated.
+    const users = await listUsers()
+    expect(users).toHaveLength(1)
+    expect((await getUser(RETURNING.id)).code).toBe(RETURNING.code)
+  })
+
+  it('verifyMagicLink for a brand-new email creates no user and no request', async () => {
+    const mod = await import('../auth')
+    const res = await mod.default(req({ action: 'verifyMagicLink', token: forgedToken('ghost@example.com') }))
+    expect(res.status).toBe(503)
+    expect(await listUsers()).toHaveLength(0)
+    expect(await listRequests()).toHaveLength(0)
+  })
+
+  it('requestMagicLink fails closed (503 MAGIC_LINK_NOT_CONFIGURED) even when the mail key IS configured', async () => {
+    process.env.RUNOUT_MAIL_API_KEY = 're_fake_key'
+    const mod = await import('../auth')
+    const res = await mod.default(req({ action: 'requestMagicLink', email: 'ada@example.com' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(503)
+    expect(body.code).toBe('MAGIC_LINK_NOT_CONFIGURED')
+    // No link/token was minted and no pending request was recorded.
+    expect(await listRequests()).toHaveLength(0)
   })
 })

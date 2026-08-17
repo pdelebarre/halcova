@@ -16,9 +16,10 @@ Netlify function. There is no database to provision.
 - **Function**: `netlify/functions/collection.js`. A `COLLECTIONS` whitelist
   (`records`, `books`) rejects unknown kinds; `?collection=` picks the kind.
 - **Auth first**: every request runs `authorize(req)` before anything else —
-  it reads `Authorization: Bearer <code>` (`bearer` from `_shared/auth.js`),
-  accepts the admin key for the owner, or resolves the member via
-  `findUserByCode`. 401 on missing/unknown code, 403 on disabled account or a
+  it reads `Authorization: Bearer <sessionToken>` and resolves it via
+  `resolveSession` (`_shared/session-auth.js`) to the owner / demo / member
+  (SEC-EPIC-1, #176 — the access code is exchange-only at login). 401 on
+  missing/unknown/expired/revoked token, 403 on a disabled account or a
   collection the user's plan doesn't include.
 - **Per-user stores**: the store name comes from `storeNameFor(user.id,
   collection)` in `netlify/functions/_shared/users.js` — the owner keeps the

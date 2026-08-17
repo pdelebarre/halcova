@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as authApi from '../api/auth'
-import { getAccessCode, getSession } from '../utils/session'
+import { getSession, getSessionToken } from '../utils/session'
 
 // Owns the signed-in session. Persists to localStorage (runout.session) so
 // the PWA remembers you between visits, and revalidates the code against the
@@ -18,7 +18,7 @@ export function useAuth() {
     }
     authApi.me()
       .then((user) => {
-        if (!cancelled) setSession(user ? { user, code: getAccessCode() } : null)
+        if (!cancelled) setSession(user ? { user, session: getSessionToken() } : null)
       })
       .catch(() => { /* offline — keep the cached session */ })
       .finally(() => {
@@ -29,7 +29,7 @@ export function useAuth() {
 
   const login = useCallback(async (code) => {
     const user = await authApi.login(code)
-    setSession({ user, code })
+    setSession({ user, session: getSessionToken() })
     return user
   }, [])
 
@@ -38,7 +38,7 @@ export function useAuth() {
   const refresh = useCallback(async () => {
     try {
       const user = await authApi.me()
-      setSession(user ? { user, code: getAccessCode() } : null)
+      setSession(user ? { user, session: getSessionToken() } : null)
     } catch {
       // Offline / server error — keep the cached session so the shell still
       // works. Only a resolved `null` from me() (revoked/disabled, 401/403)
@@ -51,5 +51,12 @@ export function useAuth() {
     setSession(null)
   }, [])
 
-  return { session, ready, login, logout, refresh, requestAccess, setSession }
+  // SEC-1.4 (#179): revoke EVERY session for this user (all devices, current
+  // one included) server-side, then clear the local session.
+  const logoutAll = useCallback(() => {
+    authApi.logoutAll()
+    setSession(null)
+  }, [])
+
+  return { session, ready, login, logout, logoutAll, refresh, requestAccess, setSession }
 }
