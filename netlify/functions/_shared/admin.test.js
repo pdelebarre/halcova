@@ -19,10 +19,13 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler, { KNOWN_FEATURES, sanitizeFeatures } from '../admin'
-import { adminSessionToken } from './session-test-helpers'
+import { publicUser } from './auth'
+import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
 import { createMemDb } from './repositories/test-helpers'
 import { createFeedbackRepo } from './repositories/feedback-repo'
 import { createReviewsRepo } from './repositories/reviews-repo'
+import { createItemsRepo } from './repositories/items-repo'
+import { aggregateUserCounts } from './dashboard-counts'
 import { createSession, getSessionByToken } from './sessions'
 
 const usersMock = vi.hoisted(() => ({
@@ -665,5 +668,284 @@ describe('deleteUser — the member\'s live sessions are revoked (SEC-EPIC-4 #20
     // The account record, its stores and its reviews/feedback are all gone too.
     expect(usersMock.removeUserRecord).toHaveBeenCalledWith('u1')
     expect(usersMock.deleteUserCollections).toHaveBeenCalledWith('u1')
+  })
+})
+
+// (ADMIN-EPIC-1, #259) — aggregate dashboard counts on the admin GET.
+// ---------------------------------------------------------------------------
+// A GET request carrying a specific bearer (for the non-admin auth tests).
+async function getWith(bearerToken, path = '') {
+  return handler({
+    method: 'GET',
+    url: `http://localhost/.netlify/functions/admin${path}`,
+    headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${bearerToken}` : null) },
+  })
+}
+
+// Seed a Blobs collection store (the collection-store layout: `index` -> item
+// ids, `item:<id>` -> item object) so the Blobs-path collections counts have
+// data. The owner keeps runout-collection / runout-library; each member gets
+// collection-<userId>-<kind>.
+function seedBlobCollection(storeName, items) {
+  const store = stores[storeName] || createStore()
+  stores[storeName] = store
+  const ids = []
+  for (const item of items) {
+    store.data.set(`item:${item.id}`, item)
+    ids.push(item.id)
+  }
+  store.data.set('index', ids)
+}
+
+// Seed the Postgres items table via the real repo (parity with seedPgReviews).
+async function seedPgItems(db, entries) {
+  const repo = createItemsRepo(db)
+  for (const { ownerId, kind, item } of entries) {
+    await repo.insertItem(ownerId, kind, item)
+  }
+}
+
+// The exact epic §4.1 counts shape — every leaf a number.
+function expectCountsShape(counts) {
+  expect(counts).toEqual({
+    pendingRequests: expect.any(Number),
+    members: { total: expect.any(Number), active: expect.any(Number), disabled: expect.any(Number) },
+    signups: { today: expect.any(Number), thisWeek: expect.any(Number), thisMonth: expect.any(Number), total: expect.any(Number) },
+    plans: { free: expect.any(Number), premium: expect.any(Number), lifetime: expect.any(Number), unlimited: expect.any(Number) },
+    collections: { records: expect.any(Number), books: expect.any(Number) },
+    feedback: { open: expect.any(Number), in_progress: expect.any(Number), done: expect.any(Number), wontfix: expect.any(Number), duplicate: expect.any(Number), total: expect.any(Number) },
+    reviews: { total: expect.any(Number), published: expect.any(Number), pending: expect.any(Number), hidden: expect.any(Number) },
+  })
+}
+
+describe('aggregateUserCounts — pure user-derived counts (ADMIN-EPIC-1, #259)', () => {
+  it('tallies pending/members/plans and UTC signup buckets (today/week/month)', () => {
+    // 2026-08-19T12:00Z is a Wednesday — so there is a "this week but not
+    // today" slot (Tue Aug 18) distinct from the month-start slot (Aug 3).
+    const now = new Date('2026-08-19T12:00:00.000Z')
+    const users = [
+      { ...MEMBER, id: 'u1', status: 'active', plan: 'free', createdAt: '2026-08-19T08:00:00.000Z' },      // today
+      { ...MEMBER, id: 'u2', status: 'active', plan: 'premium', createdAt: '2026-08-18T00:00:00.000Z' },   // this week, not today
+      { ...MEMBER, id: 'u3', status: 'disabled', plan: 'lifetime', createdAt: '2026-08-03T00:00:00.000Z' }, // this month, not this week
+      { ...MEMBER, id: 'u4', status: 'active', plan: 'unlimited', createdAt: '2026-01-01T00:00:00.000Z' }, // older than this month
+      { ...MEMBER, id: 'u5', status: 'active', plan: 'platinum', createdAt: '2026-01-02T00:00:00.000Z' },  // unknown plan -> free
+      { ...MEMBER, id: 'u6', status: 'active', plan: 'free', createdAt: 'garbage' },                       // unparseable -> skipped in signups only
+    ]
+    const requests = [
+      { id: 'r1', status: 'pending' }, { id: 'r2', status: 'pending' }, { id: 'r3', status: 'approved' },
+    ]
+    expect(aggregateUserCounts(requests, users, now)).toEqual({
+      pendingRequests: 2,
+      members: { total: 6, active: 5, disabled: 1 },
+      signups: { today: 1, thisWeek: 2, thisMonth: 3, total: 6 },
+      plans: { free: 3, premium: 1, lifetime: 1, unlimited: 1 },
+    })
+  })
+
+  it('defaults missing plan to free and never counts non-members', () => {
+    const now = new Date('2026-08-19T12:00:00.000Z')
+    const users = [
+      { ...MEMBER, id: 'u1', plan: undefined, createdAt: '2026-08-19T08:00:00.000Z' },
+      { ...MEMBER, id: 'a1', role: 'admin', status: 'active', plan: 'premium' }, // stored admin — excluded
+    ]
+    expect(aggregateUserCounts([], users, now)).toEqual({
+      pendingRequests: 0,
+      members: { total: 1, active: 1, disabled: 0 },
+      signups: { today: 1, thisWeek: 1, thisMonth: 1, total: 1 },
+      plans: { free: 1, premium: 0, lifetime: 0, unlimited: 0 },
+    })
+  })
+})
+
+describe('GET /admin?dashboard=1 — the counts block (ADMIN-EPIC-1, #259, Blobs path)', () => {
+  // A representative dataset: 3 members (u1 signed up "now" so the signup
+  // buckets are deterministic), 2 pending requests, feedback/reviews in the
+  // shared blob stores, and owned items in the owner's legacy stores + a
+  // member's isolated store.
+  const seedDashboardData = () => {
+    usersMock.listUsers.mockResolvedValue([
+      { ...MEMBER, id: 'u1', name: 'Ada', email: 'ada@example.com', status: 'active', plan: 'free', createdAt: new Date().toISOString() },
+      { ...MEMBER, id: 'u2', name: 'Bob', email: 'bob@example.com', status: 'active', plan: 'premium', createdAt: '2000-01-01T00:00:00.000Z' },
+      { ...MEMBER, id: 'u3', name: 'Cleo', email: 'cleo@example.com', status: 'disabled', plan: 'lifetime', createdAt: '2000-01-01T00:00:00.000Z' },
+    ])
+    usersMock.listRequests.mockResolvedValue([
+      { id: 'r1', name: 'Dana', email: 'dana@example.com', status: 'pending', createdAt: '2026-08-01T00:00:00.000Z' },
+      { id: 'r2', name: 'Erin', email: 'erin@example.com', status: 'pending', createdAt: '2026-08-02T00:00:00.000Z' },
+      { id: 'r3', name: 'Fran', email: 'fran@example.com', status: 'approved', createdAt: '2026-08-03T00:00:00.000Z' },
+    ])
+    seedBlobFeedback([
+      { id: '10000000-0000-4000-8000-000000000001', authorId: 'u1', status: 'open' },
+      { id: '10000000-0000-4000-8000-000000000002', authorId: 'u2', status: 'done' },
+      { id: '10000000-0000-4000-8000-000000000003', authorId: 'u3', status: 'open' },
+      { id: '10000000-0000-4000-8000-000000000004', authorId: 'u1', status: 'in_progress' },
+      { id: '10000000-0000-4000-8000-000000000005', authorId: 'u2', status: 'wontfix' },
+    ])
+    seedBlobReviews([
+      review({ id: '00000000-0000-0000-0000-000000000001', authorId: 'u1', status: 'published', createdAt: '2026-01-01T00:00:00.000Z' }),
+      review({ id: '00000000-0000-0000-0000-000000000002', authorId: 'u2', status: 'published', createdAt: '2026-01-02T00:00:00.000Z' }),
+      review({ id: '00000000-0000-0000-0000-000000000003', authorId: 'u3', status: 'pending', createdAt: '2026-01-03T00:00:00.000Z' }),
+      review({ id: '00000000-0000-0000-0000-000000000004', authorId: 'u1', status: 'hidden', createdAt: '2026-01-04T00:00:00.000Z' }),
+    ])
+    seedBlobCollection('runout-collection', [
+      { id: 'rec-1', title: 'R1', wishlist: false },
+      { id: 'rec-2', title: 'R2', wishlist: false },
+      { id: 'rec-3', title: 'R3 (want)', wishlist: true }, // wishlist never counts as owned
+    ])
+    seedBlobCollection('runout-library', [{ id: 'book-1', title: 'B1', wishlist: false }])
+    seedBlobCollection('collection-u1-records', [{ id: 'rec-4', title: 'R4', wishlist: false }])
+  }
+
+  it('returns the full counts block with the correct numbers (aggregates only)', async () => {
+    seedDashboardData()
+    const res = await handler(req('GET', undefined, '?dashboard=1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expectCountsShape(body.counts)
+    expect(body.counts).toMatchObject({
+      pendingRequests: 2,
+      members: { total: 3, active: 2, disabled: 1 },
+      signups: { today: 1, thisWeek: 1, thisMonth: 1, total: 3 },
+      plans: { free: 1, premium: 1, lifetime: 1, unlimited: 0 },
+      collections: { records: 3, books: 1 },
+      feedback: { open: 2, in_progress: 1, done: 1, wontfix: 1, duplicate: 0, total: 5 },
+      reviews: { total: 4, published: 2, pending: 1, hidden: 1 },
+    })
+  })
+
+  it('leaves the plain GET /admin payload byte-for-byte unchanged (no counts key)', async () => {
+    seedDashboardData()
+    const res = await handler(req('GET'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Same shape as today: { requests, users } with codes stripped — nothing added.
+    expect(body).toEqual({
+      requests: [
+        { id: 'r1', name: 'Dana', email: 'dana@example.com', status: 'pending', createdAt: '2026-08-01T00:00:00.000Z' },
+        { id: 'r2', name: 'Erin', email: 'erin@example.com', status: 'pending', createdAt: '2026-08-02T00:00:00.000Z' },
+        { id: 'r3', name: 'Fran', email: 'fran@example.com', status: 'approved', createdAt: '2026-08-03T00:00:00.000Z' },
+      ],
+      // The handler maps users through publicUser — build the expectation the
+      // same way so the parity assertion is exact (code stripped, everything
+      // else unchanged).
+      users: [
+        publicUser({ ...MEMBER, id: 'u1', name: 'Ada', email: 'ada@example.com', status: 'active', plan: 'free', createdAt: expect.any(String) }),
+        publicUser({ ...MEMBER, id: 'u2', name: 'Bob', email: 'bob@example.com', status: 'active', plan: 'premium', createdAt: '2000-01-01T00:00:00.000Z' }),
+        publicUser({ ...MEMBER, id: 'u3', name: 'Cleo', email: 'cleo@example.com', status: 'disabled', plan: 'lifetime', createdAt: '2000-01-01T00:00:00.000Z' }),
+      ],
+    })
+    expect(body).not.toHaveProperty('counts')
+    expect(body).not.toHaveProperty('reviews')
+    // publicUser still strips the code from every listed user.
+    for (const u of body.users) {
+      expect(u).not.toHaveProperty('code')
+      expect(u).not.toHaveProperty('code_hash')
+    }
+  })
+
+  it('counts contain no PII — no ids, emails, names or codes anywhere', async () => {
+    seedDashboardData()
+    const body = await (await handler(req('GET', undefined, '?dashboard=1'))).json()
+    expectCountsShape(body.counts)
+    const raw = JSON.stringify(body.counts)
+    expect(raw).not.toContain('ada@example.com')
+    expect(raw).not.toContain('Ada')
+    expect(raw).not.toContain('u1')
+    expect(raw).not.toContain('RU-')
+    expect(raw).not.toContain('code')
+  })
+})
+
+describe('GET /admin?dashboard=1 — the counts block (ADMIN-EPIC-1, #259, Postgres path)', () => {
+  it('computes feedback / reviews / collections via SQL aggregates (pg-mem)', async () => {
+    pgRef.configured = true
+    pgRef.db = await createMemDb()
+
+    // The user-derived metrics come from the requests/users the GET loads
+    // (mocked listRequests/listUsers — the same full lists the response body
+    // carries); the aggregate-only metrics (feedback / reviews / collections)
+    // are computed in SQL against pg-mem via create*Repo(db).countsBy*().
+    usersMock.listUsers.mockResolvedValue([
+      { ...MEMBER, id: 'u1', status: 'active', plan: 'free', createdAt: new Date().toISOString() },
+      { ...MEMBER, id: 'u2', status: 'active', plan: 'premium', createdAt: '2000-01-01T00:00:00.000Z' },
+    ])
+    usersMock.listRequests.mockResolvedValue([{ id: 'r1', status: 'pending' }])
+
+    await seedPgFeedback(pgRef.db, [
+      { id: '10000000-0000-4000-8000-000000000001', authorId: 'u1', status: 'open' },
+      { id: '10000000-0000-4000-8000-000000000002', authorId: 'u2', status: 'done' },
+      { id: '10000000-0000-4000-8000-000000000003', authorId: 'u1', status: 'open' },
+    ])
+    await seedPgReviews(pgRef.db, [
+      // Distinct (kind, sourceId, authorId) per review — the UNIQUE upsert key
+      // would otherwise collapse two reviews for the same author+release.
+      review({ id: '00000000-0000-0000-0000-000000000001', authorId: 'u1', status: 'published' }),
+      review({ id: '00000000-0000-0000-0000-000000000002', authorId: 'u2', status: 'pending' }),
+      review({ id: '00000000-0000-0000-0000-000000000003', authorId: 'u3', status: 'hidden' }),
+    ])
+    await seedPgItems(pgRef.db, [
+      { ownerId: 'owner', kind: 'records', item: { id: 'aaaaaaaa-0000-4000-8000-000000000001', title: 'A', wishlist: false } },
+      { ownerId: 'owner', kind: 'records', item: { id: 'aaaaaaaa-0000-4000-8000-000000000002', title: 'B', wishlist: true } },
+      { ownerId: 'u1', kind: 'records', item: { id: 'aaaaaaaa-0000-4000-8000-000000000003', title: 'C', wishlist: false } },
+      { ownerId: 'u1', kind: 'books', item: { id: 'bbbbbbbb-0000-4000-8000-000000000001', title: 'D', wishlist: false } },
+    ])
+
+    const res = await handler(req('GET', undefined, '?dashboard=1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expectCountsShape(body.counts)
+    expect(body.counts).toMatchObject({
+      pendingRequests: 1,
+      members: { total: 2, active: 2, disabled: 0 },
+      signups: { today: 1, thisWeek: 1, thisMonth: 1, total: 2 },
+      plans: { free: 1, premium: 1, lifetime: 0, unlimited: 0 },
+      collections: { records: 2, books: 1 }, // the wishlist record is excluded
+      feedback: { open: 2, in_progress: 0, done: 1, wontfix: 0, duplicate: 0, total: 3 },
+      reviews: { total: 3, published: 1, pending: 1, hidden: 1 },
+    })
+  })
+})
+
+describe('GET /admin?dashboard=1 — still requireAdmin-gated (member/demo/forged/absent)', () => {
+  it('403s for a member session', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    const token = await sessionTokenFor({ userId: 'u1', role: 'member' })
+    const res = await getWith(token, '?dashboard=1')
+    expect(res.status).toBe(403)
+  })
+
+  it('403s for a demo session', async () => {
+    const token = await demoSessionToken()
+    const res = await getWith(token, '?dashboard=1')
+    expect(res.status).toBe(403)
+  })
+
+  it('401s for an absent bearer', async () => {
+    const res = await handler({ ...req('GET', undefined, '?dashboard=1'), headers: { get: () => null } })
+    expect(res.status).toBe(401)
+  })
+
+  it('401s for a forged bearer', async () => {
+    const res = await getWith('forged-token', '?dashboard=1')
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('GET /admin?dashboard=1 — junk query params are ignored (never 500)', () => {
+  it('treats a non-"1" dashboard value as absent and ignores unknown params', async () => {
+    const body = await (await handler(req('GET', undefined, '?dashboard=banana'))).json()
+    expect(body).not.toHaveProperty('counts')
+
+    const ok = await handler(req('GET', undefined, '?dashboard=1&junk=whatever&limit=oops&status=zzz'))
+    expect(ok.status).toBe(200)
+    expect((await ok.json()).counts).toBeTruthy()
+
+    // dashboard + reviews are independent opt-ins — both work together.
+    const both = await handler(req('GET', undefined, '?reviews=1&dashboard=1'))
+    expect(both.status).toBe(200)
+    const bothBody = await both.json()
+    expect(bothBody.counts).toBeTruthy()
+    expect(Array.isArray(bothBody.reviews)).toBe(true)
   })
 })

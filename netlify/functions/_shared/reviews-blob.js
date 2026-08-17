@@ -202,6 +202,21 @@ export function createReviewsBlobStore({ store = getStore(REVIEWS_STORE) } = {})
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   }
 
+  // (ADMIN-EPIC-1, #259) — dashboard aggregate: review volume by status as
+  // `[{ status, count }]`, enumerated across every indexed release — NOT capped
+  // by listAll's pagination window, so the totals are exact.
+  async function countsByStatus() {
+    const tally = {}
+    for (const key of await readReleases()) {
+      const { kind, sourceId } = parseReleaseKey(key) || { kind: '', sourceId: '' }
+      for (const r of await readRelease(kind, sourceId)) {
+        const status = REVIEW_STATUSES.has(r.status) ? r.status : 'published'
+        tally[status] = (tally[status] || 0) + 1
+      }
+    }
+    return Object.entries(tally).map(([status, count]) => ({ status, count }))
+  }
+
   // Member deletion cleanup: remove every review the member wrote across all
   // releases, keep each release's array + the id index consistent.
   async function deleteByAuthor(authorId) {
@@ -230,6 +245,7 @@ export function createReviewsBlobStore({ store = getStore(REVIEWS_STORE) } = {})
     deleteReview,
     setStatus,
     listAll,
+    countsByStatus,
     deleteByAuthor,
   }
 }

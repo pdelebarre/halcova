@@ -26,6 +26,7 @@ import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { badRequest, json, readJsonBody, safeError } from './_shared/security'
 import { emailHash, logAudit } from './_shared/audit'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
+import { getDashboardCounts } from './_shared/dashboard-counts'
 import {
   deleteUserCollections,
   getRequest,
@@ -379,6 +380,17 @@ export default async (req) => {
         body.reviews = backend === 'blobs' ? result.slice(offset, offset + limit) : result
         body.limit = limit
         body.offset = offset
+      }
+      // (ADMIN-EPIC-1, #259) — Dashboard counts. Opt-in via ?dashboard=1 so the
+      // plain member-list call stays lightweight and byte-for-byte unchanged.
+      // requireAdmin already gated this GET (member/demo/forged -> 401/403); the
+      // counts block is AGGREGATES ONLY — never ids, emails, names, IPs or codes
+      // (epic §5 data minimization; publicUser already strips codes from users).
+      // User-derived metrics aggregate in memory from the requests/users this
+      // GET already loads; feedback/reviews/collections prefer SQL on the
+      // Postgres path and the Blobs stores otherwise (see dashboard-counts.js).
+      if (url.searchParams.get('dashboard') === '1') {
+        body.counts = await getDashboardCounts({ requests, users })
       }
       return json(200, body)
     }

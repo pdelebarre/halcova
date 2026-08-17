@@ -151,7 +151,21 @@ export function createFeedbackBlobStore({ store = getStore(FEEDBACK_STORE) } = {
       .sort(byNewest)
     return filtered.slice(offsetN, offsetN + capped)
   }
-
+  // (ADMIN-EPIC-1, #259) — dashboard aggregate: feedback volume by status as
+  // `[{ status, count }]`, enumerated from index:open — NOT capped by
+  // listFeedback's pagination window, so the totals are exact. A missing/
+  // corrupt `fb:` blob behind a stale index entry is skipped (never a 500),
+  // matching listFeedback.
+  async function countsByStatus() {
+    const tally = {}
+    for (const id of await readIndex()) {
+      const feedback = await readFeedback(id)
+      if (!feedback) continue
+      const status = FEEDBACK_STATUSES.has(feedback.status) ? feedback.status : 'open'
+      tally[status] = (tally[status] || 0) + 1
+    }
+    return Object.entries(tally).map(([status, count]) => ({ status, count }))
+  }
   // Admin triage: update a feedback's status and/or owner-only admin note —
   // parity with updateFeedback in feedback-repo.js. A junk id is a no-op
   // (null); a JUNK status makes the WHOLE update a no-op (null) — never a
@@ -205,6 +219,7 @@ export function createFeedbackBlobStore({ store = getStore(FEEDBACK_STORE) } = {
   return {
     createFeedback,
     listFeedback,
+    countsByStatus,
     updateFeedback,
     deleteFeedback,
     deleteByAuthor,
