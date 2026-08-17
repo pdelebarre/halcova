@@ -2,11 +2,12 @@
   "schemaVersion": "1.0",
   "pack": "foundations",
   "name": "Halcova Library — Foundations pack (starter)",
-  "description": "Genre origins (T4), era snapshots (T3), and label/publisher lore (T5) with the highest hit-rate per entry. This is the working template for the Core 500 bank — compact on purpose.",
+  "description": "Genre origins (T4), era snapshots (T3), and label/publisher lore (T5) with the highest hit-rate per entry. 31 entries across records and books — the working template for the Core 500 bank.",
   "locale": "en",
   "coverage": {
     "model": "Foundations match any item in a matched genre/label/year band, so hit-rate per entry is high; per-artist T1/T2/T6/T7 packs close the remaining gap.",
-    "betaNote": "Validate the ~50–70% item-coverage estimate on a typical mixed 40-item collection before international launch (lore-layer-plan.md §8)."
+    "betaNote": "Validate the ~50–70% item-coverage estimate on a typical mixed 40-item collection before international launch (lore-layer-plan.md §8).",
+    "factsToFlag": "F-0018 (hip-hop origin party) and F-0020 (first heavy-metal band) ship only their uncontested cores with hedged [DISPUTED] framing; F-0027 (Latin American Boom) is flagged [CULT] for the es local-hero pack."
   },
   "entries": [
     {
@@ -212,6 +213,230 @@
       "matchKeys": { "artist": ["Will Eisner"], "title": ["A Contract with God"], "label": ["Baronet"], "genre": ["Graphic Novels", "Comics"], "year": 1978 },
       "flags": ["VALIDATE", "DISPUTED"],
       "sources": ["S-0029", "S-0030"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0016",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Rhythm and blues grew out of blues, gospel, and jazz in the 1940s. The term was coined in the late 1940s by Billboard writer Jerry Wexler — later a producer at Atlantic Records — to replace 'race music.' Soul music then emerged in the 1950s and 1960s as R&B fused with gospel, with its roots in the Black church.",
+        "voice": "A name a music journalist coined because 'race music' wouldn't do — and a whole crate of records that owe him one."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": [], "genre": ["R&B", "Rhythm and blues", "Soul"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0031", "S-0032"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0017",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Modern country music traces to the Bristol Sessions of 1927, when Victor producer Ralph Peer recorded the Carter Family and Jimmie Rodgers in Bristol, on the Tennessee–Virginia border. The sessions are often called the 'big bang' of country music.",
+        "voice": "One town, two weeks, and the recording sessions people still call country music's big bang."
+      },
+      "matchKeys": { "artist": ["The Carter Family", "Jimmie Rodgers"], "title": [], "label": [], "genre": ["Country", "Country & Western", "Bluegrass", "Folk"], "year": 1927 },
+      "flags": ["FACT"],
+      "sources": ["S-0033", "S-0034"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0018",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Hip hop emerged in the Bronx, New York, in the early 1970s at neighborhood block parties. DJ Kool Herc's party at 1520 Sedgwick Avenue in 1973, where he extended the instrumental breaks of funk and soul records, is widely cited as a foundational moment — though the culture grew across the decade through DJing, MCing, breaking, and graffiti.",
+        "voice": "Two turntables, a longer break, and a culture that was built on a Bronx street corner."
+      },
+      "matchKeys": { "artist": ["DJ Kool Herc"], "title": [], "label": [], "genre": ["Hip Hop", "Rap"], "year": 1973 },
+      "flags": ["FACT"],
+      "sources": ["S-0035", "S-0036"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0019",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Reggae developed in Jamaica in the late 1960s, growing out of ska and rocksteady with a slower tempo and the offbeat 'one drop' rhythm. Bob Marley and the Wailers carried the music to a global audience in the 1970s.",
+        "voice": "From Kingston sound systems to beaches on the other side of the world — the beat that refused to stay home."
+      },
+      "matchKeys": { "artist": ["Bob Marley", "Bob Marley and the Wailers", "The Wailers", "Toots and the Maytals"], "title": [], "label": [], "genre": ["Reggae", "Ska", "Rocksteady", "Dub"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0037", "S-0038"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0020",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Heavy metal emerged in the late 1960s and early 1970s, largely in Birmingham, England, where bands including Black Sabbath, Led Zeppelin, and Deep Purple turned up the volume and distortion. Which band truly 'started' the genre is contested; the uncontested core is that these bands, among others, defined its sound.",
+        "voice": "A city of factories, three bands with very loud guitars, and an argument that still won't die. The crate just turns it up."
+      },
+      "matchKeys": { "artist": ["Black Sabbath", "Led Zeppelin", "Deep Purple"], "title": [], "label": [], "genre": ["Heavy Metal", "Metal", "Hard Rock"], "year": [1968, 1972] },
+      "flags": ["FACT", "DISPUTED"],
+      "sources": ["S-0039", "S-0040"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0021",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Atlantic Records was founded in New York in 1947 by Ahmet Ertegun and Herb Abramson. It became home to landmark R&B and soul — Ray Charles, Aretha Franklin, Otis Redding — and later to rock bands including Led Zeppelin.",
+        "voice": "A label that bet on soul before the charts did — and that your crate keeps paying back."
+      },
+      "matchKeys": { "artist": ["Ray Charles", "Aretha Franklin", "Otis Redding", "Led Zeppelin"], "title": [], "label": ["Atlantic", "Atlantic Records", "ATCO"], "genre": ["R&B", "Soul", "Rock"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0041", "S-0042"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0022",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Chess Records was founded in Chicago in 1950 by brothers Phil and Leonard Chess. It became a cornerstone of electric Chicago blues — Muddy Waters, Howlin' Wolf — and of early rock and roll with Chuck Berry and Bo Diddley.",
+        "voice": "Two brothers, a South Side storefront, and some of the loudest, most important blues ever put on wax."
+      },
+      "matchKeys": { "artist": ["Muddy Waters", "Howlin' Wolf", "Chuck Berry", "Bo Diddley"], "title": [], "label": ["Chess", "Checker", "Cadet"], "genre": ["Blues", "Chicago Blues", "Rock and roll", "Rhythm and blues"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0043", "S-0044"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0023",
+      "taxonomy": "T3",
+      "kind": "records",
+      "fact": {
+        "text": "Disco rose through the 1970s from dance clubs rooted in Black, Latino, and gay club culture, and peaked with the 1977 film 'Saturday Night Fever' and its Bee Gees soundtrack, which helped make the genre a global phenomenon.",
+        "voice": "Four-on-the-floor, a mirrorball, and a soundtrack that still fills dance floors — and crates."
+      },
+      "matchKeys": { "artist": ["Bee Gees"], "title": ["Saturday Night Fever"], "label": [], "genre": ["Disco", "Dance", "Funk"], "year": [1970, 1979] },
+      "flags": ["FACT"],
+      "sources": ["S-0045", "S-0046"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0024",
+      "taxonomy": "T3",
+      "kind": "records",
+      "fact": {
+        "text": "The Beatles' February 1964 appearance on 'The Ed Sullivan Show' in the US opened the British Invasion — a wave of UK acts, including the Rolling Stones, the Kinks, and the Who, that dominated American charts through the mid-1960s.",
+        "voice": "One Sunday night on American television, and suddenly the record stores stocked British accents."
+      },
+      "matchKeys": { "artist": ["The Beatles", "The Rolling Stones", "The Kinks", "The Who"], "title": [], "label": [], "genre": ["Rock", "Pop", "Beat", "British Invasion"], "year": [1964, 1966] },
+      "flags": ["FACT"],
+      "sources": ["S-0047", "S-0048"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0025",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "Horace Walpole's 'The Castle of Otranto' (1764) is widely credited as the first Gothic novel. Its second edition carried the subtitle 'A Gothic Story,' and its ruined castles, supernatural events, and melodrama came to define the genre.",
+        "voice": "Ruined castles, creaking doors, and a genre that's been giving shelves nightmares since 1764."
+      },
+      "matchKeys": { "artist": ["Horace Walpole"], "title": ["The Castle of Otranto"], "label": [], "genre": ["Gothic", "Horror", "Classic", "Fiction"], "year": 1764 },
+      "flags": ["FACT"],
+      "sources": ["S-0049", "S-0050"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0026",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "J.R.R. Tolkien's 'The Hobbit' (1937) and 'The Lord of the Rings' (1954–55) are widely credited with establishing modern fantasy as a distinct genre, shaping the secondary worlds, invented languages, and epic quests that followed.",
+        "voice": "An Oxford professor built a whole world out of languages and maps — and every fantasy shelf since is walking in his footsteps."
+      },
+      "matchKeys": { "artist": ["J.R.R. Tolkien"], "title": ["The Hobbit", "The Lord of the Rings"], "label": [], "genre": ["Fantasy", "High Fantasy", "Classic"], "year": [1937, 1955] },
+      "flags": ["FACT"],
+      "sources": ["S-0051", "S-0052"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0027",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "The Latin American 'Boom' of the 1960s and 1970s brought a surge of internationally celebrated novelists — Gabriel García Márquez, Mario Vargas Llosa, Julio Cortázar, Carlos Fuentes — often associated with magical realism and experimental narrative.",
+        "voice": "A continent's stories, one decade, and two Nobel laureates later — your shelf still isn't done with them."
+      },
+      "matchKeys": { "artist": ["Gabriel García Márquez", "Mario Vargas Llosa", "Julio Cortázar", "Carlos Fuentes"], "title": [], "label": [], "genre": ["Magical Realism", "Latin American", "Fiction", "Literature"], "year": [1960, 1979] },
+      "flags": ["FACT", "CULT"],
+      "sources": ["S-0053", "S-0054"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0028",
+      "taxonomy": "T5",
+      "kind": "books",
+      "fact": {
+        "text": "Faber and Faber was founded in 1929 by Geoffrey Faber, growing out of the earlier firm Faber & Gwyer. T.S. Eliot joined as an editor in 1925 and became a director, publishing his own poetry with the house, which became one of the most influential literary imprints of the 20th century.",
+        "voice": "A publisher with a poet at the editor's desk — the 20th century's literature kept walking in after him."
+      },
+      "matchKeys": { "artist": ["T.S. Eliot", "W.H. Auden", "Sylvia Plath", "Seamus Heaney"], "title": [], "label": ["Faber and Faber", "Faber & Faber", "Faber"], "genre": ["Poetry", "Literature", "Fiction", "Drama"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0055", "S-0056"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0029",
+      "taxonomy": "T5",
+      "kind": "books",
+      "fact": {
+        "text": "Anchor Books was launched in 1953 by Jason Epstein at Doubleday. It is widely credited with pioneering the American trade paperback — serious books in affordable, bookstore-friendly paper editions.",
+        "voice": "Before 1953, paperbacks were cheap thrillers. Jason Epstein made them the library you could actually afford."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": ["Anchor", "Anchor Books", "Anchor Books / Doubleday"], "genre": ["Classic", "Literature", "Nonfiction", "Fiction"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0057", "S-0058"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0030",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "The Beat Generation was a 1950s American literary movement centered in New York and San Francisco, known for spontaneous, experimental prose and poetry — most famously Allen Ginsberg's 'Howl' (1956) and Jack Kerouac's 'On the Road' (1957).",
+        "voice": "Typewriters, road trips, and a refusal to sit still — the beats turned restlessness into literature."
+      },
+      "matchKeys": { "artist": ["Jack Kerouac", "Allen Ginsberg", "William S. Burroughs"], "title": ["On the Road", "Howl"], "label": [], "genre": ["Beat", "Poetry", "Literature", "Fiction"], "year": [1950, 1959] },
+      "flags": ["FACT"],
+      "sources": ["S-0059", "S-0060"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0031",
+      "taxonomy": "T3",
+      "kind": "books",
+      "fact": {
+        "text": "In the mid-19th century, many novels first appeared in serial form, published a chapter or two at a time in magazines or part issues. Charles Dickens's 'The Pickwick Papers' (1836–37) helped make serial publication hugely popular, and his later novels were eagerly awaited installment by installment.",
+        "voice": "Before binge-watching, there was serial reading: a month of waiting between chapters, and readers loved every second."
+      },
+      "matchKeys": { "artist": ["Charles Dickens"], "title": ["The Pickwick Papers"], "label": [], "genre": ["Classic", "Fiction", "Literature"], "year": [1836, 1870] },
+      "flags": ["FACT"],
+      "sources": ["S-0061", "S-0062"],
       "lastVerified": "2026-08-17",
       "verifiedBy": "Marketing Manager"
     }
