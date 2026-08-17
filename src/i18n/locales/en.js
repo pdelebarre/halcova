@@ -73,6 +73,12 @@ const en = {
   'scan.torchOff': 'Turn off torch',
   'scan.retryCamera': 'Retry camera',
   'scan.enterManually': 'Enter details manually instead',
+  // Decode hardening: shown when the camera has been armed for a while with
+  // nothing decoded (subtle hint — no camera reset), or when the decoder hits a
+  // hard failure / the camera is interrupted (error + retry).
+  'scan.noBarcodeYet': 'No barcode detected yet — hold steady, keep it in the frame',
+  'scan.decodeError': "Couldn't read the camera feed. Retry to restart scanning.",
+  'scan.cameraLost': 'The camera was interrupted. Retry to restart scanning.',
 
   // §6b Cover scan (on-device OCR — camera/gallery, no barcode needed)
   'coverScan.title': 'Scan a cover',
