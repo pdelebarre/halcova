@@ -18,11 +18,32 @@ const wasmUrl =
     ? zxingReaderWasmUrl
     : `${APP_BASE}${zxingReaderWasmUrl}`
 
-prepareZXingModule({
-  overrides: {
-    locateFile: (path) => (path.endsWith('.wasm') ? wasmUrl : path),
-  },
-})
+// Eagerly download + instantiate the decoder so it is ready before the first
+// frame is decoded. We fetch the wasm bytes ourselves and hand them to the
+// decoder as a Blob URL, which forces ArrayBuffer instantiation instead of
+// WebAssembly streaming compile — streaming compile is unreliable on iOS
+// Safari when the wasm is served by the service worker (a documented
+// Safari + SW + wasm bug). Eager + retried so a transient load failure
+// self-heals instead of failing the first readBarcodes call forever.
+let wasmReadyPromise = null
+async function ensureWasmReady() {
+  if (!wasmReadyPromise) {
+    wasmReadyPromise = (async () => {
+      const res = await fetch(wasmUrl)
+      if (!res.ok) throw new Error(`barcode decoder download failed (${res.status})`)
+      const bytes = await res.arrayBuffer()
+      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }))
+      await prepareZXingModule({
+        fireImmediately: true,
+        overrides: { locateFile: (path) => (path.endsWith('.wasm') ? blobUrl : path) },
+      })
+    })().catch((err) => {
+      console.error('[scanner] decoder init failed (will retry):', err?.message || err)
+      wasmReadyPromise = null // re-arm for a retry on the next scan
+    })
+  }
+  return wasmReadyPromise
+}
 
 // 1D retail codes printed on records and sleeves — same set the old
 // html5-qrcode scanner supported, decoded by the zxing-wasm WASM engine which
@@ -37,9 +58,6 @@ const DECODE_INTERVAL_MS = 180 // ~5 decode attempts per second
 // Frames wider than this are downscaled before decoding — keeps the WASM fast
 // on mid-range phones while staying sharp enough for small barcodes.
 const MAX_DECODE_WIDTH = 640
-// After this long of armed scanning (camera live, loop decoding) with zero
-// decodes AND zero hard errors, show a subtle "nothing detected yet" hint so
-// it's never a silent black hole. Does NOT reset the camera.
 // After this long of armed scanning with no barcode detected, show a subtle
 // hint so it's never a silent black hole. Never fatal, never resets the camera.
 const WATCHDOG_MS = 9000
@@ -97,19 +115,18 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
       stopStream()
     }
 
-    // Self-heal: a transient wasm load/instantiation failure must not
-    // permanently break scanning. Purge the cached module so the next
-    // readBarcodes call re-downloads + re-instantiates it from scratch.
+    // Self-heal: a transient decoder load/instantiation failure must not
+    // permanently break scanning. Purge the cached module and re-arm the eager
+    // loader so the next decode attempt re-downloads + re-instantiates.
     const reinitWasm = () => {
       try {
         purgeZXingModule()
-        prepareZXingModule({
-          overrides: { locateFile: (path) => (path.endsWith('.wasm') ? wasmUrl : path) },
-        })
-        console.warn('[scanner] re-initialized zxing wasm after decode failures')
       } catch {
-        // Ignore — the next readBarcodes attempt will simply try again.
+        // ignore — purge is best-effort
       }
+      wasmReadyPromise = null
+      ensureWasmReady()
+      console.warn('[scanner] re-initializing barcode decoder after decode failures')
     }
 
     async function decodeFrame(video, canvas, ctx) {
@@ -198,6 +215,13 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
 
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
+
+        // Ensure the decoder is ready before the first frame is decoded, so a
+        // slow/cached wasm load never makes readBarcodes throw on the first
+        // frames. If it failed, this still resolves and the tolerant loop
+        // self-heals via reinitWasm.
+        await ensureWasmReady()
+
         let decoding = false
         let lastDecode = 0
         let decodeFailures = 0
