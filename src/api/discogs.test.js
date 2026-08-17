@@ -199,6 +199,18 @@ describe('getReleaseDetail', () => {
     expect(detail.released).toBe('')
   })
 
+  // (FEAT-EPIC-5, #276) F1: Discogs returns master_id: 0 for masterless
+  // releases; the client must map it to null so the server validator (which
+  // only accepts null / positive ids) never rejects the enrichment backfill.
+  it('maps master_id 0 (and <= 0) to null, keeps a positive master_id (F1)', async () => {
+    global.fetch.mockResolvedValue(okJson({ master_id: 0 }))
+    expect((await discogs.getReleaseDetail(101)).masterId).toBeNull()
+    global.fetch.mockResolvedValue(okJson({ master_id: -3 }))
+    expect((await discogs.getReleaseDetail(101)).masterId).toBeNull()
+    global.fetch.mockResolvedValue(okJson({ master_id: 1234 }))
+    expect((await discogs.getReleaseDetail(101)).masterId).toBe(1234)
+  })
+
   it('keeps released only when it matches the YYYY[-MM[-DD]] contract', async () => {
     global.fetch.mockResolvedValue(okJson({ released: '19??-08-17' })) // garbage → dropped
     expect((await discogs.getReleaseDetail(101)).released).toBe('')

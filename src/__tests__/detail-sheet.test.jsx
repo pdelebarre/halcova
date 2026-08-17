@@ -231,6 +231,33 @@ describe('Detail sheet (records)', () => {
     unmount()
   })
 
+  // (FEAT-EPIC-5, #276) F1: a detail with masterId: 0 must not send masterId
+  // in the PUT (the server validator rejects 0 and would drop the whole
+  // backfill); the sheet stays interactive.
+  it('does not PUT masterId when the detail reports masterId 0 (F1)', async () => {
+    discogsApi.getReleaseDetail.mockResolvedValue({
+      artists: [{ id: 9, name: 'Miles Davis' }],
+      masterId: 0,
+      tracklist: [{ position: 'A1', title: 'So What' }],
+      released: '1959-08-17',
+    })
+    const { unmount } = renderDetail(RECORD)
+    await waitFor(() => expect(collectionApi.updateItem).toHaveBeenCalled())
+    // masterId must not appear in the PUT payload (0 is the invalid seam).
+    expect(collectionApi.updateItem).not.toHaveBeenCalledWith(
+      'r1',
+      expect.objectContaining({ masterId: 0 }),
+      'records',
+    )
+    const payload = collectionApi.updateItem.mock.calls[0][1]
+    expect(payload.masterId).toBeUndefined()
+    // Enrichment still happens for the other fields, and the sheet is alive.
+    expect(payload.artists).toEqual([{ id: 9, name: 'Miles Davis' }])
+    expect(payload.tracklist).toEqual([{ position: 'A1', title: 'So What' }])
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    unmount()
+  })
+
   it('skips the enrichment merge for demo items (nothing is persisted) (FEAT-EPIC-5 #276)', async () => {
     discogsApi.getReleaseDetail.mockResolvedValue({
       artists: [{ id: 9, name: 'Miles Davis' }],
