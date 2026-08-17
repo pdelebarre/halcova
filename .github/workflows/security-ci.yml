@@ -1,0 +1,135 @@
+# Security CI merge gate (SEC-EPIC-5, #213).
+#
+# BLOCKING gate — unlike the advisory scans (codeql.yml, secret-scan.yml,
+# sonarcloud.yml), this workflow FAILS the check-run on critical/high security
+# findings, so it blocks merges once it is added to the branch-protection
+# required status checks. It covers the four pillars:
+#   - security unit tests (the negative security tests shipped with each epic),
+#   - SAST (CodeQL, security-extended) — fails on high/critical findings,
+#   - dependency checks (npm audit --audit-level=high) — fails on high/critical,
+#   - secret scanning (Gitleaks, blocking mode).
+#
+# Branch protection is an OWNER action (Settings -> Branches): add the three
+# job names (`security-tests`, `dependency-audit`, `sast`/`secret-scan`) as
+# required status checks. Until then this workflow reports but a human must
+# enforce the gate. The exceptions policy (which findings can be waived, by
+# whom, with a ticket) is documented in .github/ai/README.md.
+#
+# SEC-5.4 (#211): third-party actions are pinned to immutable commit SHAs
+# (dependabot keeps them updated via PRs for the github-actions ecosystem).
+#   - actions/checkout@v7 -> 3d3c42e5aac5ba805825da76410c181273ba90b1
+#   - actions/setup-node@v7 -> 820762786026740c76f36085b0efc47a31fe5020
+#   - github/codeql-action@v4 -> ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
+name: Security CI (blocking gate)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  security-tests:
+    name: Security unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      # Blocking: the full suite includes the security negative tests
+      # (validation, CSRF, outage 503, XSS, rate-limit 429, safe-error, PWA
+      # cache isolation). A regression there fails the merge.
+      - name: Run the test suite (incl. security negative tests)
+        run: npm test
+      - name: Verify the production build
+        run: npm run build
+
+  dependency-audit:
+    name: Dependency audit (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      # BLOCKING: fails on any high/critical advisory (no continue-on-error).
+      # Exceptions require a filed ticket + Security Auditor sign-off (see
+      # .github/ai/README.md).
+      - name: npm audit (blocking on high/critical)
+        run: npm audit --audit-level=high
+
+  secret-scan:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      # BLOCKING: Gitleaks fails (exit 1) on any detected secret. Output is
+      # redacted so nothing secret is logged.
+      - name: Run Gitleaks (blocking)
+        run: |
+          docker run --rm \
+            -v "${PWD}:/repo" \
+            --workdir /repo \
+            gitleaks/gitleaks:v8.24.3 \
+            git --redact --no-banner --exit-code 1
+
+  sast:
+    name: SAST (CodeQL, blocking on high/critical)
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      security-events: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
+      # BLOCKING (no continue-on-error): a CodeQL setup/analysis error fails.
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
+      # BLOCKING on high/critical findings: scan the produced SARIF and fail
+      # when any result references a rule with security-severity >= 7. Low/
+      # moderate findings are allowed and tracked as advisory (see the
+      # exceptions policy). Requires jq (present on ubuntu-latest).
+      - name: Fail on high/critical CodeQL findings
+        run: |
+          set -euo pipefail
+          fail=0
+          found=0
+          for f in $(find .. -name '*.sarif' 2>/dev/null); do
+            found=1
+            n=$(jq '[.runs[].results[] as $r | .runs[].tool.driver.rules[] as $rule | select($rule.id == $r.ruleId and (($rule.properties."security-severity" // "0") | tonumber) >= 7)] | length' "$f")
+            echo "$f high/critical results: $n"
+            [ "$n" -gt 0 ] && fail=1
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::warning::No SARIF found — analysis may not have run."
+          fi
+          if [ "$fail" -eq 1 ]; then
+            echo "::error::High/critical CodeQL findings detected. See the code-scanning alerts and the exceptions policy in .github/ai/README.md."
+            exit 1
+          fi
+          echo "No high/critical CodeQL findings."

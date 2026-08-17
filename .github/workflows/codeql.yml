@@ -1,7 +1,12 @@
 # CodeQL SAST for JavaScript/TypeScript (SEC-EPIC-5, #209).
 # ADVISORY only — never blocks merges: the analyze step runs with
 # continue-on-error so findings surface without gating the launch branch.
-# The blocking security CI merge gate is a later milestone (#213).
+# The blocking security CI merge gate lives in security-ci.yml (#213).
+#
+# SEC-5.4 (#211): third-party actions are pinned to immutable commit SHAs
+# (dependabot for the github-actions ecosystem keeps them updated via PRs).
+#   - actions/checkout@v7  -> 3d3c42e5aac5ba805825da76410c181273ba90b1
+#   - github/codeql-action@v4 -> ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
 name: CodeQL analysis (advisory)
 
 on:
@@ -28,17 +33,20 @@ jobs:
       matrix:
         language: ['javascript-typescript']
     steps:
+      # actions/checkout@v7 pinned to SHA 3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
+      # github/codeql-action@v4 pinned to SHA ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
 
+      # github/codeql-action@v4 pinned to SHA ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
         continue-on-error: true
