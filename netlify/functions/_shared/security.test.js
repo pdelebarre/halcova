@@ -8,7 +8,7 @@
 //   - SEC-3.1 (#194): validators reject type mismatch / over-length / out-of-
 //     enum / junk / unknown (protected) fields with clean { error, code }.
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   arrayOfStrings,
   badRequest,
@@ -54,6 +54,21 @@ describe('SEC-3.7 (#200) — safe error responses', () => {
     expect(body.error).not.toContain('DROP')
     expect(body.error).not.toContain('syntax error')
     expect(body.error).toBe('Something went wrong. Please try again.')
+  })
+
+  it('safeError scrubs secrets from the logged message (NIT M5)', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const err = new Error('lookup failed for RU-ABCD-EFGH-JKLM and sk_live_1234567890abcdef')
+      safeError(err, { headers: { get: () => null } })
+      const logged = spy.mock.calls[0].join(' ')
+      expect(logged).not.toContain('RU-ABCD-EFGH-JKLM')
+      expect(logged).not.toContain('sk_live_1234567890abcdef')
+      expect(logged).toContain('REDACTED')
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('echoes a safe request id and strips an unsafe one', () => {

@@ -80,6 +80,12 @@ describe('lookup actions — fixed base host only (no host injection)', () => {
     const fetched = String(global.fetch.mock.calls[0][0])
     expect(fetched.startsWith('https://api.discogs.com/')).toBe(true)
   })
+
+  it('non-cover fetches use redirect: manual so a hostile 3xx is never followed (NIT M5)', async () => {
+    await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=0012345'))
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch.mock.calls[0][1].redirect).toBe('manual')
+  })
 })
 
 describe('cover action — public SSRF surface (via the discogs handler)', () => {

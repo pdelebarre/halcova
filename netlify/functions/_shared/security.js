@@ -14,7 +14,12 @@
 //
 // Security rules: NEVER log/return access codes, session tokens, the admin
 // key, or any Stripe/DB secret. `safeError` logs only the error message (never
-// a body) and the client gets a fixed, secret-free message.
+// a body) — routed through the shared `redactString` so a secret that somehow
+// reaches `err.message` is scrubbed — and the client gets a fixed, secret-free
+// message. `redactString` lives in _shared/audit.js, which has no dependency
+// back on this module, so there is no import cycle.
+
+import { redactString } from './audit'
 
 // ---------------------------------------------------------------------------
 // SEC-3.4 (#197) — security headers on every JSON response.
@@ -69,7 +74,10 @@ export function requestId(req) {
 // generic 500. The real error goes to logs only.
 export function safeError(err, req) {
   const id = requestId(req)
-  console.error(`[internal]${id ? ` requestId=${id}` : ''}:`, err?.message || err)
+  // NIT M5: scrub the logged detail through the shared redactor so an access
+  // code, key, bearer, long token, or email in `err.message` never reaches the
+  // log verbatim. The client-facing generic 500 is unchanged.
+  console.error(`[internal]${id ? ` requestId=${id}` : ''}:`, redactString(err?.message || err))
   const headers = id ? { 'X-Request-Id': id } : {}
   return json(500, { error: 'Something went wrong. Please try again.', code: 'INTERNAL' }, headers)
 }

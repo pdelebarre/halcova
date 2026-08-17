@@ -138,7 +138,12 @@ export async function fetchGoogleWithRetry(url, { retries = 1, delayMs = 800 } =
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
     try {
-      const res = await fetch(url, { headers: { Accept: 'application/json' } })
+      // SSRF guard (NIT M5, consistent with the cover proxy): never follow a
+      // redirect. The upstream is the fixed GOOGLE_BASE; `redirect:'manual'`
+      // makes a hostile 3xx surface as the raw response (isTransient is false
+      // for 3xx, so it's returned as-is and rejected by the `!res.ok` check in
+      // lookup()) — it can never be followed to an internal target.
+      const res = await fetch(url, { redirect: 'manual', headers: { Accept: 'application/json' } })
       lastResponse = res
       lastError = null
       // Success or a non-transient failure is final; 429/5xx gets retried.

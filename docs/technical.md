@@ -710,6 +710,15 @@ and an **email-hash** (sha256 of the normalized email — never the raw address)
 Billing ids (Stripe customer/subscription/checkout ids) are server-only and may
 appear in audit events but must never reach a client response.
 
+**Client-IP policy (NIT M5).** A raw client IP is used ONLY as an ephemeral,
+transient key — the per-IP rate-limit identity and the anomaly burst-counter
+key in `runout-rate-limits` — and is **never emitted** to an audit event or log
+line. Anywhere an IP would otherwise appear in an audit `scope`, we store a
+truncated sha256 fingerprint instead (`anomalyScope(prefix, ip)`, § 13.6). This
+is an explicit, incident-response-only exception: the raw IP lets ops correlate
+a burst source transiently (in the surrounding function-log request context)
+while the persisted/emitted signal stays PII-free.
+
 **Enforcement helpers** (`netlify/functions/_shared/audit.js`):
 
 - `redactString(value)` scrubs known secret patterns (codes, Stripe keys,
@@ -754,6 +763,12 @@ per signal when a threshold is crossed. Wired into:
 - auth login failures per-IP (`auth_failure_burst`, threshold 10),
 - webhook invalid signatures (`webhook_invalid_signature_burst`, threshold 5),
 - admin authorization denials per-IP (`admin_denial_burst`, threshold 10).
+
+The anomaly `scope` never contains a raw client IP: the burst-counter blob key
+may use it transiently, but the emitted audit `scope` stores only a truncated
+sha256 fingerprint via `anomalyScope(prefix, ip)` (see § 13.5 for the IP
+policy). The full IP remains available for incident response in the
+surrounding function-log request context.
 
 **How alerts surface.** The `AUDIT` lines land in Netlify function logs for
 every deploy. To alert, either (a) use Netlify's log drain / a log-shipping

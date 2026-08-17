@@ -76,6 +76,12 @@ describe('lookup actions — fixed base host only (no host injection)', () => {
     expect(parsed.pathname).not.toContain('/../')
   })
 
+  it('non-cover fetches use redirect: manual so a hostile 3xx is never followed (NIT M5)', async () => {
+    await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780140328721'))
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch.mock.calls[0][1].redirect).toBe('manual')
+  })
+
   it('searchBarcode sends only the fixed base with the digits as a param', async () => {
     await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780140328721'))
     const fetched = String(global.fetch.mock.calls[0][0])

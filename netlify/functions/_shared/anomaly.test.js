@@ -5,7 +5,7 @@
 // other function tests so the fixed-window counter + burst emission are proven
 // through the real store interface.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ANOMALY_WINDOW_MS, recordAnomaly } from './anomaly'
+import { ANOMALY_WINDOW_MS, anomalyScope, recordAnomaly } from './anomaly'
 import { windowIndex } from './rate-limit'
 
 const { stores, createStore } = vi.hoisted(() => {
@@ -95,6 +95,26 @@ describe('recordAnomaly', () => {
     const line = console.log.mock.calls[0][0]
     expect(line).not.toContain('RU-ABCD')
     expect(line).toContain('u-1')
+  })
+
+  it('stores only a hashed scope, never the raw client IP, when a scope is provided (NIT M5)', async () => {
+    const key = 'anom:auth:login:203.0.113.7'
+    const scope = anomalyScope('anom:auth:login', '203.0.113.7')
+    await recordAnomaly(store, key, { threshold: 1, signal: 'auth_failure_burst', scope })
+    const line = console.log.mock.calls[0][0]
+    // The raw IP must not appear anywhere in the emitted audit event.
+    expect(line).not.toContain('203.0.113.7')
+    const event = JSON.parse(line.slice('AUDIT '.length))
+    expect(event.scope).toBe(scope)
+    // A stable, non-PII fingerprint: prefix + 16 hex chars (truncated sha256).
+    expect(scope).toMatch(/^anom:auth:login:[0-9a-f]{16}$/)
+  })
+
+  it('defaults the audit scope to the key when no scope is provided', async () => {
+    const key = 'anom:x'
+    await recordAnomaly(store, key, { threshold: 1, signal: 's' })
+    const event = JSON.parse(console.log.mock.calls[0][0].slice('AUDIT '.length))
+    expect(event.scope).toBe(key)
   })
 
   it('tolerates a failed store read/write (degrades, never throws)', async () => {

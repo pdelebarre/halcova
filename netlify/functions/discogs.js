@@ -101,13 +101,23 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
 
   let data
   try {
+    // SSRF guard (NIT M5, consistent with the cover proxy): never follow a
+    // redirect. The upstream is the fixed DISCOGS_BASE and user input only ever
+    // rides as encoded query-param values, but `redirect:'manual'` makes a
+    // hostile upstream 3xx surface as the raw response, which we reject below —
+    // it can never be followed to an internal target.
     const res = await fetch(url.toString(), {
+      redirect: 'manual',
       headers: {
         'User-Agent': USER_AGENT,
         'Authorization': `Discogs token=${token}`,
       },
     })
-    // Only successful responses get cached — never error bodies.
+    // Only successful responses get cached — never error bodies. A manual 3xx
+    // (never followed) is rejected outright.
+    if (res.status >= 300 && res.status < 400) {
+      return json(502, { error: 'Discogs redirect not allowed.', code: 'HTTP_ERROR' })
+    }
     if (!res.ok) {
       if (res.status === 401) return json(502, { error: 'Discogs token rejected.', code: 'BAD_TOKEN' })
       if (res.status === 429) return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' })

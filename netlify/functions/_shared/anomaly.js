@@ -13,16 +13,28 @@
 // Emits ONCE per window per signal (on the exact crossing of the threshold), so
 // a sustained flood produces one alert per window rather than per-request spam.
 
+import { createHash } from 'node:crypto'
 import { windowIndex } from './rate-limit'
 import { logAudit } from './audit'
 
 export const ANOMALY_WINDOW_MS = 60_000
 
+// NIT M5 — explicit client-IP policy: the raw IP is only ever used as an
+// EPHEMERAL rate-limit/anomaly burst-counter key (transient blob state that is
+// never emitted). The anomaly audit `scope` stores only a stable, non-PII
+// fingerprint — a truncated sha256 of the IP — so incident response can
+// correlate a burst source without logging the raw address. See
+// docs/technical.md § 13.5/13.6.
+export function anomalyScope(prefix, ip) {
+  const digest = createHash('sha256').update(String(ip || '')).digest('hex').slice(0, 16)
+  return `${prefix}:${digest}`
+}
+
 // Record one occurrence of `key` in `store` and, when the count in the current
 // fixed window crosses `threshold`, emit an anomaly audit event (once) and
 // return { burst: true, count }. `signal` names the signal (e.g.
 // 'auth_failure_burst') and `fields` are extra safe audit fields (redacted).
-export async function recordAnomaly(store, key, { threshold, signal, windowMs = ANOMALY_WINDOW_MS, fields = {}, now = Date.now() } = {}) {
+export async function recordAnomaly(store, key, { threshold, signal, windowMs = ANOMALY_WINDOW_MS, fields = {}, now = Date.now(), scope } = {}) {
   if (!threshold || threshold < 1) return { burst: false, count: 0 }
   let entry = null
   try { entry = (await store.get(key, { type: 'json' })) || null } catch { entry = null }
@@ -31,7 +43,9 @@ export async function recordAnomaly(store, key, { threshold, signal, windowMs = 
   const next = count + 1
   try { await store.setJSON(key, { w, count: next }) } catch { /* best-effort */ }
   if (next === threshold) {
-    logAudit('anomaly', { signal, scope: key, count: next, ...fields })
+    // `scope` (when provided) overrides the raw counter key for the emitted
+    // audit event so a client IP never appears verbatim — see anomalyScope.
+    logAudit('anomaly', { signal, scope: scope ?? key, count: next, ...fields })
     return { burst: true, count: next }
   }
   return { burst: false, count: next }

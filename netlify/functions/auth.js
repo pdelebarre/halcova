@@ -26,7 +26,7 @@ import {
 } from './_shared/users'
 import { json, readJsonBody, safeError } from './_shared/security'
 import { logAudit } from './_shared/audit'
-import { recordAnomaly } from './_shared/anomaly'
+import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
 // NOTE — CSRF (SEC-3.5, #198): sessions are NOT cookie-based. SEC-EPIC-1
 // (#176) uses a Bearer session token held in localStorage and sent as an
@@ -182,7 +182,9 @@ async function handleLogin(body, req) {
     // SEC-6.6 (#220): a burst of failed logins from one IP is an early-warning
     // anomaly signal (in addition to the per-IP rate limit).
     if (ip) {
-      await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:auth:login:${ip}`, { threshold: 10, signal: 'auth_failure_burst' })
+      // NIT M5: the burst-counter key (transient) may use the raw IP, but the
+      // audit `scope` carries only a truncated hash — never the raw address.
+      await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:auth:login:${ip}`, { threshold: 10, signal: 'auth_failure_burst', scope: anomalyScope('anom:auth:login', ip) })
     }
     return json(401, { error: "That access code isn't recognized. Check it and try again." })
   }
