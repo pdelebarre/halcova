@@ -82,6 +82,17 @@ export function verifyMagicLinkToken(token, { secret, now = Date.now() } = {}) {
   } catch {
     return { ok: false, code: 'LINK_INVALID' }
   }
+  // CWE-347: reject non-canonical base64url encodings. A 32-byte digest
+  // base64url-encodes to 43 chars whose LAST char carries only 4 significant
+  // bits + 2 padding bits — so an attacker can flip those padding bits (e.g.
+  // replace a trailing `U` with `X`) and the string still decodes to the SAME
+  // 32 bytes. Re-encoding the decoded bytes and requiring exact string
+  // equality with the original `sig` deterministically rejects every such
+  // malleable encoding. This is a string equality on already-parsed input (the
+  // byte comparison below stays constant-time via timingSafeEqual).
+  if (Buffer.from(provided).toString('base64url') !== sig) {
+    return { ok: false, code: 'LINK_INVALID' }
+  }
   if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
     return { ok: false, code: 'LINK_INVALID' }
   }

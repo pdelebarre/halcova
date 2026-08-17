@@ -78,6 +78,40 @@ describe('signMagicLink + verifyMagicLinkToken', () => {
     expect(result.code).toBe('LINK_INVALID')
   })
 
+  it('rejects a NON-CANONICAL (malleable) signature encoding that decodes to the same bytes (CWE-347)', () => {
+    const now = Date.now()
+    const token = signMagicLink({ email: 'ada@example.com', expiresAt: now + DEFAULT_TTL_MS, jti: 'j1', secret: SECRET })
+    const sep = token.indexOf('.')
+    const payload = token.slice(0, sep)
+    const sig = token.slice(sep + 1)
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
+    // A 32-byte digest base64url-encodes to 43 chars whose LAST char has only
+    // 4 significant bits + 2 padding bits. Canonical encodings clear those low
+    // padding bits, so an attacker can set one and the string still DECODES to
+    // the exact same 32 bytes — previously passing timingSafeEqual. Flip the
+    // lowest padding bit of the final sextet to build such a malleable sig.
+    const last = sig[sig.length - 1]
+    const lastIdx = alphabet.indexOf(last)
+    const malleable = `${sig.slice(0, -1)}${alphabet[lastIdx | 1]}`
+    // Sanity: the tampered string genuinely decodes to the SAME bytes, so only
+    // the canonical re-encode check can catch it.
+    expect(Buffer.from(malleable, 'base64url').equals(Buffer.from(sig, 'base64url'))).toBe(true)
+
+    const result = verifyMagicLinkToken(`${payload}.${malleable}`, { secret: SECRET, now })
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('LINK_INVALID')
+  })
+
+  it('verifies a canonical token — the re-encode check causes no false rejections', () => {
+    const now = Date.now()
+    const token = signMagicLink({ email: 'ada@example.com', expiresAt: now + DEFAULT_TTL_MS, jti: 'j1', secret: SECRET })
+    const result = verifyMagicLinkToken(token, { secret: SECRET, now })
+    expect(result.ok).toBe(true)
+    expect(result.email).toBe('ada@example.com')
+    expect(result.jti).toBe('j1')
+  })
+
   it('rejects malformed tokens', () => {
     expect(verifyMagicLinkToken('not-a-token', { secret: SECRET }).code).toBe('LINK_INVALID')
     expect(verifyMagicLinkToken('', { secret: SECRET }).code).toBe('LINK_INVALID')
