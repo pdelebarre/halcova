@@ -437,3 +437,57 @@ home screen. No app store, no passwords.
 
 Each long-form gets chapters, an end screen (next video + Request access link),
 and a mid-video card with the UTM'd link.
+
+---
+
+## Feedback — "We read everything" (epic #74 · T9, launch beat)
+
+> **Placement:** slots into the **existing** `campaign-viral-launch.md` calendar —
+> **Phase 4 → The Open** (Day 14+, from Sun 08-30, as the first members onboard)
+> and **early Phase 5 → The Loop** (Day 15+). It does **not** invent a phase; it
+> runs once the in-app feedback feature (epic #74) has shipped and members are
+> inside the app. Full plan + tracking: `feedback-launch-beat.md`.
+> **Promise guardrail:** "we read everything" = reading + triage, **never** a
+> reply SLA. No instant-reply, no roadmap-seat, no metrics, no leaked internals
+> (no admin panel / statuses / access codes / rate-limits).
+
+### M1 · WhatsApp (personal 1:1 — first circle, after sign-in)
+> You're in. 🏛️ One thing before you start scanning:
+> Settings → Feedback, right inside the app. Suggest something, or tell us
+> what broke. You'll get a reference number (#fb-…) so we can find it in the
+> pile.
+> We read everything. It's a small team — but it's a real inbox.
+> (No instant replies — just a real one.)
+
+### M2 · X
+> Every bug report is one we never have to chase. 👀
+> In Halcova: Settings → Feedback. Suggest an idea or report a problem —
+> you get a reference id, and it lands straight in our inbox.
+> We read everything. That's the whole point.
+> #Halcova #WhatsInYourHalcova
+
+### M2 · Instagram / Facebook
+> Your crate has a direct line to us now. 📬
+> Settings → Feedback. Tell us what to build — or what broke. Every report
+> gets a reference id, so it lands on the right desk.
+> We read everything. Small team, real inbox.
+> #Halcova #vinyl #bookstagram #recordcollection
+
+### M3 · Newsletter (subject + short body)
+> **Subject:** We read everything.
+>
+> **Body:**
+> Halcova now has an always-on way to reach us: **Settings → Feedback**.
+> Suggest an idea or report a problem — whichever it is, you'll get a
+> reference number (#fb-…), and your report goes straight to the team's
+> inbox, where it genuinely feeds what we build next.
+> No instant replies — but everything is read, and everything is triaged.
+> Your crate, your shelf, and now a direct line to the people building it.
+
+### Translation notes (post-reveal, per `copy-kit-halcova.md` §7)
+- "We read everything" stays EN at launch; localized follow-ups need a native
+  pass `[VALIDATE]` — keep it a warm, honest reading promise, never a response
+  time.
+- `#fb-…` / the reference format stay untranslated.
+- Keep at least one situational joke per localized post
+  (`review-benefits-humor.md` §5).

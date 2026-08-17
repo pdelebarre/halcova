@@ -293,6 +293,13 @@ Package the feature for members and for the launch.
 - [ ] KPI/measurement plan documented in this epic §6.
 - [ ] No invented metrics or promises (no "instant reply" claims).
 
+> **T9 deliverable:** `marketing/feedback-launch-beat.md` — the EN copy review
+> + exact `feedback.*` / `admin.feedback.*` key handoff (§1), the "We read
+> everything" launch beat + copy-bank entries (`campaign-copy-bank.md` §2), the
+> feedback funnel + KPI table from epic §6 (§3), and the always-on successor to
+> the private-test form (`private-test-plan.md` §6b). Docs/copy only — no app
+> code.
+
 ---
 
 ## Creation order (paste into GitHub)

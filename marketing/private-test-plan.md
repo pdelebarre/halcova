@@ -41,6 +41,8 @@
 - [ ] **Codes:** from the admin panel, generate one access code per tester,
       grant **Records and/or Books** per person.
 - [ ] **Feedback form:** a 2-minute form (see §6) — create + link it in invites.
+      Once the in-app feedback channel ships (epic #74), the form is retired in
+      favour of the always-on channel (Settings → Feedback, see §6b).
 
 ## 4. Tester roster (fill in)
 
@@ -83,7 +85,29 @@
   no — tell us what sounds off)
 - Q9: One thing you'd change. (free text)
 
-## 7. What to measure (alongside the form)
+## 6b. Always-on in-app feedback channel (successor to the form)
+
+Once epic #74 ships, the one-off Google Form in §6 is **retired** and replaced
+by the always-on in-app channel (Settings → Feedback + the ErrorBoundary
+"Report a problem" button):
+
+- **How members reach us:** Settings → Feedback → toggle **Suggestion** / **Report
+  a problem** → optional category + message → **reference id** (`#fb-…`).
+- **What the owner sees:** every report in the admin **Feedback inbox** with
+  auto-context (route, version, device, timestamp), filterable by status/type,
+  with an internal note + delete. This **is** the private-test feedback sink
+  going forward — no separate form to maintain.
+- **Rate-limit:** 5 submissions/hour per member (starting point — validate in
+  T8); feedback is member-only (no anonymous reports).
+- **What replaces the form's questions:** Q1–Q3 (the Halcova name check) still
+  needs a **one-off form** for the *name* — that's not an app channel. Keep a
+  small name-check form for the native-speaker pass; the *product* questions
+  (Q4–Q9) become in-app suggestions/bug reports.
+- **Keep for the private test:** the name-check form (Q1–Q3) + the onboarding
+  walkthrough in §5. Everything product-related flows through the in-app inbox.
+- Full copy/tracking: `marketing/feedback-launch-beat.md`.
+
+## 7. What to measure (alongside the form / the in-app inbox)
 
 | Metric | How |
 | --- | --- |
@@ -92,6 +116,7 @@
 | Duplicate use | how often the "already own" flag appears |
 | Retention | return visits over 2 weeks |
 | Name ratings | Q1/Q3 averages per language |
+| In-app feedback | reports submitted via Settings → Feedback (admin inbox) — once epic #74 ships |
 
 ## 8. Go / no-go for a wider launch
 
