@@ -5,13 +5,13 @@
 // (`200 { item }`) from the function, which stores lending state on the item
 // blob itself (item.lending / item.lendingHistory).
 
-import { getAccessCode } from '../utils/session'
+import { getSessionToken } from '../utils/session'
 
 const FN_URL = '/.netlify/functions/lending'
 
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 async function postAction(body) {

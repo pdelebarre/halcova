@@ -22,7 +22,7 @@ function res(status, data) {
 const MEMBER = { id: 'u1', name: 'Ada', role: 'member', collections: { records: true, books: true } }
 
 function mockSignedIn(user) {
-  saveSession({ user, code: 'RU-AAAA-BBBB-CCCC' })
+  saveSession({ user, session: 'tok-session-abc123' })
   global.fetch = vi.fn((url) => {
     const u = String(url)
     if (u.includes('/functions/auth')) return Promise.resolve(res(200, { user }))

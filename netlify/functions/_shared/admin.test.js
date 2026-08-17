@@ -19,7 +19,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler, { KNOWN_FEATURES, sanitizeFeatures } from '../admin'
-import { ADMIN_KEY } from './auth'
+import { adminSessionToken } from './session-test-helpers'
 import { createMemDb } from './repositories/test-helpers'
 import { createFeedbackRepo } from './repositories/feedback-repo'
 import { createReviewsRepo } from './repositories/reviews-repo'
@@ -91,11 +91,15 @@ const MEMBER = {
 
 const CODE_RE = /^RU-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/
 
+// The owner's admin session token, minted per-test (SEC-1.6, #181) — the admin
+// API authorizes by the session's role, never by re-checking the admin key.
+let ADMIN_TOKEN = ''
+
 function req(method, body, path = '') {
   return {
     method,
     url: `http://localhost/.netlify/functions/admin${path}`,
-    headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${ADMIN_KEY}` : null) },
+    headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${ADMIN_TOKEN}` : null) },
     json: async () => body,
   }
 }
@@ -186,7 +190,7 @@ async function seedPgFeedback(db, items) {
   }
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   for (const fn of Object.values(usersMock)) fn.mockClear()
   usersMock.listUsers.mockResolvedValue([])
   usersMock.listRequests.mockResolvedValue([])
@@ -198,6 +202,7 @@ beforeEach(() => {
   for (const key of Object.keys(stores)) delete stores[key]
   pgRef.configured = false
   pgRef.db = null
+  ADMIN_TOKEN = await adminSessionToken()
 })
 
 describe('GET /admin — the member list never leaks codes or hashes', () => {
@@ -264,7 +269,7 @@ describe('POST approve — still returns the generated code once (shape preserve
 })
 
 describe('auth guard & unknown actions', () => {
-  it('401s without the admin key and 400s on an unknown action', async () => {
+  it('401s without a session and 400s on an unknown action', async () => {
     const res = await handler({ ...req('POST', { action: 'nope' }), headers: { get: () => null } })
     expect(res.status).toBe(401)
     expect((await post({ action: 'nope' })).status).toBe(400)
@@ -427,7 +432,7 @@ describe('POST hideReview / showReview / deleteReview — admin moderation (Blob
     }
   })
 
-  it('401s without the admin key', async () => {
+  it('401s without a session', async () => {
     seedBlobReviews([review()])
     const res = await handler({ ...req('POST', { action: 'hideReview', reviewId: review().id }), headers: { get: () => null } })
     expect(res.status).toBe(401)

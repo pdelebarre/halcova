@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as api from '../api/reviews'
-import { getAccessCode, getSession } from '../utils/session'
+import { getSession, getSessionToken } from '../utils/session'
 
 // ---------------------------------------------------------------------------
 // useReviews(kind, sourceId) — load + mutate the community-review thread for
@@ -45,7 +45,7 @@ function sortNewestFirst(list) {
 }
 
 export function useReviews(kind, sourceId) {
-  const signedIn = !!getAccessCode()
+  const signedIn = !!getSessionToken()
 
   const [reviews, setReviews] = useState([]) // published reviews from the server
   const [mine, setMine] = useState(null)     // the caller's own review or null

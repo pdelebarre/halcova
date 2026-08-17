@@ -7,15 +7,15 @@
 //
 // Only the S3 payment client lives here — the paywall UI that uses it is S6.
 
-import { getAccessCode, saveSession } from '../utils/session'
+import { getSessionToken, saveSession } from '../utils/session'
 
 const FN_BASE = '/.netlify/functions/payment'
 
-// Members send their access code as Bearer; a brand-new prospect checks out
-// pre-auth (no code yet), so the header is omitted when there is no session.
+// Members send their session token as Bearer; a brand-new prospect checks out
+// pre-auth (no session yet), so the header is omitted when there is none.
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 // Mirror the lookup clients: surface the server's error message AND its
@@ -56,17 +56,18 @@ export async function createCheckout(plan, opts = {}) {
 }
 
 // Poll a checkout session after the Stripe redirect. Returns:
-//   { status: 'pending' }                         — keep polling,
-//   { status: 'complete', user, code? }           — paid; `code` is the freshly
-//                                                   issued RU- code for a brand-
-//                                                   new prospect (returned once).
-// For a new prospect the returned session is persisted (mirrors verifyMagicLink
-// in src/api/auth.js). An existing member keeps their existing code, so their
-// stored session is left untouched (they can refresh via me()).
+//   { status: 'pending' }               — keep polling,
+//   { status: 'complete', user, session?, code? } — paid; `session` is a fresh
+//     session token for a brand-new prospect (persisted — mirrors
+//     login/verifyMagicLink), and `code` is the freshly-issued RU- code
+//     returned exactly once so they can sign in on another device. The code is
+//     NEVER persisted (SEC-EPIC-1, #177) — localStorage.runout.session holds
+//     only `{ user, session }`. An existing member keeps their session, so
+//     their stored session is left untouched (they can refresh via me()).
 export async function getCheckoutStatus(sessionId) {
   const data = await postJson({ action: 'status', sessionId })
-  if (data.status === 'complete' && data.code) {
-    saveSession({ user: data.user, code: data.code })
+  if (data.status === 'complete' && data.session) {
+    saveSession({ user: data.user, session: data.session })
   }
   return data
 }

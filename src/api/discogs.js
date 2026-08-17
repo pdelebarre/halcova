@@ -1,10 +1,10 @@
-import { getAccessCode } from '../utils/session'
+import { getSessionToken } from '../utils/session'
 import { proxyCoverUrl } from '../utils/cover'
 
 // Record lookups go through the server-side Discogs proxy, which owns the
 // single Discogs token, sends the User-Agent, and caches responses in Blobs.
-// The browser never stores or sends a token — requests authenticate with the
-// signed-in user's access code.
+// The browser never stores or sends a provider token — requests authenticate
+// with the signed-in user's session token.
 const FN_BASE = '/.netlify/functions/discogs'
 
 const ERROR_MESSAGES = {
@@ -15,8 +15,8 @@ const ERROR_MESSAGES = {
 }
 
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 async function discogsFetch(action, params = {}) {

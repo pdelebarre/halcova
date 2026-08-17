@@ -5,8 +5,7 @@
 
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
-import { findUserByCode } from './_shared/users'
+import { resolveSession } from './_shared/session-auth'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
@@ -42,25 +41,12 @@ const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(bod
   headers: { 'Content-Type': 'application/json', ...headers },
 })
 
-// Same shape as collection.js: every request carries the caller's access code.
-// The owner uses the admin key; members use the code the admin generated.
-// Unknown codes 401, disabled accounts 403.
+// Same contract as collection.js (SEC-EPIC-1, #176): every request carries a
+// live server-managed session token. resolveSession validates it and resolves
+// the owner / demo / member identity — the demo identity stays ungated for
+// lookups (T6). Unknown/expired/revoked tokens 401, disabled accounts 403.
 async function authorize(req) {
-  const code = bearer(req)
-  if (!code) return { error: json(401, { error: 'Sign in with your access code.' }) }
-
-  let user
-  if (code === ADMIN_KEY) {
-    user = { id: OWNER_ID, role: 'admin', status: 'active', collections: { records: true, books: true } }
-  } else if (isDemoCode(code)) {
-    // Lookups must keep working for the demo identity (T6) — never gate them.
-    user = DEMO_USER
-  } else {
-    user = await findUserByCode(code)
-  }
-  if (!user) return { error: json(401, { error: "That access code isn't recognized." }) }
-  if (user.status !== 'active') return { error: json(403, { error: 'This account is disabled.' }) }
-  return { user }
+  return resolveSession(req)
 }
 
 // Barcodes/ids are digits (keep X/x for UPC check digits) — also keeps blob

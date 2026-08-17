@@ -24,6 +24,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler, { FEEDBACK_RATE_LIMIT, FEEDBACK_RATE_WINDOW_MS } from './feedback'
 import { ADMIN_KEY } from './_shared/auth'
+import { adminSessionToken, demoSessionToken, sessionTokenFor } from './_shared/session-test-helpers'
 import { createFeedbackRepo } from './_shared/repositories/feedback-repo'
 import { createMemDb } from './_shared/repositories/test-helpers'
 import { createUsersRepo } from './_shared/repositories/users-repo'
@@ -73,11 +74,23 @@ const USER_ID = 'u1'
 const DEMO_CODE = 'RUNOUT-DEMO-0000'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Session tokens minted per-test AFTER the backend is chosen (SEC-EPIC-1): the
+// Bearer is a server-managed session token, not the access code / admin key.
+let MEMBER_TOKEN = ''
+let ADMIN_TOKEN = ''
+let DEMO_TOKEN = ''
+
+async function mintTokens() {
+  MEMBER_TOKEN = await sessionTokenFor({ userId: USER_ID, role: 'member' })
+  ADMIN_TOKEN = await adminSessionToken()
+  DEMO_TOKEN = await demoSessionToken()
+}
+
 const ID_1 = '10000000-0000-4000-8000-000000000001'
 const ID_2 = '10000000-0000-4000-8000-000000000002'
 const ID_3 = '10000000-0000-4000-8000-000000000003'
 
-function req(method, path = '', body, auth = `Bearer ${ADMIN_KEY}`) {
+function req(method, path = '', body, auth = `Bearer ${ADMIN_TOKEN}`) {
   return {
     method,
     url: `http://localhost/.netlify/functions/feedback${path}`,
@@ -167,11 +180,14 @@ beforeEach(async () => {
   for (const key of Object.keys(stores)) delete stores[key]
   delete process.env.DATABASE_URL
   await setBackend('blobs')
+  await mintTokens()
 })
 
 describe.each(BACKENDS)('four operations on the %s backend (via the repository seam)', (backend) => {
   beforeEach(async () => {
     await setBackend(backend)
+    // Re-mint on the ACTUAL backend so the session lives where auth reads it.
+    await mintTokens()
   })
 
   const seedMember = async () => {
@@ -190,7 +206,7 @@ describe.each(BACKENDS)('four operations on the %s backend (via the repository s
       message: '  Scanner crashes on iOS 17.  ',
       authorId: 'u999',
       authorName: 'Impostor',
-    }), `Bearer ${CODE}`)
+    }), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(201)
     const created = await res.json()
     expect(created).toMatchObject({
@@ -201,7 +217,7 @@ describe.each(BACKENDS)('four operations on the %s backend (via the repository s
     expect(created.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
 
     // GET — the admin inbox shows it, newest first.
-    const list = await call('GET', '', null, `Bearer ${ADMIN_KEY}`)
+    const list = await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)
     expect(list.status).toBe(200)
     const { items } = await list.json()
     expect(items).toHaveLength(1)
@@ -209,7 +225,7 @@ describe.each(BACKENDS)('four operations on the %s backend (via the repository s
     expect(items[0].authorName).toBe('Ada')
 
     // PATCH — admin triage (status + owner-only note).
-    const patch = await call('PATCH', '', { id: created.id, status: 'in_progress', adminNote: 'Looking into it.' }, `Bearer ${ADMIN_KEY}`)
+    const patch = await call('PATCH', '', { id: created.id, status: 'in_progress', adminNote: 'Looking into it.' }, `Bearer ${ADMIN_TOKEN}`)
     expect(patch.status).toBe(200)
     const updated = await patch.json()
     expect(updated).toMatchObject({ id: created.id, status: 'in_progress', adminNote: 'Looking into it.' })
@@ -217,14 +233,14 @@ describe.each(BACKENDS)('four operations on the %s backend (via the repository s
     expect(updated.authorId).toBe(USER_ID)
 
     // DELETE — admin removes it.
-    const del = await call('DELETE', `?id=${created.id}`, null, `Bearer ${ADMIN_KEY}`)
+    const del = await call('DELETE', `?id=${created.id}`, null, `Bearer ${ADMIN_TOKEN}`)
     expect(del.status).toBe(204)
-    const list2 = await call('GET', '', null, `Bearer ${ADMIN_KEY}`)
+    const list2 = await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)
     expect((await list2.json()).items).toHaveLength(0)
   })
 
-  it('accepts the admin key on POST too — the author is the owner', async () => {
-    const res = await call('POST', '', submitBody(), `Bearer ${ADMIN_KEY}`)
+  it('accepts the admin session on POST too — the author is the owner', async () => {
+    const res = await call('POST', '', submitBody(), `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(201)
     const created = await res.json()
     expect(created.authorId).toBe('owner')
@@ -237,33 +253,33 @@ describe.each(BACKENDS)('four operations on the %s backend (via the repository s
       { id: ID_2, type: 'bug', category: 'scanner', message: 'two', status: 'open', createdAt: '2026-01-02T00:00:00.000Z' },
       { id: ID_3, type: 'bug', category: 'billing', message: 'three', status: 'done', createdAt: '2026-01-03T00:00:00.000Z' },
     ])
-    const all = await (await call('GET', '', null, `Bearer ${ADMIN_KEY}`)).json()
+    const all = await (await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)).json()
     expect(all.items.map((i) => i.id)).toEqual([ID_3, ID_2, ID_1]) // newest first
-    const bugs = await (await call('GET', '?type=bug', null, `Bearer ${ADMIN_KEY}`)).json()
+    const bugs = await (await call('GET', '?type=bug', null, `Bearer ${ADMIN_TOKEN}`)).json()
     expect(bugs.items.map((i) => i.id)).toEqual([ID_3, ID_2])
-    const openBugs = await (await call('GET', '?type=bug&status=open', null, `Bearer ${ADMIN_KEY}`)).json()
+    const openBugs = await (await call('GET', '?type=bug&status=open', null, `Bearer ${ADMIN_TOKEN}`)).json()
     expect(openBugs.items.map((i) => i.id)).toEqual([ID_2])
-    const junk = await call('GET', '?type=garbage&status=nonsense', null, `Bearer ${ADMIN_KEY}`)
+    const junk = await call('GET', '?type=garbage&status=nonsense', null, `Bearer ${ADMIN_TOKEN}`)
     expect(junk.status).toBe(200)
     expect((await junk.json()).items).toHaveLength(3)
   })
 
   it('PATCH 404s unknown and junk ids — never 500', async () => {
-    expect((await call('PATCH', '', { id: 'nope', status: 'done' }, `Bearer ${ADMIN_KEY}`)).status).toBe(404)
-    expect((await call('PATCH', '', { id: ID_3, status: 'done' }, `Bearer ${ADMIN_KEY}`)).status).toBe(404)
+    expect((await call('PATCH', '', { id: 'nope', status: 'done' }, `Bearer ${ADMIN_TOKEN}`)).status).toBe(404)
+    expect((await call('PATCH', '', { id: ID_3, status: 'done' }, `Bearer ${ADMIN_TOKEN}`)).status).toBe(404)
   })
 
   it('DELETE 404s unknown and junk ids — never 500', async () => {
-    expect((await call('DELETE', '?id=nope', null, `Bearer ${ADMIN_KEY}`)).status).toBe(404)
-    expect((await call('DELETE', `?id=${ID_3}`, null, `Bearer ${ADMIN_KEY}`)).status).toBe(404)
+    expect((await call('DELETE', '?id=nope', null, `Bearer ${ADMIN_TOKEN}`)).status).toBe(404)
+    expect((await call('DELETE', `?id=${ID_3}`, null, `Bearer ${ADMIN_TOKEN}`)).status).toBe(404)
   })
 
-  it('requires the admin key on GET/PATCH/DELETE (member code → 401)', async () => {
+  it('rejects non-admin sessions on GET/PATCH/DELETE (none → 401, member → 403)', async () => {
     await seedMember()
     expect((await call('GET', '', null, '')).status).toBe(401)
-    expect((await call('GET', '', null, `Bearer ${CODE}`)).status).toBe(401)
-    expect((await call('PATCH', '', { id: ID_1, status: 'done' }, `Bearer ${CODE}`)).status).toBe(401)
-    expect((await call('DELETE', `?id=${ID_1}`, null, `Bearer ${CODE}`)).status).toBe(401)
+    expect((await call('GET', '', null, `Bearer ${MEMBER_TOKEN}`)).status).toBe(403)
+    expect((await call('PATCH', '', { id: ID_1, status: 'done' }, `Bearer ${MEMBER_TOKEN}`)).status).toBe(403)
+    expect((await call('DELETE', `?id=${ID_1}`, null, `Bearer ${MEMBER_TOKEN}`)).status).toBe(403)
   })
 })
 
@@ -276,47 +292,47 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
 
   it('403s for a disabled account', async () => {
     seedMemberBlobs({ status: 'disabled' })
-    const res = await call('POST', '', submitBody(), `Bearer ${CODE}`)
+    const res = await call('POST', '', submitBody(), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(403)
   })
 
-  it('403s DEMO_READONLY for the demo code', async () => {
-    const res = await call('POST', '', submitBody(), `Bearer ${DEMO_CODE}`)
+  it('403s DEMO_READONLY for the demo session', async () => {
+    const res = await call('POST', '', submitBody(), `Bearer ${DEMO_TOKEN}`)
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('DEMO_READONLY')
   })
 
   it('400s MESSAGE_REQUIRED for an empty, whitespace, or missing message', async () => {
     seedMemberBlobs()
-    expect((await call('POST', '', submitBody({ message: '' }), `Bearer ${CODE}`)).status).toBe(400)
-    expect((await call('POST', '', submitBody({ message: '   ' }), `Bearer ${CODE}`)).status).toBe(400)
-    expect((await call('POST', '', { type: 'suggestion' }, `Bearer ${CODE}`)).status).toBe(400)
+    expect((await call('POST', '', submitBody({ message: '' }), `Bearer ${MEMBER_TOKEN}`)).status).toBe(400)
+    expect((await call('POST', '', submitBody({ message: '   ' }), `Bearer ${MEMBER_TOKEN}`)).status).toBe(400)
+    expect((await call('POST', '', { type: 'suggestion' }, `Bearer ${MEMBER_TOKEN}`)).status).toBe(400)
   })
 
   it('400s MESSAGE_TOO_LONG past 4000 characters', async () => {
     seedMemberBlobs()
-    const res = await call('POST', '', submitBody({ message: 'x'.repeat(4001) }), `Bearer ${CODE}`)
+    const res = await call('POST', '', submitBody({ message: 'x'.repeat(4001) }), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(400)
     expect((await res.json()).code).toBe('MESSAGE_TOO_LONG')
   })
 
   it('400s INVALID_TYPE for a junk type', async () => {
     seedMemberBlobs()
-    const res = await call('POST', '', submitBody({ type: 'garbage' }), `Bearer ${CODE}`)
+    const res = await call('POST', '', submitBody({ type: 'garbage' }), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(400)
     expect((await res.json()).code).toBe('INVALID_TYPE')
   })
 
   it('400s INVALID_CATEGORY for a junk category', async () => {
     seedMemberBlobs()
-    const res = await call('POST', '', submitBody({ category: 'nonsense' }), `Bearer ${CODE}`)
+    const res = await call('POST', '', submitBody({ category: 'nonsense' }), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(400)
     expect((await res.json()).code).toBe('INVALID_CATEGORY')
   })
 
   it('defaults type to suggestion and category to other when absent', async () => {
     seedMemberBlobs()
-    const res = await call('POST', '', { message: 'Just saying hi.' }, `Bearer ${CODE}`)
+    const res = await call('POST', '', { message: 'Just saying hi.' }, `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(201)
     const created = await res.json()
     expect(created.type).toBe('suggestion')
@@ -328,7 +344,7 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
     const res = await handler({
       method: 'POST',
       url: 'http://localhost/.netlify/functions/feedback',
-      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${CODE}` : null) },
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${MEMBER_TOKEN}` : null) },
       json: async () => { throw new Error('bad json') },
     })
     expect(res.status).toBe(400)
@@ -341,28 +357,29 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
       'rl:feedback:u1',
       { w: windowIndex(Date.now(), FEEDBACK_RATE_WINDOW_MS), count: FEEDBACK_RATE_LIMIT },
     )
-    const res = await call('POST', '', submitBody(), `Bearer ${CODE}`)
+    const res = await call('POST', '', submitBody(), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(429)
     expect((await res.json()).code).toBe('RATE_LIMITED')
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 
-  it('405s on an unsupported method (admin key present)', async () => {
-    expect((await call('PUT', '', {}, `Bearer ${ADMIN_KEY}`)).status).toBe(405)
+  it('405s on an unsupported method (admin session present)', async () => {
+    expect((await call('PUT', '', {}, `Bearer ${ADMIN_TOKEN}`)).status).toBe(405)
   })
 
-  it('never leaks the access code, the admin key, code_hash, or PII beyond the session', async () => {
+  it('never leaks the access code, the admin key, code_hash, session tokens, or PII beyond the session', async () => {
     seedMemberBlobs() // seeded member email is u1@example.com
-    const post = await call('POST', '', submitBody(), `Bearer ${CODE}`)
+    const post = await call('POST', '', submitBody(), `Bearer ${MEMBER_TOKEN}`)
     const postText = await post.text()
     expect(postText).not.toContain(CODE)
     expect(postText).not.toContain('code_hash')
     expect(postText).not.toContain(ADMIN_KEY)
+    expect(postText).not.toContain(MEMBER_TOKEN)
     // Only the public display name is stamped on feedback — the member's email
     // (PII beyond the session) must never appear in a submission response.
     expect(postText).not.toContain('u1@example.com')
     expect(postText).not.toContain('email')
-    const list = await call('GET', '', null, `Bearer ${ADMIN_KEY}`)
+    const list = await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)
     const listText = await list.text()
     expect(listText).not.toContain(CODE)
     expect(listText).not.toContain('code_hash')
@@ -382,7 +399,7 @@ describe('Postgres outage → Blobs fallback (never 500s)', () => {
       connect: async () => { throw new Error('connection refused') },
     }
     __resetRepositoryForTests()
-    const res = await call('GET', '', null, `Bearer ${ADMIN_KEY}`)
+    const res = await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.items).toHaveLength(1)

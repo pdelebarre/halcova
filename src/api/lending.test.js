@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as lending from './lending'
 import { saveSession } from '../utils/session'
 
-const CODE = 'RU-XXXX-XXXX-XXXX'
+const SESSION_TOKEN = 'tok-lending-session-abc123'
 
 function okJson(data) {
   return { ok: true, status: 200, json: async () => data }
@@ -22,7 +22,7 @@ const RETURNED = { id: 'r1', title: 'Miles Davis - Kind of Blue' }
 
 beforeEach(() => {
   localStorage.clear()
-  saveSession({ user: { id: 'u42' }, code: CODE })
+  saveSession({ user: { id: 'u42' }, session: SESSION_TOKEN })
   global.fetch = vi.fn()
 })
 
@@ -45,7 +45,7 @@ describe('lend', () => {
     const [url, init] = global.fetch.mock.calls[0]
     expect(url).toBe('/.netlify/functions/lending')
     expect(init.method).toBe('POST')
-    expect(init.headers).toMatchObject({ Authorization: `Bearer ${CODE}` })
+    expect(init.headers).toMatchObject({ Authorization: `Bearer ${SESSION_TOKEN}` })
     expect(JSON.parse(init.body)).toEqual({
       action: 'lend',
       collection: 'records',
@@ -82,7 +82,7 @@ describe('returnItem', () => {
     const [url, init] = global.fetch.mock.calls[0]
     expect(url).toBe('/.netlify/functions/lending')
     expect(init.method).toBe('POST')
-    expect(init.headers).toMatchObject({ Authorization: `Bearer ${CODE}` })
+    expect(init.headers).toMatchObject({ Authorization: `Bearer ${SESSION_TOKEN}` })
     expect(JSON.parse(init.body)).toEqual({ action: 'return', collection: 'records', itemId: 'r1' })
   })
 

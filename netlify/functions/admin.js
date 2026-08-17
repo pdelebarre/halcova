@@ -1,5 +1,9 @@
-// Admin API — only reachable with the admin key (RUNOUT_ADMIN_KEY), sent as
-// `Authorization: Bearer <key>`. Handles the "accept new users" flow:
+// Admin API — owner-only. Authorized by the SESSION's role (SEC-1.6, #181):
+// the owner signs in with RUNOUT_ADMIN_KEY (login exchanges it for an admin
+// session token in auth.js), and every admin call carries
+// `Authorization: Bearer <sessionToken>`. requireAdmin() rejects anything that
+// isn't a live admin session — a member session or a forged/absent key is
+// 401/403. Handles the "accept new users" flow:
 //   - list pending requests + members
 //   - approve a request (grants Records and/or Books, returns the access code)
 //   - reject a request
@@ -8,7 +12,9 @@
 //   - moderate community reviews (hide / show / delete, plus a listing)
 
 import { randomUUID } from 'node:crypto'
-import { ADMIN_KEY, OWNER_ID, bearer, generateAccessCode, publicUser } from './_shared/auth'
+import { OWNER_ID, generateAccessCode, publicUser } from './_shared/auth'
+import { requireAdmin } from './_shared/session-auth'
+import { deleteAllForUser, revokeAllForUser } from './_shared/sessions'
 import { parsePagination } from './_shared/pagination'
 import { db, isPostgresConfigured } from './_shared/postgres'
 import { createReviewsRepo } from './_shared/repositories/reviews-repo'
@@ -145,6 +151,10 @@ async function handleRotate(body) {
   // saveUser hashes the code on the Postgres path (sole authority) and keeps
   // the plaintext Blobs mirror in sync during read-through.
   await saveUser({ ...user, code: newCode })
+  // Rotating the credential also kills any live sessions issued under the old
+  // code (SEC-EPIC-1 defense in depth) — the member signs in again with the
+  // new code.
+  await revokeAllForUser(user.id)
   return json(200, { user: publicUser(user), code: newCode })
 }
 
@@ -170,6 +180,9 @@ async function handleUpdateUser(body) {
   }
 
   await saveUser(user)
+  // A disabled member's live sessions die immediately (SEC-1.9, #184) —
+  // defense in depth on top of the per-request status check in resolveSession.
+  if (user.status === 'disabled') await revokeAllForUser(user.id)
   return json(200, { user: publicUser(user) })
 }
 
@@ -243,6 +256,9 @@ async function handleDeleteUser(body) {
   await deleteMemberFeedback(user.id)
   await deleteUserCollections(user.id)
   await removeUserRecord(user.id)
+  // The member's sessions go with the account (SEC-1.9, #184) — no orphaned
+  // live session can outlive a deleted user.
+  await deleteAllForUser(user.id)
   return json(200, { ok: true })
 }
 
@@ -274,9 +290,11 @@ async function handleDeleteReview(body) {
 
 export default async (req) => {
   try {
-    if (bearer(req) !== ADMIN_KEY) {
-      return json(401, { error: 'Admin key required. Set RUNOUT_ADMIN_KEY and sign in as the owner.' })
-    }
+    // SEC-1.6 (#181): authorize by the SESSION's role, not by re-checking the
+    // bearer equals ADMIN_KEY. The admin key only ever minted this session at
+    // login (auth.js); a member session or a forged/absent key is rejected.
+    const admin = await requireAdmin(req)
+    if (admin.error) return admin.error
 
     if (req.method === 'GET') {
       const url = new URL(req.url)

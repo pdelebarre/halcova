@@ -30,15 +30,14 @@
 import { randomUUID } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import {
-  ADMIN_KEY,
   bearer,
   generateAccessCode,
-  isDemoCode,
   publicUser,
 } from './_shared/auth'
+import { resolveSession } from './_shared/session-auth'
+import { createSession } from './_shared/sessions'
 import {
   findPendingRequestByEmail,
-  findUserByCode,
   findUserByEmail,
   findUserByStripeSession,
   getRequest,
@@ -127,23 +126,26 @@ function siteUrl(req) {
 }
 
 // Resolve the caller's identity for checkout/portal:
-//   - a Bearer access code → an existing member ({ kind: 'member', user }),
+//   - a Bearer session token → an existing member ({ kind: 'member', user }),
 //   - no Bearer → a pre-auth prospect from { name, email } ({ kind, name, email }).
 // The owner and the demo identity are rejected with 403 — they must never be
 // able to start a checkout (the owner already has every plan; the demo space
 // is read-only). Returns an object or throws an httpError.
 async function resolveIdentity(req, body) {
-  const code = bearer(req)
-  if (code) {
-    if (code === ADMIN_KEY) {
+  const token = bearer(req)
+  if (token) {
+    // SEC-EPIC-1 (#176): the Bearer is a session token now, not an access code.
+    const resolved = await resolveSession(req)
+    if (resolved.error) {
+      throw httpError(401, { error: 'Sign in to check out.', code: 'SESSION_INVALID' })
+    }
+    const user = resolved.user
+    if (user.role === 'admin') {
       throw httpError(403, { error: "The owner already has every plan.", code: 'PAYMENT_REQUIRED' })
     }
-    if (isDemoCode(code)) {
+    if (user.role === 'demo') {
       throw httpError(403, { error: "The demo space is read-only and can't be upgraded.", code: 'PAYMENT_REQUIRED' })
     }
-    const user = await findUserByCode(code)
-    if (!user) throw httpError(401, { error: "That access code isn't recognized." })
-    if (user.status !== 'active') throw httpError(403, { error: 'This account is disabled.' })
     return { kind: 'member', user }
   }
   const name = String(body.name || '').trim().slice(0, 80)
@@ -246,20 +248,22 @@ async function handleStatus(body, req) {
     if (byIp.limited) return rateLimited(byIp)
   }
 
-  // M2: a signed-in member ALREADY holds their access code in their session —
-  // `status` must never hand it back out over the wire. If a Bearer is
-  // present, require it to be valid (401/403 on an unknown/disabled account,
-  // 403 for the owner/demo who have no code to collect) and suppress the code
-  // from the response entirely.
-  const bearerCode = bearer(req)
+  // M2 (SEC-EPIC-1, #176): a signed-in member ALREADY holds a session —
+  // `status` must never hand their code back out over the wire. If a Bearer
+  // session token is present, require it to be valid (401/403 on an unknown /
+  // disabled account, 403 for the owner/demo who have no code to collect) and
+  // suppress the code from the response entirely.
+  const sessionToken = bearer(req)
   let member = null
-  if (bearerCode) {
-    if (bearerCode === ADMIN_KEY || isDemoCode(bearerCode)) {
+  if (sessionToken) {
+    const resolved = await resolveSession(req)
+    if (resolved.error) {
+      throw httpError(401, { error: 'Sign in to check out.', code: 'SESSION_INVALID' })
+    }
+    if (resolved.user.role === 'admin' || resolved.user.role === 'demo') {
       throw httpError(403, { error: "This account doesn't collect a checkout code.", code: 'PAYMENT_REQUIRED' })
     }
-    member = await findUserByCode(bearerCode)
-    if (!member) throw httpError(401, { error: "That access code isn't recognized." })
-    if (member.status !== 'active') throw httpError(403, { error: 'This account is disabled.' })
+    member = resolved.user
   }
 
   // Deliver the completion response. The access code goes out ONLY to a
@@ -279,9 +283,18 @@ async function handleStatus(body, req) {
       // can never read the code again.
       await saveUser({ ...user, codeDelivered: true })
     }
+    // SEC-EPIC-1 (#176/#177): a brand-new prospect is signed STRAIGHT IN with a
+    // fresh session token — the code is still handed over exactly once (so they
+    // can sign in on another device) but it is never persisted client-side.
+    let session = null
+    if (!member) {
+      const created = await createSession({ userId: user.id, role: user.role || 'member' })
+      session = created.token
+    }
     return json(200, {
       status: 'complete',
       user: publicUser(user),
+      ...(session ? { session } : {}),
       ...(deliverCode ? { code: deliverCode } : {}),
     })
   }

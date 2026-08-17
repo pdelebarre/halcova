@@ -20,6 +20,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../reviews'
+import { sessionTokenFor } from './session-test-helpers'
 
 // In-memory @netlify/blobs registry shared with the module under test.
 const { stores, createStore } = vi.hoisted(() => {
@@ -61,6 +62,9 @@ vi.mock('./postgres', () => ({
 const CODE = 'RU-AAAA-BBBB-CCCC'
 const USER_ID = 'u1'
 const SOURCE_ID = '372469'
+
+// Session token minted per-test on the Blobs backend (SEC-EPIC-1).
+let MEMBER_TOKEN = ''
 
 function seedMember() {
   const identity = stores['runout-identity'] || createStore()
@@ -109,7 +113,7 @@ const review = (overrides = {}) => ({
 })
 
 // `jsonFn` is injectable so a malformed body (json throwing) can be simulated.
-function req(method, path = '', body, auth = `Bearer ${CODE}`, jsonFn) {
+function req(method, path = '', body, auth = `Bearer ${MEMBER_TOKEN}`, jsonFn) {
   return {
     method,
     url: `http://localhost/.netlify/functions/reviews${path}`,
@@ -129,10 +133,13 @@ const downDb = {
   connect: async () => { throw new Error('connection refused') },
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   for (const key of Object.keys(stores)) delete stores[key]
   pgRef.configured = false
   pgRef.db = null
+  // Mint the member session on the Blobs backend (the cached repository stays
+  // blobs here — reviews.js routes on isPostgresConfigured directly).
+  MEMBER_TOKEN = await sessionTokenFor({ userId: USER_ID, role: 'member' })
 })
 
 describe('default export — Postgres → Blobs read-through fallback', () => {
@@ -196,7 +203,7 @@ describe('default export — Postgres → Blobs read-through fallback', () => {
 describe('default export — malformed body and a failing Blobs store', () => {
   it('treats a malformed JSON POST body as an empty body (400 INVALID_KIND, never a 500)', async () => {
     seedMember()
-    const res = await call('POST', '', undefined, `Bearer ${CODE}`, async () => { throw new SyntaxError('bad json') })
+    const res = await call('POST', '', undefined, `Bearer ${MEMBER_TOKEN}`, async () => { throw new SyntaxError('bad json') })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.code).toBe('INVALID_KIND') // empty body → no kind

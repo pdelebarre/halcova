@@ -26,46 +26,53 @@ describe('payment API client (S3)', () => {
     expect(init.headers.Authorization).toBeUndefined()
   })
 
-  it('createCheckout for a signed-in member carries their access code as Bearer', async () => {
-    saveSession({ user: MEMBER, code: 'RU-AAAA-BBBB-CCCC' })
+  it('createCheckout for a signed-in member carries their session token as Bearer', async () => {
+    saveSession({ user: MEMBER, session: 'tok-member-session' })
     global.fetch.mockResolvedValue(res(200, { url: 'https://checkout.stripe.com/c/pay/cs_1', sessionId: 'cs_1' }))
     await payment.createCheckout('premium')
     const [, init] = global.fetch.mock.calls[0]
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe('Bearer tok-member-session')
     expect(JSON.parse(init.body)).toEqual({ action: 'checkout', plan: 'premium' })
   })
 
   it('getCheckoutStatus returns pending and never touches the session', async () => {
-    saveSession({ user: MEMBER, code: 'RU-AAAA-BBBB-CCCC' })
+    saveSession({ user: MEMBER, session: 'tok-member-session' })
     global.fetch.mockResolvedValue(res(200, { status: 'pending' }))
     const out = await payment.getCheckoutStatus('cs_1')
     expect(out).toEqual({ status: 'pending' })
-    expect(getSession()).toEqual({ user: MEMBER, code: 'RU-AAAA-BBBB-CCCC' })
+    expect(getSession()).toEqual({ user: MEMBER, session: 'tok-member-session' })
   })
 
-  it('getCheckoutStatus persists the issued code for a brand-new prospect (complete)', async () => {
-    global.fetch.mockResolvedValue(res(200, { status: 'complete', user: { id: 'u2', plan: 'lifetime' }, code: 'RU-NEWW-NEWW-NEWW' }))
+  it('getCheckoutStatus persists the SESSION (never the code) for a brand-new prospect', async () => {
+    global.fetch.mockResolvedValue(res(200, {
+      status: 'complete',
+      user: { id: 'u2', plan: 'lifetime' },
+      session: 'tok-new-prospect',
+      code: 'RU-NEWW-NEWW-NEWW',
+    }))
     const out = await payment.getCheckoutStatus('cs_1')
     expect(out.status).toBe('complete')
-    expect(getSession()).toEqual({ user: { id: 'u2', plan: 'lifetime' }, code: 'RU-NEWW-NEWW-NEWW' })
+    expect(getSession()).toEqual({ user: { id: 'u2', plan: 'lifetime' }, session: 'tok-new-prospect' })
+    // SEC-1.2 (#177): the one-time code is returned but NEVER persisted.
+    expect(localStorage.getItem('runout.session')).not.toContain('RU-NEWW')
   })
 
-  it('getCheckoutStatus for an existing member (no new code) does NOT wipe their stored code', async () => {
-    saveSession({ user: MEMBER, code: 'RU-AAAA-BBBB-CCCC' })
+  it('getCheckoutStatus for an existing member (no new session) does NOT wipe their stored session', async () => {
+    saveSession({ user: MEMBER, session: 'tok-member-session' })
     global.fetch.mockResolvedValue(res(200, { status: 'complete', user: { ...MEMBER, plan: 'premium' } }))
     const out = await payment.getCheckoutStatus('cs_1')
     expect(out.status).toBe('complete')
-    // The member keeps their existing code — the upgrade only changes the plan.
-    expect(getSession().code).toBe('RU-AAAA-BBBB-CCCC')
+    // The member keeps their existing session — the upgrade only changes the plan.
+    expect(getSession().session).toBe('tok-member-session')
   })
 
-  it('openPortal sends the Bearer code and returns the portal url', async () => {
-    saveSession({ user: MEMBER, code: 'RU-AAAA-BBBB-CCCC' })
+  it('openPortal sends the session token as Bearer and returns the portal url', async () => {
+    saveSession({ user: MEMBER, session: 'tok-member-session' })
     global.fetch.mockResolvedValue(res(200, { url: 'https://billing.stripe.com/session/xyz' }))
     const out = await payment.openPortal()
     expect(out).toEqual({ url: 'https://billing.stripe.com/session/xyz' })
     const [, init] = global.fetch.mock.calls[0]
-    expect(init.headers.Authorization).toBe('Bearer RU-AAAA-BBBB-CCCC')
+    expect(init.headers.Authorization).toBe('Bearer tok-member-session')
     expect(JSON.parse(init.body)).toEqual({ action: 'portal' })
   })
 

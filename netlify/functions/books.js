@@ -13,8 +13,7 @@
 
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, isDemoCode } from './_shared/auth'
-import { findUserByCode } from './_shared/users'
+import { resolveSession } from './_shared/session-auth'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
@@ -63,26 +62,12 @@ const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(bod
 // Digit-only codes (isbn) stay readable and are left unhashed.
 const cacheKey = (prefix, input) => `${prefix}:${createHash('sha256').update(String(input)).digest('hex')}`
 
-// Every request must carry the caller's access code — same contract as
-// collection.js: the admin key counts as the owner, members are resolved by
-// their code (unknown -> 401, disabled -> 403). The code itself is never
-// logged or echoed.
+// Every request must carry a live server-managed session token — same contract
+// as collection.js (SEC-EPIC-1, #176): resolveSession validates it and resolves
+// the owner / demo / member identity (the demo stays ungated for lookups, T6).
+// Unknown/expired/revoked tokens 401, disabled accounts 403. Never logged.
 async function authorize(req) {
-  const code = bearer(req)
-  if (!code) return { error: json(401, { error: 'Sign in with your access code.' }) }
-
-  let user
-  if (code === ADMIN_KEY) {
-    user = { id: OWNER_ID, role: 'admin', status: 'active' }
-  } else if (isDemoCode(code)) {
-    // Lookups must keep working for the demo identity (T6) — never gate them.
-    user = DEMO_USER
-  } else {
-    user = await findUserByCode(code)
-  }
-  if (!user) return { error: json(401, { error: "That access code isn't recognized." }) }
-  if (user.status !== 'active') return { error: json(403, { error: 'This account is disabled.' }) }
-  return { user }
+  return resolveSession(req)
 }
 
 function googleUrl(path, params = {}) {

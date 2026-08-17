@@ -1,23 +1,23 @@
-import { getAccessCode } from '../utils/session'
+import { getSessionToken } from '../utils/session'
 
 // Client for the feedback Netlify function (in-app suggestions + bug reports,
 // epic #74, T4 — issue #77). Mirrors src/api/collection.js / src/api/reviews.js
-// conventions: `Authorization: Bearer <code>` from the session, and the
+// conventions: `Authorization: Bearer <sessionToken>` from the session, and the
 // server's `{ error, code }` unwrapped into a thrown Error on non-200.
 //
-// Members submit (POST); the owner's admin key — also carried by the session
-// code — drives the inbox (GET / PATCH / DELETE).
+// Members submit (POST); the owner's admin session — also carried by the
+// session token — drives the inbox (GET / PATCH / DELETE).
 //
 // Graceful-failure contract (no dark screen): every call fails fast with a
-// NO_TOKEN-coded Error when there is no signed-in code (never a raw network
-// 401), and non-JSON / empty / non-200 responses degrade to a coded Error
-// (or `undefined` for a bodyless 204) instead of an uncaught throw.
+// NO_TOKEN-coded Error when there is no signed-in session token (never a raw
+// network 401), and non-JSON / empty / non-200 responses degrade to a coded
+// Error (or `undefined` for a bodyless 204) instead of an uncaught throw.
 
 const FN_BASE = '/.netlify/functions/feedback'
 
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 function fnUrl(extra = {}) {
@@ -64,9 +64,9 @@ async function handle(res) {
 
 // POST — a member submits a suggestion or bug report. The author is derived
 // server-side from the session; this body only carries the submission fields.
-// Bearer code required. -> 201 { id, … }
+// Session token required. -> 201 { id, … }
 export async function submitFeedback({ type, category, message, url, appVersion } = {}) {
-  if (!getAccessCode()) throw noTokenError()
+  if (!getSessionToken()) throw noTokenError()
   const res = await fetch(fnUrl(), {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -76,18 +76,18 @@ export async function submitFeedback({ type, category, message, url, appVersion 
 }
 
 // GET — the admin inbox, newest first, with optional status/type filters.
-// Admin key required. -> { items } (mapped to [] when absent).
+// Admin session required. -> { items } (mapped to [] when absent).
 export async function listFeedback({ status, type } = {}) {
-  if (!getAccessCode()) throw noTokenError()
+  if (!getSessionToken()) throw noTokenError()
   const res = await fetch(fnUrl({ status, type }), { headers: authHeaders() })
   const data = await handle(res)
   return Array.isArray(data?.items) ? data.items : []
 }
 
 // PATCH — admin triage: update `status` and/or `adminNote`. Only the fields
-// the caller provides are sent. Admin key required. -> the updated item.
+// the caller provides are sent. Admin session required. -> the updated item.
 export async function updateFeedback({ id, status, adminNote } = {}) {
-  if (!getAccessCode()) throw noTokenError()
+  if (!getSessionToken()) throw noTokenError()
   const body = { id }
   if (status !== undefined) body.status = status
   if (adminNote !== undefined) body.adminNote = adminNote
@@ -99,10 +99,10 @@ export async function updateFeedback({ id, status, adminNote } = {}) {
   return handle(res)
 }
 
-// DELETE — admin removes a feedback entry. Admin key required. -> 204
+// DELETE — admin removes a feedback entry. Admin session required. -> 204
 // (resolves to `undefined`; unknown id rejects with the server's 404).
 export async function deleteFeedback(id) {
-  if (!getAccessCode()) throw noTokenError()
+  if (!getSessionToken()) throw noTokenError()
   const res = await fetch(fnUrl({ id }), { method: 'DELETE', headers: authHeaders() })
   return handle(res)
 }

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as discogs from './discogs'
 import { saveSession } from '../utils/session'
 
-const CODE = 'RU-XXXX-XXXX-XXXX'
+const SESSION_TOKEN = 'tok-discogs-session-abc123'
 
 function okJson(data) {
   return { ok: true, status: 200, json: async () => data }
@@ -14,7 +14,7 @@ function errorJson(status, body = {}) {
 
 beforeEach(() => {
   localStorage.clear()
-  saveSession({ user: { id: 'u42' }, code: CODE })
+  saveSession({ user: { id: 'u42' }, session: SESSION_TOKEN })
   global.fetch = vi.fn()
 })
 
@@ -36,7 +36,7 @@ describe('searchByBarcode', () => {
     expect(url.pathname).toBe('/.netlify/functions/discogs')
     expect(url.searchParams.get('action')).toBe('searchBarcode')
     expect(url.searchParams.get('barcode')).toBe('07464405491')
-    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${CODE}` })
+    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${SESSION_TOKEN}` })
 
     expect(results).toHaveLength(1)
     expect(results[0]).toMatchObject({
@@ -123,7 +123,7 @@ describe('searchByText', () => {
     expect(url.pathname).toBe('/.netlify/functions/discogs')
     expect(url.searchParams.get('action')).toBe('searchText')
     expect(url.searchParams.get('q')).toBe('blah')
-    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${CODE}` })
+    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${SESSION_TOKEN}` })
     expect(out[0].barcode).toBe('')
   })
 })
@@ -145,7 +145,7 @@ describe('getReleaseDetail', () => {
     expect(url.pathname).toBe('/.netlify/functions/discogs')
     expect(url.searchParams.get('action')).toBe('release')
     expect(url.searchParams.get('id')).toBe('101')
-    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${CODE}` })
+    expect(global.fetch.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${SESSION_TOKEN}` })
   })
 
   it('defaults missing tracklist and images', async () => {

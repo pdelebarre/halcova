@@ -23,8 +23,9 @@
 //   and never ships to the client; RUNOUT_DEMO_CODE is public by design).
 
 import { getStore } from '@netlify/blobs'
-import { ADMIN_KEY, DEMO_USER, bearer } from './_shared/auth'
+import { DEMO_USER } from './_shared/auth'
 import { json } from './_shared/collection-store'
+import { requireAdmin } from './_shared/session-auth'
 import { DEMO_RECORDS, DEMO_BOOKS, seedDemoStore } from './_shared/demo-data'
 import { storeNameFor } from './_shared/users'
 
@@ -33,9 +34,10 @@ import { storeNameFor } from './_shared/users'
 // uses, so the demo always shows the same fixed set). Harmless to re-run — it
 // skips a kind whose store index is already non-empty.
 export default async (req) => {
-  if (bearer(req) !== ADMIN_KEY) {
-    return json(401, { error: 'Admin key required. Set RUNOUT_ADMIN_KEY and sign in as the owner.' })
-  }
+  // SEC-1.6 (#181): authorize by the session's role (the owner's admin
+  // session), never by re-checking a bearer string against ADMIN_KEY.
+  const admin = await requireAdmin(req)
+  if (admin.error) return admin.error
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
 
   const records = await seedDemoStore(getStore(storeNameFor(DEMO_USER.id, 'records')), DEMO_RECORDS)

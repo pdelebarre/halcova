@@ -44,7 +44,7 @@ const PUBLISHED = [MINE, OTHER]
 
 beforeEach(() => {
   vi.clearAllMocks()
-  saveSession({ user: { id: 'u1', name: 'Miles' }, code: 'RU-AAAA-BBBB-CCCC' })
+  saveSession({ user: { id: 'u1', name: 'Miles' }, session: 'tok-reviews-session-abc123' })
   api.listReviews.mockResolvedValue({ reviews: PUBLISHED, aggregate: { avg: 4.5, count: 2 }, mine: MINE })
 })
 

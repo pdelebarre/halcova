@@ -1,9 +1,9 @@
-import { getAccessCode } from '../utils/session'
+import { getSessionToken } from '../utils/session'
 import { proxyCoverUrl } from '../utils/cover'
 
 // Books are looked up through the server-side Google Books proxy, which owns
 // request building (country, etc.) and caches responses in Blobs. The browser
-// just calls the function with the signed-in user's access code. Items are
+// just calls the function with the signed-in user's session token. Items are
 // normalized into the same shape the app uses for records ("Author - Title",
 // year, label=publisher, barcode=ISBN, etc.) so the shared grid/detail/
 // duplicate-detection code works for both.
@@ -16,8 +16,8 @@ const ERROR_MESSAGES = {
 }
 
 function authHeaders() {
-  const code = getAccessCode()
-  return code ? { Authorization: `Bearer ${code}` } : {}
+  const token = getSessionToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 async function booksFetch(action, params = {}) {

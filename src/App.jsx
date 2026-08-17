@@ -16,7 +16,7 @@ import * as authApi from './api/auth'
 import * as paymentApi from './api/payment'
 import * as collectionApi from './api/collection'
 import { useAuth } from './hooks/useAuth'
-import { getAccessCode } from './utils/session'
+import { getSessionToken } from './utils/session'
 import { isOverdue } from './utils/lending'
 import { t } from './i18n'
 import './App.css'
@@ -170,7 +170,7 @@ export default function App() {
       .then((user) => {
         if (cancelled) return
         stripUrlParam('magic-link')
-        setSession({ user, code: getAccessCode() })
+        setSession({ user, session: getSessionToken() })
       })
       .catch(() => {
         if (cancelled) return
@@ -214,7 +214,7 @@ export default function App() {
           const data = await paymentApi.getCheckoutStatus(sessionId)
           if (data?.status === 'complete') {
             const nextUser = data.user || sessionRef.current?.user
-            if (nextUser) setSession({ user: nextUser, code: getAccessCode() })
+            if (nextUser) setSession({ user: nextUser, session: getSessionToken() })
             await refresh()
             paid = true
           }

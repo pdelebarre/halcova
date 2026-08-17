@@ -188,7 +188,10 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
 
     const { status, body } = await call({ action: 'verifyMagicLink', token: validToken('ada@example.com') })
     expect(status).toBe(200)
-    expect(body.code).toMatch(/^RU-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)
+    // SEC-EPIC-1 (#176/#177): the response is { user, session } — an opaque
+    // session token, never the access code.
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect(body).not.toHaveProperty('code')
     // Self-serve members start on the free tier with both collections and no
     // manual feature flags (no lending).
     expect(body.user).toMatchObject({
@@ -199,15 +202,15 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
       collections: { records: true, books: true },
       features: {},
     })
-    // The code lives ONLY at the top level, exactly once — never inside the
-    // public user object.
+    // The code is never inside the public user object either.
     expect(body.user).not.toHaveProperty('code')
     expect(body.user).not.toHaveProperty('stripeCustomerId')
 
-    // The issued code matches the stored member, and the request flipped.
+    // The member was created with a freshly-issued RU- code (stored, never
+    // returned again), and the request flipped to approved.
     const users = await listUsers()
     expect(users).toHaveLength(1)
-    expect(users[0].code).toBe(body.code)
+    expect(users[0].code).toMatch(/^RU-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)
     expect((await listRequests())[0].status).toBe('approved')
   })
 
@@ -223,8 +226,8 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
 
     const { status, body } = await call({ action: 'verifyMagicLink', token: validToken('ada@example.com') })
     expect(status).toBe(200)
-    expect(body.code).toMatch(/^RU-/)
-    expect(body.code).not.toBe(RETURNING.code)
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect(body).not.toHaveProperty('code')
     // Plan + collections + billing fields survive the rotation.
     expect(body.user.plan).toBe('premium')
     expect(body.user.collections).toEqual({ records: true, books: false })
@@ -233,13 +236,15 @@ describe('verifyMagicLink — self-serve signup round-trip (#59)', () => {
     // Exactly one account — no duplicate.
     const users = await listUsers()
     expect(users).toHaveLength(1)
-    expect(users[0].code).toBe(body.code)
+    expect(users[0].code).toMatch(/^RU-/)
+    expect(users[0].code).not.toBe(RETURNING.code)
     // The OLD code stops working; the NEW one signs in (rotation semantics).
     const oldLogin = await call({ action: 'login', code: 'RU-OLD-OLD-OLD' })
     expect(oldLogin.status).toBe(401)
-    const newLogin = await call({ action: 'login', code: body.code })
+    const newLogin = await call({ action: 'login', code: users[0].code })
     expect(newLogin.status).toBe(200)
     expect(newLogin.body.user.id).toBe('u-member')
+    expect(newLogin.body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
   })
 
   it('never re-enables a disabled member (403) and does not rotate their code', async () => {
@@ -299,7 +304,8 @@ describe('end-to-end: request → click the devLink → session', () => {
     const { status, body } = await call({ action: 'verifyMagicLink', token })
     expect(status).toBe(200)
     expect(body.user.email).toBe('ada@example.com')
-    expect(body.code).toMatch(/^RU-/)
+    expect(body.session).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect(body).not.toHaveProperty('code')
     // The request used for the checkout identity is now approved.
     expect((await listRequests())[0].status).toBe('approved')
   })

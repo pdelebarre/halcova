@@ -7,6 +7,7 @@
 // function can switch backends transparently.
 
 import * as blobUsers from './blob-users'
+import * as blobSessions from './blob-sessions'
 import { createFeedbackBlobStore } from '../feedback-blob'
 
 // A lazy facade over the shared `runout-feedback` store. The underlying store
@@ -31,6 +32,13 @@ export function createBlobRepository() {
   return {
     backend: 'blobs',
     feedback: lazyFeedback(),
+    sessions: {
+      getByTokenHash: blobSessions.getSessionByTokenHash,
+      save: blobSessions.saveSession,
+      revokeByTokenHash: blobSessions.revokeSessionByTokenHash,
+      revokeAllForUser: blobSessions.revokeAllForUser,
+      deleteAllForUser: blobSessions.deleteAllForUser,
+    },
     users: {
       listUsers: blobUsers.listUsers,
       getUser: blobUsers.getUser,

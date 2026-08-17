@@ -20,7 +20,7 @@ const MEMBER = {
   role: 'member',
   collections: { records: true, books: false },
 }
-const SESSION = { user: MEMBER, code: 'RU-AAAA-BBBB-CCCC' }
+const SESSION = { user: MEMBER, session: 'tok-session-abc123' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -70,9 +70,9 @@ describe('useAuth.refresh', () => {
       await result.current.refresh()
     })
 
-    // The refreshed profile replaced the stale cached one; the code survived.
+    // The refreshed profile replaced the stale cached one; the token survived.
     expect(result.current.session.user.plan).toBe('premium')
-    expect(result.current.session.code).toBe('RU-AAAA-BBBB-CCCC')
+    expect(result.current.session.session).toBe('tok-session-abc123')
   })
 
   it('revalidates the cached session on mount when me() resolves a user', async () => {
@@ -84,7 +84,7 @@ describe('useAuth.refresh', () => {
 
     // The startup revalidation pulled the freshest plan into the session.
     expect(result.current.session.user.plan).toBe('lifetime')
-    expect(result.current.session.code).toBe('RU-AAAA-BBBB-CCCC')
+    expect(result.current.session.session).toBe('tok-session-abc123')
   })
 
   it('signs the user out on logout', async () => {
