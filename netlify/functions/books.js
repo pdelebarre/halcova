@@ -17,7 +17,7 @@ import { resolveSession } from './_shared/session-auth'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
-import { json, safeError, securityHeaders } from './_shared/security'
+import { json, safeError } from './_shared/security'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -57,13 +57,6 @@ const TTL_MS = {
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 const BOOKS_USER_LIMIT = Number(process.env.RUNOUT_BOOKS_RATE_LIMIT) || 60
 const BOOKS_OVERALL_LIMIT = Number(process.env.RUNOUT_BOOKS_OVERALL_RATE_LIMIT) || 300
-
-// Keep the `json` name used throughout this file, but with security headers
-// applied (SEC-3.4, #197).
-const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...securityHeaders(), ...headers },
-})
 
 // Blob keys are character/length restricted, and free-text user input can't be
 // trusted to stay inside them — hash `q` and `detail` into a fixed-size hex

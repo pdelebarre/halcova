@@ -9,7 +9,7 @@ import { resolveSession } from './_shared/session-auth'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
-import { json, safeError, securityHeaders } from './_shared/security'
+import { json, safeError } from './_shared/security'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 // Discogs policy requires a User-Agent header on every request.
@@ -42,13 +42,6 @@ const TTL = {
   q: 1 * DAY,        // text search drifts as new releases appear
   release: 30 * DAY, // release details are stable
 }
-
-// Keep the `json` name used throughout this file, but with security headers
-// applied (SEC-3.4, #197).
-const json = (statusCode, body, headers = {}) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...securityHeaders(), ...headers },
-})
 
 // Same contract as collection.js (SEC-EPIC-1, #176): every request carries a
 // live server-managed session token. resolveSession validates it and resolves

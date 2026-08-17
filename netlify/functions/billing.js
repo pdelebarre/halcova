@@ -34,7 +34,7 @@ import {
 } from './_shared/users'
 import { applyEntitlement, materializeCheckoutSession } from './_shared/entitlements'
 import { generateAccessCode } from './_shared/auth'
-import { json, securityHeaders } from './_shared/security'
+import { json } from './_shared/security'
 import { logAudit, safeLog } from './_shared/audit'
 import { recordAnomaly } from './_shared/anomaly'
 
@@ -52,12 +52,6 @@ const KNOWN_EVENT_TYPES = new Set([
   'customer.subscription.deleted',
   'invoice.payment_failed',
 ])
-
-// Webhook JSON responder with the security headers applied (SEC-3.4, #197).
-const json = (statusCode, body) => new Response(JSON.stringify(body), {
-  status: statusCode,
-  headers: { 'Content-Type': 'application/json', ...securityHeaders() },
-})
 
 // The same dependency set the payment.js reconcile path uses — both build the
 // shared materializer from the same repository facade so they can never drift
