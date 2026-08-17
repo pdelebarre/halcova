@@ -8,7 +8,8 @@
 // write audit events to Netlify Blobs: retention there is unmanaged and it
 // would mix security signals into a user-data store; a structured log line is
 // cheap, has no PII-retention cost, and is what a future SIEM drain would
-// consume anyway. See docs/technical.md § 13.5 for the policy.
+// consume anyway. See docs/technical.md § 13.5 for the policy and
+// docs/security-runbook.md for how `anomaly` events drive incident response.
 //
 // Security rules (non-negotiable):
 //   - NEVER include access codes, session tokens, the admin key, Stripe

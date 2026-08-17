@@ -694,6 +694,74 @@ otherwise), which is the CSRF defense for a header-based token flow. This is
 asserted by negative tests in `auth-endpoint.test.js` (no `Set-Cookie` is ever
 issued; a forged cross-site Origin with no Bearer is 401).
 
+### 13.5 Secret/PII-safe logging & audit events (SEC-6.4 #218 / SEC-6.5 #219)
+
+**Logging policy.** Function logs must NEVER contain:
+
+- access codes (`RU-XXXX-XXXX-XXXX`), session tokens, or `localStorage` sessions,
+- the admin key (`RUNOUT_ADMIN_KEY`) or any magic-link token,
+- Stripe secrets (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, restricted keys)
+  or raw webhook bodies,
+- passwords / bearer headers, or
+- private collection contents (items, lending borrower contact).
+
+What IS safe to log: a user id, a request id, an event type, a generic status,
+and an **email-hash** (sha256 of the normalized email — never the raw address).
+Billing ids (Stripe customer/subscription/checkout ids) are server-only and may
+appear in audit events but must never reach a client response.
+
+**Enforcement helpers** (`netlify/functions/_shared/audit.js`):
+
+- `redactString(value)` scrubs known secret patterns (codes, Stripe keys,
+  bearer/long tokens, emails) from any free-text value.
+- `redactFields(obj)` DROPS secret-keyed fields (`code`, `token`, `secret`,
+  `password`, `authorization`, raw `email`/`name`, …) and recurses, so a caller
+  can't accidentally leak a field by naming it.
+- `safeLog(level, message, extra)` logs a redacted line — use it instead of
+  bare `console.log/error` wherever a value might be untrusted.
+- `emailHash(email)` is the only email-derived value allowed in a log.
+- `logAudit(type, fields)` emits one structured, redacted `AUDIT <json>` line
+  (see § 13.6).
+
+**Audit-event sink decision.** Events are emitted as a single structured JSON
+line with a stable `AUDIT ` prefix to the Netlify function log (greppable and
+drainable) — the pragmatic option at this scale. We deliberately do NOT write
+audit events to Netlify Blobs: retention there is unmanaged and it would mix
+security signals into a user-data store. The one deliberate dev exception is
+the mailer's dev no-op link echo (`[mailer:dev] magic-link for ${email}: ${link}`)
+— it is gated to `NODE_ENV !== 'production'` (or an explicit `RUNOUT_DEV_EMAIL=1`)
+and never fires in production, where a missing key fails closed instead.
+
+### 13.6 Security audit events & anomaly detection (SEC-6.4 #218 / SEC-6.6 #220)
+
+**Emitted audit event types** (all secret-safe; a user id + optional email-hash
+only):
+
+- `auth.login_failed` / `auth.login_success` / `auth.session_invalid` /
+  `auth.logout` / `auth.logout_all`
+- `admin.approve` / `admin.reject` / `admin.update_user` / `admin.rotate` /
+  `admin.delete_user`
+- `webhook.invalid_signature` / `webhook.unknown_event_type` /
+  `webhook.processing_failed` / `webhook.not_configured` / `billing.payment_failed`
+- `payment.checkout_created` / `payment.status` / `payment.portal_opened`
+- `anomaly.*` (SEC-6.6) — emitted by the burst detector
+
+**Anomaly detection** (`netlify/functions/_shared/anomaly.js`, SEC-6.6 #220) is
+a lightweight, dependency-free fixed-window burst counter, not a full SIEM. It
+counts a signal in a 60s window and emits one `anomaly` audit event per window
+per signal when a threshold is crossed. Wired into:
+
+- auth login failures per-IP (`auth_failure_burst`, threshold 10),
+- webhook invalid signatures (`webhook_invalid_signature_burst`, threshold 5),
+- admin authorization denials per-IP (`admin_denial_burst`, threshold 10).
+
+**How alerts surface.** The `AUDIT` lines land in Netlify function logs for
+every deploy. To alert, either (a) use Netlify's log drain / a log-shipping
+integration to forward function logs and build a query for `"type":"anomaly"`,
+or (b) add a Netlify deploy-hook / notification channel that fires on a
+log-query match for `anomaly` events. A full runbook for responding is in
+`docs/security-runbook.md`.
+
 ---
 
 ## 14. Tooling & scripts
