@@ -1,0 +1,219 @@
+{
+  "schemaVersion": "1.0",
+  "pack": "foundations",
+  "name": "Halcova Library — Foundations pack (starter)",
+  "description": "Genre origins (T4), era snapshots (T3), and label/publisher lore (T5) with the highest hit-rate per entry. This is the working template for the Core 500 bank — compact on purpose.",
+  "locale": "en",
+  "coverage": {
+    "model": "Foundations match any item in a matched genre/label/year band, so hit-rate per entry is high; per-artist T1/T2/T6/T7 packs close the remaining gap.",
+    "betaNote": "Validate the ~50–70% item-coverage estimate on a typical mixed 40-item collection before international launch (lore-layer-plan.md §8)."
+  },
+  "entries": [
+    {
+      "id": "F-0001",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "The blues grew out of African-American work songs, spirituals, and field hollers in the Deep South in the late 19th and early 20th centuries. W.C. Handy's 'Memphis Blues' (1912) is among the first blues compositions to reach print and helped carry the blues to a national audience.",
+        "voice": "Before vinyl, the blues lived in the field and the church. Then W.C. Handy wrote one down — and it never went back."
+      },
+      "matchKeys": { "artist": ["W.C. Handy"], "title": ["Memphis Blues"], "label": [], "genre": ["Blues"], "year": 1912 },
+      "flags": ["FACT"],
+      "sources": ["S-0001", "S-0002"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0002",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "The phrase 'rock and roll' appears in blues records as early as the 1920s (e.g. 'My Man Rocks Me (With One Steady Roll)', 1922). Cleveland disc jockey Alan Freed is widely credited with popularizing the term for the new genre in the early 1950s.",
+        "voice": "The words are older than the genre — by the time Alan Freed put them on the radio, they'd been swinging around in blues lyrics for decades."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": [], "genre": ["Rock and roll", "Rock"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0003", "S-0004"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0003",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Historians still argue over the 'first rock and roll record'. The most frequently named candidate is 'Rocket 88' (1951), credited to Jackie Brenston with Ike Turner's Kings of Rhythm, recorded at Sam Phillips' Memphis studio — but other sources make the case for earlier R&B tracks or Elvis Presley's 'That's All Right' (1954). The uncontested core: several early-1950s records share the claim.",
+        "voice": "Ask three historians which record started rock and roll and you'll get four answers. The crate doesn't care — it owns them all."
+      },
+      "matchKeys": { "artist": ["Jackie Brenston", "Ike Turner", "Elvis Presley"], "title": ["Rocket 88", "That's All Right"], "label": [], "genre": ["Rock and roll", "Rock", "R&B"], "year": [1951, 1954] },
+      "flags": ["FACT", "DISPUTED"],
+      "sources": ["S-0005", "S-0006"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0004",
+      "taxonomy": "T4",
+      "kind": "records",
+      "fact": {
+        "text": "Jazz developed in New Orleans in the early 20th century, blending blues, ragtime, brass-band, and Creole traditions. The first jazz recordings were made in 1917 by the Original Dixieland Jass Band ('Livery Stable Blues')."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": [], "genre": ["Jazz", "Dixieland"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0007", "S-0008"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0005",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Blue Note Records was founded in 1939 in New York by Alfred Lion (with Max Margulis); photographer Francis Wolff joined in 1941. Lion and Wolff together shaped the label's signature hard-bop sound and its iconic covers.",
+        "voice": "Two Berlin-born friends, one tiny label, and the most photographed record sleeves in jazz."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": ["Blue Note"], "genre": ["Jazz", "Hard Bop", "Soul Jazz"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0009", "S-0010"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0006",
+      "taxonomy": "T5",
+      "kind": "records",
+      "fact": {
+        "text": "Motown Record Corporation was founded by Berry Gordy in Detroit in 1959; the name comes from 'Motor Town'. The Miracles' 'Shop Around' (1960) became one of Motown's first million-sellers."
+      },
+      "matchKeys": { "artist": ["The Miracles", "Berry Gordy"], "title": ["Shop Around"], "label": ["Motown", "Tamla", "Gordy"], "genre": ["Soul", "R&B", "Pop"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0011", "S-0012"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0007",
+      "taxonomy": "T3",
+      "kind": "records",
+      "fact": {
+        "text": "Columbia introduced the 12-inch long-playing record (LP) in 1948; RCA Victor introduced the 45 rpm single in 1949. Those two formats defined the record store — and the crate — for the next five decades.",
+        "voice": "Two speeds, one destiny: the LP for the deep listen, the 45 for the hit. Your crate is just their reunion."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": [], "genre": [], "year": [1948, 1949] },
+      "flags": ["FACT"],
+      "sources": ["S-0013", "S-0014"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0008",
+      "taxonomy": "T3",
+      "kind": "records",
+      "fact": {
+        "text": "The Sex Pistols' 'Never Mind the Bollocks, Here's the Sex Pistols' (released October 1977) was the band's only studio album and a cornerstone of the punk movement in the UK.",
+        "voice": "One album, one middle finger, one genre reshaped. The shelf has never been the same since."
+      },
+      "matchKeys": { "artist": ["Sex Pistols"], "title": ["Never Mind the Bollocks, Here's the Sex Pistols"], "label": ["Virgin"], "genre": ["Punk", "Punk Rock"], "year": 1977 },
+      "flags": ["FACT", "CULT"],
+      "sources": ["S-0015", "S-0016"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0009",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "Edgar Allan Poe's 'The Murders in the Rue Morgue' (1841) is widely credited as the first modern detective story, introducing the analytical detective and the locked-room mystery."
+      },
+      "matchKeys": { "artist": ["Edgar Allan Poe"], "title": ["The Murders in the Rue Morgue"], "label": [], "genre": ["Mystery", "Detective", "Classic"], "year": 1841 },
+      "flags": ["FACT"],
+      "sources": ["S-0017", "S-0018"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0010",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "Mary Shelley's 'Frankenstein' (1818) is frequently cited as one of the earliest works of science fiction, though scholars also credit later writers such as H.G. Wells. The label 'science fiction' itself was popularized by Hugo Gernsback in the 1920s.",
+        "voice": "A ghost-story contest in a rainy Swiss villa, an 18-year-old author, and arguably the first science-fiction novel. Some shelves are born legendary."
+      },
+      "matchKeys": { "artist": ["Mary Shelley", "H.G. Wells", "Jules Verne"], "title": ["Frankenstein", "The Time Machine", "Twenty Thousand Leagues Under the Seas"], "label": [], "genre": ["Science Fiction", "Gothic", "Classic"], "year": [1818, 1895] },
+      "flags": ["FACT"],
+      "sources": ["S-0019", "S-0020"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0011",
+      "taxonomy": "T5",
+      "kind": "books",
+      "fact": {
+        "text": "Penguin Books was founded by Allen Lane in London in 1935. Its first ten sixpenny paperbacks — with the now-iconic orange covers — are credited with starting the paperback revolution and making good books affordable.",
+        "voice": "In 1935 a publisher decided a good book should cost the same as a packet of cigarettes. The paperback never looked back."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": ["Penguin", "Penguin Books", "Penguin Classics"], "genre": ["Classic", "Literature", "Fiction"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0021", "S-0022"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0012",
+      "taxonomy": "T5",
+      "kind": "books",
+      "fact": {
+        "text": "Everyman's Library was founded in 1906 by publisher J.M. Dent in London, with the aim of making the classics affordable to 'everyman' — the motto that still names the imprint."
+      },
+      "matchKeys": { "artist": [], "title": [], "label": ["Everyman's Library", "Everyman"], "genre": ["Classic", "Literature"], "year": null },
+      "flags": ["FACT"],
+      "sources": ["S-0023", "S-0024"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0013",
+      "taxonomy": "T3",
+      "kind": "books",
+      "fact": {
+        "text": "Johannes Gutenberg introduced movable-type printing in Europe in the mid-15th century. The Gutenberg Bible (c. 1455) is the earliest major book printed with movable type; around 180 copies were made.",
+        "voice": "Before Gutenberg, a library was a luxury for kings. After him, it became something you could fill — and your shelf is the proof."
+      },
+      "matchKeys": { "artist": [], "title": ["Gutenberg Bible"], "label": [], "genre": ["History", "Religion", "Classic"], "year": 1455 },
+      "flags": ["FACT"],
+      "sources": ["S-0025", "S-0026"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0014",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "Astérix, by writer René Goscinny and artist Albert Uderzo, first appeared in October 1959 in the first issue of the French comics magazine Pilote. It is one of the best-selling comic series in the world.",
+        "voice": "Le petit Gaulois arrived in 1959 with a magic potion and a healthy disrespect for Rome — and French shelves never looked back."
+      },
+      "matchKeys": { "artist": ["René Goscinny", "Albert Uderzo"], "title": ["Astérix le Gaulois", "Asterix the Gaul"], "label": [], "genre": ["Comics", "Graphic Novels", "Humor"], "year": 1959 },
+      "flags": ["FACT", "CULT"],
+      "sources": ["S-0027", "S-0028"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    },
+    {
+      "id": "F-0015",
+      "taxonomy": "T4",
+      "kind": "books",
+      "fact": {
+        "text": "Will Eisner's 'A Contract with God' (1978) is widely credited with popularizing the term 'graphic novel' in the English-speaking world, though the term appears in print before that date and the 'first graphic novel' title is itself contested. The uncontested core: Eisner's book reframed how comics could be sold and shelved.",
+        "voice": "A 60-something cartoonist decided a comic could be a novel. Bookshops have been rearranging their shelves ever since."
+      },
+      "matchKeys": { "artist": ["Will Eisner"], "title": ["A Contract with God"], "label": ["Baronet"], "genre": ["Graphic Novels", "Comics"], "year": 1978 },
+      "flags": ["VALIDATE", "DISPUTED"],
+      "sources": ["S-0029", "S-0030"],
+      "lastVerified": "2026-08-17",
+      "verifiedBy": "Marketing Manager"
+    }
+  ]
+}

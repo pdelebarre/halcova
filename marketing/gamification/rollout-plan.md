@@ -8,6 +8,15 @@ incrementally shippable sequence with owners, gates, and exit criteria.
 **Branch:** `feat/gamification` · **Owner:** Project Manager
 **Target kind:** shared flow (records + books), parameterized per catalog.
 
+> **Pivot (2026-08-17, signed off):** the suite is **contents-first**. Games
+> play what you own — artists, stories, historical context, anecdotes — never
+> *when* you added it. The `dateAdded`-trivia mechanics below (Newest/Oldest
+> quiz, add-date reveal, Impulse Buyer, add-streak, scan-recent quest) are
+> **retired**; the content source is Phase-A blob enrichment + the precached
+> Halcova Library (see `lore-layer-plan.md`). `requirements.md` §4/§5bis/§11 and
+> `concept.md` are the authoritative post-pivot spec; this plan's F-rows below
+> are retained as the historical audit of the original proposal.
+
 ---
 
 ## 1. How to read this
@@ -35,14 +44,15 @@ client-side:
 | Format mix, Variant Hoarder | `formatType`, duplicate detection | ⚠️ `formatType` not in documented shape |
 | Country mix, Sophisticate | `country`, `style` | ⚠️ likely absent |
 | Page Counter, Series Starter | `pageCount` | ⚠️ likely absent |
-| Newest/Oldest quiz, streak days, Impulse Buyer | `dateAdded` | ⚠️ not in documented shape |
+| Newest/Oldest quiz, streak days, Impulse Buyer | `dateAdded` | ⚠️ not in documented shape — **retired** by the contents-first pivot (no dateAdded trivia) |
 | "Your notes say…" reveal, Notes quest, Sleeve Sleuth | `notes` | ⚠️ `[VALIDATE]` #7 |
 | Lending quests | lending records queryable client-side | ⚠️ `[VALIDATE]` #4 |
 
 **F-2 — no event log.** XP idempotency and the "Impulse Buyer" badge ("10 added
-in a day") assume an event log or a `dateAdded` timestamp. If neither exists, XP
-can only be derived from current item state and streaks become impossible
-(`[VALIDATE]` #2).
+in a day") assume an event log or a `dateAdded` timestamp. **Resolved by the
+pivot:** the Impulse Buyer badge is cut, so no event log / `dateAdded` bucketing
+is needed — XP/levels/badges/streaks derive idempotently from current item state
++ the client gameplay ledger (`requirements.md` §7.2, §11.2).
 
 **F-3 — measurement assumes an analytics layer.** The `gamif_*` funnel events in
 `requirements.md` §9 assume an existing client event hook. Without one, the
@@ -91,6 +101,12 @@ Turn F-1…F-3 into a signed-off data-availability matrix before any UI work.
 
 ### Phase 1 — "Know & Play" *(sliced into four shippable releases)*
 
+> **Content layer first.** Per the pivot, releases 1.1–1.4 depend on Phase A
+> (blob enrichment of the stored item — stable ids, tracklist, series, synopsis)
+> and Phase B (precached Halcova Library + `lookupLore()`) as the offline,
+> contents-first content source (`requirements.md` §5bis). Release 1.1 includes
+> the Phase-A enrichment commit; the lore bank ships with release 1.3/1.4.
+
 **1.1 Persona + share card** — the single most shareable artifact; proves the
 loop and the virality hook with the smallest surface.
 - Pure `src/utils/persona.js` (mirrors `match.js`, unit-tested) + one card
@@ -106,9 +122,15 @@ ritual yet.
   Buyer without an event log).
 
 **1.3 Crate Quiz + streaks** — the daily retention engine, the biggest slice.
-- `src/utils/quiz.js` (pure, seeded by local day), question pools skip items
-  missing `coverImage`/`year`, locked state for <3 items, 1-day grace streak.
-- Depends on the Phase-0 streak-day-boundary decision.
+- `src/utils/quiz.js` (pure, seeded by local day), metadata-core question pools
+  skip items missing `coverImage`/`year`, locked state for <3 items, 1-day grace
+  streak. **Contents-first:** `newestOrOldest` and the add-date reveal are
+  removed; content games (`coverMemory`, `spotImpostor`, `labelPressMatch`,
+  `numbersGame`, `genreOddOneOut`, `trackDetective`, `blurbMatch`, `loreFact`,
+  `yearContext`, `connection`) deal only when Phase-A/B material exists, and the
+  miss-reveal teaches a lore fact + notes (never the add date).
+- Depends on the Phase-0 streak-day-boundary decision and on Phase A (blob
+  enrichment) + Phase B (precached Halcova Library) shipping first (§5bis).
 
 **1.4 Shelf Stories** — facts tier first (deterministic, provably derived);
 recommendations/era lessons tier only after Phase 0 confirms the data they need.
