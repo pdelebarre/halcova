@@ -29,6 +29,14 @@ jobs:
         run: npm run test:coverage
         continue-on-error: true
 
+      # Advisory dependency scan (SEC-EPIC-5, #208) — report-only, never blocks.
+      # npm install above generates a transient lockfile for the audit to read.
+      - name: npm audit (advisory, non-blocking)
+        run: |
+          npm audit --audit-level=high \
+            || echo "::warning::npm audit found high/critical vulnerabilities — advisory only, does not block merges"
+        continue-on-error: true
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:

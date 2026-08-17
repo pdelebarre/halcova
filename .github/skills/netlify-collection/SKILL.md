@@ -67,3 +67,21 @@ Netlify function. There is no database to provision.
   appear empty.
 - Never log access codes or the admin key; use `publicUser` before sending a
   user to the client.
+
+## Security requirements (checklist)
+
+Verify before merging a collection-backend change:
+
+- [ ] **Auth on every request** — `authorize(req)` runs before any work on
+      every method; no endpoint path bypasses it.
+- [ ] **Authorization** — plan enforcement (403) and disabled-member handling
+      are covered by negative tests, not just happy-path tests.
+- [ ] **Store isolation** — `storeNameFor` keeps member stores isolated per
+      kind; no cross-account read/write path (IDOR).
+- [ ] **Cache scope** — the collection API is never client-cached (no service
+      worker runtime rule) and server caching is limited to the intended
+      Netlify Blobs behavior.
+- [ ] **Logout cleanup** — signed-out sessions cannot read cached or local
+      collection data; revalidation clears stale sessions.
+- [ ] **Secrets** — no access codes / admin keys logged or returned; use
+      `publicUser`.

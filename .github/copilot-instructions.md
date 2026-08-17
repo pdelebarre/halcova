@@ -50,6 +50,11 @@ Blobs.
 - **Never leak secrets**: don't log access codes or the admin key; strip the
   `code` field before sending users to the client (`publicUser` in
   `netlify/functions/_shared/auth.js`).
+- **Mandatory security gate**: any change touching auth, authorization, user
+  data, payments, storage, caching, external APIs, or databases requires
+  threat modeling + negative security tests and a `Security Auditor` (or
+  `Multi-tenant Security` for tenant isolation) review before it is declared
+  done (see `.github/ai/README.md`).
 
 ## Branching & Version Control
 
