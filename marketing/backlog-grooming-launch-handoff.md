@@ -15,6 +15,7 @@
 2. **The real launch gates are NOT in the backlog** — they were marketing-doc open items. Three were created today as tickets: **#119** (icon with barcode), **#120** (legal/domain/handles), **#121** (landing page + Request access + UTM/analytics). These are the true P0s.
 3. **Three gamification tickets were shipped but never closed** — #45, #50, #44 shipped in PR #62 (merged 2026-08-14). Closed in this grooming pass; epic #43's remaining work is #47 (Phase 2) and #49 (Phase 3).
 4. **Phase 1–2 of the campaign are name-free and safe to run now** — the app does not need a public URL until Phase 4. This gives ~2 weeks of runway to clear the P0 gates without panic.
+5. **Security is now the top priority (owner direction, 2026-08-17).** Seven SEC epics (#175, #185, #193, #201, #207, #214, #228) were filed on 2026-08-17 and are **not yet in any milestone**. The milestone plan (§1.5) has been adapted to put them ahead of every product/marketing epic — identity/session → tenant isolation → API/web → data protection → payments/IR — with only the campaign-dated launch gates (M1) staying ahead of them. Product epics #84, #74, #95 are already closed; #138/#96/#127/#47 move to M6.
 
 ## Delivery status (2026-08-15, PM sweep)
 
@@ -82,45 +83,64 @@ Still open P0 launch gates: **#120** (legal/domain — owner decision) · **#121
 
 ---
 
-## 1.5 Milestones (defined by the Project Manager, 2026-08-15)
+## 1.5 Milestones (adapted by the Project Manager, 2026-08-17 — security-first)
 
-### M1 — Launch-ready · target **Wed 2026-08-26** (before the Phase 3 reveal)
-- **Goal:** every Phase 3/4 gate green.
-- **Scope:** #120 legal/domain (owner) · #121 landing + Request access + UTM (owner) · merge **PR #145** (#85) · record #87 device validation · i18n sign-off for shipped keys (#93 partial).
-- **Exit:** reveal + open gates clear; app live on the stable URL; Request access + analytics counting; #85 merged; #87 validated or explicitly deferred.
-- **Risks:** owner availability for #120/#121; physical device for #87.
+> **Priority override:** the seven **SEC epics (#175, #185, #193, #201, #207, #214, #228)** are now the
+> top of the queue and outrank every product/marketing epic. The hard launch gates in M1 stay (they are
+> campaign-dated), but everything after the open is **security-first**: identity/session → tenant
+> isolation → API/web → data protection → payments/IR → then product resumes. Product epics #84, #74
+> and #95 are already closed (see §0), so M2/M3 no longer hold product scope.
 
-### M2 — Open the doors · target **Sun 2026-08-30 – Fri 2026-09-05** (Phase 4)
-- **Goal:** new members get a friction-free first run + clear free-plan entry.
-- **Scope:** Epic #84 A5 lending polish (#90, #92, #93, #94, #117, #118, #91) → close epic #84 · Epic #138 Free-tier guidance (#139–#144).
-- **Exit:** epic #84 fully closed; free-plan onboarding + near-limit hint live; admin ready for approval waves.
-- **Risks:** native i18n sign-off (#93, #141); ergonomics gates.
+### M1 — Launch-ready + Security foundations · target **Wed 2026-08-26** (before the Phase 3 reveal)
+- **Goal:** every Phase 3/4 gate green **and** the cheap security force-multipliers in place so all later work is reviewed under security rules.
+- **Launch scope (hard gates, unchanged):** #120 legal/domain (owner) · #121 landing + Request access + UTM (owner) · merge **PR #145** (#85) · record #87 device validation · i18n sign-off for shipped keys (#93 partial).
+- **Security scope (parallel — skill/config only, zero launch risk):** SEC-EPIC-7 governance #222 (mandatory security review gate) → #224 (strengthen multi-tenant skill) → #223 (auditor-skill hardening) → #225 (PWA/offline/Data skill reqs) → #226 (release checklist). SEC-EPIC-5 quick wins #210 (secret scanning, P0) · #208 (dependency/SCA scanning) · #209 (CodeQL/SAST) — enable in **advisory** mode so the launch branch is not blocked mid-campaign.
+- **Exit:** reveal + open gates clear; app live on the stable URL; **security review is a mandatory agent gate**; scanning active (advisory).
+- **Risks:** owner availability for #120/#121; physical device for #87; keep CI scanning non-blocking during launch.
 
-### M3 — Listen & stand out · target **Sep 1–15**
-- **Goal:** always-on feedback channel + per-room visual identity for the campaign.
-- **Scope:** Epic #74 Feedback (#75–#83) · Epic #95 Theme (#102–#110).
-- **Exit:** feedback inbox + admin triage live ("we read everything"); both rooms shipped with contrast pass; #108 screenshots to Marketing.
-- **Risks:** #104 gated on theme survey; shared-tree collisions with #127.
+### M2 — Security: Identity & session hardening · target **Aug 30 – Sep 19** (replaces "Open the doors")
+- **Goal:** replace long-lived bearer access codes with server-managed sessions; remove credentials from the browser; eliminate the global admin key.
+- **Scope:** SEC-EPIC-1 (#175): #176 replace access-code-as-session (P0) → #177 drop localStorage credentials (P0) → #180 remove prod admin-key fallback (P0) → #181 role-based admin authz (P0) → #184 auth takeover/replay regression tests (P0) → #178 short-lived sessions/rotation → #179 server-side revocation → #182 magic-link hardening → #183 passkeys/SiWA evaluation.
+- **Exit:** no credential material in localStorage; sessions short-lived + revocable server-side; no admin-key fallback in prod; admin actions are role-authorized; takeover/replay suite green.
+- **Risks:** largest refactor of the program — needs its own branch (`feat/security-identity`), full Tester pass, and touches `src/api/auth.js`, `netlify/functions/auth.js`/`admin.js`, `_shared/*`; never leak codes/keys.
 
-### M4 — Community & depth · target **Sep–Oct** (post-launch quarter)
-- **Goal:** first community feature + collection depth.
-- **Scope:** Epic #96 Sightings (#97–#116, start #98 privacy ADR) · Epic #127 Grouped browse (#128–#137) · Epic #43 Phase 2 (#47).
-- **Exit:** sightings privacy ADR + feature live; grouped browse shipped; Phase 2 quests shipped.
-- **Risks:** #98 owner/security decisions.
+### M3 — Security: Tenant isolation & object authorization · target **Sep 22 – Oct 10**
+- **Goal:** guarantee every collection object is accessible only to its owner/authorized tenant, server-side.
+- **Scope:** SEC-EPIC-2 (#185): #186 authenticated tenant context (P0) → #187 enforce `owner_id` on every object op (P0) → #189 IDOR/cross-tenant penetration tests (P0) → #190 PostgreSQL row-level security (P0) → #188 eliminate mass assignment → #191 server-side plan/feature authz → #192 offline tenant isolation + account-switching tests.
+- **Exit:** tenant identity resolved server-side on every request (never trusted from the browser); `owner_id` enforced on GET/PUT/DELETE + lending/reviews; RLS policies live + tested; IDOR suite green.
+- **Risks:** depends on the Postgres data layer (ADR-0002 Phase 1) being authoritative; #190 needs `db/migrations/` policies + migration-safety tests.
 
-### M5 — Icebox (unscheduled)
+### M4 — Security: API/web, data protection & supply-chain completion · target **Oct 13–31**
+- **Goal:** harden every endpoint, make Postgres the single authoritative store, and make CI gates blocking.
+- **Scope:** SEC-EPIC-3 (#193): #194 schema validation → #195 request/payload size limits → #196 stored-XSS audit → #197 security headers (CSP/HSTS/…) → #198 CSRF for cookie sessions → #199 endpoint-specific rate limits → #200 safe error responses. SEC-EPIC-4 (#201): #202 remove Postgres→Blobs production fallback (P0) → #203 encryption/backup/recovery docs → #205 PWA cache security regression tests → #206 user-data deletion/revocation → #204 data classification/retention. SEC-EPIC-5 remainder: #211 pin GitHub Actions → #213 security CI merge gate (flip to **blocking**) → #212 SBOM per release.
+- **Exit:** schema-validated + size-limited + header'd endpoints; no silent PG→Blobs fallback (controlled 503 + alert); PWA caches never hold another tenant's data; SBOM + blocking SAST/secret/dependency gates.
+- **Risks:** #198 CSRF depends on the session model from M2; #202 depends on Postgres being fully authoritative (ADR-0002 Phase 1); CI flip can surface findings — plan remediation SLAs.
+
+### M5 — Payments, monitoring & incident response · target **Nov 3–21**
+- **Goal:** harden the live payment path and stand up security telemetry + incident readiness.
+- **Scope:** SEC-EPIC-6 (#214): #215 Stripe webhook hardening — raw-body signature, event-type validation, idempotency/replay protection (P0) → #216 bind checkout status to authenticated context → #217 SSRF regression suite for the Discogs/Books proxies → #218 security audit events → #219 secret/PII-safe logging policy → #221 incident-response runbook → #220 anomaly detection/alerting.
+- **Exit:** webhook verifies signatures on raw bodies + rejects forged/replayed events; checkout status bound to the authenticated user; audit events + IR runbook in place; no secrets/PII in logs.
+- **Risks:** needs real Stripe test keys/webhook endpoint; alerting (#220) may need a Netlify log drain — scope with the Netlify Backend agent.
+
+### M6 — Product resumes (post-security) · target **Dec+**
+- **Goal:** the product/marketing backlog resumes only after the security program clears.
+- **Scope:** Epic #138 Free-tier guidance (remaining #139–#144) · Epic #96 Sightings (#97–#116, start #98 privacy ADR) · Epic #127 Grouped browse (#128–#137) · Epic #43 Phase 2 (#47).
+- **Exit:** free-tier guidance live; sightings privacy ADR + feature live; grouped browse shipped; Phase 2 quests shipped.
+- **Risks:** shared-tree collisions with #127 (CollectionView/locales); #98 owner/security decisions; **all product work now runs under the M1 security gate**.
+
+### M7 — Icebox (unscheduled)
 - **#37 Scaling Phase 2 · #49 Gamification Phase 3** — revisit with real traffic/product decision; no date.
 
 ---
 
-## 2. Suggested take-over plan for the PM agent
+## 2. Suggested take-over plan for the PM agent (adapted 2026-08-17 — security-first)
 
-1. **This week (before Aug 17 — campaign Phase 1 starts):** dispatch **#119** (icon) and **#120** (legal/domain) so Phase 3 gates are in motion; get owner decision on the legal gate.
-2. **Week of Aug 17–23:** run epic **#84** C2 → C1 (activation first), and start **#121** (landing page) so it's deploy-ready before Phase 4. Confirm the native-tester pass for #93 and device validation for #85/#87 in parallel.
-3. **Week of Aug 24–30 (Phase 3/4):** clear remaining P0 gates (#121 live), then launch-month P1 epics: **#74** feedback (so the owner can hear from launch traffic) and **#95** theme (T1/T2 unblocked; T3 once the survey lands).
-4. **After launch:** P2 — #96 sightings, #43 Phase 2/3, #37 scaling, each gated on the decisions noted above.
+1. **This week (before Aug 17 — campaign Phase 1 starts):** dispatch **#120** (legal/domain) and **#121** (landing) so Phase 3 gates are in motion; get owner decision on the legal gate. Kick off the M1 security foundations in parallel: SEC-EPIC-7 governance (#222 → #224 → #223 → #225 → #226) and SEC-EPIC-5 advisory scanning (#210, #208, #209) — skill/config work, no launch risk.
+2. **Week of Aug 17–23:** merge **PR #145** (#85) and record #87 device validation; confirm native-tester pass for #93; keep #121 deploy-ready before Phase 4. Do not start product epics — security is now ahead of them.
+3. **Week of Aug 24–30 (Phase 3/4):** clear remaining P0 gates (#121 live), then begin **SEC-EPIC-1** identity/session hardening (#175) on `feat/security-identity` — this is the critical-path security epic and must start as soon as the launch is out.
+4. **After launch (security-first):** SEC-EPIC-1 → SEC-EPIC-2 → SEC-EPIC-3 + SEC-EPIC-4 → SEC-EPIC-6 + SEC-EPIC-5 remainder → product resumes (M6). Each security epic is gated on its own review + regression tests; product epics (#138, #96, #127, #47) do not start until the security program clears.
 
-**DoD for the PM on each ticket:** the ticket bodies already carry acceptance criteria + DoD (`lint/test/build`, no dark-screen, copy via `catalog.copy`/i18n). Feature work stays on feature branches; never `main`.
+**DoD for the PM on each ticket:** the ticket bodies already carry acceptance criteria + DoD (`lint/test/build`, no dark-screen, copy via `catalog.copy`/i18n). Feature work stays on feature branches; never `main`. Every security ticket additionally requires Security Auditor sign-off and negative regression tests (authz/IDOR/replay where relevant).
 
 ---
 
