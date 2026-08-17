@@ -61,3 +61,25 @@ are cached at runtime so the app keeps working on a flaky connection.
   load; test deploys on a clean browser profile to see fresh precache.
 - The Netlify function (`/.netlify/functions/*`) is NOT cached — collection
   writes go straight to the network (correct: they must be authorized live).
+
+## Security requirements (checklist)
+
+Verify each item before merging a PWA/offline change:
+
+- [ ] **Offline storage review** — list exactly what is cached (precache vs
+      runtime) and why; every cache has a named, evictable entry.
+- [ ] **Cache scope** — private data (collection items, session, user
+      profiles) is NEVER cached in the service worker or shared caches; only
+      public lookup responses and cover images are cached.
+- [ ] **No sensitive caching** — the collection API and auth endpoints are
+      never runtime-cached; confirm no auth/session data lands in Cache
+      Storage.
+- [ ] **Logout cleanup** — signing out clears cached session data and any
+      user-scoped cached entries, not just `localStorage`; cache keys must not
+      leak data across accounts.
+- [ ] **Cross-account isolation** — cached responses are not keyed in a way
+      that lets one signed-in user see another's data after sign-out or after
+      signing in as a different account.
+- [ ] **Wasm/precache integrity** — the scanner `.wasm` stays precached and no
+      cache rule is broadened to `/*` or `*` (which could capture sensitive
+      responses).

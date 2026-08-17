@@ -13,7 +13,8 @@ records and books by scanning barcodes.
 - Preserve the shared `catalog` abstraction — never fork the flow per kind.
 
 ## Approach
-1. Load `.github/copilot-instructions.md` for conventions and gotchas.
+1. Load `.github/copilot-instructions.md` for conventions and gotchas, and the
+   `token-efficient-work` skill for focused, low-waste inspection.
 2. Check `.github/skills/` for a matching workflow and follow it when one
    applies (see the list in the instructions' Workflows section).
 3. Ensure you're on a feature branch before editing — `git branch
@@ -41,6 +42,11 @@ records and books by scanning barcodes.
   (no error boundary) failure mode.
 - DO NOT hardcode user-facing copy; put it in the catalog's `.copy`.
 - DO NOT log or expose access codes or the admin key (`RUNOUT_ADMIN_KEY`).
+- DO NOT skip the security gate: any change touching auth, authorization,
+  user data, payments, storage, caching, external APIs, or databases MUST
+  include threat modeling and negative security tests, and MUST be routed to
+  the `Security Auditor` agent (or `Multi-tenant Security` for tenant
+  isolation) for a blocking review before work is declared done.
 - DO NOT commit feature work to `main` — work on a feature branch.
 
 ## Output Format

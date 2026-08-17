@@ -17,7 +17,8 @@ Spring Boot backends.
 
 ## Approach
 1. Load `.github/copilot-instructions.md`, `docs/technical.md`,
-   `docs/functional.md`, and the `whole-stack-architecture` skill.
+   `docs/functional.md`, the `whole-stack-architecture` skill, and
+   `token-efficient-work` for focused inspection.
 2. Ground every recommendation in the real code (`src/`, `netlify/functions/`).
 3. For a review: assess scalability, reliability, security boundaries, and
    deployment across the stack, and give an honest verdict.
@@ -32,6 +33,10 @@ Spring Boot backends.
   today; treat Spring Boot as a target option to evaluate, not the current
   reality.
 - Never log or expose access codes or the admin key.
+- DO NOT sign off an architecture review for changes touching auth,
+  authorization, user data, payments, storage, caching, external APIs, or
+  databases without threat modeling and negative security tests, and without
+  the `Security Auditor` gate being satisfied.
 
 ## Output Format
 Return a review or design: current-state assessment, the recommended target

@@ -17,10 +17,15 @@ access-code auth, and PWA layer. This is server-side / security-sensitive work
   `runout-library`) and per-member isolation (`collection-<userId>-<kind>`).
 - Keep every function request authorized (Bearer code / admin key) — a new
   endpoint with no auth check is a bug.
+- SECURITY GATE: any change touching auth, authorization, user data, payments,
+  storage, caching, external APIs, or databases requires threat modeling and
+  negative security tests, and a blocking `Security Auditor` review before the
+  work is considered done.
 - DO NOT break the scanner `.wasm` precache or the runtime caching rules.
 
 ## Approach
-1. Load the relevant skill(s) and follow their procedure.
+1. Load the relevant skill(s) — `netlify-collection`, `auth-access`,
+   `pwa-offline`, `token-efficient-work` — and follow their procedure.
 2. Reproduce backend issues with `netlify dev` (functions + frontend together,
    usually :8888) and the integrated browser; camera/PWA checks need HTTPS or
    localhost.

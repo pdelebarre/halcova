@@ -65,3 +65,20 @@ Next inspection:
 - Do not invent APIs, schemas or security guarantees.
 - Do not modify authentication, payments or tenant isolation without targeted tests.
 - Do not introduce microservices or infrastructure without measured justification.
+
+## Mandatory security gate
+
+Any change touching **auth, authorization, user data, payments, storage,
+caching, external APIs, or databases** MUST pass a security gate before it is
+declared done:
+
+1. **Threat modeling** — identify the assets, trust boundaries, and the
+   threats the change introduces or weakens (see the `security-auditor` and
+   `multi-tenant-security` agents).
+2. **Negative security tests** — attack-path tests (unauthorized access,
+   IDOR, privilege escalation, tampering) in addition to happy-path tests.
+
+The owning agent MUST route such changes to the `Security Auditor` (or
+`Multi-tenant Security` for tenant isolation) for a blocking review. This gate
+is **blocking** — security review may not be skipped, deferred, or waived by
+an implementer.
