@@ -16,8 +16,6 @@ The PM coordinates work but cannot override a mandatory specialist gate. A miles
 ```text
 Project Manager
   │
-  ├── accountable for scope, sequencing, priorities, delegation and milestone advancement
-  │
   ├── Architecture authority
   │     ├── Whole Stack Architect — end-to-end architecture
   │     ├── Front End Architect — frontend/component architecture
@@ -30,9 +28,10 @@ Project Manager
   │     ├── Security Auditor — application security gate
   │     └── Multi-tenant Security — tenant-isolation security gate
   │
-  ├── Quality & experience authority
+  ├── Quality / release / experience authority
   │     ├── Tester — test/coverage gate
-  │     ├── Ergonomics Reviewer — UX/a11y review gate
+  │     ├── Release Validator — independent release-readiness gate
+  │     ├── Ergonomics Reviewer — critical UX/a11y gate
   │     └── UI UX Expert — design authority and UX/a11y input
   │
   ├── Delivery specialists
@@ -40,7 +39,8 @@ Project Manager
   │     ├── Runout Engineer
   │     ├── Netlify Backend
   │     ├── Scanner Builder
-  │     └── Catalog Designer
+  │     ├── Catalog Designer
+  │     └── Sync Engineer
   │
   ├── Operations evidence
   │     └── Observability Engineer
@@ -48,15 +48,15 @@ Project Manager
   ├── Agent system governance
   │     └── Agent Developer
   │
-  └── Product/GTM
+  └── Product / GTM
         └── Marketing Manager
 ```
 
 ### Non-overridable rule
 
-The PM may resolve scope, sequencing and trade-off conflicts, but **may not declare a milestone complete when a mandatory security, architecture, testing, API/data, or critical UX gate is FAIL**.
+The PM may resolve scope, sequencing and trade-off conflicts, but **may not declare a milestone complete when a mandatory security, architecture, testing, release, API/data, or critical UX gate is FAIL**.
 
-A specialist must provide evidence for a PASS. Documentation-only assertions are insufficient for security and quality gates.
+A specialist must provide evidence for PASS. Documentation-only assertions are insufficient for security and quality gates.
 
 ## 3. RACI-style matrix
 
@@ -68,12 +68,14 @@ A specialist must provide evidence for a PASS. Documentation-only assertions are
 | End-to-end architecture | PM | Whole Stack Architect | Security + relevant domain architect |
 | Frontend architecture | PM | Front End Architect | UI UX Expert, Ergonomics Reviewer |
 | Data schema / migrations | PM | Data Architect | Security, API Contract Reviewer, Tester |
-| Platform / deployment | PM | Platform Architect | Security, Observability Engineer |
-| Offline / sync | PM | Offline Architect | Data, API, Security, Tester |
+| Platform / deployment | PM | Platform Architect | Security, Observability, Release Validator |
+| Offline / sync architecture | PM | Offline Architect | Data, API, Security, Tester |
+| Sync implementation | PM | Sync Engineer | Offline Architect + API/Data + Security where applicable |
 | API contract | PM | API Contract Reviewer | Backend + frontend + Security |
 | Application security | PM | Security Auditor | Architecture + implementer + Tester |
 | Tenant isolation | PM | Multi-tenant Security | Data Architect + Security Auditor |
 | Test strategy & regression | PM | Tester | Implementer + Security where applicable |
+| Release readiness | PM | Release Validator | Tester + Security + Platform + Observability |
 | Accessibility / critical UX | PM | Ergonomics Reviewer | UI UX Expert + Tester |
 | Product UI design | PM | UI UX Expert | Front End Architect + Ergonomics Reviewer |
 | Feature implementation | PM | Domain implementer | Architect before implementation; Tester after |
@@ -81,25 +83,28 @@ A specialist must provide evidence for a PASS. Documentation-only assertions are
 | New collection type | PM | Catalog Designer | Front End Architect + Data/API/Security as relevant |
 | Netlify backend | PM | Netlify Backend | Whole Stack + Security + Tester |
 | General implementation | PM | Runout Engineer / Front End Developer | Appropriate specialist gates |
-| Observability | PM | Observability Engineer | Platform + Security |
-| Marketing / GTM | PM | Marketing Manager | Product/UX; no technical gate override |
+| Observability | PM | Observability Engineer | Platform + Security + Release Validator |
+| Marketing / GTM | PM | Marketing Manager | Product/UX; no technical override |
 | Agent/prompt/skill changes | PM | Agent Developer | ADR/governance review when authority changes |
-| Milestone completion | **PM** | PM | All mandatory gates must PASS |
-| Release authorization | **PM** | PM | Security/Architecture/Tester/UX gates as applicable |
+| Milestone completion | **PM** | PM | All mandatory gates PASS |
+| Release authorization | **PM** | PM | Release Validator + mandatory specialist gates |
 
 ## 4. Specialist veto / blocking authority
 
 ### Security Auditor
-Blocks completion for changes touching authentication, authorization, user data, payments, storage, caching, external APIs, databases, or other security-sensitive surfaces until threat modelling, negative tests and implementation evidence support PASS.
+Blocks completion for authentication, authorization, user data, payments, storage, caching, external APIs, databases and other security-sensitive surfaces until threat modelling, negative tests and implementation evidence support PASS.
 
 ### Multi-tenant Security
 Blocks completion for tenant isolation, membership authorization, tenant-scoped storage and equivalent boundaries until cross-tenant, IDOR and privilege-escalation tests pass.
 
 ### Tester
-Blocks completion when required automated tests fail, regression evidence is insufficient, or the repository coverage gate is not met. The current project baseline is 70% across the configured metrics.
+Blocks completion when required automated tests fail, regression evidence is insufficient, or the configured coverage gate is not met. Current baseline: 70% across statements, branches, functions and lines.
+
+### Release Validator
+Blocks release readiness when required build, test, coverage, security, migration, PWA or operational checks were not run or do not pass. It is an independent final evidence check; it does not replace Security Auditor, Tester or architecture gates.
 
 ### API Contract Reviewer
-Blocks API-related completion when a change breaks or ambiguously changes request/response contracts, authentication requirements, error semantics, idempotency or compatibility without an approved migration/versioning strategy.
+Blocks API completion when request/response contracts, authentication requirements, error semantics, idempotency or compatibility are unsafe or undocumented.
 
 ### Data Architect
 Blocks schema/migration completion when constraints, isolation, migration safety, rollback/forward-fix or reconciliation evidence is insufficient.
@@ -107,40 +112,42 @@ Blocks schema/migration completion when constraints, isolation, migration safety
 ### Platform Architect / Observability Engineer
 Can block production readiness when deployment, backup/restore, health, rollback, monitoring or sensitive-data logging requirements are not evidenced.
 
+### Offline Architect
+Blocks offline/sync architecture completion when consistency, local-data boundaries, lifecycle or conflict policy is insufficient.
+
 ### Ergonomics Reviewer
-Blocks M2 critical UX acceptance when WCAG/accessibility, touch ergonomics, discoverability or critical-flow usability requirements fail. For non-critical UX issues it reports findings to the PM rather than blocking delivery.
+Blocks M2 critical UX acceptance when WCAG/accessibility, touch ergonomics, discoverability or critical-flow usability requirements fail. Non-critical polish is advisory.
 
 ### Architecture agents
-The relevant architecture agent may block implementation of a design that violates an accepted ADR, creates an unsafe architectural seam, or introduces an unjustified platform dependency. Architecture disagreements are escalated to the Whole Stack Architect; unresolved strategic conflicts go to the PM for a documented decision/ADR.
+The relevant architecture agent may block implementation of a design that violates an accepted ADR, creates an unsafe seam, or introduces an unjustified platform dependency. Architecture disagreements escalate to Whole Stack Architect; unresolved strategic conflicts require a documented PM decision/ADR.
 
 ## 5. Agent lifecycle
 
-Every milestone follows:
-
 ```text
 PM PLAN
-  → architecture/design
+  → architecture/domain design
   → implementation
   → test/verification
-  → security/API/data/UX/operations gates as applicable
+  → specialist gates
+  → release validation when applicable
   → PM milestone decision
 ```
 
-A failed gate creates a loop back to the responsible implementer or design authority. The PM owns the coordination and records the decision; the blocking specialist owns the technical verdict.
+A failed gate loops back to the responsible implementer or design authority. The PM records coordination and escalation; the specialist owns the technical verdict.
 
 ## 6. Separation of duties
 
-- An implementation agent must not approve its own security or quality gate.
-- Security findings are not waived by developers or implementers.
-- The PM cannot convert a specialist FAIL into PASS without the specialist re-reviewing evidence.
-- Agent Developer cannot unilaterally change the authority model; governance changes require an ADR and PM approval.
-- Marketing cannot introduce unvalidated product claims or override engineering/security constraints.
+- Implementation agents do not approve their own security or quality gates.
+- Security findings are not waived by implementers.
+- PM cannot convert specialist FAIL into PASS without specialist re-review.
+- Agent Developer cannot unilaterally change the authority model; governance changes require an ADR and matrix/workflow updates.
+- Marketing cannot introduce unvalidated product claims or override technical/security constraints.
+- Release Validator does not replace upstream specialist authority; it verifies evidence exists and release conditions are satisfied.
 
 ## 7. Required milestone handoff state
 
-The PM must pass at least:
-
-- milestone and objective;
+The PM passes at least:
+- milestone/objective;
 - ticket + parent epic;
 - dependencies and entry criteria;
 - relevant ADRs;
@@ -150,10 +157,10 @@ The PM must pass at least:
 - current gate verdicts;
 - branch/PR context.
 
-Each specialist returns a concise verdict, evidence, findings, residual risks and explicit **PASS / FAIL / NOT APPLICABLE** decision where a gate applies.
+Each specialist returns evidence, findings, residual risks and explicit PASS / FAIL / NOT APPLICABLE where a gate applies.
 
 ## 8. Milestone advancement
 
-The PM may advance from M0 → M1 → M2 → M3 → M4 → M5 → M6 only when the current milestone's exit criteria in #355 are satisfied.
+The PM may advance M0 → M1 → M2 → M3 → M4 → M5 → M6 only when the current milestone's #355 exit criteria and mandatory gates are satisfied.
 
-Future milestones are planning horizons, not authorization to start work early. The PM re-grooms the next milestone using evidence from the completed milestone.
+Future milestones are planning horizons, not authorization to start early. The PM re-grooms the next milestone using evidence from the completed milestone.
