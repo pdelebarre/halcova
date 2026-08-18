@@ -16,6 +16,7 @@ const EVENTS_KEY = 'runout.events'
 const ENABLED_KEY = 'runout.events.enabled'
 const ACTIVATION_KEY = 'runout.events.activation'
 const MAX_EVENTS = 500
+const BROWSE_PREFIX = 'runout.events.browse.'
 
 /** Secret-like key pattern — any matching prop key is dropped before queueing. */
 const SECRET_KEY = /code|token|key|secret|barcode|isbn|pin|cipher|pass|session|credential|auth|jwt/i
@@ -29,9 +30,7 @@ export function isTrackingEnabled() {
   }
 }
 
-/**
- * Turn tracking on ('1') or off (key removed). Never throws.
- */
+/** Turn tracking on ('1') or off (key removed). Never throws. */
 export function setTrackingEnabled(on) {
   try {
     if (on) localStorage.setItem(ENABLED_KEY, '1')
@@ -39,10 +38,7 @@ export function setTrackingEnabled(on) {
   } catch { /* never throw */ }
 }
 
-/**
- * Drop secret-like keys and any non-primitive value. Non-objects yield an
- * empty payload, so props can never smuggle in codes or nested structures.
- */
+/** Drop secret-like keys and any non-primitive value before queueing. */
 function sanitize(props) {
   if (!props || typeof props !== 'object' || Array.isArray(props)) return {}
   const out = {}
@@ -81,14 +77,22 @@ function markActivationOnce() {
   }
 }
 
+function markBrowseOnce(kind) {
+  if (!kind) return false
+  try {
+    const key = `${BROWSE_PREFIX}${kind}`
+    if (sessionStorage.getItem(key) === '1') return false
+    sessionStorage.setItem(key, '1')
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
- * Queue one event when tracking is enabled. A no-op otherwise — including for
- * a missing/non-string event name. Props are sanitized before queueing.
- *
- * A successful owned-item add already calls `gamif_item_added`. The first such
- * event in a browser session is the existing app's best authoritative signal
- * for activation, so capture `activation` here without adding another call
- * site or risking a double-fire under React StrictMode.
+ * Queue one event when tracking is enabled. A no-op otherwise.
+ * A successful owned-item add already calls `gamif_item_added`; the first such
+ * event in a browser session is the activation signal.
  */
 export function track(event, props = {}) {
   if (!isTrackingEnabled()) return
@@ -106,20 +110,50 @@ export function track(event, props = {}) {
 }
 
 /**
- * Placeholder for the future opt-in network flush (no endpoint exists yet —
- * Phase 0 §4). Until one is wired it does nothing; clearEvents() is how the
- * queue is emptied today.
+ * Observe CollectionView mounts without adding another application call site.
+ * CollectionView exposes `.collection-view[data-kind]`. A mount is the browse
+ * signal; it is counted once per kind per browser session, avoiding StrictMode
+ * and remount double-counts. Disabled tracking remains a true no-op.
  */
+function observeCollectionBrowse() {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return
+
+  const emitIfCollection = (node) => {
+    if (!(node instanceof Element)) return
+    const roots = []
+    if (node.matches('.collection-view[data-kind]')) roots.push(node)
+    node.querySelectorAll?.('.collection-view[data-kind]').forEach((root) => roots.push(root))
+    for (const root of roots) {
+      const kind = root.getAttribute('data-kind')
+      if (kind && isTrackingEnabled() && markBrowseOnce(kind)) track('browse', { kind })
+    }
+  }
+
+  try {
+    document.querySelectorAll('.collection-view[data-kind]').forEach(emitIfCollection)
+    if (!document.body) return
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) emitIfCollection(node)
+      }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+  } catch { /* instrumentation must never affect application behaviour */ }
+}
+
+observeCollectionBrowse()
+
+/** Placeholder for the future opt-in network flush. */
 export function flushEvents() {
   // no-op — reserved for the opt-in flush endpoint
 }
 
 /** Drop any queued events. Safe to call whether tracking is on or off. */
 export function clearEvents() {
-  try {
-    localStorage.removeItem(EVENTS_KEY)
-  } catch { /* never throw */ }
+  try { localStorage.removeItem(EVENTS_KEY) } catch { /* never throw */ }
   try {
     sessionStorage.removeItem(ACTIVATION_KEY)
+    sessionStorage.removeItem(`${BROWSE_PREFIX}records`)
+    sessionStorage.removeItem(`${BROWSE_PREFIX}books`)
   } catch { /* never throw */ }
 }
