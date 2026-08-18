@@ -1,6 +1,6 @@
 ---
 name: agentic-workflow
-description: 'Run Halcova as a governed agent graph: the Project Manager orchestrates, specialist agents own domain decisions, mandatory security/quality gates can block completion, and failed gates loop back to implementation. Use for milestone execution, feature planning, agent DAGs, handoffs, release gates, governance, or orchestration.'
+description: 'Run Halcova as a governed agent graph: the Project Manager orchestrates, specialist agents own domain decisions, mandatory security/quality gates can block completion, failed gates loop back to implementation, parallel work is used safely, and agents minimize unnecessary context/token consumption. Use for milestone execution, feature planning, agent DAGs, handoffs, release gates, governance, orchestration, or context-efficient execution.'
 ---
 # Agentic Workflow — Governed Delivery Graph
 
@@ -15,6 +15,7 @@ Halcova's agents are nodes, specialist handoffs are edges, shared task context i
 - A failed gate loops work back to the responsible implementer or design authority.
 - Future milestones are not automatically authorized because capacity exists; advance only after the current milestone passes its exit gates in #355.
 - Governance changes affecting authority, veto rights, separation of duties, or milestone advancement require an ADR and corresponding update to the responsibility matrix and this skill.
+- **Token/context efficiency is a delivery constraint, not a quality shortcut.** Agents MUST minimize unnecessary context while preserving correctness, security, architecture, testing and required evidence.
 
 ## Agent inventory and authority
 
@@ -108,6 +109,83 @@ At minimum pass:
 - security classification;
 - expected acceptance/evidence;
 - previous gate verdicts and residual risks.
+
+**Handoff rule:** pass the minimum sufficient state, not the entire prior conversation or repository context. Link/reference canonical documents instead of copying them into prompts where possible.
+
+## Context and token efficiency protocol
+
+Agents MUST optimize for **minimum sufficient context**. Token efficiency must never weaken security, correctness, architecture, testing, accessibility or required evidence.
+
+### Context acquisition
+
+- Start with the ticket, acceptance criteria, relevant parent epic and required ADRs.
+- Inspect targeted files, symbols, directories and tests before opening large files or the entire repository.
+- Use search to locate relevant symbols/references before reading broad code areas.
+- Read only the sections needed for the current decision or implementation.
+- Do not preload every agent definition, ADR, issue or source file when the task does not require it.
+- Expand context progressively when evidence shows that more is needed.
+- If required context is genuinely missing, request or retrieve it rather than guessing.
+
+### Context reuse
+
+- Treat `docs/agents/responsibility-matrix.md`, ADRs and canonical backlog items as sources of truth; reference them instead of duplicating their contents.
+- Reuse valid prior gate results and test evidence when the underlying code and assumptions have not changed.
+- Do not repeat an investigation already completed by another agent unless the evidence is stale, contradictory or specifically requires independent verification.
+- PM state should be a compact execution record, not a transcript of every agent interaction.
+
+### Handoff compression
+
+Every agent handoff should prefer a structured concise summary containing:
+
+```text
+Decision / status:
+Files / surfaces changed:
+Dependencies:
+Evidence:
+Open risks / blockers:
+Next action:
+```
+
+Do not paste large source files, full logs or complete prior conversations into downstream prompts when a concise summary plus file references is sufficient.
+
+### Parallel-agent budget
+
+Parallelism must not multiply redundant investigation.
+
+- Launch an agent only when its work is unblocked and materially useful.
+- Do not have multiple agents independently answer the same question without a defined reason for independent review.
+- Avoid starting downstream agents merely to keep them busy; waiting is preferable to consuming context on blocked work.
+- Prefer one authoritative architecture decision over several duplicate design explorations.
+- For expensive validation, run the narrowest relevant checks first, then expand only if failures or risk justify it.
+
+### Output discipline
+
+Agents should return concise, evidence-oriented results rather than long narratives.
+
+A completed implementation handoff should normally contain:
+
+- outcome;
+- changed files/components;
+- tests/checks run;
+- evidence/results;
+- unresolved risks;
+- next required gate.
+
+Do not reproduce code or logs in the handoff unless the exact excerpt is required to explain a defect or decision.
+
+### Safety boundary
+
+Token optimization is **never** a reason to skip:
+
+- security review required by the matrix;
+- tenant-isolation validation;
+- architecture decisions required by an ADR;
+- mandatory tests or coverage;
+- required accessibility/ergonomics review;
+- release validation;
+- evidence needed to substantiate a PASS.
+
+If context is insufficient for a reliable gate decision, the agent MUST obtain more context or return `NOT VERIFIED`; it must not infer PASS to save tokens.
 
 ## Parallel execution protocol
 
@@ -308,6 +386,9 @@ For each milestone from #355:
 - [ ] Specialist authority identified.
 - [ ] No agent approves its own work where an independent gate is required.
 - [ ] State passed across every handoff.
+- [ ] Context is limited to the minimum sufficient information.
+- [ ] Canonical documents are referenced rather than unnecessarily copied.
+- [ ] No redundant investigations or validations are consuming context.
 - [ ] Architecture/contracts established before dependent parallel work.
 - [ ] Parallel workstreams have clear ownership and branches.
 - [ ] No unsafe shared ownership or unresolved semantic contract conflicts.
