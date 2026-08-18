@@ -19,7 +19,7 @@ M0 is the release gate for the existing Records/Books product. This document rec
 | Lint | `npm run lint` is a blocking step in `security-ci.yml` via merged PR #357. | PASS — gate configured; fresh post-#362 run still required |
 | Security CI | Blocking workflow includes security tests, dependency audit, secret scan and SAST; lint is also blocking. | PASS — configuration verified; fresh post-#362 run still required |
 
-PR #361 and PR #362 are merged. #361 implements first-add activation telemetry and #362 implements collection browse telemetry. Both preserve DEFAULT-OFF tracking and use the existing first-party queue; neither adds a third-party analytics SDK or telemetry backend. cite not applicable
+PR #361 and PR #362 are merged. #361 implements first-add activation telemetry and #362 implements collection browse telemetry. Both preserve DEFAULT-OFF tracking and use the existing first-party queue; neither adds a third-party analytics SDK or telemetry backend.
 
 ## Current-product security evidence
 
@@ -36,7 +36,7 @@ Issue #87 is intentionally **open**. Its implementation is merged, but its expli
 - no iOS Safari permission re-prompt when continuing to scan;
 - no camera LED/battery drain while the result sheet is displayed.
 
-The issue must not be considered complete until evidence is recorded. cite not applicable
+The issue must not be considered complete until evidence is recorded.
 
 ### Other scanner evidence
 
