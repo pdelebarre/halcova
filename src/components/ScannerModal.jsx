@@ -18,32 +18,15 @@ const wasmUrl =
     ? zxingReaderWasmUrl
     : `${APP_BASE}${zxingReaderWasmUrl}`
 
-// Eagerly download + instantiate the decoder so it is ready before the first
-// frame is decoded. We fetch the wasm bytes ourselves and hand them to the
-// decoder as a Blob URL, which forces ArrayBuffer instantiation instead of
-// WebAssembly streaming compile — streaming compile is unreliable on iOS
-// Safari when the wasm is served by the service worker (a documented
-// Safari + SW + wasm bug). Eager + retried so a transient load failure
-// self-heals instead of failing the first readBarcodes call forever.
-let wasmReadyPromise = null
-async function ensureWasmReady() {
-  if (!wasmReadyPromise) {
-    wasmReadyPromise = (async () => {
-      const res = await fetch(wasmUrl)
-      if (!res.ok) throw new Error(`barcode decoder download failed (${res.status})`)
-      const bytes = await res.arrayBuffer()
-      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }))
-      await prepareZXingModule({
-        fireImmediately: true,
-        overrides: { locateFile: (path) => (path.endsWith('.wasm') ? blobUrl : path) },
-      })
-    })().catch((err) => {
-      console.error('[scanner] decoder init failed (will retry):', err?.message || err)
-      wasmReadyPromise = null // re-arm for a retry on the next scan
-    })
-  }
-  return wasmReadyPromise
-}
+// Self-hosted WASM via the bundled `?url` asset — a plain SAME-ORIGIN URL.
+// Do NOT hand the decoder a Blob URL here: the deployed Content-Security-Policy
+// sets `connect-src 'self'` (netlify.toml), which blocks blob: fetches and
+// therefore breaks the decoder entirely ("both async and sync fetching of the
+// wasm failed"). prepareZXingModule is idempotent; readBarcodes initialises
+// the module on first use.
+prepareZXingModule({
+  overrides: { locateFile: (path) => (path.endsWith('.wasm') ? wasmUrl : path) },
+})
 
 // 1D retail codes printed on records and sleeves — same set the old
 // html5-qrcode scanner supported, decoded by the zxing-wasm WASM engine which
@@ -116,16 +99,18 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
     }
 
     // Self-heal: a transient decoder load/instantiation failure must not
-    // permanently break scanning. Purge the cached module and re-arm the eager
-    // loader so the next decode attempt re-downloads + re-instantiates.
+    // permanently break scanning. Purge the cached module and re-prepare with
+    // the plain same-origin URL so the next decode attempt re-downloads +
+    // re-instantiates.
     const reinitWasm = () => {
       try {
         purgeZXingModule()
       } catch {
         // ignore — purge is best-effort
       }
-      wasmReadyPromise = null
-      ensureWasmReady()
+      prepareZXingModule({
+        overrides: { locateFile: (path) => (path.endsWith('.wasm') ? wasmUrl : path) },
+      })
       console.warn('[scanner] re-initializing barcode decoder after decode failures')
     }
 
@@ -215,12 +200,6 @@ export default function ScannerModal({ onDetected, onClose, active = true }) {
 
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
-
-        // Ensure the decoder is ready before the first frame is decoded, so a
-        // slow/cached wasm load never makes readBarcodes throw on the first
-        // frames. If it failed, this still resolves and the tolerant loop
-        // self-heals via reinitWasm.
-        await ensureWasmReady()
 
         let decoding = false
         let lastDecode = 0
