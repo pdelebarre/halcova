@@ -109,33 +109,137 @@ At minimum pass:
 - expected acceptance/evidence;
 - previous gate verdicts and residual risks.
 
+## Parallel execution protocol
+
+The PM MUST identify independent workstreams and execute them concurrently when dependencies permit. Parallelism is a delivery optimization, not a relaxation of governance.
+
+### Before parallel execution
+
+1. Establish required architecture and domain decisions.
+2. Establish shared API, domain, persistence, sync and error contracts.
+3. Identify file/component ownership boundaries.
+4. Identify dependencies and integration points.
+5. Create one branch per implementation workstream.
+6. Define required validation gates for each workstream.
+
+### Parallelism is permitted only when
+
+- prerequisite architecture decisions are resolved;
+- shared contracts are stable enough for implementation;
+- workstreams have independent ownership boundaries or explicit coordination points;
+- no two agents are concurrently editing the same ownership boundary without a deliberate integration plan;
+- security boundaries are understood;
+- integration and validation responsibilities are explicit.
+
+### Parallelism is prohibited when
+
+- architecture, data, API or synchronization semantics are unresolved;
+- two agents would independently define the same contract or domain model;
+- a change has an unresolved security boundary;
+- one workstream depends on behavior that another workstream has not yet defined;
+- parallel work would create unsafe concurrent migrations or incompatible schema/API changes.
+
+### Branch and PR isolation
+
+For parallel implementation:
+
+- one implementation workstream → one branch;
+- one branch → one focused PR where practical;
+- implementation agents do not share a mutable feature branch;
+- the PM owns integration ordering;
+- merge conflicts or semantic contract conflicts return to the relevant architecture/implementation owners rather than being silently resolved by an unrelated agent.
+
+### Workstream ownership record
+
+Every parallel workstream should have:
+
+- owner agent;
+- branch;
+- files/components/API surfaces owned;
+- dependencies;
+- consumers;
+- integration point;
+- required validation agents;
+- expected evidence.
+
+Example:
+
+```text
+M2-Offline-Storage
+Owner: Sync Engineer
+Architecture: Offline Architect
+Branch: agent/m2-offline-storage
+Depends on: #152, #159
+Owns: storage/sync modules
+Consumed by: Front End Developer, Scanner Builder
+Validation: Tester, Security Auditor
+```
+
+### Parallel completion model
+
+The PM should maintain work in states such as:
+
+```text
+READY → IN PROGRESS → WAITING → READY FOR REVIEW → VALIDATED → INTEGRATED → DONE
+```
+
+Independent work may occupy these states concurrently. The PM must avoid unnecessary serialization while preserving dependency order and specialist gates.
+
+### Milestone versus workstream sequencing
+
+**Milestones remain sequential:**
+
+`M0 → M1 → M2 → M3 → M4 → M5 → M6`
+
+**Work inside a milestone may be highly parallel:**
+
+```text
+M2
+├── Collector UI
+├── Scanner
+├── Offline storage
+├── Search
+└── Backend/API
+      ↓
+  integration + validation
+      ↓
+  milestone gate
+```
+
+Do not start a later milestone merely because independent work remains in the current milestone. Strategic progression remains gate-driven.
+
 ## Canonical execution graph
 
 ```mermaid
 graph TD
-  A[Request / Milestone] --> B[PM: PLAN + DAG + branch]
-  B --> C[Architecture / Domain Design]
-  C --> D[Implementation]
-  D --> E[Tester]
-  E --> F{Tests / coverage PASS?}
-  F -- no --> D
-  F -- yes --> G{Specialist gates required?}
-  G -- security --> H[Security Auditor]
-  G -- tenant --> I[Multi-tenant Security]
-  G -- API/data --> J[API/Data Architect Review]
-  G -- UX --> K[Ergonomics / UI UX Review]
-  G -- operations --> L[Platform / Observability Review]
-  G -- release --> M[Release Validator]
-  G -- none --> N[PM Gate]
-  H --> O{All required gates PASS?}
-  I --> O
-  J --> O
-  K --> O
-  L --> O
-  M --> O
-  O -- no --> D
-  O -- yes --> P[PM Gate]
-  P --> Q{Milestone exit criteria PASS?}
+  A[Request / Milestone] --> B[PM: PLAN + DAG + branch/workstream ownership]
+  B --> C[Architecture / Domain / Contract Design]
+  C --> D1[Parallel Workstream A]
+  C --> D2[Parallel Workstream B]
+  C --> D3[Parallel Workstream C]
+  D1 --> E[Integration]
+  D2 --> E
+  D3 --> E
+  E --> F[Tester]
+  F --> G{Tests / coverage PASS?}
+  G -- no --> D1
+  G -- yes --> H{Specialist gates required?}
+  H -- security --> I[Security Auditor]
+  H -- tenant --> J[Multi-tenant Security]
+  H -- API/data --> K[API/Data Architect Review]
+  H -- UX --> L[Ergonomics / UI UX Review]
+  H -- operations --> M[Platform / Observability Review]
+  H -- release --> N[Release Validator]
+  H -- none --> O[PM Gate]
+  I --> P{All required gates PASS?}
+  J --> P
+  K --> P
+  L --> P
+  M --> P
+  N --> P
+  P -- no --> D1
+  P -- yes --> O
+  O --> Q{Milestone exit criteria PASS?}
   Q -- no --> B
   Q -- yes --> R[PM: close evidence + authorize next milestone]
 ```
@@ -187,12 +291,15 @@ For each milestone from #355:
 
 1. PM verifies entry criteria and scope.
 2. PM decomposes work and assigns agents using the responsibility matrix.
-3. Architecture/domain agents produce required decisions.
-4. Implementers execute.
-5. Tester and specialist gates collect evidence.
-6. Release Validator verifies release readiness when applicable.
-7. PM records PASS/HOLD/FAIL and residual risk.
-8. Only PASS authorizes the next milestone; the next milestone is re-groomed using evidence from the completed one.
+3. PM builds a dependency DAG and identifies parallel workstreams.
+4. Architecture/domain/contract agents produce required decisions before dependent parallel implementation begins.
+5. PM establishes branch and ownership boundaries for parallel work.
+6. Implementers execute independent workstreams concurrently where permitted.
+7. PM coordinates integration at explicit contract boundaries.
+8. Tester and specialist gates collect evidence.
+9. Release Validator verifies release readiness when applicable.
+10. PM records PASS/HOLD/FAIL and residual risk.
+11. Only PASS authorizes the next milestone; the next milestone is re-groomed using evidence from the completed one.
 
 ## Checklist
 
@@ -201,6 +308,9 @@ For each milestone from #355:
 - [ ] Specialist authority identified.
 - [ ] No agent approves its own work where an independent gate is required.
 - [ ] State passed across every handoff.
+- [ ] Architecture/contracts established before dependent parallel work.
+- [ ] Parallel workstreams have clear ownership and branches.
+- [ ] No unsafe shared ownership or unresolved semantic contract conflicts.
 - [ ] Security gate applied whenever required.
 - [ ] Required architecture/data/API/UX/quality gates identified.
 - [ ] Required specialist gates PASS.
