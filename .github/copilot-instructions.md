@@ -1,77 +1,106 @@
-# Runout — Project Guidelines
+# Halcova — Project Guidelines
 
-Runout (package name `runout`, repo `vinyl-crate`) is a React 19 + Vite 8 PWA for cataloging vinyl records and books by scanning barcodes. There is no app server — just a static frontend plus one Netlify function backed by Netlify Blobs.
+Halcova uses a governed multi-agent delivery model. The **Project Manager is accountable for orchestration, integration and milestone advancement**, while specialist agents retain independent technical authority and blocking gates.
 
-## Agent governance
+## Canonical governance sources
 
-Halcova uses a governed multi-agent delivery model. The **Project Manager is accountable for orchestration and milestone advancement**, but specialist agents retain independent technical authority and blocking gates.
-
-Canonical sources:
 - `docs/agents/responsibility-matrix.md` — responsibilities, authority and veto gates.
-- `docs/adr/0014-agent-orchestration-and-governance.md` — governance decision/rationale.
-- `.github/skills/agentic-workflow/SKILL.md` — execution graph and gate loops.
+- `docs/adr/0014-agent-orchestration-and-governance.md` — governance rationale.
+- `.github/skills/agentic-workflow/SKILL.md` — adaptive execution graph, context efficiency and gate loops.
 - GitHub #355 — canonical milestone roadmap and exit criteria.
 
-Rules:
+## Authority rules
+
 - PM cannot convert a mandatory specialist FAIL into PASS.
 - Security Auditor blocks security-sensitive completion; Multi-tenant Security blocks tenant-isolation completion.
 - Tester owns the required quality/test verdict.
-- Relevant architecture/data/API/platform/offline agents own their specialist design gates.
+- Relevant architecture/data/API/platform/offline agents own specialist design gates.
 - Ergonomics Reviewer blocks defined critical UX/accessibility gates.
-- An implementation agent does not approve its own security or quality gate.
-- A milestone advances only after its #355 exit criteria and mandatory specialist gates pass.
+- Implementation agents do not approve their own security or quality gates.
+- A milestone advances only after its exit criteria and mandatory specialist gates pass.
 
-## Architecture
+## Agent operating protocol
 
-- **One shared collection flow** (`src/CollectionView.jsx`) drives *both* records and books. A `catalog` object (`src/catalog.js`: `recordsCatalog`, `booksCatalog`) parameterizes everything: which lookup API to call, which components render items, and the copy used in labels/toasts/empty states.
-- **Item shape** is identical for records and books: `title` stored as `"Artist - Author - Title"`, plus `year`, `label`, `genre`, `coverImage`, `barcode`, and a kind-specific id (`discogsId` / `googleBooksId`).
-- **Lookup APIs** live in `src/api/*` (Discogs, Google Books) and normalize raw responses into the item shape above. Errors carry a `code` (`NO_TOKEN`, `BAD_TOKEN`, `RATE_LIMIT`, `HTTP_ERROR`).
-- **Auth** (no passwords): the owner signs in with the admin key (`RUNOUT_ADMIN_KEY` env / `.env`); members request access and are approved from the admin panel, which issues `RU-XXXX-XXXX-XXXX` access codes. The session lives at `localStorage.runout.session` and every function call carries `Authorization: Bearer <code>`. See `src/api/auth.js`, `netlify/functions/auth.js` + `admin.js`, `netlify/functions/_shared/`.
-- **Storage**: `netlify/functions/collection.js` is a CRUD API over Netlify Blobs. Every request is authorized (Bearer code / admin key). The owner keeps the legacy stores (`runout-collection` / `runout-library`); each member gets isolated `collection-<userId>-<kind>` stores (see `storeNameFor` in `netlify/functions/_shared/users.js`). The frontend talks to it via `src/api/collection.js` and `src/hooks/useCollection.js` (optimistic updates with rollback on failure).
-- **PWA**: `vite-plugin-pwa` (`vite.config.js`) precaches the shell *and* the scanner `.wasm`, with NetworkFirst caching for the Discogs/Google Books APIs and CacheFirst for their cover images.
+### Scope
 
-## Conventions
+- Work **only on the assigned GitHub issue** and its acceptance criteria.
+- Every ticket belongs to exactly one parent epic.
+- Do not opportunistically fix unrelated issues. Create or request a separate issue when scope expands.
+- Do not redefine architecture, security authority, milestone scope, or agent responsibilities without PM direction and the required ADR.
 
-- Split titles with `splitArtistTitle` from `src/utils/match.js` — never reimplement it. A missing import here has caused real render crashes.
-- **There is no error boundary.** Any uncaught render error unmounts React to a dark screen (`body` background is `#16130F`). Guard new item data paths defensively.
-- User-facing copy belongs in the catalog object's `.copy`, not hardcoded in components.
-- Normalize API responses to the item shape inside `src/api/*`, never in views.
-- Barcodes/ISBNs are cleaned to digits (`/[^0-9Xx]/g`) before searching.
-- Duplicate detection matches on `discogsId` / `googleBooksId` / `barcode` (see `findRelated` in `src/utils/match.js`).
-- **Never leak secrets**: don't log access codes or the admin key; strip the `code` field before sending users to the client (`publicUser` in `netlify/functions/_shared/auth.js`).
-- **Mandatory security gate**: any change touching auth, authorization, user data, payments, storage, caching, external APIs, or databases requires threat modeling + negative security tests and a `Security Auditor` (or `Multi-tenant Security` for tenant isolation) review before it is declared done.
+### Branch discipline
 
-## Tickets & Epics
+- **One issue → one implementation branch → one focused PR.**
+- Never create, rename, delete or switch branches unless explicitly instructed by the PM.
+- Never work directly on `main` for feature/bug implementation.
+- Never share a mutable implementation branch with another agent.
+- Keep branches short-lived. If work becomes too large, split it into smaller issues rather than creating a long-lived mega-branch.
+- Do not create separate branches merely for architecture review, testing, security review or release validation.
+- Review agents should normally review the implementation PR and return evidence; they do not create competing implementation branches.
+- Do not merge your own PR. Integration/merge is controlled by the PM.
 
-- **Every ticket is a GitHub issue and belongs to exactly one parent epic.** Never file a ticket without linking it to its epic issue. If no epic exists for the work, create one (labeled `epic`) before creating any subtask tickets.
-- **Epic naming:** `[DOMAIN]-EPIC-<N>` for work-stream epics (e.g. `SEC-EPIC-1`, `SEC-EPIC-2`, … for security); product/marketing epics use `epic #<N>`. An epic is a numbered issue labeled `epic` that links all of its subtask tickets.
-- **Ticket naming:** numbered issues within an epic, referenced as `#<N>` (e.g. `#176`, `#188`). Follow the epic's `T<k>` subtask ordering (T1, T2, …) and reference the epic + ticket in code/comments/docs as `(EPIC, #ticket)`, e.g. `(SEC-EPIC-1, #176)`. Apply the epic's labels (`backend`, `frontend`, `i18n`, `qa`, `marketing`, `security`, `enhancement`, `priority:P0–P3`, `blocked`).
-- The Project Manager owns this: identify the parent epic before breaking work into tasks, and never hand off a task that isn't tied to a ticket + epic.
-- Live epic/ticket map and milestone plan: `marketing/backlog-grooming-launch-handoff.md`.
+### Parallel execution
 
-## Branching & Version Control
+- Independent implementation workstreams may run in parallel **only after** required architecture, domain and shared contracts are sufficiently stable.
+- Before parallel work, establish ownership boundaries, dependencies, integration points and required gates.
+- If two agents would modify the same contract, schema, migration or ownership boundary, serialize that work or have the PM establish an explicit integration plan first.
+- Prefer one branch/worktree per independent implementation issue. When running multiple local agents concurrently, use separate Git worktrees so agents cannot switch or overwrite each other's working tree.
+- Do not start downstream agents merely to keep them busy; waiting is preferable to redundant context consumption.
 
-- **Never commit new feature work directly to `main`.** Before starting any new feature, create a feature branch from `main`: `git switch -c feat/<kebab-slug>`.
-- Use intent prefixes, kebab-case, short names: `feat/` (features), `fix/` (bug fixes), `docs/` (documentation), `chore/` (tooling/refactors).
-- The Project Manager (or implementing agent) creates the branch before work starts; implementation, tests, and docs for that feature live on it.
-- Sync with `main` regularly (`git fetch origin && git merge origin/main`), and finish with a pull request — don't push straight to `main`.
-- Exceptions are allowed only when the user explicitly says to work on `main`.
+### Implementation discipline
 
-## Build & Test
+- Keep diffs minimal and reviewable.
+- Do not silently change API, data, offline/sync, authentication, authorization, storage or other shared contracts.
+- If a required architecture or contract decision is missing, stop and report the blocker rather than inventing a competing design.
+- Never bypass tests, security controls or acceptance criteria to make a task appear complete.
+- Never commit secrets, credentials, local environment files or private generated data.
+
+## Context and token efficiency
+
+- Start from the issue, acceptance criteria, relevant ADRs and directly affected files.
+- Search for symbols and references before reading large files or the whole repository.
+- Use the **minimum sufficient context** and expand only when evidence requires it.
+- Reference canonical documents rather than copying their full contents into prompts.
+- Reuse valid prior evidence when the underlying code and assumptions have not changed.
+- Do not repeat investigations unless evidence is stale, contradictory or independent verification is explicitly required.
+- Return concise handoffs: status, changed files/surfaces, tests/checks, evidence, risks/blockers and next gate.
+- Token optimization never justifies skipping security, architecture, testing, accessibility, release or required evidence.
+- If context is insufficient for a reliable conclusion, return `NOT VERIFIED`; never guess PASS.
+
+## Completion contract
+
+Before reporting completion:
+
+1. Verify the issue acceptance criteria.
+2. Run the narrowest relevant tests/checks first; expand when failures or risk justify it.
+3. Report exactly what changed and what was validated.
+4. Report unresolved risks/blockers explicitly.
+5. Identify the next required specialist gate, if any.
+6. Leave merge/integration decisions to the PM.
+
+## Existing project conventions
+
+- **Frontend:** shared collection flow and catalog configuration must remain consistent across records and books.
+- **Item shape:** preserve the canonical normalized item model and kind-specific identifiers.
+- **Lookup APIs:** normalize external responses inside `src/api/*`, not views.
+- **Auth/security:** never leak access codes or admin credentials; security-sensitive changes require threat modeling, negative security tests and the appropriate security review.
+- **PWA/offline:** respect the approved offline-first architecture and sync contracts; do not invent local-vs-server consistency semantics in implementation code.
+- **Tickets:** follow existing epic/ticket naming, labels and parent-epic conventions.
+
+## Build & test
 
 ```bash
 npm install --cache "$TMPDIR/npm-cache"
-npm run dev
-netlify dev
 npm run lint
 npm test
 npm run test:coverage
 npm run build
 ```
 
-## Workflows
+Run only the checks relevant to the change first, then the full required suite when the issue/milestone requires it.
 
-- **Agents:** Project Manager (orchestrator); Whole Stack Architect, Front End Architect, Data Architect, Platform Architect and Offline Architect (architecture); API Contract Reviewer; Front End Developer / Runout Engineer (implementation); Tester (quality gate); Security Auditor / Multi-tenant Security (security gates); UI UX Expert / Ergonomics Reviewer (experience); Catalog Designer / Scanner Builder / Netlify Backend (domain implementation); Observability Engineer (operational evidence); Agent Developer (agent system); Marketing Manager (GTM).
-- **Skills:** `agentic-workflow` is the canonical governed execution graph; other skills define domain procedures and must respect its authority/gate model.
+## Agent roles
 
-Detailed docs: `docs/technical.md`, `docs/functional.md`.
+Project Manager: orchestration/integration/milestones. Architecture: Whole Stack, Front End, Data, Platform, Offline, API Contract. Implementation: Front End Developer, Runout Engineer, Catalog Designer, Scanner Builder, Netlify Backend, Sync Engineer. Gates: Tester, Security Auditor, Multi-tenant Security, Ergonomics Reviewer, Release Validator. Design/operations: UI UX Expert, Observability Engineer. Agent system: Agent Developer. Product/GTM: Marketing Manager.
+
+The canonical detailed authority model remains in `docs/agents/responsibility-matrix.md` and `.github/skills/agentic-workflow/SKILL.md`.
