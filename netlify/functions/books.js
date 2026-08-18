@@ -177,11 +177,16 @@ async function lookup(lookupSpec, ttlMs, identity) {
   let res
   try {
     res = await fetchGoogleWithRetry(lookupSpec.endpoint)
-  } catch {
+  } catch (err) {
     // A network error survived the retries — surface HTTP_ERROR.
+    console.warn(`[books] lookup network error (key=${GOOGLE_API_KEY ? 'set' : 'MISSING'}): ${err?.message || err}`)
     return { error: json(502, { error: 'Google Books request failed.', code: 'HTTP_ERROR' }) }
   }
   if (!res.ok) {
+    // Log the actual upstream status so a 403 (invalid/restricted key), a 3xx
+    // (redirect not followed by the SSRF guard), or a 5xx is visible in the
+    // function logs instead of surfacing as an opaque HTTP_ERROR.
+    console.warn(`[books] Google responded ${res.status}${res.headers?.get('location') ? ` (location: ${res.headers.get('location')})` : ''} for ${lookupSpec.cacheKey} (key=${GOOGLE_API_KEY ? 'set' : 'MISSING'})`)
     if (res.status === 429) {
       return { error: json(429, { error: 'Google Books rate limit hit.', code: 'RATE_LIMIT' }) }
     }
