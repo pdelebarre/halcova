@@ -12,6 +12,7 @@ describe('track instrumentation (default-OFF, first-party)', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
+    document.body.innerHTML = ''
   })
 
   it('is disabled by default and only turns on via setTrackingEnabled(true)', () => {
@@ -73,6 +74,49 @@ describe('track instrumentation (default-OFF, first-party)', () => {
     expect(activation.props).toEqual({ kind: 'books', source: 'scan' })
   })
 
+  it('queues one browse event per collection kind when tracking is enabled', async () => {
+    setTrackingEnabled(true)
+    const root = document.createElement('div')
+    root.className = 'collection-view'
+    root.dataset.kind = 'records'
+    document.body.appendChild(root)
+    await new Promise((resolve) => queueMicrotask(resolve))
+    await new Promise((resolve) => queueMicrotask(resolve))
+
+    expect(readQueue().filter((entry) => entry.event === 'browse')).toEqual([
+      expect.objectContaining({ props: { kind: 'records' } }),
+    ])
+
+    const remount = document.createElement('div')
+    remount.className = 'collection-view'
+    remount.dataset.kind = 'records'
+    document.body.appendChild(remount)
+    await new Promise((resolve) => queueMicrotask(resolve))
+    expect(readQueue().filter((entry) => entry.event === 'browse')).toHaveLength(1)
+  })
+
+  it('does not queue browse events when tracking is disabled', async () => {
+    const root = document.createElement('div')
+    root.className = 'collection-view'
+    root.dataset.kind = 'books'
+    document.body.appendChild(root)
+    await new Promise((resolve) => queueMicrotask(resolve))
+    expect(localStorage.getItem(EVENTS_KEY)).toBeNull()
+  })
+
+  it('does not leak identifying browse data', () => {
+    setTrackingEnabled(true)
+    track('browse', {
+      kind: 'records',
+      title: 'A private title',
+      artist: 'A private artist',
+      barcode: '1234567890128',
+      isbn: '9783161484100',
+      token: 'secret-token',
+    })
+    expect(readQueue()[0].props).toEqual({ kind: 'records' })
+  })
+
   it('sanitizes props — drops code/token/key/secret/barcode/isbn/pin/cipher/credential keys and nested objects', () => {
     setTrackingEnabled(true)
     track('gamif_share_exported', {
@@ -99,7 +143,7 @@ describe('track instrumentation (default-OFF, first-party)', () => {
     for (let i = 0; i < 505; i += 1) track('e', { i })
     const queue = readQueue()
     expect(queue).toHaveLength(500)
-    expect(queue[0].props.i).toBe(5) // first 5 dropped
+    expect(queue[0].props.i).toBe(5)
     expect(queue[queue.length - 1].props.i).toBe(504)
   })
 
@@ -131,5 +175,7 @@ describe('track instrumentation (default-OFF, first-party)', () => {
     clearEvents()
     expect(localStorage.getItem(EVENTS_KEY)).toBeNull()
     expect(sessionStorage.getItem('runout.events.activation')).toBeNull()
+    expect(sessionStorage.getItem('runout.events.browse.records')).toBeNull()
+    expect(sessionStorage.getItem('runout.events.browse.books')).toBeNull()
   })
 })
