@@ -1,135 +1,174 @@
 # Halcova — Architecture Decision & Recommendations
 
-- **Status:** Accepted for implementation
+- **Status:** Accepted roadmap baseline
 - **Date:** 2026-08-18
-- **Related ADRs:** ADR-0002 through ADR-0006
+- **Authoring disciplines:** Product / Architecture / UX / Security
+- **ADR registry:** [`docs/adr/`](adr/)
 
 ## Executive decision
 
 Halcova will evolve from a records/books application into a **generic, secure, collector-first collection platform**.
 
-The evolution is incremental. There will be no big-bang rewrite and no separate core architecture per collection type.
+The evolution is incremental. There will be **no big-bang rewrite** and no separate core architecture per collection type.
 
-Target domain:
+The target domain is:
 
 ```text
 CollectionType
-    |
-    +--> Collection
-            |
-            +--> CollectionItem ----> CanonicalItem
+     |
+     +--> Collection
+             |
+             +--> CollectionItem ----> CanonicalItem
 ```
 
-`CanonicalItem` contains reusable catalogue identity/metadata. `CollectionItem` contains the user's ownership relationship and private attributes. This separation is foundational for social, AI, wishlist and marketplace capabilities.
+`CanonicalItem` represents reusable catalogue identity. `CollectionItem` represents a user's relationship to that item and contains ownership/private data.
 
-## Target architecture
+## Target platform
 
 ```text
 React PWA / future native clients
-          |
-       API / BFF
-          |
-Application + Policy Layer
-(authn, authz, validation, commands)
-          |
-Collection Domain Platform
-(CollectionType, Collection, CanonicalItem,
- CollectionItem, Wishlist, Sets, Ownership)
-          |
-     +----+----------------+
-     |                     |
- PostgreSQL          Object storage
-(system of record)   images/documents
-     |
-Provider adapters
-(Discogs, Books, MusicBrainz, etc.)
-     |
-AI Gateway / external providers
+              |
+          API boundary
+              |
+   Authentication + sessions
+              |
+ Authorization + validation
+              |
+       Collection domain
+              |
+   +----------+-----------+
+   |                      |
+PostgreSQL          Object/blob storage
+(system of record)  images/documents
+   |
+Provider adapters ---- AI gateway ---- external providers
+   |
+Social / marketplace / valuation capabilities
 ```
 
-## Architecture recommendations
+The API boundary is intentionally independent of Netlify Functions so the application can later move compute without changing product contracts. ADR-0002 governs the phased Netlify → PostgreSQL → dedicated API evolution.
 
-### 1. Generic collection model
+## Architectural principles
 
-Introduce a collection-type registry with field schemas, capabilities, identifier rules and provider mappings. Records and Books are the first types. Future candidates are Games, Vinyl/Albums, Guitars/Instruments, Trading Cards and Coins.
+1. **Collection type is configuration/domain data, not a separate application.**
+2. **Canonical metadata and personal ownership data are separate.**
+3. **Authentication establishes identity; authorization establishes access.**
+4. **The server is authoritative for ownership, entitlements and mutations.**
+5. **External provider data, imports and LLM output are untrusted.**
+6. **AI uses typed tools and the existing provider-neutral gateway; it never receives unrestricted data access.**
+7. **Social is collection-centric, optional and privacy-first.**
+8. **Offline is optimized for high-value collector workflows, with the server authoritative on synchronization.**
+9. **Security, privacy, accessibility and observability are release gates.**
+10. **Microservices are introduced only when operational requirements justify them.**
 
-Adding a type should require configuration/provider/UX work, **not a new core domain model**.
+## Product/UX architecture
 
-### 2. Persistence and scalability
+The primary interaction remains:
 
-ADR-0002 remains the governing scaling decision: fix hot paths first, move persistence from Netlify Blobs to PostgreSQL at the appropriate scale, and introduce a dedicated API service only when operational requirements justify it. Do not introduce microservices prematurely.
+**Capture → Identify → Confirm → Add → Browse**
 
-Recommended PostgreSQL entities include `users`, `collection_types`, `collections`, `canonical_items`, `collection_items`, `collection_type_fields`, `wishlist_entries`, `sets` and `lookup_cache`. JSONB is allowed for genuinely type-specific attributes with explicit schema validation; it must not become an ungoverned replacement for relational modelling.
+Use one dominant Add action, progressive disclosure, infer-first metadata, one-handed mobile controls, ≥44px touch targets, explicit offline/loading/error states and reusable item-detail patterns. Critical flows target WCAG 2.2 AA.
 
-### 3. API/application layer
+A known item should target **<10 seconds from capture to successful add** under realistic device/network conditions.
 
-Preserve the existing API during migration and adapt it internally to the new domain. New resources should converge on collections, items, collection types, wishlist, sets, profiles, social and AI capabilities.
+## Security baseline
 
-Every mutation follows:
+Every protected operation follows:
 
 ```text
-Authenticate -> Authorize -> Validate -> Execute -> Persist -> Audit
+Authenticate → Authorize → Validate → Execute → Audit safely
 ```
 
-Ownership is always derived from authenticated context. The client is never authoritative for owner IDs or permissions.
+Required controls include object/property-level authorization, server-derived ownership, rate limiting, schema validation, signed private asset access, secret/dependency/SAST scanning, PII-safe logging, security audit events, negative authorization tests, threat modeling and data export/deletion/retention controls.
 
-### 4. Metadata providers
+No new P0 platform capability is production-ready with an unresolved HIGH security finding.
 
-Use provider adapters and normalized internal representations. Provider-specific JSON must not leak into domain entities. Provider failures must be isolated, bounded, cached where appropriate and observable.
+## Data and persistence
 
-### 5. AI
+ADR-0002 remains authoritative for scaling. The preferred relational target is centered on:
 
-AI is an application capability, not a privileged subsystem. All AI operations go through the existing provider-neutral AI gateway.
+```text
+users
+collection_types
+collections
+canonical_items
+collection_items
+collection_type_fields
+wishlist_entries
+sets
+lookup_cache
+social_* / entitlement_* as enabled
+```
 
-Rules: model output is untrusted; tool arguments are schema validated; every tool re-authorizes; minimum necessary data is sent; credentials remain server-side; prompt injection cannot grant permissions; mutations require application authorization/user confirmation where appropriate; calls are rate/cost limited; provider switching remains centralized.
+Use JSONB for genuinely extensible type-specific attributes, with explicit schema validation. Do not use ungoverned JSON as a replacement for core relational invariants.
 
-### 6. Social
+Migration is additive, idempotent, reconcilable and reversible within a defined retirement window (ADR-0014).
 
-Social is collection-centric, not a generic social network. Profiles, public collections, follows and activity are introduced first. Comments, groups and recommendations follow only after moderation and privacy controls exist.
+## External providers
 
-Public DTOs must explicitly allowlist fields. Purchase prices, precise locations, serial numbers, receipts and private notes are private by default.
+Provider adapters normalize external metadata and isolate provider-specific schemas, secrets, rate limits, retries, caching and failures. Shared caches contain only data safe to share across users. Arbitrary provider URLs are never trusted for server-side fetching (ADR-0013).
 
-### 7. UX
+## AI
 
-The core interaction is **Capture -> Identify -> Confirm -> Add -> Browse**.
+AI capabilities include metadata completion, duplicate detection, collection questions, recommendations and image identification. All access goes through the existing provider-neutral gateway so the administrator can change model/provider without application changes or redeployment.
 
-Use one dominant Add action, progressive disclosure, infer-first workflows, one-handed mobile interaction, 44px+ touch targets, explicit loading/offline/error states, global search, grid/list/grouped views and a clear separation between shared metadata and My Copy data. Target WCAG 2.2 AA for critical flows.
+AI is an assistant, not an authority:
 
-The primary product performance target is under 10 seconds from capture to successful add for a known item under realistic conditions.
+```text
+User → AI → typed tool → authorization → domain command/query
+```
 
-### 8. Security
+## Social
 
-Security is a release gate. Required controls include object/property-level authorization, server-side privacy policies, rate limiting, secure signed asset access, schema validation, secret/dependency/SAST scanning, PII-safe logging, audit events, threat modelling, negative authorization tests, and export/deletion/retention controls.
+The social graph is built around collectors, public collections and collection activity. Public DTOs explicitly allowlist fields. Purchase prices, precise locations, serial numbers, receipts and private notes remain private by default. Blocking, reporting, moderation and rate limiting precede broad rollout.
 
-No new platform capability should ship with an unresolved HIGH security finding.
+## Monetization
 
-### 9. Migration
+Entitlements are provider-neutral. Payment providers update normalized application entitlements through signature-verified, idempotent server-side webhooks. Payment data never becomes part of the collection domain. The final merchant-of-record decision remains separate from the domain architecture (ADR-0008).
 
-Migrate incrementally: introduce the generic domain, backfill canonical and ownership entities, reconcile, use read-through compatibility where required, switch writes, verify parity, then retire legacy storage only after a defined rollback/retention window.
+## Delivery sequence
 
-### 10. Delivery sequence
+### P0 — Foundation
 
-**P0:** security/privacy foundation, generic domain, type registry, Books/Records migration, collector-first UX.
+- Security/privacy platform
+- Generic collection domain
+- Collection type registry
+- Books/Records migration
+- Collector-first UX
+- Stable API/validation boundary
 
-**P1:** wishlist/completion, import/bulk operations, additional types, AI intelligence, profiles/public collections, follows/feed.
+### P1 — Differentiation
 
-**P2:** communities, recommendations, valuation, marketplace discovery, buy/sell/trade, insurance/provenance.
+- Wishlist/completion
+- Import/bulk operations
+- Additional collection types
+- AI assistant/metadata intelligence
+- Profiles/public collections
+- Follows/feed
 
-Use feature flags and explicit rollback criteria for social, AI and commerce.
+### P2 — Growth and monetization
 
-## Architectural guardrails
+- Communities/recommendations
+- Valuation
+- Marketplace discovery
+- Buy/sell/trade
+- Insurance/provenance services
 
-1. No big-bang rewrite.
-2. No collection-type-specific core architecture.
-3. No client-authoritative ownership or authorization.
-4. No unrestricted LLM access to data/tools.
-5. No public serialization of private ownership data.
-6. No marketplace before privacy and abuse controls are mature.
-7. No microservices without demonstrated operational need.
-8. No provider-specific models leaking into the domain.
-9. No UX complexity that is not justified by measured user value.
-10. No P0 production release with unresolved HIGH security findings.
+Feature flags, release gates and rollback criteria apply to every phase.
 
-## Roadmap issues
+## Related GitHub roadmap
 
-#313 Generic Collection Platform · #319 Collector UX · #331 AI · #325 Social · #337 Security · #348 Type Expansion · #343 Marketplace · #354 Transformation · #355 Roadmap/Gates · #356 Cross-functional readiness.
+- #313 Generic Collection Platform
+- #319 Collector-First Mobile Experience
+- #325 Collector Social & Discovery
+- #331 Collection Intelligence & AI Assistant
+- #337 Collection Platform Security & Privacy
+- #343 Collector Marketplace & Value Services
+- #348 Collection Type Expansion, Import & Growth
+- #354 Collection Platform Product Transformation
+- #355 Transformation Roadmap, Dependencies & Release Gates
+- #356 Cross-Functional Architecture, UX, Security & Product Readiness Review
+
+## ADR governance
+
+ADR-0015 defines the ADR lifecycle. ADR numbers are unique; superseded decisions are explicitly marked rather than left as contradictory active decisions.
