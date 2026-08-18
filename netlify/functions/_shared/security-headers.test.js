@@ -41,6 +41,9 @@ describe('SEC-3.4 (#197) — netlify.toml carries the production security header
     const src = await netlifyToml()
     const cspLine = src.split('\n').find((l) => l.includes('Content-Security-Policy'))
     expect(cspLine).toContain("script-src 'self'")
+    // The barcode scanner compiles WebAssembly (zxing-wasm); the CSP must allow
+    // wasm compilation without allowing eval() — 'wasm-unsafe-eval'.
+    expect(cspLine).toContain("script-src 'self' 'wasm-unsafe-eval'")
     expect(cspLine).toContain("style-src 'self' 'unsafe-inline'")
     // Cover/lookup hosts allowed for images.
     expect(cspLine).toContain('*.discogs.com')
