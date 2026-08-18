@@ -14,30 +14,87 @@ Halcova's agents are nodes, specialist handoffs are edges, shared task context i
 - An implementation agent must not approve its own security or quality gate.
 - A failed gate loops work back to the responsible implementer or design authority.
 - Future milestones are not automatically authorized because capacity exists; advance only after the current milestone passes its exit gates in #355.
+- Governance changes affecting authority, veto rights, separation of duties, or milestone advancement require an ADR and corresponding update to the responsibility matrix and this skill.
 
 ## Agent inventory and authority
 
-| Node | Primary responsibility | Gate authority |
+The following is the canonical operational roster. Names must match the repository agent definitions; do not invent substitute roles.
+
+| Agent | Primary responsibility | Authority / gate |
 |---|---|---|
-| Project Manager | plan, delegate, coordinate, milestone decision | milestone accountability; cannot override specialist FAIL |
-| Whole Stack Architect | end-to-end architecture | architecture gate |
-| Front End Architect | frontend architecture | frontend architecture gate |
-| Data Architect | schema/migrations/isolation | data/migration gate |
-| Platform Architect | deployment/operations | operational readiness gate |
-| Offline Architect | offline/sync | sync architecture gate |
-| API Contract Reviewer | API compatibility/contracts | API contract gate |
-| Front End Developer / Runout Engineer | implementation | none over own work |
-| Catalog Designer | collection-type design | domain design input |
-| Scanner Builder | scanner implementation | specialist input |
-| Netlify Backend | functions/Blobs/auth/PWA implementation | none over own work |
-| Tester | tests, regression, coverage | required quality gate |
-| Security Auditor | application security | **blocking security gate** |
-| Multi-tenant Security | tenant isolation | **blocking tenant-security gate** |
-| Ergonomics Reviewer | UX/a11y review | **blocking gate for defined critical UX** |
-| UI UX Expert | design/Figma/UX | design authority; critical UX independently reviewed |
-| Observability Engineer | logs/metrics/diagnostics | operational evidence |
-| Agent Developer | agents/prompts/skills | agent-system implementation; governance changes require ADR |
-| Marketing Manager | positioning/GTM/content | product-truth input; no technical override |
+| **Project Manager** | Scope, prioritisation, sequencing, delegation, dependencies, risk, milestone decisions | **Accountable for delivery; cannot override mandatory specialist FAIL** |
+| **Whole Stack Architect** | End-to-end architecture and cross-layer design | Architecture gate |
+| **Front End Architect** | React/frontend architecture and component boundaries | Frontend architecture gate |
+| **Data Architect** | Data model, schema, migrations, isolation and reconciliation | Data/migration gate |
+| **Platform Architect** | Deployment, infrastructure and operational topology | Platform/operational gate |
+| **Offline Architect** | Offline-first architecture, consistency and sync model | Offline/sync architecture gate |
+| **API Contract Reviewer** | API contracts, compatibility, errors and idempotency | API contract gate |
+| **Front End Developer** | Frontend implementation | No authority over own quality/security gate |
+| **Runout Engineer** | Cross-app implementation, catalog/scanner/PWA integration | No authority over own quality/security gate |
+| **Catalog Designer** | Collection-kind/domain design | Domain design authority within assigned scope; architecture/security still govern |
+| **Scanner Builder** | Camera/barcode/scanner implementation | No authority over own security/quality gate |
+| **Netlify Backend** | Netlify functions, Blobs, auth/admin/PWA backend implementation | No authority over own security/quality gate |
+| **Sync Engineer** | IndexedDB persistence, mutation queues, push/pull sync, retries | Implementation authority only; Offline Architect owns architecture |
+| **Tester** | Automated tests, regression, coverage and QA evidence | **Blocking quality gate** |
+| **Security Auditor** | Application security, threat modelling and negative security tests | **Blocking security gate** |
+| **Multi-tenant Security** | Tenant isolation, membership, IDOR and privilege boundaries | **Blocking tenant-security gate** |
+| **Ergonomics Reviewer** | Accessibility, mobile ergonomics, discoverability and critical UX review | **Blocking gate for explicitly critical UX** |
+| **UI UX Expert** | Product UI/UX design and Figma/design-system work | Design authority/input; critical UX independently reviewed by Ergonomics Reviewer |
+| **Observability Engineer** | Logging, metrics, diagnostics and operational evidence | Operational evidence authority; Platform Architect governs topology |
+| **Release Validator** | Build, tests, coverage, security evidence, migrations and release/PWA readiness | **Blocking release-readiness gate when assigned** |
+| **Agent Developer** | Agents, prompts, skills and agent-system implementation | Implementation authority only; governance changes require ADR/PM approval |
+| **Marketing Manager** | Positioning, messaging, GTM and product communication | Product/GTM input; no technical or security override |
+
+### Authority hierarchy
+
+```text
+Project Manager
+  │
+  ├── accountable for delivery, scope, sequencing and milestone advancement
+  │
+  ├── Architecture authority
+  │     ├── Whole Stack Architect
+  │     ├── Front End Architect
+  │     ├── Data Architect
+  │     ├── Platform Architect
+  │     ├── Offline Architect
+  │     └── API Contract Reviewer
+  │
+  ├── Security authority
+  │     ├── Security Auditor
+  │     └── Multi-tenant Security
+  │
+  ├── Quality / release authority
+  │     ├── Tester
+  │     └── Release Validator
+  │
+  ├── Experience authority
+  │     ├── Ergonomics Reviewer
+  │     └── UI UX Expert
+  │
+  ├── Delivery specialists
+  │     ├── Front End Developer
+  │     ├── Runout Engineer
+  │     ├── Catalog Designer
+  │     ├── Scanner Builder
+  │     ├── Netlify Backend
+  │     └── Sync Engineer
+  │
+  ├── Operations evidence
+  │     └── Observability Engineer
+  │
+  ├── Agent-system governance
+  │     └── Agent Developer
+  │
+  └── Product / GTM
+        └── Marketing Manager
+```
+
+### Non-overridable rule
+
+The PM may resolve scope, sequencing and trade-off conflicts, but **may not declare a milestone complete when a mandatory security, architecture, testing, API/data, release, or explicitly critical UX gate is FAIL**.
+
+A specialist must provide evidence for PASS. Documentation-only assertions are insufficient for security and quality gates.
 
 ## State passed on every handoff
 
@@ -68,17 +125,19 @@ graph TD
   G -- API/data --> J[API/Data Architect Review]
   G -- UX --> K[Ergonomics / UI UX Review]
   G -- operations --> L[Platform / Observability Review]
-  G -- none --> M[PM Gate]
-  H --> N{PASS?}
-  I --> N
-  J --> N
-  K --> N
-  L --> N
-  N -- no --> D
-  N -- yes --> M
-  M --> O{Milestone exit criteria PASS?}
-  O -- no --> B
-  O -- yes --> P[PM: close evidence + authorize next milestone]
+  G -- release --> M[Release Validator]
+  G -- none --> N[PM Gate]
+  H --> O{All required gates PASS?}
+  I --> O
+  J --> O
+  K --> O
+  L --> O
+  M --> O
+  O -- no --> D
+  O -- yes --> P[PM Gate]
+  P --> Q{Milestone exit criteria PASS?}
+  Q -- no --> B
+  Q -- yes --> R[PM: close evidence + authorize next milestone]
 ```
 
 ## Mandatory gates
@@ -98,6 +157,17 @@ For M2 critical journeys and other explicitly gated user experiences, `Ergonomic
 ### API/data/operations
 API compatibility, migration safety, rollback, backup/restore, observability and operational readiness are gated when applicable.
 
+### Release
+`Release Validator` validates the release evidence bundle when assigned. It does not replace Security Auditor, Tester or Architecture authority; it verifies that their required evidence exists and that build/test/coverage/migration/PWA readiness checks pass.
+
+## Separation of duties
+
+- An implementation agent must not approve its own security or quality gate.
+- `Agent Developer` cannot unilaterally redefine agent authority or veto rights.
+- `Release Validator` cannot waive a failed specialist gate.
+- `Marketing Manager` cannot override security, architecture, quality or accessibility constraints.
+- The PM cannot convert a specialist FAIL into PASS without the specialist re-reviewing new evidence.
+
 ## Loops
 
 - Security FAIL → remediate → Security re-review.
@@ -106,6 +176,7 @@ API compatibility, migration safety, rollback, backup/restore, observability and
 - Architecture FAIL → design/implementation loop.
 - API/data FAIL → contract/data loop.
 - UX FAIL → design/implementation loop.
+- Release validation FAIL → remediate evidence/implementation → Release Validator re-review.
 - Build/lint FAIL → implementer loop.
 
 No gate may be silently waived.
@@ -119,8 +190,9 @@ For each milestone from #355:
 3. Architecture/domain agents produce required decisions.
 4. Implementers execute.
 5. Tester and specialist gates collect evidence.
-6. PM records PASS/HOLD/FAIL and residual risk.
-7. Only PASS authorizes the next milestone; the next milestone is re-groomed using evidence from the completed one.
+6. Release Validator verifies release readiness when applicable.
+7. PM records PASS/HOLD/FAIL and residual risk.
+8. Only PASS authorizes the next milestone; the next milestone is re-groomed using evidence from the completed one.
 
 ## Checklist
 
@@ -130,7 +202,9 @@ For each milestone from #355:
 - [ ] No agent approves its own work where an independent gate is required.
 - [ ] State passed across every handoff.
 - [ ] Security gate applied whenever required.
+- [ ] Required architecture/data/API/UX/quality gates identified.
 - [ ] Required specialist gates PASS.
+- [ ] Release Validator PASS when release readiness is in scope.
 - [ ] `npm run lint`, `npm test`, `npm run test:coverage`, `npm run build` pass when applicable.
 - [ ] Evidence and residual risks recorded.
 - [ ] PM advances only after milestone exit criteria PASS.
