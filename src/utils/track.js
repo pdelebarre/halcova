@@ -14,6 +14,7 @@
 
 const EVENTS_KEY = 'runout.events'
 const ENABLED_KEY = 'runout.events.enabled'
+const ACTIVATION_KEY = 'runout.events.activation'
 const MAX_EVENTS = 500
 
 /** Secret-like key pattern — any matching prop key is dropped before queueing. */
@@ -70,16 +71,37 @@ function writeQueue(queue) {
   } catch { /* never throw (e.g. storage full) */ }
 }
 
+function markActivationOnce() {
+  try {
+    if (sessionStorage.getItem(ACTIVATION_KEY) === '1') return false
+    sessionStorage.setItem(ACTIVATION_KEY, '1')
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Queue one event when tracking is enabled. A no-op otherwise — including for
  * a missing/non-string event name. Props are sanitized before queueing.
+ *
+ * A successful owned-item add already calls `gamif_item_added`. The first such
+ * event in a browser session is the existing app's best authoritative signal
+ * for activation, so capture `activation` here without adding another call
+ * site or risking a double-fire under React StrictMode.
  */
 export function track(event, props = {}) {
   if (!isTrackingEnabled()) return
   if (!event || typeof event !== 'string') return
-  const entry = { event, ts: new Date().toISOString(), props: sanitize(props) }
+
+  const safeProps = sanitize(props)
   const queue = readQueue()
-  queue.push(entry)
+  queue.push({ event, ts: new Date().toISOString(), props: safeProps })
+
+  if (event === 'gamif_item_added' && markActivationOnce()) {
+    queue.push({ event: 'activation', ts: new Date().toISOString(), props: { kind: safeProps.kind, source: safeProps.source } })
+  }
+
   writeQueue(queue)
 }
 
@@ -96,5 +118,8 @@ export function flushEvents() {
 export function clearEvents() {
   try {
     localStorage.removeItem(EVENTS_KEY)
+  } catch { /* never throw */ }
+  try {
+    sessionStorage.removeItem(ACTIVATION_KEY)
   } catch { /* never throw */ }
 }
