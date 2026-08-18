@@ -1,6 +1,6 @@
 ---
 name: agentic-workflow
-description: 'Run Halcova as a governed agent graph: the Project Manager orchestrates, specialist agents own domain decisions, mandatory security/quality gates can block completion, failed gates loop back to implementation, parallel work is used safely, and agents minimize unnecessary context/token consumption. Use for milestone execution, feature planning, agent DAGs, handoffs, release gates, governance, orchestration, or context-efficient execution.'
+description: 'Run Halcova as a governed agent graph: the Project Manager orchestrates, specialist agents own domain decisions, mandatory security/quality gates can block completion, failed gates loop back to implementation, parallel work is used safely, agents minimize unnecessary context/token consumption, and the PM builds an adaptive minimal agent DAG per task.'
 ---
 # Agentic Workflow — Governed Delivery Graph
 
@@ -16,6 +16,7 @@ Halcova's agents are nodes, specialist handoffs are edges, shared task context i
 - Future milestones are not automatically authorized because capacity exists; advance only after the current milestone passes its exit gates in #355.
 - Governance changes affecting authority, veto rights, separation of duties, or milestone advancement require an ADR and corresponding update to the responsibility matrix and this skill.
 - **Token/context efficiency is a delivery constraint, not a quality shortcut.** Agents MUST minimize unnecessary context while preserving correctness, security, architecture, testing and required evidence.
+- **The PM is the graph compiler:** for each ticket/workstream it selects the smallest safe set of agents and gates required by deterministic trigger rules.
 
 ## Agent inventory and authority
 
@@ -97,6 +98,80 @@ The PM may resolve scope, sequencing and trade-off conflicts, but **may not decl
 
 A specialist must provide evidence for PASS. Documentation-only assertions are insufficient for security and quality gates.
 
+## Adaptive Agent Graph Protocol
+
+The PM MUST build a **minimal safe DAG** for every ticket or workstream before assigning agents. The graph is adaptive: agents are added because deterministic ticket characteristics trigger their responsibility or because a dependency requires them.
+
+### Ticket classification
+
+Classify each ticket by:
+
+- domain: frontend / backend / data / platform / scanner / catalog / sync / agent-system / product;
+- complexity: low / medium / high;
+- architecture impact: none / local / cross-layer;
+- security impact: none / application / tenant / sensitive-data;
+- data impact: none / query / schema / migration / reconciliation;
+- API impact: none / consumer-visible / contract-breaking / idempotency;
+- offline impact: none / cache / local-write / sync / conflict;
+- UX impact: none / normal / critical journey / accessibility;
+- operational impact: none / observability / deployment / rollback;
+- release impact: none / release-critical;
+- dependencies and milestone constraints.
+
+If classification is uncertain, use the safer routing and obtain the smallest specialist clarification needed.
+
+### Deterministic routing rules
+
+| Trigger | Mandatory specialist(s) |
+|---|---|
+| Cross-layer architecture change | Whole Stack Architect |
+| React/frontend architecture boundary | Front End Architect |
+| Schema, migration, reconciliation or data model change | Data Architect |
+| Deployment/infrastructure/topology change | Platform Architect |
+| Offline cache, local writes, sync or conflict semantics | Offline Architect |
+| Consumer-visible API or compatibility change | API Contract Reviewer |
+| Auth, authorization, sensitive user data, storage, caching, external API or database security boundary | Security Auditor |
+| Tenant/membership/IDOR/privilege boundary | Multi-tenant Security |
+| Critical mobile journey or accessibility gate | Ergonomics Reviewer |
+| Product UI/UX design work | UI UX Expert |
+| Logging/metrics/diagnostics/operational evidence | Observability Engineer |
+| Release/build/PWA/deployment readiness | Release Validator |
+| Automated regression/coverage requirement | Tester |
+| Agent/skill/prompt/governance change | Agent Developer + PM; ADR when governance changes |
+| Collection-kind/domain model design | Catalog Designer |
+| Scanner/camera/barcode capability | Scanner Builder |
+| Netlify functions/Blobs/auth/PWA backend | Netlify Backend |
+| IndexedDB/outbox/push-pull/retry implementation | Sync Engineer |
+
+These are mandatory routing rules. The PM may add agents for risk or dependencies but may not omit a mandatory specialist triggered by the ticket.
+
+### Gate-by-exception
+
+Do **not** invoke every specialist for every ticket. Invoke the minimum graph satisfying deterministic routing rules, dependencies and milestone exit criteria. Record ambiguous omissions.
+
+### Minimal graph examples
+
+```text
+Low-risk UI:
+PM → Front End Developer → Tester → PM
+
+Frontend architecture:
+PM → Front End Architect → Front End Developer → Tester → PM
+
+Offline synchronization:
+PM → Offline Architect → triggered Data/API specialists
+  → Sync Engineer / Backend → Tester + Security Auditor
+  → Release Validator if release-critical → PM
+
+Tenant authorization:
+PM → Security Auditor + Multi-tenant Security → Backend
+  → Tester → Security re-review → PM
+```
+
+### Independent review
+
+Implementation agents never provide their own mandatory security or quality approval.
+
 ## State passed on every handoff
 
 At minimum pass:
@@ -118,7 +193,7 @@ Agents MUST optimize for **minimum sufficient context**. Token efficiency must n
 
 ### Context acquisition
 
-- Start with the ticket, acceptance criteria, relevant parent epic and required ADRs.
+- Start with the ticket, acceptance criteria, relevant parent epic and triggered ADRs.
 - Inspect targeted files, symbols, directories and tests before opening large files or the entire repository.
 - Use search to locate relevant symbols/references before reading broad code areas.
 - Read only the sections needed for the current decision or implementation.
@@ -162,28 +237,11 @@ Parallelism must not multiply redundant investigation.
 
 Agents should return concise, evidence-oriented results rather than long narratives.
 
-A completed implementation handoff should normally contain:
-
-- outcome;
-- changed files/components;
-- tests/checks run;
-- evidence/results;
-- unresolved risks;
-- next required gate.
-
-Do not reproduce code or logs in the handoff unless the exact excerpt is required to explain a defect or decision.
+A completed implementation handoff should normally contain outcome, changed files/components, tests/checks run, evidence/results, unresolved risks and next required gate. Do not reproduce code or logs unless the exact excerpt is required.
 
 ### Safety boundary
 
-Token optimization is **never** a reason to skip:
-
-- security review required by the matrix;
-- tenant-isolation validation;
-- architecture decisions required by an ADR;
-- mandatory tests or coverage;
-- required accessibility/ergonomics review;
-- release validation;
-- evidence needed to substantiate a PASS.
+Token optimization is **never** a reason to skip security review, tenant-isolation validation, architecture decisions, mandatory tests/coverage, required accessibility/ergonomics review, release validation, or evidence needed to substantiate PASS.
 
 If context is insufficient for a reliable gate decision, the agent MUST obtain more context or return `NOT VERIFIED`; it must not infer PASS to save tokens.
 
@@ -199,15 +257,6 @@ The PM MUST identify independent workstreams and execute them concurrently when 
 4. Identify dependencies and integration points.
 5. Create one branch per implementation workstream.
 6. Define required validation gates for each workstream.
-
-### Parallelism is permitted only when
-
-- prerequisite architecture decisions are resolved;
-- shared contracts are stable enough for implementation;
-- workstreams have independent ownership boundaries or explicit coordination points;
-- no two agents are concurrently editing the same ownership boundary without a deliberate integration plan;
-- security boundaries are understood;
-- integration and validation responsibilities are explicit.
 
 ### Parallelism is prohibited when
 
@@ -225,37 +274,13 @@ For parallel implementation:
 - one branch → one focused PR where practical;
 - implementation agents do not share a mutable feature branch;
 - the PM owns integration ordering;
-- merge conflicts or semantic contract conflicts return to the relevant architecture/implementation owners rather than being silently resolved by an unrelated agent.
+- merge conflicts or semantic contract conflicts return to the relevant architecture/implementation owners.
 
 ### Workstream ownership record
 
-Every parallel workstream should have:
-
-- owner agent;
-- branch;
-- files/components/API surfaces owned;
-- dependencies;
-- consumers;
-- integration point;
-- required validation agents;
-- expected evidence.
-
-Example:
-
-```text
-M2-Offline-Storage
-Owner: Sync Engineer
-Architecture: Offline Architect
-Branch: agent/m2-offline-storage
-Depends on: #152, #159
-Owns: storage/sync modules
-Consumed by: Front End Developer, Scanner Builder
-Validation: Tester, Security Auditor
-```
+Every parallel workstream should record owner agent, branch, files/components/API surfaces owned, dependencies, consumers, integration point, required validation agents and expected evidence.
 
 ### Parallel completion model
-
-The PM should maintain work in states such as:
 
 ```text
 READY → IN PROGRESS → WAITING → READY FOR REVIEW → VALIDATED → INTEGRATED → DONE
@@ -265,61 +290,32 @@ Independent work may occupy these states concurrently. The PM must avoid unneces
 
 ### Milestone versus workstream sequencing
 
-**Milestones remain sequential:**
+**Milestones remain sequential:** `M0 → M1 → M2 → M3 → M4 → M5 → M6`
 
-`M0 → M1 → M2 → M3 → M4 → M5 → M6`
-
-**Work inside a milestone may be highly parallel:**
-
-```text
-M2
-├── Collector UI
-├── Scanner
-├── Offline storage
-├── Search
-└── Backend/API
-      ↓
-  integration + validation
-      ↓
-  milestone gate
-```
-
-Do not start a later milestone merely because independent work remains in the current milestone. Strategic progression remains gate-driven.
+Work inside a milestone may be highly parallel. Do not start a later milestone merely because independent work remains in the current milestone. Strategic progression remains gate-driven.
 
 ## Canonical execution graph
 
 ```mermaid
 graph TD
-  A[Request / Milestone] --> B[PM: PLAN + DAG + branch/workstream ownership]
-  B --> C[Architecture / Domain / Contract Design]
-  C --> D1[Parallel Workstream A]
-  C --> D2[Parallel Workstream B]
-  C --> D3[Parallel Workstream C]
-  D1 --> E[Integration]
-  D2 --> E
-  D3 --> E
-  E --> F[Tester]
-  F --> G{Tests / coverage PASS?}
-  G -- no --> D1
-  G -- yes --> H{Specialist gates required?}
-  H -- security --> I[Security Auditor]
-  H -- tenant --> J[Multi-tenant Security]
-  H -- API/data --> K[API/Data Architect Review]
-  H -- UX --> L[Ergonomics / UI UX Review]
-  H -- operations --> M[Platform / Observability Review]
-  H -- release --> N[Release Validator]
-  H -- none --> O[PM Gate]
-  I --> P{All required gates PASS?}
-  J --> P
-  K --> P
-  L --> P
-  M --> P
-  N --> P
-  P -- no --> D1
-  P -- yes --> O
-  O --> Q{Milestone exit criteria PASS?}
-  Q -- no --> B
-  Q -- yes --> R[PM: close evidence + authorize next milestone]
+  A[Ticket / Milestone] --> B[PM: classify + compile minimal DAG]
+  B --> C{Mandatory specialist trigger?}
+  C -->|yes| D[Required authority agents]
+  C -->|no| E[Minimal implementation path]
+  D --> F[Shared decisions/contracts]
+  F --> G[Implementation]
+  E --> G
+  G --> H[Parallel independent workstreams]
+  H --> I[Integration]
+  I --> J[Tester]
+  J --> K{Required gates PASS?}
+  K -->|no| L[Targeted remediation]
+  L --> G
+  K -->|yes| M[Release Validator if triggered]
+  M --> N[PM milestone gate]
+  N --> O{Exit criteria PASS?}
+  O -->|no| B
+  O -->|yes| P[Authorize next milestone]
 ```
 
 ## Mandatory gates
@@ -368,14 +364,14 @@ No gate may be silently waived.
 For each milestone from #355:
 
 1. PM verifies entry criteria and scope.
-2. PM decomposes work and assigns agents using the responsibility matrix.
-3. PM builds a dependency DAG and identifies parallel workstreams.
-4. Architecture/domain/contract agents produce required decisions before dependent parallel implementation begins.
-5. PM establishes branch and ownership boundaries for parallel work.
-6. Implementers execute independent workstreams concurrently where permitted.
+2. PM classifies tickets and compiles minimal safe DAGs.
+3. PM assigns agents using deterministic responsibility triggers.
+4. Required architecture/domain/contract agents decide before dependent implementation.
+5. PM establishes branch and ownership boundaries.
+6. Independent implementation workstreams execute concurrently where permitted.
 7. PM coordinates integration at explicit contract boundaries.
-8. Tester and specialist gates collect evidence.
-9. Release Validator verifies release readiness when applicable.
+8. Tester and triggered specialist gates collect evidence.
+9. Release Validator verifies readiness when applicable.
 10. PM records PASS/HOLD/FAIL and residual risk.
 11. Only PASS authorizes the next milestone; the next milestone is re-groomed using evidence from the completed one.
 
@@ -383,19 +379,17 @@ For each milestone from #355:
 
 - [ ] Governance docs loaded.
 - [ ] PM owns plan and milestone accountability.
-- [ ] Specialist authority identified.
+- [ ] Ticket classification completed.
+- [ ] Minimal safe DAG compiled.
+- [ ] Mandatory specialist triggers identified and none omitted.
+- [ ] No unnecessary specialist agents launched.
 - [ ] No agent approves its own work where an independent gate is required.
-- [ ] State passed across every handoff.
-- [ ] Context is limited to the minimum sufficient information.
-- [ ] Canonical documents are referenced rather than unnecessarily copied.
-- [ ] No redundant investigations or validations are consuming context.
+- [ ] Minimum sufficient context used.
+- [ ] Canonical documents referenced rather than unnecessarily copied.
+- [ ] No redundant investigations consume context.
 - [ ] Architecture/contracts established before dependent parallel work.
 - [ ] Parallel workstreams have clear ownership and branches.
-- [ ] No unsafe shared ownership or unresolved semantic contract conflicts.
-- [ ] Security gate applied whenever required.
-- [ ] Required architecture/data/API/UX/quality gates identified.
 - [ ] Required specialist gates PASS.
-- [ ] Release Validator PASS when release readiness is in scope.
-- [ ] `npm run lint`, `npm test`, `npm run test:coverage`, `npm run build` pass when applicable.
+- [ ] Required tests/coverage/build checks pass.
 - [ ] Evidence and residual risks recorded.
 - [ ] PM advances only after milestone exit criteria PASS.
