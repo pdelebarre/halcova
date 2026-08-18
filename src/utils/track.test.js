@@ -11,6 +11,7 @@ function readQueue() {
 describe('track instrumentation (default-OFF, first-party)', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
   })
 
   it('is disabled by default and only turns on via setTrackingEnabled(true)', () => {
@@ -37,6 +38,39 @@ describe('track instrumentation (default-OFF, first-party)', () => {
     expect(queue[0].props).toEqual({ kind: 'records', shared: false })
     expect(typeof queue[0].ts).toBe('string')
     expect(Number.isNaN(Date.parse(queue[0].ts))).toBe(false)
+  })
+
+  it('records activation after the first successful owned-item add', () => {
+    setTrackingEnabled(true)
+    track('gamif_item_added', { kind: 'records', source: 'scan' })
+    const queue = readQueue()
+    expect(queue).toHaveLength(2)
+    expect(queue[0].event).toBe('gamif_item_added')
+    expect(queue[1].event).toBe('activation')
+    expect(queue[1].props).toEqual({ kind: 'records', source: 'scan' })
+  })
+
+  it('records activation only once per browser session', () => {
+    setTrackingEnabled(true)
+    track('gamif_item_added', { kind: 'records', source: 'manual' })
+    track('gamif_item_added', { kind: 'records', source: 'scan' })
+    const queue = readQueue()
+    expect(queue.filter((entry) => entry.event === 'activation')).toHaveLength(1)
+  })
+
+  it('does not leak identifying add data into the activation event', () => {
+    setTrackingEnabled(true)
+    track('gamif_item_added', {
+      kind: 'books',
+      source: 'scan',
+      title: 'A private title',
+      artist: 'A private artist',
+      barcode: '1234567890128',
+      isbn: '9783161484100',
+      token: 'secret-token',
+    })
+    const activation = readQueue().find((entry) => entry.event === 'activation')
+    expect(activation.props).toEqual({ kind: 'books', source: 'scan' })
   })
 
   it('sanitizes props — drops code/token/key/secret/barcode/isbn/pin/cipher/credential keys and nested objects', () => {
@@ -96,5 +130,6 @@ describe('track instrumentation (default-OFF, first-party)', () => {
     expect(readQueue()).toHaveLength(1)
     clearEvents()
     expect(localStorage.getItem(EVENTS_KEY)).toBeNull()
+    expect(sessionStorage.getItem('runout.events.activation')).toBeNull()
   })
 })
