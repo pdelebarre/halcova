@@ -279,4 +279,52 @@ describe('MusicBrainz fallback chain (RES-1.2 T2, #288)', () => {
     const body = await res.json()
     expect(body.code).toBe('HTTP_ERROR') // primary's original error code preserved
   })
+
+  // Explicit regression pin for the NO_FALLBACK_CODES suppression behavior
+  // ({BAD_TOKEN, SERVER_NO_TOKEN, PROVIDER_RATE_LIMIT, RATE_LIMIT}): a token /
+  // config problem is an ops signal that must NOT be masked by quietly routing
+  // every lookup to MusicBrainz, and a rate limit must not pile extra load onto
+  // the fallback provider while Discogs is already throttled. In each case the
+  // fallback never fires — MusicBrainz (musicbrainz.org) is never contacted.
+
+  it('fallback does NOT fire on a Discogs 401 (BAD_TOKEN) — MusicBrainz never contacted', async () => {
+    // A 401 is a non-retryable upstream status, so lookupFetch returns after a
+    // SINGLE Discogs fetch — exactly once, and never on musicbrainz.org.
+    global.fetch.mockResolvedValue(upstream(401, { message: 'invalid token' }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('BAD_TOKEN')
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const only = new URL(String(global.fetch.mock.calls[0][0]))
+    expect(only.hostname).toBe('api.discogs.com') // MusicBrainz never contacted
+  })
+
+  it('fallback does NOT fire on a Discogs 429 (PROVIDER_RATE_LIMIT) — no MB load piled on', async () => {
+    // 429 is RETRYABLE through the real lookupFetch helper, so the Discogs host
+    // may legitimately be hit more than once. What we pin here is that NOT A
+    // SINGLE call ever leaves for musicbrainz.org, and the server-side
+    // PROVIDER_RATE_LIMIT code surfaces unchanged to the client.
+    global.fetch.mockResolvedValue(upstream(429, { message: 'rate limited' }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('PROVIDER_RATE_LIMIT')
+    expect(global.fetch.mock.calls.length).toBeGreaterThan(0)
+    for (const call of global.fetch.mock.calls) {
+      expect(new URL(String(call[0])).hostname).toBe('api.discogs.com') // never musicbrainz.org
+    }
+  })
+
+  it('fallback does NOT fire when the token is missing (SERVER_NO_TOKEN) — no fetch at all', async () => {
+    // A missing token is a server misconfiguration (SERVER_NO_TOKEN in
+    // NO_FALLBACK_CODES). It short-circuits before ANY network call, so neither
+    // Discogs nor MusicBrainz is contacted and the fallback never fires.
+    delete process.env.RUNOUT_DISCOGS_TOKEN
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.code).toBe('SERVER_NO_TOKEN')
+    expect(global.fetch).not.toHaveBeenCalled() // neither Discogs nor MusicBrainz
+  })
 })

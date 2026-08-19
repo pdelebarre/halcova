@@ -105,6 +105,22 @@ describe('searchBarcode', () => {
     expect(out).toEqual({ results: [] })
   })
 
+  it('returns the empty envelope (not throw) for a non-3xx upstream error status (5xx / 404)', async () => {
+    // A non-redirect, non-ok upstream status (e.g. 500 or 404) must NOT throw
+    // to the caller or leak provider details — the adapter surfaces it as the
+    // normalized empty { results: [] } envelope so the fallback chain degrades
+    // gracefully to "no result".
+    lookupFetch.mockResolvedValue(upstream({ detail: 'boom' }, { status: 500 }))
+    expect(await searchBarcode('07464405491')).toEqual({ results: [] })
+
+    lookupFetch.mockResolvedValue(upstream({ error: 'not found' }, { status: 404 }))
+    expect(await searchBarcode('07464405491')).toEqual({ results: [] })
+
+    // Same safe degradation through the free-text path.
+    lookupFetch.mockResolvedValue(upstream({ detail: 'boom' }, { status: 503 }))
+    expect(await searchText('kind of blue')).toEqual({ results: [] })
+  })
+
   it('returns an empty envelope for a missing/empty barcode', async () => {
     expect(await searchBarcode('   ')).toEqual({ results: [] })
     expect(lookupFetch).not.toHaveBeenCalled()
