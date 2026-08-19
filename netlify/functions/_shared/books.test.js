@@ -106,3 +106,49 @@ describe('cover action — public SSRF surface (via the books handler)', () => {
     })
   }
 })
+
+describe('error-code mapping through the real lookupFetch (T1 handler integration, #284)', () => {
+  // Drive the ACTUAL handler with a mocked global.fetch. The shared T1 helper
+  // (lookup-fetch.js) runs for REAL inside the handler — we do not stub the
+  // helper, only the network. `retry-after: 1` keeps the helper's real backoff
+  // deterministic (each retry sleeps exactly ~1s instead of random jitter).
+  function upstream(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (String(name).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify(body),
+    }
+  }
+
+  it('transient 429 then 200 -> returns the items payload (success)', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(429, {}))
+      .mockResolvedValueOnce(upstream(200, { items: [{ id: 'b1' }] }))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=test'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toEqual([{ id: 'b1' }])
+    // The 429 was actually retried through the helper, not returned to the user.
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('persistent 429 -> PROVIDER_RATE_LIMIT (distinct from our own RATE_LIMIT)', async () => {
+    global.fetch.mockResolvedValue(upstream(429, {}))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=test'))
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('PROVIDER_RATE_LIMIT')
+    // The provider's upstream 429 must surface as PROVIDER_RATE_LIMIT, never
+    // our own client-facing RATE_LIMIT used for our throttling.
+    expect(body.code).not.toBe('RATE_LIMIT')
+  })
+
+  it('persistent network failure -> 502 HTTP_ERROR', async () => {
+    global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=test'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('HTTP_ERROR')
+  })
+})

@@ -17,6 +17,7 @@ import { enforce } from './_shared/policy'
 import { rateLimitGuard, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
+import { lookupFetch } from './_shared/lookup-fetch'
 import { json, safeError } from './_shared/security'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
@@ -122,40 +123,16 @@ function buildLookup(action, searchParams) {
   return null
 }
 
-// Transient failures (HTTP 429/5xx, or a network error) are retried a couple of
-// times with a short delay before RATE_LIMIT/HTTP_ERROR is surfaced. The loop
-// stays small (default: one retry ≈ 2 attempts total) so it fits comfortably
-// inside the Netlify function timeout (default 10s). This helper only fetches —
-// the caller decides what gets cached (successful bodies only).
-export async function fetchGoogleWithRetry(url, { retries = 1, delayMs = 800 } = {}) {
-  const isTransient = (status) => status === 429 || status >= 500
-  let lastResponse
-  let lastError
-
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs))
-    }
-    try {
-      // SSRF guard (NIT M5, consistent with the cover proxy): never follow a
-      // redirect. The upstream is the fixed GOOGLE_BASE; `redirect:'manual'`
-      // makes a hostile 3xx surface as the raw response (isTransient is false
-      // for 3xx, so it's returned as-is and rejected by the `!res.ok` check in
-      // lookup()) — it can never be followed to an internal target.
-      const res = await fetch(url, { redirect: 'manual', headers: { Accept: 'application/json' } })
-      lastResponse = res
-      lastError = null
-      // Success or a non-transient failure is final; 429/5xx gets retried.
-      if (res.ok || !isTransient(res.status)) return res
-    } catch (err) {
-      lastError = err
-      // Network error — retry if attempts remain, otherwise rethrow below.
-    }
-  }
-
-  if (lastError) throw lastError
-  return lastResponse
-}
+// The outbound Google Books fetch + retry a couple of times on transient
+// failures (429/5xx/network) lives in the shared `_shared/lookup-fetch.js`
+// helper (T1, #284) — the SAME helper discogs.js uses, so the two lookup
+// proxies can't drift. All requests go through `lookupFetch`, which:
+//   - retries only 429/5xx/network failures (never 4xx/3xx),
+//   - honors a bounded `Retry-After` + full-jitter exponential backoff,
+//   - enforces a per-attempt timeout and an overall 8s deadline,
+//   - always sets `redirect:'manual'` (SSRF control — never follows redirects).
+// This function only fetches — the caller decides what gets cached (successful
+// bodies only, below in lookup()).
 
 // Serve from the shared cache when fresh; otherwise hit Google and cache the
 // response. Only successful responses are cached — never errors. `identity` is
@@ -192,9 +169,16 @@ async function lookup(lookupSpec, ttlMs, identity) {
 
   let res
   try {
-    res = await fetchGoogleWithRetry(lookupSpec.endpoint)
+    // Shared T1 helper — retries transient 429/5xx/network, enforces the
+    // overall 8s deadline, and always sets redirect:'manual'. On a persistent
+    // retryable HTTP status it returns the last raw Response (mapped below by
+    // res.status); on a persistent network failure / deadline it throws.
+    res = await lookupFetch(lookupSpec.endpoint, {
+      headers: { Accept: 'application/json' },
+    })
   } catch (err) {
-    // A network error survived the retries — surface HTTP_ERROR.
+    // A network error survived the retries (or the deadline fired) — surface
+    // HTTP_ERROR.
     console.warn(`[books] lookup network error (key=${GOOGLE_API_KEY ? 'set' : 'MISSING'}): ${err?.message || err}`)
     return { error: json(502, { error: 'Google Books request failed.', code: 'HTTP_ERROR' }) }
   }

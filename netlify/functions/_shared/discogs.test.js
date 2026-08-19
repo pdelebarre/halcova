@@ -119,3 +119,59 @@ describe('cover action — public SSRF surface (via the discogs handler)', () =>
     expect(String(global.fetch.mock.calls[0][0])).toBe('https://i.discogs.com/hash/x.jpeg')
   })
 })
+
+describe('error-code mapping through the real lookupFetch (T1 handler integration, #284)', () => {
+  // Drive the ACTUAL handler with a mocked global.fetch. The shared T1 helper
+  // (lookup-fetch.js) runs for REAL inside the handler — we do not stub the
+  // helper, only the network. `retry-after: 1` keeps the helper's real backoff
+  // deterministic (each retry sleeps exactly ~1s instead of random jitter).
+  function upstream(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (String(name).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify(body),
+    }
+  }
+
+  it('transient 429 then 200 -> returns the results payload (success)', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(429, {}))
+      .mockResolvedValueOnce(upstream(200, { results: [{ id: 123 }] }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=test'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.results).toEqual([{ id: 123 }])
+    // The 429 was actually retried through the helper, not returned to the user.
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('persistent 429 -> PROVIDER_RATE_LIMIT (distinct from our own RATE_LIMIT)', async () => {
+    global.fetch.mockResolvedValue(upstream(429, {}))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=test'))
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('PROVIDER_RATE_LIMIT')
+    // The provider's upstream 429 must surface as PROVIDER_RATE_LIMIT, never
+    // our own client-facing RATE_LIMIT used for our throttling.
+    expect(body.code).not.toBe('RATE_LIMIT')
+  })
+
+  it('persistent network failure -> 502 HTTP_ERROR', async () => {
+    global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=test'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('HTTP_ERROR')
+  })
+
+  it('upstream 401 -> BAD_TOKEN with no retry (non-retryable)', async () => {
+    global.fetch.mockResolvedValue(upstream(401, { message: 'invalid token' }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=test'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('BAD_TOKEN')
+    // A 401 is a non-retryable upstream status — the helper must NOT retry it.
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+})
