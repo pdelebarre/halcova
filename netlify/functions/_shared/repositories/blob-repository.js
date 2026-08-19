@@ -9,6 +9,7 @@
 import * as blobUsers from './blob-users'
 import * as blobSessions from './blob-sessions'
 import { createFeedbackBlobStore } from '../feedback-blob'
+import { createLookupQueueStore } from '../lookup-queue-store'
 
 // A lazy facade over the shared `runout-feedback` store. The underlying store
 // is opened on the FIRST op, not when the repository is built — getStore()
@@ -32,6 +33,11 @@ export function createBlobRepository() {
   return {
     backend: 'blobs',
     feedback: lazyFeedback(),
+    // T6 (#285): the deferred-enrichment queue on the Blobs backend. A lazy
+    // facade over the runout-lookup-queue store (opened on first use, like
+    // feedback) exposing the SAME op surface as createLookupQueueRepo, so the
+    // shared `_shared/lookup-queue.js` seam is backend-agnostic.
+    lookupQueue: lazyLookupQueue(),
     sessions: {
       getByTokenHash: blobSessions.getSessionByTokenHash,
       save: blobSessions.saveSession,
@@ -56,5 +62,22 @@ export function createBlobRepository() {
     },
     items: null,
     lookupCache: null,
+  }
+}
+
+// A lazy facade over the shared `runout-lookup-queue` store (opened on first
+// use — getStore() throws without Netlify env vars, and getRepository() must
+// stay constructible in tests/local dev). Op surface matches
+// createLookupQueueRepo so the seam can't tell which backend it's on.
+function lazyLookupQueue() {
+  let store = null
+  const open = () => store || (store = createLookupQueueStore())
+  return {
+    enqueue: (entry) => open().enqueue(entry),
+    claimDue: (userId, limit) => open().claimDue(userId, limit),
+    markDone: (userId, id) => open().markDone(userId, id),
+    markFailed: (userId, id, opts) => open().markFailed(userId, id, opts),
+    listPendingUsers: () => open().listPendingUsers(),
+    countPending: (userId) => open().countPending(userId),
   }
 }
