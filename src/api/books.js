@@ -123,6 +123,10 @@ function toBookItem(volume, scannedIsbn) {
 
   const item = {
     googleBooksId: volume.id || null,
+    // (RES-1.3 T3, #283) additive fallback id — the OpenLibrary work/edition
+    // OLID, present only on fallback hits (where googleBooksId is null). Same
+    // class as googleBooksId, kept null on Google primary hits.
+    openLibraryId: volume.openLibraryId || null,
     title: itemTitle,
     label: v.publisher || '',
     catno: isbn,

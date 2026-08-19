@@ -42,6 +42,10 @@ export const ITEM_FIELD_ALLOWLIST = new Set([
   // MusicBrainz release MBID, used when a lookup came from the MusicBrainz
   // fallback (discogsId is null for those). String (a UUID), like googleBooksId.
   'mbid',
+  // (RES-1.3 T3, #283) additive fallback-provider id for books: the OpenLibrary
+  // work/edition OLID, used when a lookup came from the OpenLibrary fallback
+  // (googleBooksId is null for those). String, like googleBooksId.
+  'openLibraryId',
 ])
 
 // Identity / privilege fields that a client must NEVER be able to write on a
@@ -239,6 +243,9 @@ export function validateItem(body, { partial = false } = {}) {
     // (RES-1.2 T2, #288) additive fallback id — a MusicBrainz release MBID (a
     // UUID string). Optional; validated as a string like googleBooksId.
     str(body?.mbid, { max: 64 }),
+    // (RES-1.3 T3, #283) additive fallback id — an OpenLibrary OLID. Optional;
+    // validated as a string like googleBooksId.
+    str(body?.openLibraryId, { max: 200 }),
     str(body?.isbn, { max: 32 }),
     str(body?.dateAdded, { max: 40 }),
     str(body?.notes, { max: 5000 }),

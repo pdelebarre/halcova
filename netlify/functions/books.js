@@ -18,6 +18,7 @@ import { rateLimitGuard, rateLimitIdentity, clientIp, retryAfterSeconds } from '
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
 import { lookupFetch } from './_shared/lookup-fetch'
+import { openlibrary } from './_shared/providers/openlibrary'
 import { json, safeError } from './_shared/security'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
@@ -218,6 +219,67 @@ async function lookup(lookupSpec, ttlMs, identity) {
   return { data }
 }
 
+// Books codes that are NOT a transient lookup outage — we deliberately do NOT
+// spend the fallback provider on them, mirroring #288's MusicBrainz chain: a
+// token/config problem (BAD_TOKEN / SERVER_NO_TOKEN) is an ops signal that
+// shouldn't be masked by quietly routing everything to OpenLibrary, and a rate
+// limit (PROVIDER_RATE_LIMIT / our RATE_LIMIT) must not pile extra load onto
+// the fallback provider while Google Books is already throttled. (Google Books
+// is tokenless, so BAD_TOKEN / SERVER_NO_TOKEN are effectively unreachable —
+// they are listed for parity + future-proofing with the Discogs chain.)
+const NO_FALLBACK_CODES = new Set([
+  'BAD_TOKEN',
+  'SERVER_NO_TOKEN',
+  'PROVIDER_RATE_LIMIT',
+  'RATE_LIMIT',
+])
+
+// Primary-then-fallback lookup chain (RES-1.3 T3, #283).
+//
+// Google Books is the PRIMARY books provider and stays first, and every result
+// keeps the `{ items:[...] }` Google Books envelope. When the primary call
+// ERRORS (a genuine service outage — 5xx / network / timeout, i.e. NOT an
+// auth/token or rate-limit code), or returns a HEALTHY-EMPTY result set, we
+// fall back to the tokenless OpenLibrary provider (netlify/functions/_shared/
+// providers/openlibrary.js). The FIRST non-empty result set wins:
+//   - Google non-empty  -> Google results, unchanged (no fallback call).
+//   - Google error/empty + OpenLibrary non-empty -> OL results in the SAME
+//     `{ items:[...] }` envelope, each hit marked `source:'openlibrary'` with
+//     `openLibraryId` set and `googleBooksId` null (normalized by the adapter).
+//   - Both empty/errored -> return the PRIMARY's original result verbatim, so
+//     today's error codes / empty-search behavior are preserved exactly.
+//
+// `result` is the { data } | { error: Response } shape from lookup(). We read
+// the primary body defensively to decide on healthy-empty vs error + code.
+async function lookupWithFallback(lookupSpec, ttlMs, identity, fallback) {
+  const result = await lookup(lookupSpec, ttlMs, identity)
+
+  // A healthy, non-empty primary result wins — no fallback call.
+  if (result.data && Array.isArray(result.data.items) && result.data.items.length > 0) {
+    return result
+  }
+
+  // An error whose code is an authoritative outcome (auth/config/rate-limit)
+  // is returned as-is — never mask it by falling back.
+  if (result.error) {
+    let code = null
+    try {
+      const body = await result.error.clone().json()
+      code = body?.code
+    } catch {
+      code = null
+    }
+    if (code && NO_FALLBACK_CODES.has(code)) return result
+  }
+
+  // Fallback fires on a Google service error OR a healthy-empty result set.
+  const fb = await fallback()
+  if (fb && Array.isArray(fb.items) && fb.items.length > 0) {
+    return { data: fb }
+  }
+  return result
+}
+
 export default async (req) => {
   try {
     const url = new URL(req.url)
@@ -268,7 +330,20 @@ export default async (req) => {
     const lookupSpec = buildLookup(action, url.searchParams)
     if (!lookupSpec) return json(400, { error: 'Unknown action.' })
 
-    const result = await lookup(lookupSpec, TTL_MS[action], identity)
+    // RES-1.3 T3 (#283): the search actions fall back to the tokenless
+    // OpenLibrary provider on a Google service error or healthy-empty result.
+    // `detail` stays Google-only — a fallback hit has no googleBooksId, so the
+    // frontend's BookDetail googleBooksId guard never asks for detail here.
+    let result
+    if (action === 'searchBarcode') {
+      result = await lookupWithFallback(lookupSpec, TTL_MS[action], identity,
+        () => openlibrary.searchBarcode(url.searchParams.get('isbn') || ''))
+    } else if (action === 'searchText') {
+      result = await lookupWithFallback(lookupSpec, TTL_MS[action], identity,
+        () => openlibrary.searchText(url.searchParams.get('q') || ''))
+    } else {
+      result = await lookup(lookupSpec, TTL_MS[action], identity)
+    }
     if (result.error) return result.error
     return json(200, result.data)
   } catch (err) {
