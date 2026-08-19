@@ -179,6 +179,25 @@ const NO_FALLBACK_CODES = new Set([
   'RATE_LIMIT',
 ])
 
+// RES-1.5 T5 (#290): when EVERY provider in the lookup chain genuinely fails
+// (a real service outage — NOT a token/config or rate-limit code, which the
+// NO_FALLBACK_CODES path returns as-is), the client must be able to tell
+// "all providers are down" apart from "no match anywhere". We return a
+// DISTINCT `ALL_PROVIDERS_FAILED` code (cf. HTTP_ERROR, which is reserved for
+// single-provider failures that surface a real/healthy error path). The client
+// throws `err.code === 'ALL_PROVIDERS_FAILED'` for this, distinct from
+// NO_MATCH (a healthy-empty result set).
+function allProvidersFailed() {
+  return json(502, { error: 'All lookup providers are unavailable.', code: 'ALL_PROVIDERS_FAILED' })
+}
+
+// The top-level `source` marker on a winning search response: the primary sets
+// `source:'discogs'`; a MusicBrainz fallback win sets `source:'musicbrainz'`
+// (already on each fallback hit). The client reads it to know the origin and,
+// for a fallback win, to offer "matched via {source}" feedback.
+const PRIMARY_SOURCE = 'discogs'
+const FALLBACK_SOURCE = 'musicbrainz'
+
 // Primary-then-fallback lookup chain (RES-1.2 T2, #288; RES-1.4 T4, #291).
 //
 // Discogs is the PRIMARY records provider and stays first. When the primary
@@ -186,12 +205,15 @@ const NO_FALLBACK_CODES = new Set([
 // auth/token or rate-limit code), or returns a HEALTHY-EMPTY result set, we fall
 // back to the tokenless MusicBrainz provider (netlify/functions/_shared/
 // providers/musicbrainz.js). The FIRST non-empty result set wins:
-//   - Discogs non-empty  -> Discogs results, unchanged (no fallback call).
+//   - Discogs non-empty  -> Discogs results with a top-level
+//     `source:'discogs'` marker (no fallback call).
 //   - Discogs error/empty + MusicBrainz non-empty -> MB results in the SAME
-//     `{ results:[...] }` envelope, each hit marked `source:'musicbrainz'`
-//     with `mbid` set and `discogsId` null (normalized by the adapter).
-//   - Both empty/errored  -> return the PRIMARY's original response verbatim,
-//     so today's error codes / empty-search behavior are preserved exactly.
+//     `{ results:[...] }` envelope with a top-level `source:'musicbrainz'`,
+//     each hit also marked `source:'musicbrainz'` with `mbid` set and
+//     `discogsId` null (normalized by the adapter).
+//   - Both healthy-empty   -> 200 `{ results: [] }` (client NO_MATCH).
+//   - Both errored (outage) -> 502 `{ code:'ALL_PROVIDERS_FAILED' }` (client
+//     surfaces "all providers unavailable", distinct from NO_MATCH).
 //
 // RES-1.4 T4 (#291) — negative cache + circuit-breaker cooldown. Two
 // SKIP-PRIMARY signals are checked BEFORE any provider call:
@@ -201,11 +223,12 @@ const NO_FALLBACK_CODES = new Set([
 //   - Negative cache: when this specific key is negative-cached as
 //     HEALTHY-EMPTY ({empty:true} sentinel), we skip the empty provider call
 //     and fall through to the fallback — "no match HERE" is not a failure.
-// In BOTH skip cases the fallback's first non-empty result wins; if the
-// fallback is also empty/errored we return what the primary would have
-// produced: healthy-empty (`{ results: [] }`) for a negative-cached key (the
-// primary WOULD have been healthy-empty), or HTTP_ERROR for a cooldown (a
-// provider in cooldown is down).
+// In BOTH skip cases the fallback's first non-empty result wins (marked with
+// `source:'musicbrainz'`); if the fallback is also empty/errored we return what
+// the primary would have produced: healthy-empty (`{ results: [] }`) for a
+// negative-cached key (the primary WOULD have been healthy-empty), or
+// ALL_PROVIDERS_FAILED for a cooldown (a provider in cooldown is down, so all
+// providers are unavailable).
 //
 // 429 / NO_FALLBACK tension (explicitly resolved here, #291): NO_FALLBACK_CODES
 // (BAD_TOKEN / SERVER_NO_TOKEN / PROVIDER_RATE_LIMIT / RATE_LIMIT) still
@@ -239,14 +262,15 @@ async function lookupWithFallback({
     // (down) or this specific key is negative-cached as empty ("no match here").
     const fb = await fallback()
     if (fb && Array.isArray(fb.results) && fb.results.length > 0) {
-      return json(200, fb)
+      // Fallback wins — mark the winning source on top of the envelope.
+      return json(200, { source: FALLBACK_SOURCE, ...fb })
     }
     // Fallback also empty/errored: mirror what the primary would have returned.
     // A negative-cached key -> healthy-empty primary -> empty envelope. A
-    // provider in cooldown -> down primary -> its original HTTP_ERROR outage.
+    // provider in cooldown -> down primary -> all providers failed.
     return negativeEmpty
       ? json(200, { results: [] })
-      : json(502, { error: 'Discogs request failed.', code: 'HTTP_ERROR' })
+      : allProvidersFailed()
   }
 
   const res = await primary()
@@ -273,10 +297,18 @@ async function lookupWithFallback({
     if (primaryEmpty) await writeEmptyCache(provider, key, action)
     const fb = await fallback()
     if (fb && Array.isArray(fb.results) && fb.results.length > 0) {
-      return json(200, fb)
+      // Fallback wins — mark the winning source on top of the envelope.
+      return json(200, { source: FALLBACK_SOURCE, ...fb })
     }
+    // Both the primary and the fallback came up short. RES-1.5 T5 (#290):
+    // distinguish a genuine all-provider outage (-> ALL_PROVIDERS_FAILED) from
+    // a healthy-empty across all (-> 200 [] = NO_MATCH), instead of returning
+    // the primary's original error verbatim.
+    if (!res.ok) return allProvidersFailed()
+    return json(200, { results: [] })
   }
-  return res
+  // Primary won with a non-empty result set — mark its source.
+  return json(200, { source: PRIMARY_SOURCE, ...primaryBody })
 }
 
 export default async (req) => {

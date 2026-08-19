@@ -17,6 +17,9 @@ const ERROR_MESSAGES = {
   // temporarily exhausted rather than something they did.
   PROVIDER_RATE_LIMIT: 'Google Books is temporarily rate-limited — try again in a moment.',
   HTTP_ERROR: 'Google Books request failed.',
+  // RES-1.5 T5 (#290): every provider in the chain failed (a genuine outage) —
+  // distinct from "no match" (a healthy-empty result set).
+  ALL_PROVIDERS_FAILED: "Couldn't reach any lookup service — try again in a moment.",
 }
 
 function authHeaders() {
@@ -120,13 +123,18 @@ function toBookItem(volume, scannedIsbn) {
   const authors = (v.authors || []).join(', ')
   const title = v.title || ''
   const itemTitle = authors ? `${authors} - ${title}` : title
+  // RES-1.5 T5 (#290): branch on the per-hit `source` marker for id-field
+  // mapping — a Google Books primary hit carries `googleBooksId`; an
+  // OpenLibrary fallback hit carries `openLibraryId` (googleBooksId null).
+  const fallback = volume?.source === 'openlibrary'
 
   const item = {
-    googleBooksId: volume.id || null,
+    // (RES-1.5 T5) branch: null for an OpenLibrary fallback hit, else volume.id.
+    googleBooksId: fallback ? null : (volume.id || null),
     // (RES-1.3 T3, #283) additive fallback id — the OpenLibrary work/edition
     // OLID, present only on fallback hits (where googleBooksId is null). Same
     // class as googleBooksId, kept null on Google primary hits.
-    openLibraryId: volume.openLibraryId || null,
+    openLibraryId: fallback ? (volume.openLibraryId || null) : null,
     title: itemTitle,
     label: v.publisher || '',
     catno: isbn,
@@ -163,15 +171,29 @@ function toBookItem(volume, scannedIsbn) {
   return item
 }
 
+// RES-1.5 T5 (#290): the shared return shape. For backwards-compat with the
+// array-based callers (CollectionView reads `results.length` / `results[0]` /
+// `.map`), we return the ARRAY itself and attach metadata as extra props:
+//   - `source`  -> the winning provider ('google' | 'openlibrary') from the
+//                  server's top-level marker.
+//   - `outcome` -> 'ok' | 'NO_MATCH'. NO_MATCH (healthy-empty) is distinct
+//                  from ALL_PROVIDERS_FAILED, which THROWS with err.code.
+function withLookupMeta(mapped, data) {
+  const arr = Array.isArray(mapped) ? mapped : []
+  arr.source = data?.source || (arr[0]?.source || 'google')
+  arr.outcome = arr.length > 0 ? 'ok' : 'NO_MATCH'
+  return arr
+}
+
 export async function searchByBarcode(isbn) {
   const clean = cleanIsbn(isbn)
   const data = await booksFetch('searchBarcode', { isbn: clean })
-  return (data.items || []).slice(0, 10).map((vol) => toBookItem(vol, clean))
+  return withLookupMeta((data.items || []).slice(0, 10).map((vol) => toBookItem(vol, clean)), data)
 }
 
 export async function searchByText(query) {
   const data = await booksFetch('searchText', { q: query })
-  return (data.items || []).map((vol) => toBookItem(vol, ''))
+  return withLookupMeta((data.items || []).map((vol) => toBookItem(vol, '')), data)
 }
 
 export async function getBookDetail(googleBooksId) {

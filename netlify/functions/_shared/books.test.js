@@ -149,13 +149,19 @@ describe('error-code mapping through the real lookupFetch (T1 handler integratio
     expect(body.code).not.toBe('RATE_LIMIT')
   })
 
-  it('persistent network failure -> 502 HTTP_ERROR', async () => {
+  it('persistent network failure -> 502 ALL_PROVIDERS_FAILED (RES-1.5 T5)', async () => {
+    // A network failure is a genuine service outage, so the OpenLibrary fallback
+    // also attempts and fails; RES-1.5 T5 (#290) collapses "every provider down"
+    // into a distinct ALL_PROVIDERS_FAILED code.
     global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
     const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=test'))
     expect(res.status).toBe(502)
     const body = await res.json()
-    expect(body.code).toBe('HTTP_ERROR')
-  })
+    expect(body.code).toBe('ALL_PROVIDERS_FAILED')
+    // T5: the persistent-network path runs the real retry backoff chain (Google
+    // 3 attempts + OpenLibrary); give it an explicit timeout so it never flakes
+    // against the 5s Vitest default (same fix as its sibling test below).
+  }, 15000)
 })
 
 // RES-1.3 T3 (#283) — OpenLibrary fallback chain through the REAL handler.
@@ -207,6 +213,8 @@ describe('OpenLibrary fallback chain (RES-1.3 T3, #283)', () => {
     const body = await res.json()
     expect(Array.isArray(body.items)).toBe(true)
     expect(body.items).toHaveLength(1)
+    // RES-1.5 T5 (#290): top-level source marks the winning (fallback) provider.
+    expect(body.source).toBe('openlibrary')
     const v = body.items[0]
     // The fallback hit is marked + carries the additive id; googleBooksId null.
     expect(v.source).toBe('openlibrary')
@@ -242,19 +250,36 @@ describe('OpenLibrary fallback chain (RES-1.3 T3, #283)', () => {
     const body = await res.json()
     expect(body.items).toHaveLength(1)
     expect(body.items[0].id).toBe('g1')
+    // RES-1.5 T5 (#290): top-level source marks the primary provider.
+    expect(body.source).toBe('google')
     expect(callsToHost('openlibrary.org')).toHaveLength(0)
   })
 
-  it('Google empty + OpenLibrary empty -> primary empty result is preserved', async () => {
+  it('Google empty + OpenLibrary empty -> 200 NO_MATCH ([]), NOT all-failed', async () => {
     global.fetch
       .mockResolvedValueOnce(upstream(200, { items: [] })) // Google healthy-empty
       .mockResolvedValueOnce(upstream(200, {}))             // OpenLibrary: no ISBN key -> empty
     const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
     expect(res.status).toBe(200)
     const body = await res.json()
-    // Primary empty result preserved, not an error, not a fallback hit.
+    // Primary empty result preserved (NO_MATCH) — not an error, not all-failed.
     expect(body.items).toEqual([])
+    expect(body.source).toBeUndefined()
   })
+
+  it('Google error + OpenLibrary error -> 502 ALL_PROVIDERS_FAILED', async () => {
+    // lookupFetch retries a persistent 5xx (3 attempts) for Google; OpenLibrary
+    // also fails; RES-1.5 T5 (#290) collapses every-provider-down to
+    // ALL_PROVIDERS_FAILED (distinct from NO_MATCH).
+    global.fetch.mockResolvedValue(upstream(500, {}))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('ALL_PROVIDERS_FAILED')
+    // T5: the persistent-5xx path runs the real retry backoff chain against
+    // Google (3 attempts) and then OpenLibrary; upsert an explicit timeout so
+    // this slow deterministic test never flakes against the 5s Vitest default.
+  }, 15000)
 
   it('NO_FALLBACK on a provider rate limit — OpenLibrary is never contacted', async () => {
     global.fetch.mockResolvedValue(upstream(429, {}))
@@ -343,12 +368,13 @@ describe('RES-1.4 T4 — negative cache + circuit-breaker cooldown (books chain)
   })
 
   it('a down provider (5xx) records cooldown, is skipped within the cooldown window, and is retried after', async () => {
-    // First call: Google persistent 5xx (3 retryable attempts) -> HTTP_ERROR,
-    // which arms the circuit breaker; fallback also fails -> HTTP_ERROR surfaces.
+    // First call: Google persistent 5xx (3 retryable attempts) -> provider-down,
+    // which arms the circuit breaker; fallback also fails -> ALL_PROVIDERS_FAILED
+    // surfaces (RES-1.5 T5: every provider is unavailable).
     global.fetch.mockResolvedValue(upstream(500, {}))
     const r1 = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
     expect(r1.status).toBe(502)
-    expect((await r1.json()).code).toBe('HTTP_ERROR')
+    expect((await r1.json()).code).toBe('ALL_PROVIDERS_FAILED')
 
     // Cooldown recorded in the SEPARATE provider-state store (not lookup_cache).
     const down = stores['runout-provider-state'].data.get('books')

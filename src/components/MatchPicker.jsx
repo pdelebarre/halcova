@@ -2,7 +2,7 @@ import { t } from '../i18n'
 import './MatchPicker.css'
 
 export default function MatchPicker({
-  title, matches, loading, errorMsg,
+  title, matches, loading, errorMsg, note,
   onPick, onRetrySearch, onManual, onClose,
   loadingLabel = 'Looking it up…',
   noMatchLabel = 'No matches found.',
@@ -22,6 +22,10 @@ export default function MatchPicker({
           <div className="sheet-empty">
             <p>{noMatchLabel}</p>
           </div>
+        )}
+
+        {!loading && !errorMsg && note && (
+          <p className="sheet-note">{note}</p>
         )}
 
         {!loading && matches?.length > 0 && (

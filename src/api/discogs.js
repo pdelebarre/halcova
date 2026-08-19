@@ -14,6 +14,9 @@ const ERROR_MESSAGES = {
   // SEC-7.4 (#341): upstream-provider 429 vs our own 429.
   PROVIDER_RATE_LIMIT: 'Discogs is temporarily rate-limited — try again in a moment.',
   HTTP_ERROR: 'Discogs request failed.',
+  // RES-1.5 T5 (#290): every provider in the chain failed (a genuine outage) —
+  // distinct from "no match" (a healthy-empty result set).
+  ALL_PROVIDERS_FAILED: "Couldn't reach any lookup service — try again in a moment.",
 }
 
 function authHeaders() {
@@ -73,16 +76,23 @@ function communityRating(community) {
   return out
 }
 
-export async function searchByBarcode(barcode) {
-  const clean = cleanBarcode(barcode)
-  const data = await discogsFetch('searchBarcode', { barcode: clean })
-  const results = data.results || []
-  return results.map((r) => ({
-    discogsId: r.id, // null for a MusicBrainz fallback hit (id is null)
+// Map ONE raw Discogs/MusicBrainz search-result row into the app's item shape.
+// `scannedBarcode` is the cleaned barcode for a barcode lookup ('' for text
+// search), preserving today's per-action `barcode` field. RES-1.5 T5 (#290):
+// branch on the per-hit `source` marker for id-field mapping — a Discogs
+// primary hit carries `discogsId` (mbid null); a MusicBrainz fallback hit
+// carries `mbid` (discogsId null). The server keeps ids consistent (primary id
+// + no mbid; fallback mbid + id null), but we branch defensively so a
+// malformed/pathological row can never set both ids.
+function mapDiscogsResult(r, scannedBarcode) {
+  const fallback = r?.source === 'musicbrainz'
+  return {
+    // (RES-1.5 T5) branch: null for a MusicBrainz fallback hit, r.id otherwise.
+    discogsId: fallback ? null : (r.id ?? null),
     discogsType: r.type,
     // (RES-1.2 T2, #288) additive fallback-provider id: the MusicBrainz release
     // MBID, present only on fallback hits (where discogsId is null).
-    mbid: r.mbid || null,
+    mbid: fallback ? (r.mbid || null) : null,
     title: r.title, // "Artist - Release Title"
     year: r.year || '',
     label: (r.label && r.label[0]) || '',
@@ -94,33 +104,34 @@ export async function searchByBarcode(barcode) {
     country: r.country || '',
     coverImage: proxyCoverUrl(FN_BASE, r.cover_image || r.thumb),
     resourceUrl: r.resource_url,
-    barcode: clean,
+    barcode: scannedBarcode,
     ...communityRating(r.community),
-  }))
+  }
+}
+
+// RES-1.5 T5 (#290): the shared return shape. For backwards-compat with the
+// array-based callers (CollectionView reads `results.length` / `results[0]` /
+// `.map`), we return the ARRAY itself and attach metadata as extra props:
+//   - `source`  -> the winning provider ('discogs' | 'musicbrainz') from the
+//                  server's top-level marker.
+//   - `outcome` -> 'ok' | 'NO_MATCH'. NO_MATCH (healthy-empty) is distinct
+//                  from ALL_PROVIDERS_FAILED, which THROWS with err.code.
+function withLookupMeta(mapped, data) {
+  const arr = Array.isArray(mapped) ? mapped : []
+  arr.source = data?.source || (arr[0]?.source || 'discogs')
+  arr.outcome = arr.length > 0 ? 'ok' : 'NO_MATCH'
+  return arr
+}
+
+export async function searchByBarcode(barcode) {
+  const clean = cleanBarcode(barcode)
+  const data = await discogsFetch('searchBarcode', { barcode: clean })
+  return withLookupMeta((data.results || []).map((r) => mapDiscogsResult(r, clean)), data)
 }
 
 export async function searchByText(query) {
   const data = await discogsFetch('searchText', { q: query })
-  const results = data.results || []
-  return results.slice(0, 20).map((r) => ({
-    discogsId: r.id, // null for a MusicBrainz fallback hit (id is null)
-    discogsType: r.type,
-    // (RES-1.2 T2, #288) additive fallback-provider id (see searchByBarcode).
-    mbid: r.mbid || null,
-    title: r.title,
-    year: r.year || '',
-    label: (r.label && r.label[0]) || '',
-    catno: r.catno || '',
-    formatRaw: (r.format || []).join(', '),
-    formatType: parseFormatType(r.format),
-    genre: r.genre || [],
-    style: r.style || [],
-    country: r.country || '',
-    coverImage: proxyCoverUrl(FN_BASE, r.cover_image || r.thumb),
-    resourceUrl: r.resource_url,
-    barcode: '',
-    ...communityRating(r.community),
-  }))
+  return withLookupMeta((data.results || []).slice(0, 20).map((r) => mapDiscogsResult(r, '')), data)
 }
 
 // (FEAT-EPIC-5, #276) Phase A blob enrichment caps — bound the payload the

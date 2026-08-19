@@ -132,16 +132,22 @@ describe('searchByBarcode', () => {
 
   it('maps a missing items array to an empty list', async () => {
     global.fetch.mockResolvedValue(okJson({}))
-    expect(await books.searchByBarcode('123')).toEqual([])
+    const results = await books.searchByBarcode('123')
+    // RES-1.5 T5 (#290): still an empty array (backwards-compat + NO_MATCH),
+    // now with metadata props attached — so assert length, not deep-equal [].
+    expect(results).toHaveLength(0)
+    expect(results.outcome).toBe('NO_MATCH')
   })
 
   it('carries openLibraryId for a fallback hit and keeps googleBooksId null (RES-1.3 T3)', async () => {
     global.fetch.mockResolvedValue(okJson({
       items: [{
         // A normalized OpenLibrary fallback hit: no Google id (id null), but the
-        // additive openLibraryId is present; volumeInfo has the Google shape.
+        // additive openLibraryId is present; the `source` marker tells the client
+        // to map the fallback id (RES-1.5 T5). volumeInfo has the Google shape.
         id: null,
         openLibraryId: 'OL168469W',
+        source: 'openlibrary',
         selfLink: 'https://openlibrary.org/works/OL168469W',
         volumeInfo: {
           title: 'The Handmaid\'s Tale',
@@ -341,8 +347,50 @@ describe('error handling', () => {
     await expect(books.searchByText('x')).rejects.toMatchObject({ code: 'HTTP_ERROR' })
   })
 
+  it('surfaces ALL_PROVIDERS_FAILED as err.code (distinct from NO_MATCH)', async () => {
+    global.fetch.mockResolvedValue(errorJson(502, { error: 'all down', code: 'ALL_PROVIDERS_FAILED' }))
+    await expect(books.searchByText('x')).rejects.toMatchObject({ code: 'ALL_PROVIDERS_FAILED' })
+  })
+
   it('falls back to HTTP_ERROR when the error body has no code', async () => {
     global.fetch.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) })
     await expect(books.searchByText('x')).rejects.toMatchObject({ code: 'HTTP_ERROR' })
+  })
+})
+
+// RES-1.5 T5 (#290): array-with-metadata contract for books.
+describe('RES-1.5 T5 — source/outcome metadata on book search results', () => {
+  it('attaches source + outcome "ok" on a Google primary hit', async () => {
+    global.fetch.mockResolvedValue(okJson({ source: 'google', items: [{ id: 'g1', volumeInfo: { title: 'T' } }] }))
+    const results = await books.searchByBarcode('9780452284234')
+    expect(Array.isArray(results)).toBe(true)
+    expect(results).toHaveLength(1)
+    expect(results.source).toBe('google')
+    expect(results.outcome).toBe('ok')
+    expect(results[0].googleBooksId).toBe('g1')
+    expect(results[0].openLibraryId).toBeNull()
+  })
+
+  it('maps a fallback hit id fields from source (openLibraryId set, googleBooksId null) and marks source', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      source: 'openlibrary',
+      items: [{
+        id: null, openLibraryId: 'OL168469W', source: 'openlibrary', selfLink: 'https://openlibrary.org/works/OL168469W',
+        volumeInfo: { title: 'The Handmaid\'s Tale', authors: ['Margaret Atwood'], industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780452284234' }] },
+      }],
+    }))
+    const results = await books.searchByBarcode('9780452284234')
+    expect(results).toHaveLength(1)
+    expect(results.source).toBe('openlibrary')
+    expect(results.outcome).toBe('ok')
+    expect(results[0].googleBooksId).toBeNull()
+    expect(results[0].openLibraryId).toBe('OL168469W')
+  })
+
+  it('healthy-empty -> empty array with outcome NO_MATCH (distinct from all-failed throw)', async () => {
+    global.fetch.mockResolvedValue(okJson({ items: [] }))
+    const results = await books.searchByBarcode('9780452284234')
+    expect(results).toHaveLength(0)
+    expect(results.outcome).toBe('NO_MATCH')
   })
 })

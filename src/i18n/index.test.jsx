@@ -379,6 +379,38 @@ describe('t()', () => {
     })
   })
 
+  describe('RES-1.5 T5 lookup error-contract keys (#290)', () => {
+    it('ships every lookup key in all 8 locales (no raw-key fallback)', () => {
+      const required = [
+        'lookup.scanCover',
+        'lookup.fallbackNote',
+        'lookup.tryingFallback',
+        'lookup.foundVia',
+        'lookup.allFailed',
+      ]
+      for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
+        setLocale(locale)
+        for (const key of required) {
+          // t() returns the key itself only when the key is missing everywhere.
+          expect(t(key)).not.toBe(key)
+        }
+      }
+    })
+
+    it('resolves the EN baseline strings and reuses coverScan.noText (no raw keys)', () => {
+      setLocale('en')
+      expect(t('lookup.scanCover')).toBe('Scan a cover')
+      expect(t('lookup.fallbackNote')).toContain('fallback')
+      expect(t('lookup.tryingFallback')).toContain('fallback')
+      expect(t('lookup.allFailed')).toContain('lookup service')
+      expect(t('lookup.foundVia', { source: 'MusicBrainz' })).toBe('Matched via MusicBrainz')
+      // Other locales inherit EN — the resolved value is never the raw key.
+      setLocale('fr')
+      expect(t('lookup.foundVia', { source: 'MusicBrainz' })).not.toBe('lookup.foundVia')
+      expect(t('lookup.allFailed')).not.toBe('lookup.allFailed')
+    })
+  })
+
   describe('fallback behaviour', () => {
     it('falls back to en when key is missing in a non-en locale', () => {
       // 'common.copy' exists in en but let's test with a key that exists in en
