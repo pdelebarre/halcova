@@ -11,6 +11,7 @@ import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
 import PlayPanel from './components/PlayPanel'
 import { useCollection } from './hooks/useCollection'
+import { useLookup } from './hooks/useLookup'
 import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { extractSearchQuery } from './utils/ocrText'
@@ -254,6 +255,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
   const { Grid, Detail, ManualAdd, Card } = catalog.components
   const copy = catalog.copy
+
+  // RES-1.7 T7 (#293): one shared lookup client for every entry path (barcode
+  // scan, cover OCR, manual-add text search). The hook walks catalog.providers
+  // through lookupChain; catalog.api stays the single primary endpoint (the
+  // server resolves primary → fallback in one call and marks the winner).
+  const lookup = useLookup({ api: catalog.api, providers: catalog.providers })
 
   // RES-1.5 T5 (#290): map the server's "winning source" marker to a friendly,
   // localizable note. Returns '' for a primary/unknown source so the picker
@@ -607,18 +614,23 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     setModal('pick')
     setPickerState({ matches: null, loading: true, errorMsg: '' })
     try {
-      const results = await catalog.api.searchByBarcode(clean)
+      // RES-1.7 T7 (#293): the lookup runs through the shared useLookup +
+      // lookupChain. The server resolves primary → fallback in one call and
+      // the winning provider comes back on `out.provider` (the server's
+      // `source` marker) — catalog.api stays the single primary endpoint.
+      const out = await lookup.run('barcode', clean)
+      const results = out.results
       // A successful lookup means a token is configured — drop any hint.
       setRecordsNoToken(false)
       // RES-1.5 T5 (#290): when the WINNING provider is a fallback (server's
-      // top-level source marker), the array carries `source` — surface a small
+      // top-level source marker), `out.provider` carries it — surface a small
       // "matched via …" note so the user knows the origin. NO_MATCH (empty +
       // outcome 'NO_MATCH') vs ALL_PROVIDERS_FAILED (thrown err.code) are kept
       // distinct by the picker paths below.
       if (results.length === 1) {
         presentCandidate(results[0], 'scan')
       } else {
-        setPickerState({ matches: results, loading: false, errorMsg: '', note: fallbackNote(results.source) })
+        setPickerState({ matches: results, loading: false, errorMsg: '', note: fallbackNote(out.provider) })
       }
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
@@ -629,9 +641,15 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         showToast(`${catalog.lookupName} ${t('view.lookupsNotConfigured', { lookupName: catalog.lookupName })}`, 'error')
         return
       }
-      // RES-1.5 T5 (#290): ALL_PROVIDERS_FAILED throws here with err.code —
-      // the error path (vs the empty NO_MATCH path) keeps the two distinct.
-      setPickerState({ matches: [], loading: false, errorMsg: err.message })
+      // RES-1.5 T5 (#290): a healthy-empty chain throws NO_MATCH here (same
+      // empty picker as today's empty-array path); ALL_PROVIDERS_FAILED /
+      // RATE_LIMIT / etc. throw with err.code — the error path keeps the two
+      // distinct.
+      setPickerState({
+        matches: [],
+        loading: false,
+        errorMsg: err.code === 'NO_MATCH' ? '' : err.message,
+      })
     }
   }
 
@@ -644,22 +662,26 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // never crash on empty/weird OCR output — there's no error boundary.
   async function handleCoverCaptured(blob) {
     setCoverState({ busy: true, error: '' })
+    lookup.beginOcr()
     try {
       const { recognizeImage } = await import('./utils/ocr')
+      lookup.capturingOcr()
       const { lines } = await recognizeImage(blob)
       const { query, barcode } = extractSearchQuery(lines, catalog.kind)
-      let results = null
+      // RES-1.7 T7 (#293): a readable barcode → barcode lookup, readable text
+      // → text lookup — both funnel through the shared useLookup + lookupChain.
+      let out = null
       if (barcode) {
-        results = await catalog.api.searchByBarcode(barcode)
+        out = await lookup.run('barcode', barcode)
       } else if (query) {
-        results = await catalog.api.searchByText(query)
+        out = await lookup.run('text', query)
       }
       // Nothing readable on the cover — surface a friendly hint instead of
       // fabricating a search. Stays inside the cover flow.
-      if (results === null) {
+      if (out === null) {
         throw new Error(copy.coverScan?.noText || t('coverScan.noText'))
       }
-      const safeResults = Array.isArray(results) ? results : []
+      const safeResults = Array.isArray(out.results) ? out.results : []
       // A successful lookup means a token is configured — drop any hint.
       setRecordsNoToken(false)
       setCoverState({ busy: false, error: '' })
@@ -672,7 +694,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         presentCandidate(safeResults[0], 'scan')
       } else {
         setModal('pick')
-        setPickerState({ matches: safeResults, loading: false, errorMsg: '', note: fallbackNote(safeResults.source) })
+        setPickerState({ matches: safeResults, loading: false, errorMsg: '', note: fallbackNote(out.provider) })
       }
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
@@ -684,6 +706,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         setModal(null)
         return
       }
+      // RES-1.5 T5 (#290): a healthy-empty chain throws NO_MATCH — same empty
+      // picker as today's empty-array path (not an error).
+      if (err?.code === 'NO_MATCH') {
+        setCoverState({ busy: false, error: '' })
+        setModal('pick')
+        setPickerState({ matches: [], loading: false, errorMsg: '' })
+        return
+      }
       // OCR or lookup failure: surface the error inside the cover flow so the
       // user can retry / pick a photo again — never a blank picker.
       setCoverState({
@@ -692,6 +722,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           ? (copy.coverScan?.timedOut || t('coverScan.timedOut'))
           : (err?.message || copy.coverScan?.error || t('coverScan.error')),
       })
+    } finally {
+      lookup.finishOcr()
     }
   }
 
@@ -1281,7 +1313,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       )}
 
       {modal === 'manual' && (
-        <ManualAdd copy={copy} onPick={presentCandidate} onClose={() => setModal(null)} />
+        <ManualAdd copy={copy} api={catalog.api} providers={catalog.providers} onPick={presentCandidate} onClose={() => setModal(null)} />
       )}
 
       {modal === 'result' && scanCandidate && (

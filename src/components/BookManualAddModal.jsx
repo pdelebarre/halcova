@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import * as books from '../api/books'
+import { useLookup } from '../hooks/useLookup'
 import { t } from '../i18n'
 import { sanitizeItemForCreate } from '../utils/sanitizeItem'
 import MatchPicker from './MatchPicker'
 import './ManualAddModal.css'
 
 const emptyForm = { title: '', author: '', year: '', publisher: '', category: '' }
+// RES-1.7 T7 (#293): the ordered chain, matching booksCatalog.providers.
+// CollectionView passes the catalog's own list; this default keeps the modal
+// self-sufficient (e.g. in tests) without importing catalog.js (circular).
+const DEFAULT_PROVIDERS = ['books', 'openLibrary']
 
-export default function BookManualAddModal({ onPick, onClose, copy = {} }) {
+export default function BookManualAddModal({ onPick, onClose, copy = {}, api = books, providers = DEFAULT_PROVIDERS }) {
   const [mode, setMode] = useState('search') // search | picking | form
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState(null)
@@ -16,6 +21,10 @@ export default function BookManualAddModal({ onPick, onClose, copy = {} }) {
   const [form, setForm] = useState(emptyForm)
   const [titleError, setTitleError] = useState('')
 
+  // RES-1.7 T7 (#293): the shared lookup client — text search now chains
+  // primary → fallback through useLookup instead of a hardcoded books call.
+  const lookup = useLookup({ api, providers })
+
   async function runSearch(e) {
     e?.preventDefault()
     if (!query.trim()) return
@@ -23,11 +32,13 @@ export default function BookManualAddModal({ onPick, onClose, copy = {} }) {
     setLoading(true)
     setErrorMsg('')
     try {
-      const results = await books.searchByText(query.trim())
-      setMatches(results)
+      const out = await lookup.run('text', query.trim())
+      setMatches(out.results)
     } catch (err) {
-      setErrorMsg(err.message)
+      // A healthy-empty chain throws NO_MATCH — keep the empty "no matches"
+      // label (not an error), exactly like today's empty-array path.
       setMatches([])
+      setErrorMsg(err.code === 'NO_MATCH' ? '' : err.message)
     } finally {
       setLoading(false)
     }

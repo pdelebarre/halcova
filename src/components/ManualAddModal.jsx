@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as discogs from '../api/discogs'
+import { useLookup } from '../hooks/useLookup'
 import { t } from '../i18n'
 import { sanitizeItemForCreate } from '../utils/sanitizeItem'
 import MatchPicker from './MatchPicker'
@@ -7,8 +8,12 @@ import './ManualAddModal.css'
 
 const FORMATS = ['LP', 'EP', 'CD', '7"', '12"', 'Other']
 const emptyForm = { title: '', artist: '', formatType: 'LP', year: '', label: '', catno: '', genre: '' }
+// RES-1.7 T7 (#293): the ordered chain, matching recordsCatalog.providers.
+// CollectionView passes the catalog's own list; this default keeps the modal
+// self-sufficient (e.g. in tests) without importing catalog.js (circular).
+const DEFAULT_PROVIDERS = ['discogs', 'musicbrainz']
 
-export default function ManualAddModal({ onPick, onClose, copy = {} }) {
+export default function ManualAddModal({ onPick, onClose, copy = {}, api = discogs, providers = DEFAULT_PROVIDERS }) {
   const [mode, setMode] = useState('search') // search | picking | form
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState(null)
@@ -17,6 +22,10 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
   const [form, setForm] = useState(emptyForm)
   const [titleError, setTitleError] = useState('')
 
+  // RES-1.7 T7 (#293): the shared lookup client — text search now chains
+  // primary → fallback through useLookup instead of a hardcoded discogs call.
+  const lookup = useLookup({ api, providers })
+
   async function runSearch(e) {
     e?.preventDefault()
     if (!query.trim()) return
@@ -24,13 +33,15 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
     setLoading(true)
     setErrorMsg('')
     try {
-      const results = await discogs.searchByText(query.trim())
-      setMatches(results)
+      const out = await lookup.run('text', query.trim())
+      setMatches(out.results)
     } catch (err) {
-      setErrorMsg(err.code === 'SERVER_NO_TOKEN'
-        ? t('err.lookupsNotConfiguredToken')
-        : err.message)
+      // A healthy-empty chain throws NO_MATCH — keep the empty "no matches"
+      // label (not an error), exactly like today's empty-array path.
       setMatches([])
+      setErrorMsg(err.code === 'NO_MATCH'
+        ? ''
+        : (err.code === 'SERVER_NO_TOKEN' ? t('err.lookupsNotConfiguredToken') : err.message))
     } finally {
       setLoading(false)
     }

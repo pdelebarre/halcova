@@ -33,6 +33,12 @@ export const recordsCatalog = {
   searchPlaceholder: 'Search your crate…',
   storage: 'records',
   api: discogs,
+  // RES-1.7 T7 (#293): the ordered provider chain for client orchestration.
+  // The server (netlify/functions/discogs.js) resolves primary → fallback and
+  // marks the winner in the top-level `source`; this list drives the client
+  // lookupChain derivation (provider/attempts) — `catalog.api` stays the
+  // single primary for getDetail/detailLink/reviewKey.
+  providers: ['discogs', 'musicbrainz'],
   getDetail: discogs.getReleaseDetail,
   lookupName: 'Discogs',
   formats: ['LP', 'EP', 'CD', '7"', '12"'],
@@ -507,6 +513,11 @@ export const booksCatalog = {
   searchPlaceholder: 'Search your shelf…',
   storage: 'books',
   api: books,
+  // RES-1.7 T7 (#293): the ordered provider chain for client orchestration.
+  // The server (netlify/functions/books.js) resolves primary → fallback and
+  // marks the winner in the top-level `source`; this list drives the client
+  // lookupChain derivation — `catalog.api` stays the single primary.
+  providers: ['books', 'openLibrary'],
   getDetail: books.getBookDetail,
   lookupName: 'Google Books',
   formats: [], // books are looked up by ISBN — no format chips
