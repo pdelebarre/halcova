@@ -120,6 +120,36 @@ describe('Cover-scan-to-add integration', () => {
     expect(await screen.findByRole('dialog', { name: 'Is this it?' })).toBeInTheDocument()
     expect(screen.getByText('No matches found on Discogs.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add manually' })).toBeInTheDocument()
+    // T8 (#286): the empty state OFFERS cover OCR (never auto-opens it) so the
+    // user can scan a clearer cover instead of giving up.
+    expect(screen.getByRole('button', { name: 'Scan the cover — the app can read it' })).toBeInTheDocument()
+  })
+
+  // T8 (#286): offline — OCR runs on-device, so the cover is read and the
+  // chain is attempted; when it short-circuits to a network error the picker
+  // shows the offline line + manual-add, and the scan-cover offer stays.
+  it('shows the offline line + manual-add in the picker when the chain fails offline', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: false })
+    try {
+      ocr.recognizeImage.mockResolvedValue({
+        text: 'Miles Davis\nKind of Blue',
+        lines: [line('Miles Davis', { area: 5000 }), line('Kind of Blue', { area: 3000 })],
+      })
+      // Offline: fetch rejects with a bare TypeError (no HTTP response) which
+      // the chain surfaces as ALL_ERROR.
+      discogs.searchByText.mockRejectedValue(new TypeError('Failed to fetch'))
+
+      render(<CollectionView catalog={recordsCatalog} onRequestSettings={vi.fn()} />)
+      await openCoverScan()
+
+      expect(await screen.findByRole('dialog', { name: 'Is this it?' })).toBeInTheDocument()
+      expect(screen.getByText(/offline/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Add manually' })).toBeInTheDocument()
+      // OCR is on-device — the scan-cover offer stays available offline.
+      expect(screen.getByRole('button', { name: 'Scan the cover — the app can read it' })).toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: true })
+    }
   })
 
   it('opens settings and shows the token toast on SERVER_NO_TOKEN', async () => {
@@ -148,8 +178,10 @@ describe('Cover-scan-to-add integration', () => {
     await openCoverScan()
 
     // The error surfaces INSIDE the still-open cover modal (with Retry / pick
-    // a photo again), never a blank picker.
+    // a photo again), never a blank picker. T8 (#286): the camera is never
+    // AUTO-reopened — the user stays in the cover flow they already opened.
     expect(await screen.findByText(/Couldn't read the cover/)).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Scan a cover' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Is this it?' })).not.toBeInTheDocument()
     expect(discogs.searchByBarcode).not.toHaveBeenCalled()
     expect(discogs.searchByText).not.toHaveBeenCalled()

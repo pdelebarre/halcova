@@ -43,9 +43,14 @@ describe('scanner + cover-OCR initialize ONLY on invocation (lazy), not on shell
     expect(src).toMatch(/const\s+ScannerModal\s*=\s*lazy\(\(\)\s*=>\s*import\(['"]\.\/components\/ScannerModal['"]\)\)/)
     expect(src).toMatch(/const\s+CoverScanModal\s*=\s*lazy\(\(\)\s*=>\s*import\(['"]\.\/components\/CoverScanModal['"]\)\)/)
     // No Tesseract/OCR import in CollectionView — OCR is dynamic, per scan.
-    expect(src).toMatch(/await\s+import\(['"]\.\/utils\/ocr['"]\)/)
+    // T8 (#286): the cover-OCR orchestrator lives in useLookup.runOcr, so the
+    // dynamic import moved to the hook (still never on shell mount).
     expect(src).not.toMatch(/^import\s+.*['"]\.\/utils\/ocr['"]/m)
     expect(src).not.toContain("'tesseract.js'")
+    const hookSrc = await readFile('src/hooks/useLookup.js')
+    expect(hookSrc).toMatch(/await\s+import\(['"]\.\.\/utils\/ocr['"]\)/)
+    expect(hookSrc).not.toMatch(/^import\s+.*['"]\.\.\/utils\/ocr['"]/m)
+    expect(hookSrc).not.toContain("'tesseract.js'")
   })
 
   it('the OCR orchestrator pulls the heavy Tesseract runtime via dynamic import only', async () => {

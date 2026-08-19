@@ -98,6 +98,10 @@ const en = {
   // to a real string in every locale). `coverScan.noText` is reused for the
   // unreadable-cover path rather than duplicating it.
   'lookup.scanCover': 'Scan a cover',
+  // T8 (#286): picker offer (empty/error states) — OCR can read the cover.
+  'lookup.scanCoverOffer': 'Scan the cover — the app can read it',
+  // T8 (#286): offline line — OCR is on-device, only the chain needs a net.
+  'lookup.offline': "You're offline — lookups need a connection. Cover scanning still works on-device.",
   'lookup.fallbackNote': 'Matched via the fallback catalog source.',
   'lookup.tryingFallback': 'No primary match — trying the fallback catalog…',
   'lookup.foundVia': 'Matched via {source}',
