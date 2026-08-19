@@ -93,6 +93,32 @@ describe('searchByBarcode', () => {
     expect(results[1].rating).toBeUndefined()
     expect(results[1].ratingCount).toBeUndefined()
   })
+
+  it('maps a MusicBrainz fallback hit: discogsId null and mbid carried (RES-1.2 T2)', async () => {
+    // This is the Discogs-envelope shape the MusicBrainz fallback provider emits:
+    // id null (discogsId stays null), mbid + source set, cover from Cover Art Archive.
+    global.fetch.mockResolvedValue(okJson({
+      results: [{
+        id: null, mbid: 'b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12', source: 'musicbrainz',
+        type: 'release', title: 'Miles Davis - Kind of Blue', year: 1959,
+        label: ['Columbia'], catno: 'CL 1355', format: ['CD'],
+        cover_image: 'https://coverartarchive.org/release/b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12/front-250',
+        resource_url: 'https://musicbrainz.org/release/b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12',
+      }],
+    }))
+
+    const results = await discogs.searchByBarcode('07464405491')
+    expect(results).toHaveLength(1)
+    expect(results[0]).toMatchObject({
+      discogsId: null,
+      mbid: 'b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12',
+      title: 'Miles Davis - Kind of Blue',
+      formatType: 'CD',
+    })
+    // The Cover Art Archive cover is routed through the cover proxy.
+    expect(results[0].coverImage).toContain('action=cover')
+    expect(results[0].coverImage).toContain(encodeURIComponent('https://coverartarchive.org/release/b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12/front-250'))
+  })
 })
 
 describe('parseFormatType (via searchByText)', () => {

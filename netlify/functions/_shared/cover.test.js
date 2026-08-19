@@ -16,12 +16,18 @@ describe('isAllowedCoverHost', () => {
     expect(isAllowedCoverHost('m.media-amazon.com')).toBe(true)
   })
 
+  it('allows Cover Art Archive hosts (MusicBrainz fallback covers, RES-1.2 T2)', () => {
+    expect(isAllowedCoverHost('coverartarchive.org')).toBe(true)
+  })
+
   it('rejects arbitrary hosts — the SSRF guard', () => {
     expect(isAllowedCoverHost('example.com')).toBe(false)
     expect(isAllowedCoverHost('evil.com')).toBe(false)
     expect(isAllowedCoverHost('127.0.0.1')).toBe(false)
     expect(isAllowedCoverHost('localhost')).toBe(false)
     expect(isAllowedCoverHost('')).toBe(false)
+    // Subdomains or suffix tricks of coverartarchive are NOT allowed.
+    expect(isAllowedCoverHost('coverartarchive.org.evil.com')).toBe(false)
   })
 
   it('matches the Discogs suffix on a dot boundary only', () => {
@@ -35,6 +41,12 @@ describe('isAllowedCoverUrl', () => {
   it('accepts https covers from an allowed host', () => {
     expect(isAllowedCoverUrl('https://i.discogs.com/hash/image-1.jpeg')).toBe(true)
     expect(isAllowedCoverUrl('https://books.google.com/books/content?id=abc&printsec=frontcover')).toBe(true)
+  })
+
+  it('accepts Cover Art Archive covers (RES-1.2 T2 #288) but only https + exact host', () => {
+    expect(isAllowedCoverUrl('https://coverartarchive.org/release/b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12/front-250')).toBe(true)
+    expect(isAllowedCoverUrl('http://coverartarchive.org/release/x/front-250')).toBe(false)
+    expect(isAllowedCoverUrl('https://coverartarchive.org.evil.com/x.jpg')).toBe(false)
   })
 
   it('rejects non-https covers even on an allowed host', () => {

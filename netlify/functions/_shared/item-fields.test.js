@@ -107,6 +107,27 @@ describe('pickItemFields — Phase A enrichment does not widen the privilege sur
     expect(ITEM_FIELD_ALLOWLIST.has('ratingCount')).toBe(false)
     expect(pickItemFields({ rating: 5, ratingCount: 3 })).toEqual({})
   })
+
+  it('carries the additive mbid fallback id (RES-1.2 T2 #288) alongside discogsId', () => {
+    expect(ITEM_FIELD_ALLOWLIST.has('mbid')).toBe(true)
+    const out = pickItemFields({
+      title: 'Miles Davis - Kind of Blue',
+      discogsId: null, // null for a MusicBrainz fallback hit
+      mbid: 'b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12',
+    })
+    expect(out.discogsId).toBeNull()
+    expect(out.mbid).toBe('b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12')
+  })
+
+  it('validates mbid as an optional string and rejects a non-string', () => {
+    const { item, error } = validateItem({ title: 'A - B', mbid: 'b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12' })
+    expect(error).toBeUndefined()
+    expect(item.mbid).toBe('b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12')
+    // A numeric mbid is a type error (MBIDs are UUID strings).
+    expect(validateItem({ title: 'A - B', mbid: 123 }).error.code).toBe('TYPE_ERROR')
+    // An over-length mbid is rejected.
+    expect(validateItem({ title: 'A - B', mbid: 'x'.repeat(100) }).error.code).toBe('TOO_LONG')
+  })
 })
 
 describe('validateItem — accepts well-formed Phase A enrichment (FEAT-EPIC-5 #276)', () => {

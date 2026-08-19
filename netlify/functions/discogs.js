@@ -11,6 +11,7 @@ import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
 import { lookupFetch } from './_shared/lookup-fetch'
 import { json, safeError } from './_shared/security'
+import { musicbrainz } from './_shared/providers/musicbrainz'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
@@ -155,6 +156,58 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
   return json(200, data)
 }
 
+// Discogs codes that are NOT a transient lookup outage — we deliberately do NOT
+// spend the fallback provider on them: a token/config problem (BAD_TOKEN /
+// SERVER_NO_TOKEN) is an ops signal that shouldn't be masked by quietly routing
+// everything to MusicBrainz, and a rate limit (PROVIDER_RATE_LIMIT / our
+// RATE_LIMIT) must not pile extra load onto the fallback provider while Discogs
+// is already throttled.
+const NO_FALLBACK_CODES = new Set([
+  'BAD_TOKEN',
+  'SERVER_NO_TOKEN',
+  'PROVIDER_RATE_LIMIT',
+  'RATE_LIMIT',
+])
+
+// Primary-then-fallback lookup chain (RES-1.2 T2, #288).
+//
+// Discogs is the PRIMARY records provider and stays first. When the primary
+// call ERRORS (a genuine service outage — 5xx / network / timeout, i.e. NOT an
+// auth/token or rate-limit code), or returns a HEALTHY-EMPTY result set, we fall
+// back to the tokenless MusicBrainz provider (netlify/functions/_shared/
+// providers/musicbrainz.js). The FIRST non-empty result set wins:
+//   - Discogs non-empty  -> Discogs results, unchanged (no fallback call).
+//   - Discogs error/empty + MusicBrainz non-empty -> MB results in the SAME
+//     `{ results:[...] }` envelope, each hit marked `source:'musicbrainz'`
+//     with `mbid` set and `discogsId` null (normalized by the adapter).
+//   - Both empty/errored  -> return the PRIMARY's original response verbatim,
+//     so today's error codes / empty-search behavior are preserved exactly.
+//
+// `primary` returns a `Response` (from fetchDiscogs -> json(...)). We clone it
+// so reading its JSON to decide on empty-results never consumes the response we
+// might return unchanged.
+async function lookupWithFallback(primary, fallback) {
+  const res = await primary()
+  let primaryBody = null
+  try {
+    primaryBody = await res.clone().json()
+  } catch {
+    primaryBody = null
+  }
+  const code = primaryBody?.code
+  // Auth/config and rate-limit outcomes are authoritative — no fallback.
+  if (!res.ok && code && NO_FALLBACK_CODES.has(code)) return res
+  const primaryEmpty = primaryBody && Array.isArray(primaryBody.results) && primaryBody.results.length === 0
+  // Fallback fires on a Discogs service error OR a healthy-empty result set.
+  if (!res.ok || primaryEmpty) {
+    const fb = await fallback()
+    if (fb && Array.isArray(fb.results) && fb.results.length > 0) {
+      return json(200, fb)
+    }
+  }
+  return res
+}
+
 export default async (req) => {
   try {
   const url = new URL(req.url)
@@ -203,7 +256,11 @@ export default async (req) => {
   if (action === 'searchBarcode') {
     const barcode = cleanDigits(url.searchParams.get('barcode'))
     if (!barcode) return json(400, { error: 'Missing barcode.' })
-    return fetchDiscogs('/database/search', { barcode, type: 'release' }, `barcode:${barcode}`, TTL.barcode, identity)
+    // Discogs first; on error or healthy-empty, fall back to MusicBrainz.
+    return lookupWithFallback(
+      () => fetchDiscogs('/database/search', { barcode, type: 'release' }, `barcode:${barcode}`, TTL.barcode, identity),
+      () => musicbrainz.searchBarcode(barcode),
+    )
   }
 
   if (action === 'searchText') {
@@ -211,7 +268,11 @@ export default async (req) => {
     // outbound request.
     const q = String(url.searchParams.get('q') || '').trim().slice(0, 200)
     if (!q) return json(400, { error: 'Missing q.' })
-    return fetchDiscogs('/database/search', { q, type: 'release' }, cacheKey('q', q.toLowerCase()), TTL.q, identity)
+    // Discogs first; on error or healthy-empty, fall back to MusicBrainz.
+    return lookupWithFallback(
+      () => fetchDiscogs('/database/search', { q, type: 'release' }, cacheKey('q', q.toLowerCase()), TTL.q, identity),
+      () => musicbrainz.searchText(q),
+    )
   }
 
   if (action === 'release') {

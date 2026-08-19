@@ -82,6 +82,15 @@ describe('lookup actions — fixed base host only (no host injection)', () => {
   })
 
   it('non-cover fetches use redirect: manual so a hostile 3xx is never followed (NIT M5)', async () => {
+    // Use a NON-EMPTY Discogs result so the MusicBrainz fallback (RES-1.2 T2)
+    // does not fire — this test is about the single primary lookup fetch's
+    // redirect policy.
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ results: [{ id: 1, title: 'A - B' }] }),
+      headers: { get: () => 'application/json' },
+    })
     await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=0012345'))
     expect(global.fetch).toHaveBeenCalledTimes(1)
     expect(global.fetch.mock.calls[0][1].redirect).toBe('manual')
@@ -158,12 +167,16 @@ describe('error-code mapping through the real lookupFetch (T1 handler integratio
   })
 
   it('persistent network failure -> 502 HTTP_ERROR', async () => {
+    // A network failure is a genuine service outage, so the MusicBrainz fallback
+    // (RES-1.2 T2) also attempts and also fails; the PRIMARY's 502 HTTP_ERROR
+    // is still what surfaces. The fallback's ~1 req/s throttle + retry backoff
+    // make this slower than the pre-fallback path, so give it a larger timeout.
     global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
     const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=test'))
     expect(res.status).toBe(502)
     const body = await res.json()
     expect(body.code).toBe('HTTP_ERROR')
-  })
+  }, 15000)
 
   it('upstream 401 -> BAD_TOKEN with no retry (non-retryable)', async () => {
     global.fetch.mockResolvedValue(upstream(401, { message: 'invalid token' }))
@@ -173,5 +186,145 @@ describe('error-code mapping through the real lookupFetch (T1 handler integratio
     expect(body.code).toBe('BAD_TOKEN')
     // A 401 is a non-retryable upstream status — the helper must NOT retry it.
     expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('MusicBrainz fallback chain (RES-1.2 T2, #288)', () => {
+  const MBID = 'b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12'
+  // A realistic MusicBrainz release-search payload (what the fallback provider
+  // consumes via its REAL lookupFetch -> global.fetch mock).
+  const mbRelease = {
+    id: MBID,
+    title: 'Kind of Blue',
+    date: '1959-08-17',
+    country: 'US',
+    'artist-credit': [{ name: 'Miles Davis', artist: { id: 'a1', name: 'Miles Davis' } }],
+    'label-info': [{ label: { name: 'Columbia' }, 'catalog-number': 'CL 1355' }],
+    media: [{ format: 'CD' }],
+  }
+
+  // Fallback only fires on a Discogs error OR healthy-empty. In these tests the
+  // Discogs call and the MusicBrainz call both run against the mocked
+  // global.fetch (the provider's real lookupFetch resolves against it), so we
+  // queue Discogs-first then MusicBrainz.
+  function upstream(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (String(name).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify(body),
+    }
+  }
+  function mbUpstream(status = 200) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (n) => (String(n).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify({ releases: [mbRelease] }),
+    }
+  }
+
+  it('Discogs error -> MusicBrainz fallback fires and wins with source + mbid', async () => {
+    // A 404 is a NON-retryable upstream service error: lookupFetch returns it on
+    // the first attempt (no retry-loop noise), fetchDiscogs maps it to HTTP_ERROR
+    // 502, and the fallback fires exactly one MusicBrainz call.
+    global.fetch
+      .mockResolvedValueOnce(upstream(404, {}))            // Discogs upstream error
+      .mockResolvedValueOnce(mbUpstream(200))              // MusicBrainz
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body.results)).toBe(true)
+    expect(body.results).toHaveLength(1)
+    const hit = body.results[0]
+    expect(hit.source).toBe('musicbrainz')
+    expect(hit.mbid).toBe(MBID)
+    expect(hit.id).toBeNull() // discogsId stays null for a fallback hit
+    // The first (Discogs) fetch was the primary; the second was the fallback host.
+    const first = new URL(String(global.fetch.mock.calls[0][0]))
+    expect(first.hostname).toBe('api.discogs.com')
+    const second = new URL(String(global.fetch.mock.calls[1][0]))
+    expect(second.hostname).toBe('musicbrainz.org')
+  })
+
+  it('Discogs healthy-empty -> MusicBrainz fallback fires and wins', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(200, { results: [] })) // Discogs healthy-empty
+      .mockResolvedValueOnce(mbUpstream(200))                 // MusicBrainz
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.results[0].source).toBe('musicbrainz')
+    expect(body.results[0].mbid).toBe(MBID)
+  })
+
+  it('Discogs non-empty -> primary wins and the fallback never fires (no MB call)', async () => {
+    // Only ONE network call: Discogs returns a non-empty result set.
+    global.fetch.mockResolvedValueOnce(upstream(200, { results: [{ id: 101, title: 'Miles Davis - Kind of Blue' }] }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.results[0].id).toBe(101)
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const only = new URL(String(global.fetch.mock.calls[0][0]))
+    expect(only.hostname).toBe('api.discogs.com') // MusicBrainz never contacted
+  })
+
+  it('Discogs error + MusicBrainz empty -> returns the ORIGINAL primary error', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(404, {}))            // Discogs upstream error (non-retryable)
+      .mockResolvedValueOnce(upstream(200, { releases: [] })) // MusicBrainz healthy-empty
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('HTTP_ERROR') // primary's original error code preserved
+  })
+
+  // Explicit regression pin for the NO_FALLBACK_CODES suppression behavior
+  // ({BAD_TOKEN, SERVER_NO_TOKEN, PROVIDER_RATE_LIMIT, RATE_LIMIT}): a token /
+  // config problem is an ops signal that must NOT be masked by quietly routing
+  // every lookup to MusicBrainz, and a rate limit must not pile extra load onto
+  // the fallback provider while Discogs is already throttled. In each case the
+  // fallback never fires — MusicBrainz (musicbrainz.org) is never contacted.
+
+  it('fallback does NOT fire on a Discogs 401 (BAD_TOKEN) — MusicBrainz never contacted', async () => {
+    // A 401 is a non-retryable upstream status, so lookupFetch returns after a
+    // SINGLE Discogs fetch — exactly once, and never on musicbrainz.org.
+    global.fetch.mockResolvedValue(upstream(401, { message: 'invalid token' }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('BAD_TOKEN')
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const only = new URL(String(global.fetch.mock.calls[0][0]))
+    expect(only.hostname).toBe('api.discogs.com') // MusicBrainz never contacted
+  })
+
+  it('fallback does NOT fire on a Discogs 429 (PROVIDER_RATE_LIMIT) — no MB load piled on', async () => {
+    // 429 is RETRYABLE through the real lookupFetch helper, so the Discogs host
+    // may legitimately be hit more than once. What we pin here is that NOT A
+    // SINGLE call ever leaves for musicbrainz.org, and the server-side
+    // PROVIDER_RATE_LIMIT code surfaces unchanged to the client.
+    global.fetch.mockResolvedValue(upstream(429, { message: 'rate limited' }))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('PROVIDER_RATE_LIMIT')
+    expect(global.fetch.mock.calls.length).toBeGreaterThan(0)
+    for (const call of global.fetch.mock.calls) {
+      expect(new URL(String(call[0])).hostname).toBe('api.discogs.com') // never musicbrainz.org
+    }
+  })
+
+  it('fallback does NOT fire when the token is missing (SERVER_NO_TOKEN) — no fetch at all', async () => {
+    // A missing token is a server misconfiguration (SERVER_NO_TOKEN in
+    // NO_FALLBACK_CODES). It short-circuits before ANY network call, so neither
+    // Discogs nor MusicBrainz is contacted and the fallback never fires.
+    delete process.env.RUNOUT_DISCOGS_TOKEN
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.code).toBe('SERVER_NO_TOKEN')
+    expect(global.fetch).not.toHaveBeenCalled() // neither Discogs nor MusicBrainz
   })
 })
