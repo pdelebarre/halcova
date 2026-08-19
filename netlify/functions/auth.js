@@ -15,7 +15,7 @@ import { normalizeCode } from './_shared/codes'
 import { createRateLimiter, clientIp } from './_shared/rate-limit'
 import { consumeMagicLink, isMagicLinkConfigured, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
 import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
-import { resolveSession } from './_shared/session-auth'
+import { enforce } from './_shared/policy'
 import { createSession, revokeAllForUser, revokeSession } from './_shared/sessions'
 import {
   findPendingRequestByEmail,
@@ -214,7 +214,9 @@ async function handleMe(req) {
 
   // The Bearer is now a session token, not an access code — a live session
   // resolves to the user (disabled accounts are rejected here too, SEC-1.9).
-  const resolved = await resolveSession(req)
+  // SEC-7.1 (#338): the identity action is routed through the shared policy
+  // layer (`auth:me`, principal scoped to the session's own user).
+  const resolved = await enforce(req, 'auth:me')
   if (resolved.error) {
     // SEC-6.4 (#218): an invalid/expired/revoked session at revalidation.
     logAudit('auth.session_invalid', {})
@@ -242,7 +244,9 @@ async function handleLogout(req) {
 // owner sessions are stored like any other, so revokeAllForUser('owner') kills
 // them. Idempotent: revoking an already-dead set is a safe no-op.
 async function handleLogoutAll(req) {
-  const resolved = await resolveSession(req)
+  // SEC-7.1 (#338): the identity action is routed through the shared policy
+  // layer (`auth:logoutAll`, principal scoped to the session's own user).
+  const resolved = await enforce(req, 'auth:logoutAll')
   if (resolved.error) return resolved.error
   await revokeAllForUser(resolved.user.id)
   logAudit('auth.logout_all', { userId: resolved.user.id })

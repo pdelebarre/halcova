@@ -65,5 +65,19 @@ export async function updateItem(id, patch, collection = 'records') {
 
 export async function deleteItem(id, collection = 'records') {
   const res = await fetch(fnUrl(collection, { id }), { method: 'DELETE', headers: authHeaders() })
+  // SEC-7.1 (#338): the collection function returns a uniform non-enumerating
+  // 403 FORBIDDEN when an object-by-id delete targets an item that isn't in the
+  // caller's own per-user store (already gone, or another member's — the two are
+  // indistinguishable by design). For the member deleting from their own store,
+  // "already gone" is a benign no-op, so we treat FORBIDDEN on delete as an
+  // idempotent success to preserve the pre-#338 delete UX (no spurious error /
+  // rollback when the item was already removed). The server still rejects the
+  // cross-tenant case with the same response, so nothing extra is revealed.
+  if (res.status === 403) {
+    let code
+    try { const b = await res.json(); code = b?.code } catch { /* non-JSON */ }
+    if (code === 'FORBIDDEN') return { ok: true }
+    return handle(res)
+  }
   return handle(res)
 }

@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { resolveSession } from './_shared/session-auth'
+import { enforce } from './_shared/policy'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
@@ -44,12 +44,10 @@ const TTL = {
 }
 
 // Same contract as collection.js (SEC-EPIC-1, #176): every request carries a
-// live server-managed session token. resolveSession validates it and resolves
-// the owner / demo / member identity — the demo identity stays ungated for
-// lookups (T6). Unknown/expired/revoked tokens 401, disabled accounts 403.
-async function authorize(req) {
-  return resolveSession(req)
-}
+// live server-managed session token. SEC-7.1 (#338): authorization now routes
+// through the shared policy layer — `lookup:read` (any authenticated caller;
+// the demo identity stays ungated for lookups, T6). Unknown/expired/revoked
+// tokens 401, disabled accounts 403 — same as resolveSession before.
 
 // Barcodes/ids are digits (keep X/x for UPC check digits) — also keeps blob
 // keys clean and avoids path weirdness in the release id.
@@ -148,7 +146,7 @@ export default async (req) => {
     return handleCover(url.searchParams, getStore(CACHE_STORE))
   }
 
-  const { user, error } = await authorize(req)
+  const { user, error } = await enforce(req, 'lookup:read')
   if (error) return error
 
   // Members/owner key provider limits by user id; the shared demo identity is

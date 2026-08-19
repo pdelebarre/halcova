@@ -205,14 +205,18 @@ describe('owned-count transitions (T3)', () => {
     expect(store.data.get('count:owned')).toBe(4)
   })
 
-  it('is idempotent on DELETE of a missing item and leaves the count untouched', async () => {
+  it('is non-enumerating (403 FORBIDDEN) on DELETE of a missing item and leaves the count untouched', async () => {
+    // SEC-7.1 (#338): object-by-id access by a caller who doesn't own the item
+    // is a uniform 403 FORBIDDEN (the caller's own ghost id is
+    // indistinguishable from another tenant's), replacing the old idempotent
+    // 200/no-op. The count is untouched.
     seedMember()
     const store = collectionStore([])
     store.data.set('count:owned', 3)
 
     const res = await call('DELETE', '?collection=records&id=ghost')
-    expect(res.status).toBe(200)
-    expect((await res.json()).ok).toBe(true)
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     expect(store.data.get('count:owned')).toBe(3)
   })
 

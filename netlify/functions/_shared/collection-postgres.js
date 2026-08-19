@@ -24,6 +24,8 @@
 import { randomUUID } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { json, readIndex, writeIndex } from './collection-store'
+import { forbidden } from './policy'
+import { filterFor } from './filter'
 import { planLimitFor } from './plans'
 import { storeNameFor } from './users'
 import { parsePagination, sliceIds } from './pagination'
@@ -54,7 +56,9 @@ async function readItemsFromBlobs(req, { user, collection, url }) {
   const items = (await Promise.all(
     slice.map((itemId) => store.get(`item:${itemId}`, { type: 'json' })),
   )).filter(Boolean)
-  return json(200, { items })
+  // SEC-7.1 (#338): item DTOs run through the shared filter (own:true — the
+  // caller owns their per-user store).
+  return json(200, { items: items.map((i) => filterFor(user, 'item', i, { own: true })) })
 }
 
 // DB-first read-through: serve Postgres when it has rows, otherwise fall back
@@ -79,7 +83,8 @@ async function readItems(req, { user, collection, url }) {
   }
   await reconcileFromBlobs(repo, user.id, collection)
   const full = await repo.items.listItems(user.id, collection, { limit, offset })
-  return json(200, { items: full })
+  // SEC-7.1 (#338): item DTOs run through the shared filter (own:true).
+  return json(200, { items: full.map((i) => filterFor(user, 'item', i, { own: true })) })
 }
 
 // Lazy, self-healing read-through (ADR-0002 Phase 1, epic #38): a store that
@@ -205,7 +210,8 @@ async function handlePost(req, { user, collection }) {
   }
 
   await mirrorAdd(user.id, collection, item)
-  return json(201, item)
+  // SEC-7.1 (#338): the returned item DTO runs through the shared filter.
+  return json(201, filterFor(user, 'item', item, { own: true }))
 }
 
 async function handlePut(req, { user, collection, id }) {
@@ -225,7 +231,10 @@ async function handlePut(req, { user, collection, id }) {
       existing = null
     }
   }
-  if (!existing) return json(404, { error: 'Not found' })
+  // SEC-7.1 (#338) non-enumeration: object-by-id access by a non-owner is a
+  // uniform 403 FORBIDDEN (never a distinguishable 404) — an item id not in
+  // the caller's scope reveals nothing about whether it exists elsewhere.
+  if (!existing) return forbidden()
 
   // SEC-3.2 (#195): cap the JSON body before parsing (413 over the cap) —
   // parity with the Blobs PUT path in collection.js.
@@ -272,7 +281,8 @@ async function handlePut(req, { user, collection, id }) {
     throw err // DB-level error -> the Blobs fallback in collection.js handles it
   }
   await mirrorUpdate(user.id, collection, id, updated, existing)
-  return json(200, updated)
+  // SEC-7.1 (#338): the returned item DTO runs through the shared filter.
+  return json(200, filterFor(user, 'item', updated, { own: true }))
 }
 
 async function handleDelete(req, { user, collection, id }) {
@@ -290,6 +300,11 @@ async function handleDelete(req, { user, collection, id }) {
       existing = null
     }
   }
+  // SEC-7.1 (#338) non-enumeration: deleting an item the caller doesn't own is
+  // a uniform 403 FORBIDDEN (replaces the old idempotent 200/no-op on a missing
+  // id — the caller's own ghost id is indistinguishable from another's, so a
+  // single stable FORBIDDEN prevents probing).
+  if (!existing) return forbidden()
   await repo.items.transaction(async (tx) => {
     await tx.deleteItem(user.id, collection, id)
   })
