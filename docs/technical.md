@@ -860,7 +860,51 @@ produced one extra small `vendor-*.css` asset; all original 59 entries remain
 intact (scanner `worker.min`, `zxing_reader.wasm`, `tesseract-core`,
 `eng.traineddata.gz` all still precached).
 
-### Enforcement
+### #365 verification (2026-08-19) — deferred scanner/OCR are out of the shell; no measure-worthy split
+
+> Issue: #365 (ARCH-0.3.2, epic #150) · Scanner Builder verification + focused
+> tests. This ticket is primarily **verification** of the deferral that #364
+> established, plus regression coverage. No chunk split landed in the scanner/
+> OCR pipeline.
+
+**Build evidence** (`npm run build` on `feat/m1-perf-365-scanner-ocr`): the
+eager shell is unchanged and clean — `dist/index.html` references only
+`index` / `rolldown-runtime` / `vendor-react` / `vendor` (+ their css). The
+scanner/OCR chunks are emitted as separate deferred assets and are **not**
+referenced by the shell:
+
+- `ScannerModal-*.js` (4.46 kB) — lazy `import('./components/ScannerModal')`
+- `CoverScanModal-*.js` (3.75 kB) — lazy `import('./components/CoverScanModal')`
+- `ocr-*.js` (1.34 kB) — dynamic `await import('./utils/ocr')`
+- `worker.min-*.js` (111.30 kB) — Tesseract worker (precached)
+- `zxing_reader-*.wasm` (1,065.86 kB / gzip 453.37 kB) — scanner decoder (precached)
+- `tesseract-core-lstm.wasm-*.js` (3,896.48 kB) — Tesseract Emscripten core (precached)
+- `tessdata/eng.traineddata.gz` (10.9 MB) — English traineddata (precached)
+
+Precache remains **60 entries** (17316.42 KiB) with every deferred asset listed
+in the built `dist/sw.js` manifest (zxing wasm, worker, tesseract core,
+traineddata, ocr/chunk modals) — the offline capability matrix is intact.
+
+**Split decision: no measure-worthy split.** The heavy entries are fixed-size
+binary/WASM assets (`zxing_reader.wasm`, `tesseract-core-lstm.wasm.js` with its
+wasm embedded as base64); splitting a wasm is not meaningful. The JS-level
+dependency boundaries are already optimally code-split and each feature loads
+only on invocation:
+
+- barcode → `React.lazy(ScannerModal)` → `zxing-wasm/reader` (dynamic, wasm)
+- cover caption → `React.lazy(CoverScanModal)` (camera only — no OCR import)
+- OCR → `await import('./utils/ocr')` → `await import('tesseract.js')` (heavy
+  runtime pulled only on the first cover scan)
+
+There is no duplicated module or large library folded into a deferred chunk
+that a further split could isolate without regressing offline/precache.
+`chunkSizeWarningLimit` was **not** raised. These assets remain ACCEPTED as
+intentionally deferred + precached (see the Disposition table above).
+
+**Focused tests added** (`src/utils/deferred-scanner-ocr.test.js` +
+`cover-scan.int.test.jsx`): lazy-init-only-on-invocation invariants,
+precache-level invariants for the scanner/OCR assets, and explicit
+`OCR_TIMEOUT` / generic-error handling inside the cover flow.
 
 `npm run build` output is the canonical enforcement signal:
 
