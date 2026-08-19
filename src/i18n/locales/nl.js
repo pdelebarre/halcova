@@ -336,6 +336,8 @@ const nl = {
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
 
+  'offline.status': 'Offline — opgeslagen inhoud weergegeven',
+
   // §17 Gratis abonnement & demo
   'plan.freeCounter': '{count} van {cap} items toegevoegd',
   // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only

@@ -231,3 +231,25 @@ describe('the service worker never runtime-caches user-scoped endpoints', () => 
     expect(block).not.toContain("'/api/'")
   })
 })
+
+describe('M1 offline navigation fallback (#157)', () => {
+  it('serves the precached index.html for offline navigations (reload works offline)', async () => {
+    const { readFile } = await import('node:fs/promises')
+    const path = (await import('node:path')).default
+    const { fileURLToPath } = await import('node:url')
+    const viteConfigPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'vite.config.js')
+    const src = await readFile(viteConfigPath, 'utf8')
+
+    // The SPA shell must fall back to the precached index.html for any
+    // navigation so reloading the installed app (or a deep link) while offline
+    // renders the shell instead of a network-error / dark screen.
+    expect(src).toMatch(/navigateFallback:\s*'index\.html'/)
+
+    // The navigations runtime rule is strictly scoped to `<a>navigation`
+    // requests — never broadened to '/', '*' or any API path, so it can never
+    // capture an auth/payment/collection response.
+    const runtimeBlock = src.slice(src.indexOf('runtimeCaching: ['), src.indexOf('workbox', src.indexOf('runtimeCaching: [') + 1))
+    const navRule = runtimeBlock.slice(runtimeBlock.indexOf("'navigations'") - 200, runtimeBlock.indexOf("'navigations'") + 200)
+    expect(navRule).toMatch(/request\.mode\s*===?\s*'navigate'/)
+  })
+})
