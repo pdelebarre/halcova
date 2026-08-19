@@ -177,4 +177,33 @@ describe('Cover-scan-to-add integration', () => {
     // Only once the result is known do we leave the cover modal.
     expect(await screen.findByRole('button', { name: 'Add to crate' })).toBeInTheDocument()
   })
+
+  // #365 regression: an OCR_TIMEOUT (wedged worker / hung wasm init) must
+  // surface the timed-out copy INSIDE the still-open cover flow (retry / pick
+  // again), never a fatal crash or a silent spinner, and never fire a lookup.
+  it('shows timed-out copy inside the cover flow when OCR rejects with OCR_TIMEOUT', async () => {
+    ocr.recognizeImage.mockRejectedValue(Object.assign(new Error('OCR timed out'), { code: 'OCR_TIMEOUT' }))
+
+    render(<CollectionView catalog={recordsCatalog} onRequestSettings={vi.fn()} />)
+    await openCoverScan()
+
+    expect(await screen.findByText(/took too long/i)).toBeTruthy()
+    // Stays in the cover flow (Retry / pick again), never a blank picker.
+    expect(screen.queryByRole('dialog', { name: 'Is this it?' })).not.toBeInTheDocument()
+    expect(discogs.searchByBarcode).not.toHaveBeenCalled()
+    expect(discogs.searchByText).not.toHaveBeenCalled()
+  })
+
+  // #365 regression: a generic OCR failure (e.g. camera/encode error) surfaces
+  // the general error copy and keeps the cover modal open with retry.
+  it('shows general error copy inside the cover flow on a non-timeout OCR failure', async () => {
+    ocr.recognizeImage.mockRejectedValue(new Error('Could not encode image'))
+
+    render(<CollectionView catalog={recordsCatalog} onRequestSettings={vi.fn()} />)
+    await openCoverScan()
+
+    expect(await screen.findByText(/could not encode image/i)).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Is this it?' })).not.toBeInTheDocument()
+    expect(discogs.searchByBarcode).not.toHaveBeenCalled()
+  })
 })
