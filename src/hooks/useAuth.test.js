@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useAuth } from './useAuth'
 import { saveSession } from '../utils/session'
+import { establishOfflineTrust, sessionFingerprint } from '../utils/offlineTrust'
 
 // Mock the auth API module so refresh() exercises the real session handling
 // without any network (same pattern as useCollection.test.js).
@@ -30,6 +31,10 @@ beforeEach(() => {
 describe('useAuth.refresh', () => {
   it('keeps the cached session when me() throws (offline)', async () => {
     saveSession(SESSION)
+    // #162 / ADR-0015 Dec 4: offline keep requires a device that was previously
+    // authenticated ONLINE and explicitly trusted. Model a trusted device by
+    // establishing the bounded offline-trust grant for this session first.
+    establishOfflineTrust(MEMBER, { sessionFp: sessionFingerprint(SESSION.session) })
     authApi.me.mockRejectedValue(new Error('offline'))
 
     const { result } = renderHook(() => useAuth())
@@ -40,8 +45,26 @@ describe('useAuth.refresh', () => {
       await result.current.refresh()
     })
 
-    // Offline revalidation must NOT sign the user out (S5, #53).
+    // Offline revalidation must NOT sign the user out (S5, #53) while the
+    // device still holds a live bounded trust grant.
     expect(result.current.session).toEqual(SESSION)
+  })
+
+  it('signs the user out on offline when the bounded trust grant is absent/expired (fail closed, #162)', async () => {
+    // A cached session WITHOUT a trust grant (e.g. trust expired or this device
+    // was never explicitly trusted) must NOT keep the shell offline — the
+    // cached private state fails closed.
+    saveSession(SESSION)
+    authApi.me.mockRejectedValue(new Error('offline'))
+
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.ready).toBe(true))
+
+    await act(async () => {
+      await result.current.refresh()
+    })
+
+    expect(result.current.session).toBeNull()
   })
 
   it('clears the session when me() resolves null (revoked/disabled)', async () => {
