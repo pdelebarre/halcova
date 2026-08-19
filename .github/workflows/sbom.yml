@@ -36,7 +36,9 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '20'
+          # Node 22: the jsdom@30/undici@8 stack requires Node >= 22.19.0
+          # (OPS-3.1, #375).
+          node-version: '22'
       - name: Install dependencies
         run: npm install --legacy-peer-deps
       # npm's built-in SBOM generator (npm >= 9.7) emits a CycloneDX JSON SBOM
