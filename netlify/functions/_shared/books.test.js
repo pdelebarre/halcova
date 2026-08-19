@@ -158,7 +158,10 @@ describe('error-code mapping through the real lookupFetch (T1 handler integratio
     expect(res.status).toBe(502)
     const body = await res.json()
     expect(body.code).toBe('ALL_PROVIDERS_FAILED')
-  })
+    // T5: the persistent-network path runs the real retry backoff chain (Google
+    // 3 attempts + OpenLibrary); give it an explicit timeout so it never flakes
+    // against the 5s Vitest default (same fix as its sibling test below).
+  }, 15000)
 })
 
 // RES-1.3 T3 (#283) — OpenLibrary fallback chain through the REAL handler.
@@ -273,7 +276,10 @@ describe('OpenLibrary fallback chain (RES-1.3 T3, #283)', () => {
     expect(res.status).toBe(502)
     const body = await res.json()
     expect(body.code).toBe('ALL_PROVIDERS_FAILED')
-  })
+    // T5: the persistent-5xx path runs the real retry backoff chain against
+    // Google (3 attempts) and then OpenLibrary; upsert an explicit timeout so
+    // this slow deterministic test never flakes against the 5s Vitest default.
+  }, 15000)
 
   it('NO_FALLBACK on a provider rate limit — OpenLibrary is never contacted', async () => {
     global.fetch.mockResolvedValue(upstream(429, {}))
