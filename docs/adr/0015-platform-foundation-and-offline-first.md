@@ -1,6 +1,6 @@
 # ADR-0015: Platform foundation and offline-first architecture
 
-- **Status:** Accepted
+- **Status:** Proposed — pending specialist review
 - **Date:** 2026-08-19
 - **Related roadmap:** #150, #152, #157, #162
 
@@ -30,39 +30,66 @@ Offline capabilities are explicit per feature. The M1 shell may start and render
 
 Sensitive operations remain online-only by default, including registration, password/access-code management, payments, security administration, uncached external lookup and operations requiring current authorization.
 
-### 4. Offline trust model
+### 4. Trusted-device/session model
 
-Offline access is allowed only on a previously authenticated/trusted device and only for capabilities whose data has already been synchronized locally. Offline authorization is bounded by the approved session/trust policy.
+Offline access requires a previously authenticated and explicitly trusted device/session. The trust record must have a defined expiry/revocation mechanism and must never itself contain reusable credentials.
+
+The implementation must define and enforce:
+
+- trust establishment only after successful online authentication;
+- trust expiry and revalidation;
+- server-side revocation/disable handling when connectivity returns;
+- local invalidation on sign-out and account switch;
+- local invalidation when the trusted session is determined to be expired or revoked;
+- fail-closed behaviour for capabilities requiring current authorization.
+
+Offline authorization is capability-scoped and time-bounded. A cached trusted state is not evidence that an account remains authorized indefinitely.
 
 No raw passwords, access codes, bearer/session tokens or equivalent credentials may be stored in IndexedDB.
 
-Sign-out and account switching must clear or invalidate local collection data according to the offline security policy. Local keys and records must be scoped so another user/tenant cannot reuse them accidentally.
+### 5. Local data and service-worker boundary
 
-### 5. Synchronization
+Private collection data must be stored only in the approved IndexedDB application store and must be scoped by authenticated user/tenant/device context. Generic service-worker HTTP caching must not cache authenticated/private collection responses.
+
+Service-worker precache is limited to the public application shell and other explicitly approved non-sensitive assets. Private data must never be made available to another browser user through a shared cache.
+
+Sign-out and account switching must clear or cryptographically invalidate local private data according to the offline security policy.
+
+### 6. Local schema and repository boundary
+
+IndexedDB uses an explicit versioned schema. Schema upgrades are deterministic and migration failures fail closed rather than silently interpreting incompatible data.
+
+Feature code must use repository/application abstractions; direct IndexedDB access from UI components is prohibited.
+
+Every private record must carry or be derivable from a non-user-controlled ownership scope. Client-supplied tenant/owner identifiers are never authoritative.
+
+### 7. Synchronization
 
 M2/M3 synchronization will use explicit operation identities, durable outbox records, server-side authorization, idempotent processing, cursors and optimistic concurrency. Synchronization is not implemented by blindly replaying HTTP requests.
 
 Every offline mutation must have a deterministic operation ID. Server-side processing must reject cross-user/tenant replay and duplicate operations must be safe.
 
-### 6. Conflict policy
+### 8. Conflict policy
 
 Conflict handling is entity-specific. Silent universal last-write-wins is rejected where it can lose user intent. The detailed M2/M3 conflict matrix will be recorded before conflict-sensitive implementation.
 
-### 7. API evolution
+### 9. API evolution
 
 Existing API envelopes remain compatible during migration. New contracts are versioned where compatibility requires it. Error responses remain machine-readable and must not expose internal implementation details.
 
-### 8. External provider boundaries
+### 10. External provider boundaries
 
 External catalog providers remain server-mediated. Provider host allowlists, SSRF controls, response size limits, bounded retries and safe caching remain mandatory. Offline operation must never turn the browser into a generic external proxy.
 
-### 9. Assets
+### 11. Assets
 
 Public catalogue assets and private user assets remain separate. User documents/photos must use an authorization-before-signed-access pattern before file-heavy features are released.
 
-### 10. Observability
+### 12. Observability
 
 Offline and synchronization state must expose operational evidence without collecting unnecessary personal data. Metrics must distinguish offline, pending, synchronized, conflict and failure states without logging secrets or sensitive collection content.
+
+Telemetry must not record credentials, raw private collection contents, access codes, bearer/session tokens, or user/tenant identifiers unless a later approved privacy decision explicitly requires an aggregated form.
 
 ## Consequences
 
@@ -73,14 +100,16 @@ Offline and synchronization state must expose operational evidence without colle
 - explicit security boundary;
 - deterministic synchronization path;
 - compatibility with current deployment model;
-- clear separation between M1 foundation and M2 collector implementation.
+- clear separation between M1 foundation and M2 collector implementation;
+- explicit trust, cache, migration and revocation boundaries.
 
 ### Negative
 
 - temporary coexistence of Blobs and IndexedDB;
 - local schema migration/versioning becomes a new responsibility;
 - synchronization requires additional server contracts and testing;
-- some operations intentionally remain unavailable offline.
+- some operations intentionally remain unavailable offline;
+- trusted-device lifecycle and local invalidation require dedicated implementation/testing.
 
 ## Rejected alternatives
 
@@ -93,7 +122,11 @@ Offline and synchronization state must expose operational evidence without colle
 
 ## Required follow-up
 
-- #157 implements only the installable offline shell.
-- #162 hardens the offline trust/session boundary.
+- #157 implements only the installable offline shell and must not precache private collection responses.
+- #162 implements the trusted-session/security boundary, including expiry, revocation and invalidation behaviour.
 - #158/#159/#289/#292 implement the M2 collection offline workflow.
 - #160/#161 implement robust synchronization and conflict handling in M3.
+
+## Gate
+
+This ADR remains **Proposed** until the Offline Architect, Data Architect and Security Auditor have independently reviewed the PR and the PM has accepted all required findings. Only then may dependent M1 implementation proceed.
