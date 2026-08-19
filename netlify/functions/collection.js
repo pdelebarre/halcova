@@ -1,6 +1,8 @@
 import { getStore } from '@netlify/blobs'
 import { randomUUID } from 'node:crypto'
-import { COLLECTIONS, authorize, json, readIndex, writeIndex } from './_shared/collection-store'
+import { COLLECTIONS, json, readIndex, writeIndex } from './_shared/collection-store'
+import { enforce, forbidden } from './_shared/policy'
+import { filterFor } from './_shared/filter'
 import { DEMO_SEED, seedDemoStore } from './_shared/demo-data'
 import { planLimitFor } from './_shared/plans'
 import { storeNameFor } from './_shared/users'
@@ -39,7 +41,7 @@ async function handleBlobs(req, { user, collection, id, url }) {
       const defaultPage = isDefaultPage(url.searchParams)
       if (defaultPage) {
         const cached = await readListCache(store)
-        if (cached) return json(200, { items: cached })
+        if (cached) return json(200, { items: cached.map((i) => filterFor(user, 'item', i, { own: true })) })
       }
       // Paginated read (T2): fetch ONLY the requested slice of items, keeping
       // index order. Default limit is high (1000) so the current client is
@@ -50,8 +52,13 @@ async function handleBlobs(req, { user, collection, id, url }) {
       const items = (await Promise.all(
         slice.map((itemId) => store.get(`item:${itemId}`, { type: 'json' })),
       )).filter(Boolean)
+      // SEC-7.1 (#338): route item DTOs through the shared property-filter.
+      // Every item is owned by the caller (per-user store), so own:true passes
+      // them through unchanged — this formalizes the filter so a future
+      // non-owner item DTO can never leak private fields.
+      const visible = items.map((i) => filterFor(user, 'item', i, { own: true }))
       if (defaultPage) await writeListCache(store, items)
-      return json(200, { items })
+      return json(200, { items: visible })
     }
 
     if (req.method === 'POST') {
@@ -98,13 +105,20 @@ async function handleBlobs(req, { user, collection, id, url }) {
       // consume the cap.
       if (!item.wishlist) await adjustOwnedCount(store, +1)
       await invalidateListCache(store)
-      return json(201, item)
+      // SEC-7.1 (#338): the returned item DTO runs through the shared filter.
+      return json(201, filterFor(user, 'item', item, { own: true }))
     }
 
     if (req.method === 'PUT') {
       if (!id) return json(400, { error: 'Missing id' })
+      // SEC-7.1 (#338) non-enumeration: object-by-id access by a caller who
+      // does not own the item (not found in the caller's own per-user store)
+      // is a uniform 403 FORBIDDEN — never a distinguishable 404 that would
+      // reveal "doesn't exist" vs "exists but isn't yours". The owner's own
+      // missing id is indistinguishable from another's at the per-user store
+      // layer, so it gets the same stable FORBIDDEN.
       const existing = await store.get(`item:${id}`, { type: 'json' })
-      if (!existing) return json(404, { error: 'Not found' })
+      if (!existing) return forbidden()
       // SEC-EPIC-2 (#188): the PUT patch is narrowed to the item allowlist
       // before the merge, so a spoofed ownerId/userId/role/plan/id in the body
       // is dropped and can never change ownership or escalate privileges.
@@ -144,19 +158,25 @@ async function handleBlobs(req, { user, collection, id, url }) {
       const { delta } = wishlistToggleDelta(patch, existing)
       if (delta !== 0) await adjustOwnedCount(store, delta)
       await invalidateListCache(store)
-      return json(200, updated)
+      // SEC-7.1 (#338): the returned item DTO runs through the shared filter.
+      return json(200, filterFor(user, 'item', updated, { own: true }))
     }
 
     if (req.method === 'DELETE') {
       if (!id) return json(400, { error: 'Missing id' })
-      // Read the item first so we know whether it counted toward the owned
-      // cap. A missing item still deletes cleanly + 200s, preserving today's
-      // idempotent behavior (the count is untouched in that case).
+      // SEC-7.1 (#338) non-enumeration: deleting an item the caller does not
+      // own (not in their own store) is a uniform 403 FORBIDDEN. This replaces
+      // the old idempotent 200/no-op for a missing id — the owner's own ghost
+      // id is indistinguishable from another's at the per-user store layer, so
+      // a single stable FORBIDDEN prevents an attacker from probing which
+      // object ids exist. The old 200-on-missing behavior is a documented
+      // SEC-7.1 contract change.
       const existing = await store.get(`item:${id}`, { type: 'json' })
+      if (!existing) return forbidden()
       await store.delete(`item:${id}`)
       const ids = await readIndex(store)
       await writeIndex(store, ids.filter((existingId) => existingId !== id))
-      if (existing && !existing.wishlist) await adjustOwnedCount(store, -1)
+      if (!existing.wishlist) await adjustOwnedCount(store, -1)
       await invalidateListCache(store)
       return json(200, { ok: true })
     }
@@ -168,12 +188,33 @@ async function handleBlobs(req, { user, collection, id, url }) {
   }
 }
 
+// Map the HTTP method to the SEC-7.1 policy action. Unknown methods fall back
+// to the least-restrictive read action so auth is still gated before the 405.
+function actionFor(method) {
+  if (method === 'GET') return 'collection:item:read'
+  if (method === 'POST') return 'collection:item:create'
+  if (method === 'PUT') return 'collection:item:update'
+  if (method === 'DELETE') return 'collection:item:delete'
+  return 'collection:item:read'
+}
+
 export default async (req) => {
   const url = new URL(req.url)
   const collection = url.searchParams.get('collection') || 'records'
   const id = url.searchParams.get('id')
 
-  const { user, error } = await authorize(req)
+  // SEC-7.1 (#338): route authorization through the shared policy layer. The
+  // action is derived from the method; writes deny the read-only demo identity
+  // with the same DEMO_READONLY shape as before. The principal is always the
+  // resolved session user — a browser-supplied owner/tenant/id is never
+  // trusted. Unsupported methods still resolve the session first (so auth is
+  // gated before the 405 below), falling back to the least-restrictive read
+  // action.
+  const action = actionFor(req.method)
+  const { user, error } = await enforce(req, action, {
+    denyCode: 'DEMO_READONLY',
+    denyMessage: 'The demo collection is read-only. Sign in to add your own items.',
+  })
   if (error) return error
 
   if (!COLLECTIONS[collection]) return json(400, { error: 'Unknown collection.' })
@@ -199,14 +240,9 @@ export default async (req) => {
     }
   }
 
-  // The demo space is read-only, enforced server-side. GET stays open so demo
-  // visitors can browse, scan and search; every write is rejected.
-  if (req.method !== 'GET' && user.role === 'demo') {
-    return json(403, {
-      error: 'The demo collection is read-only. Sign in to add your own items.',
-      code: 'DEMO_READONLY',
-    })
-  }
+  // The demo space is read-only, enforced server-side through the shared
+  // policy layer (the `deny: ['demo']` on the write actions above returns
+  // DEMO_READONLY before any work runs).
 
   // Phase 1 (ADR-0002): when DATABASE_URL is configured, serve from Postgres.
   // SEC-4.1 (#202): Postgres is the configured data authority. A failure here

@@ -30,7 +30,7 @@
 import { getStore } from '@netlify/blobs'
 import { DEMO_USER } from './_shared/auth'
 import { json } from './_shared/collection-store'
-import { requireAdmin } from './_shared/session-auth'
+import { enforce } from './_shared/policy'
 import { DEMO_RECORDS, DEMO_BOOKS, seedDemoStore } from './_shared/demo-data'
 import { storeNameFor } from './_shared/users'
 
@@ -39,9 +39,10 @@ import { storeNameFor } from './_shared/users'
 // uses, so the demo always shows the same fixed set). Harmless to re-run — it
 // skips a kind whose store index is already non-empty.
 export default async (req) => {
-  // SEC-1.6 (#181): authorize by the session's role (the owner's admin
-  // session), never by re-checking a bearer string against ADMIN_KEY.
-  const admin = await requireAdmin(req)
+  // SEC-1.6 (#181) + SEC-7.1 (#338): authorize by the session's role (the
+  // owner's admin session) through the shared policy layer (`seed-demo:seed`
+  // requires:'admin'), never by re-checking a bearer string against ADMIN_KEY.
+  const admin = await enforce(req, 'seed-demo:seed')
   if (admin.error) return admin.error
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
 

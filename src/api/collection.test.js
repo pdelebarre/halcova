@@ -113,9 +113,28 @@ describe('collection API', () => {
   it('surfaces the server message for a 403 / 404 error body', async () => {
     global.fetch.mockResolvedValue(errorJson(403, { error: "Your plan doesn't include the books collection." }))
     await expect(collection.listItems('books')).rejects.toThrow("Your plan doesn't include the books collection.")
+    // SEC-7.1 (#338): the collection function no longer returns a distinguishable
+    // 404 for an object-by-id update of a missing item — a non-owner (or already-
+    // gone) id is a uniform 403 FORBIDDEN. The client surfaces it as before.
+    global.fetch.mockResolvedValue(errorJson(403, { error: 'Not authorized.', code: 'FORBIDDEN' }))
+    await expect(collection.updateItem('nope', { notes: 'x' })).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
 
-    global.fetch.mockResolvedValue(errorJson(404, { error: 'Not found' }))
-    await expect(collection.updateItem('nope', { notes: 'x' })).rejects.toThrow('Not found')
+  it('treats a FORBIDDEN delete as an idempotent success (SEC-7.1 non-enumeration)', async () => {
+    // Deleting a missing item now returns a uniform 403 FORBIDDEN (was 200). To
+    // preserve idempotent-delete UX, the client treats FORBIDDEN on delete as a
+    // benign success (the item is already gone from the caller's own store).
+    global.fetch.mockResolvedValue(errorJson(403, { error: 'Not authorized.', code: 'FORBIDDEN' }))
+    const result = await collection.deleteItem('ghost', 'records')
+    expect(result).toEqual({ ok: true })
+    const [url, init] = global.fetch.mock.calls[0]
+    expect(init.method).toBe('DELETE')
+    expect(url).toContain('id=ghost')
+  })
+
+  it('still surfaces a DEMO_READONLY delete as an error', async () => {
+    global.fetch.mockResolvedValue(errorJson(403, { error: 'The demo collection is read-only.', code: 'DEMO_READONLY' }))
+    await expect(collection.deleteItem('r1', 'records')).rejects.toMatchObject({ code: 'DEMO_READONLY' })
   })
 
   it('throws a code-less error when the error body has an error but no code', async () => {

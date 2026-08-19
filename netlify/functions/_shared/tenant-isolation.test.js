@@ -151,8 +151,10 @@ describe('#186 — spoofed tenant id is ignored (authenticated tenant context)',
       action: 'lend', collection: RECORDS, itemId: 'a1',
       ownerId: A, userId: A, borrower: { name: 'B' },
     }, B_TOKEN)
-    // B's store has no item 'a1' -> 404 (B cannot lend A's item by id).
-    expect(res.status).toBe(404)
+    // SEC-7.1 (#338): B cannot lend A's item — object-by-id access by a
+    // non-owner is a uniform 403 FORBIDDEN (was 404).
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     // A's item was not mutated by B.
     expect(stores[`collection-${A}-${RECORDS}`].data.get('item:a1').lending).toBeUndefined()
   })
@@ -209,8 +211,10 @@ describe('#188 — mass assignment is eliminated (field allowlist)', () => {
     const res = await call(collectionHandler, 'PUT', `?collection=${RECORDS}&id=a1`, {
       title: 'Hijacked', ownerId: A, userId: A, role: 'admin', plan: 'unlimited', status: 'active', id: 'x',
     }, B_TOKEN)
-    // B's store has no item a1 -> 404, and A's item is untouched.
-    expect(res.status).toBe(404)
+    // SEC-7.1 (#338): object-by-id access by a non-owner is a uniform 403
+    // FORBIDDEN (was 404), and A's item is untouched.
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     expect(aStore.data.get('item:a1').title).toBe('Title a1')
 
     // A's own legitimate PUT also strips the spoofed fields.
@@ -258,38 +262,45 @@ describe('#189 — IDOR / cross-tenant penetration', () => {
     expect((await res.json()).items).toEqual([])
   })
 
-  it('B cannot DELETE A\'s item by id (delete is scoped to B\'s own store)', async () => {
+  it('B cannot DELETE A\'s item by id (non-enumerating 403, A untouched)', async () => {
     seedMember(A); seedMember(B)
     const aStore = collectionStore(A, RECORDS, [item('a1')])
     const res = await call(collectionHandler, 'DELETE', `?collection=${RECORDS}&id=a1`, null, B_TOKEN)
-    // Deleting a missing id in B's store still 200s (idempotent) but must NOT
-    // touch A's item — the security property is that a1 survives in A's store.
-    expect(res.status).toBe(200)
+    // SEC-7.1 (#338): object-by-id access by a non-owner is a uniform 403
+    // (was 200 idempotent) and must NOT touch A's item.
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     expect(aStore.data.has('item:a1')).toBe(true)
     expect(aStore.data.get('index')).toEqual(['a1'])
   })
 
-  it('B cannot UPDATE A\'s item by id (404, A untouched)', async () => {
+  it('B cannot UPDATE A\'s item by id (non-enumerating 403, A untouched)', async () => {
     seedMember(A); seedMember(B)
     const aStore = collectionStore(A, RECORDS, [item('a1')])
     const res = await call(collectionHandler, 'PUT', `?collection=${RECORDS}&id=a1`, { title: 'Hijack' }, B_TOKEN)
-    expect(res.status).toBe(404)
+    // SEC-7.1 (#338): object-by-id access by a non-owner is a uniform 403 (was 404).
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     expect(aStore.data.get('item:a1').title).toBe('Title a1')
   })
 
-  it('B cannot LEND A\'s item by id (404, A untouched)', async () => {
+  it('B cannot LEND A\'s item by id (non-enumerating 403, A untouched)', async () => {
     seedMember(A); seedMember(B, { features: { lending: true } })
     const aStore = collectionStore(A, RECORDS, [item('a1')])
     const res = await call(lendingHandler, 'POST', '', { action: 'lend', collection: RECORDS, itemId: 'a1', borrower: { name: 'B' } }, B_TOKEN)
-    expect(res.status).toBe(404)
+    // SEC-7.1 (#338): object-by-id access by a non-owner is a uniform 403 (was 404).
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     expect(aStore.data.get('item:a1').lending).toBeUndefined()
   })
 
-  it('B cannot RETURN A\'s loan by id', async () => {
+  it('B cannot RETURN A\'s loan by id (non-enumerating 403)', async () => {
     seedMember(A); seedMember(B, { features: { lending: true } })
     const aStore = collectionStore(A, RECORDS, [item('a1', { lending: { borrower: { name: 'X' }, lentOn: new Date().toISOString() } })])
     const res = await call(lendingHandler, 'POST', '', { action: 'return', collection: RECORDS, itemId: 'a1' }, B_TOKEN)
-    expect(res.status).toBe(404)
+    // SEC-7.1 (#338): object-by-id access by a non-owner is a uniform 403 (was 404).
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
     expect(aStore.data.get('item:a1').lending).toBeDefined() // A's loan intact
   })
 
@@ -446,5 +457,89 @@ describe('SEC-3.2 (#195) — payload-size cap on the lending POST path', () => {
     expect((await res.json()).code).toBe('PAYLOAD_TOO_LARGE')
     // The item was NOT lent (the cap rejected before any write).
     expect(stores[`collection-${B}-${RECORDS}`].data.get('item:a1').lending).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SEC-7.1 (#338) — centralized authorization: follower/blocked (authenticated
+// non-owner) + private-field cases.
+//
+// There is no social-graph model (no "followers"/"blocks" entities), so a
+// "follower" and a "blocked user" both reduce to an AUTHENTICATED NON-OWNER —
+// the same policy path. These tests pin that a non-owner can never read or
+// mutate another user's objects (IDOR), that private item fields never leak
+// through any DTO the non-owner can reach, and that object-by-id access is
+// uniformly non-enumerating (403 FORBIDDEN) from a non-owner.
+// ---------------------------------------------------------------------------
+describe('#338 — SEC-7.1 follower/blocked (non-owner) + private-field negatives', () => {
+  it('a follower/blocked non-owner can never read another user\'s private item data', async () => {
+    // A (the victim) has an item with private fields; B (a follower/blocked
+    // non-owner) must never see any of it through the collection API.
+    seedMember(A); seedMember(B)
+    const privateItem = item('a-private', {
+      price: 199,
+      serial: 'S-98765',
+      notes: 'private note',
+      adminNote: 'internal moderation',
+      lending: { borrower: { name: 'Debtor', contact: '555-0100' }, lentOn: new Date().toISOString() },
+    })
+    collectionStore(A, RECORDS, [privateItem])
+
+    // B's own GET lists only B's own (empty) store — never A's items.
+    const bList = await (await call(collectionHandler, 'GET', `?collection=${RECORDS}`, null, B_TOKEN)).json()
+    expect(bList.items).toEqual([])
+
+    // B cannot read A's item by id (uniform 403 FORBIDDEN — non-enumerating)
+    // and the private fields can never be reached.
+    const putRes = await call(collectionHandler, 'PUT', `?collection=${RECORDS}&id=a-private`, { notes: 'x' }, B_TOKEN)
+    expect(putRes.status).toBe(403)
+    expect((await putRes.json()).code).toBe('FORBIDDEN')
+    // B cannot lend/delete A's private-bearing item either.
+    const lendRes = await call(lendingHandler, 'POST', '', { action: 'lend', collection: RECORDS, itemId: 'a-private', borrower: { name: 'B' } }, B_TOKEN)
+    expect(lendRes.status).toBe(403)
+    const delRes = await call(collectionHandler, 'DELETE', `?collection=${RECORDS}&id=a-private`, null, B_TOKEN)
+    expect(delRes.status).toBe(403)
+    // A's data is intact and still owned by A in A's store.
+    expect(stores[`collection-${A}-${RECORDS}`].data.get('item:a-private').notes).toBe('private note')
+  })
+
+  it('the owner can read their OWN private item fields (self-scoped DTO)', async () => {
+    // The owner of the item IS allowed the private fields (own:true filter).
+    seedMember(A)
+    collectionStore(A, RECORDS, [item('a1', { price: 99, notes: 'mine', serial: 'S1' })])
+    const body = await (await call(collectionHandler, 'GET', `?collection=${RECORDS}`, null, A_TOKEN)).json()
+    expect(body.items[0].price).toBe(99)
+    expect(body.items[0].notes).toBe('mine')
+  })
+
+  it('a non-owner cannot read another member\'s feedback (private to author + owner)', async () => {
+    seedMember(A); seedMember(B)
+    // A submits feedback; B (a follower/blocked non-owner, not admin) cannot
+    // list it via the admin inbox (403) — and feedback carries the author's
+    // PII-adjacent message, so it must never reach B.
+    const aFb = await (await call(feedbackHandler, 'POST', '', { message: 'B must not see this', type: 'bug' }, A_TOKEN)).json()
+    expect(aFb.authorId).toBe(A)
+    const inbox = await call(feedbackHandler, 'GET', '', null, B_TOKEN)
+    expect(inbox.status).toBe(403) // not admin
+    // B cannot delete or triage A's feedback.
+    expect((await call(feedbackHandler, 'DELETE', `?id=${aFb.id}`, null, B_TOKEN)).status).toBe(403)
+    expect((await call(feedbackHandler, 'PATCH', '', { id: aFb.id, status: 'done' }, B_TOKEN)).status).toBe(403)
+  })
+
+  it('a non-owner review DELETE is uniformly 403 whether the review is theirs, another\'s, or missing (non-enumerating)', async () => {
+    seedMember(A); seedMember(B)
+    // A writes a review; B (a follower/blocked non-owner) cannot delete it.
+    const created = await (await call(reviewsHandler, 'POST', '', { kind: RECORDS, sourceId: '777', rating: 5, body: 'A review' }, A_TOKEN)).json()
+    const othersRes = await call(reviewsHandler, 'DELETE', `?id=${created.review.id}`, null, B_TOKEN)
+    expect(othersRes.status).toBe(403)
+    expect((await othersRes.json()).code).toBe('FORBIDDEN')
+    // B deleting a genuinely missing review id returns the SAME 403 FORBIDDEN
+    // (no enumeration of whether the id exists).
+    const missingRes = await call(reviewsHandler, 'DELETE', `?id=00000000-0000-0000-0000-00000000dead`, null, B_TOKEN)
+    expect(missingRes.status).toBe(403)
+    expect((await missingRes.json()).code).toBe('FORBIDDEN')
+    // A's review is untouched.
+    const list = await (await call(reviewsHandler, 'GET', `?kind=${RECORDS}&sourceId=777`, null, A_TOKEN)).json()
+    expect(list.mine.id).toBe(created.review.id)
   })
 })

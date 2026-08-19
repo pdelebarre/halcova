@@ -30,8 +30,8 @@
 // any work runs.
 
 import { getStore } from '@netlify/blobs'
-import { authorize, json } from './_shared/collection-store'
-import { requireAdmin } from './_shared/session-auth'
+import { json } from './_shared/collection-store'
+import { enforce } from './_shared/policy'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { getRepository } from './_shared/repository'
 import { readJsonBody, safeError } from './_shared/security'
@@ -242,22 +242,24 @@ export default async function feedbackHandler(req) {
     const url = new URL(req.url)
 
     // Admin inbox operations (GET/PATCH/DELETE) require an admin SESSION — gated
-    // before any work runs, exactly like admin.js (SEC-1.6, #181).
+    // through the shared policy layer (`feedback:moderate`, requires:'admin'),
+    // exactly like admin.js (SEC-1.6, #181). SEC-7.1 (#338): the method-branch
+    // is centralized in the policy table.
     if (req.method !== 'POST') {
-      const admin = await requireAdmin(req)
+      const admin = await enforce(req, 'feedback:moderate')
       if (admin.error) return admin.error
       return routeAdmin(req, url)
     }
 
     // POST — the member submission (Bearer access code OR admin key). The
-    // author is resolved server-side from the session.
-    const { user, error } = await authorize(req)
+    // author is resolved server-side from the session; the demo identity is
+    // denied by the policy layer (`feedback:create` deny:['demo'],
+    // DEMO_READONLY). SEC-7.1 (#338): the principal is always the session user.
+    const { user, error } = await enforce(req, 'feedback:create', {
+      denyCode: 'DEMO_READONLY',
+      denyMessage: 'The demo space is read-only. Sign in to send feedback.',
+    })
     if (error) return error
-    // The shared inbox must never be polluted by the constant demo identity
-    // (parity with collection.js / reviews.js demo read-only guard).
-    if (user.role === 'demo') {
-      return json(403, { error: 'The demo space is read-only. Sign in to send feedback.', code: 'DEMO_READONLY' })
-    }
     const guardErr = await submissionGuardError(req, user)
     if (guardErr) return guardErr
     const parsed = await readBody(req)

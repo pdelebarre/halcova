@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { OWNER_ID, generateAccessCode, publicUser } from './_shared/auth'
-import { requireAdmin } from './_shared/session-auth'
+import { enforce } from './_shared/policy'
 import { deleteAllForUser, revokeAllForUser } from './_shared/sessions'
 import { parsePagination } from './_shared/pagination'
 import { db, isPostgresConfigured } from './_shared/postgres'
@@ -327,10 +327,12 @@ function validateId(value, label) {
 
 export default async (req) => {
   try {
-    // SEC-1.6 (#181): authorize by the SESSION's role, not by re-checking the
-    // bearer equals ADMIN_KEY. The admin key only ever minted this session at
-    // login (auth.js); a member session or a forged/absent key is rejected.
-    const admin = await requireAdmin(req)
+    // SEC-1.6 (#181) + SEC-7.1 (#338): authorize by the SESSION's role through
+    // the shared policy layer (`admin:*` requires:'admin'), not by re-checking
+    // the bearer equals ADMIN_KEY. The admin key only ever minted this session
+    // at login (auth.js); a member session or a forged/absent key is rejected.
+    // normalizeReject (inside enforce) keeps the 401/403 shape stable.
+    const admin = await enforce(req, 'admin:*')
     if (admin.error) {
       // SEC-6.6 (#220): a burst of authorization denials from one IP (a
       // non-admin probing the admin surface) is an anomaly signal.

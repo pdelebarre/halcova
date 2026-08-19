@@ -27,7 +27,9 @@
 //          either, so neither do we)
 
 import { getStore } from '@netlify/blobs'
-import { COLLECTIONS, authorize, json } from './_shared/collection-store'
+import { COLLECTIONS, json } from './_shared/collection-store'
+import { enforce, forbidden } from './_shared/policy'
+import { filterMany } from './_shared/filter'
 import { consumeDistinct, createRateLimiter, rateLimitIdentity, rateLimitKey } from './_shared/rate-limit'
 import { isPostgresConfigured, db } from './_shared/postgres'
 import { createReviewsRepo } from './_shared/repositories/reviews-repo'
@@ -108,20 +110,12 @@ async function handleGet(store, { user, kind, sourceId }) {
   if (srcErr) return json(400, { error: srcErr.message, code: srcErr.code })
   const { reviews, aggregate } = await store.listReviews(kind, sourceId, { status: REVIEW_STATUS_PUBLISHED })
   const mine = await store.getByAuthor(kind, sourceId, user.id)
-  // L1 — the list is PUBLIC: strip other reviewers' internal authorId. Only the
-  // caller's own entry keeps it (so the client can dedupe against `mine`, which
-  // always carries the caller's id). The aggregate is unaffected (it only reads
-  // rating).
-  const visible = reviews.map((r) => (r.authorId === user.id ? r : withoutAuthorId(r)))
+  // L1 + SEC-7.1 (#338): the list is PUBLIC — strip other reviewers' internal
+  // authorId via the shared property-filter (filterFor). Only the caller's own
+  // entry keeps it (so the client can dedupe against `mine`, which always
+  // carries the caller's id). The aggregate is unaffected (it only reads rating).
+  const visible = filterMany(user, 'review', reviews, { owns: (r) => r.authorId === user.id })
   return json(200, { reviews: visible, aggregate, mine })
-}
-
-// L1 — drop the internal authorId from a review before it leaves the server
-// (applied to OTHER reviewers' entries in the public list; the caller's own is
-// kept).
-function withoutAuthorId(review) {
-  const { authorId: _authorId, ...rest } = review
-  return rest
 }
 
 // POST — upsert the CALLER's review. A pre-existing review by this author is
@@ -147,15 +141,22 @@ async function handlePost(store, { user, kind, sourceId, body }) {
 }
 
 // DELETE — only the author, or the owner (admin key holder), may delete a
-// review. 404 when the id is unknown; 400 when it's missing.
+// review. SEC-7.1 (#338) non-enumeration: a NON-admin caller gets a uniform 403
+// FORBIDDEN whether the review is someone else's OR doesn't exist — the server
+// never distinguishes "exists but isn't yours" from "doesn't exist" to a
+// non-owner. Only the admin (allowOverride) gets a genuine 404 for a truly
+// missing review (no enumeration risk for the owner, who may operate on any
+// object).
 async function handleDelete(store, { user, id }) {
   if (!id) return json(400, { error: 'Missing id', code: 'MISSING_ID' })
-  const review = await store.getReview(id)
-  if (!review) return json(404, { error: 'Not found' })
-  if (review.authorId !== user.id && user.role !== 'admin') {
-    return json(403, { error: 'You can only delete your own review.', code: 'FORBIDDEN' })
+  if (user.role !== 'admin') {
+    const review = await store.getReview(id)
+    if (!review || review.authorId !== user.id) return forbidden()
   }
-  await store.deleteReview(id)
+  // Admin (owner) override: may delete any review. A genuinely missing review
+  // is a real 404 for the admin (who can operate on any object).
+  const ok = await store.deleteReview(id)
+  if (!ok) return json(404, { error: 'Not found' })
   return json(200, { ok: true })
 }
 
@@ -266,9 +267,32 @@ async function writeGuardError(req, user, kind, sourceId) {
   return null
 }
 
+// Map the HTTP method to the SEC-7.1 policy action. Unknown methods fall back
+// to the least-restrictive read action so auth is still gated before the 405.
+function actionFor(method) {
+  if (method === 'GET') return 'review:read'
+  if (method === 'POST') return 'review:create'
+  if (method === 'DELETE') return 'review:delete'
+  return 'review:read'
+}
+
 export default async function reviewsHandler(req) {
   try {
-    const { user, error } = await authorize(req)
+    // SEC-7.1 (#338): route authorization through the shared policy layer.
+    // DELETE is owner-or-admin (review:delete); writes deny the read-only demo
+    // identity (review:create). The principal is always the resolved session
+    // user. Unsupported methods still resolve the session first (auth gating
+    // before the 405).
+    const action = actionFor(req.method)
+    const { user, error } = await enforce(req, action, {
+      denyCode: 'DEMO_READONLY',
+      denyMessage: 'The demo space is read-only. Sign in to write reviews.',
+      // The review:delete ownership decision (owner-or-admin, non-enumerating)
+      // is made in handleDelete — the policy table declares the rule, and this
+      // closure lets the admin allowOverride apply at the right layer. The
+      // real target lookup happens once, inside handleDelete.
+      ...(action === 'review:delete' ? { ownsTarget: async () => true } : {}),
+    })
     if (error) return error
 
     const parsedReq = await parseRequest(req)

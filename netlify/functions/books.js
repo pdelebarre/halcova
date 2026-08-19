@@ -13,7 +13,7 @@
 
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
-import { resolveSession } from './_shared/session-auth'
+import { enforce } from './_shared/policy'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
@@ -65,12 +65,10 @@ const BOOKS_OVERALL_LIMIT = Number(process.env.RUNOUT_BOOKS_OVERALL_RATE_LIMIT) 
 const cacheKey = (prefix, input) => `${prefix}:${createHash('sha256').update(String(input)).digest('hex')}`
 
 // Every request must carry a live server-managed session token — same contract
-// as collection.js (SEC-EPIC-1, #176): resolveSession validates it and resolves
-// the owner / demo / member identity (the demo stays ungated for lookups, T6).
-// Unknown/expired/revoked tokens 401, disabled accounts 403. Never logged.
-async function authorize(req) {
-  return resolveSession(req)
-}
+// as collection.js (SEC-EPIC-1, #176). SEC-7.1 (#338): authorization routes
+// through the shared policy layer — `lookup:read` (any authenticated caller;
+// the demo identity stays ungated for lookups, T6). Unknown/expired/revoked
+// tokens 401, disabled accounts 403. Never logged.
 
 function googleUrl(path, params = {}) {
   const url = new URL(GOOGLE_BASE + path)
@@ -225,7 +223,7 @@ export default async (req) => {
       return handleCover(url.searchParams, getStore(CACHE_STORE))
     }
 
-    const { user, error } = await authorize(req)
+    const { user, error } = await enforce(req, 'lookup:read')
     if (error) return error
 
     if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })

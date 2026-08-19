@@ -14,7 +14,9 @@
 // Errors follow the existing { error } model: 400 / 401 / 403 / 404 / 405 / 409 / 500.
 
 import { getStore } from '@netlify/blobs'
-import { COLLECTIONS, authorize, json } from './_shared/collection-store'
+import { COLLECTIONS, json } from './_shared/collection-store'
+import { enforce, forbidden } from './_shared/policy'
+import { filterFor } from './_shared/filter'
 import { effectiveFeatures } from './_shared/entitlements'
 import { storeNameFor } from './_shared/users'
 import { readJsonBody, safeError } from './_shared/security'
@@ -23,8 +25,13 @@ const FEATURE_OFF_MSG = "Lending isn't enabled for your account."
 const HISTORY_CAP = 10
 
 export default async function lending(req) {
-  const { user, error } = await authorize(req)
-  if (error) return error
+  // SEC-7.1 (#338): route authorization through the shared policy layer. The
+  // principal is always the resolved session user — a browser-supplied
+  // owner/id is never trusted. Lending targets an item in the caller's OWN
+  // store (lending:item:*) and denies the read-only demo identity.
+  const pre = await enforce(req, 'collection:item:read')
+  if (pre.error) return pre.error
+  const user = pre.user
 
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
 
@@ -34,14 +41,20 @@ export default async function lending(req) {
   const invalid = validateAction(body)
   if (invalid) return invalid
 
+  // Enforce the lending-specific policy (deny the demo identity — the shared
+  // read action above is demo-open). The feature gate below is the plan +
+  // capability check.
+  const gated = await enforce(req, body.action === 'lend' ? 'lending:item:lend' : 'lending:item:return')
+  if (gated.error) return gated.error
+
   const denied = featureGate(user, body.collection)
   if (denied) return denied
 
   const store = getStore(storeNameFor(user.id, body.collection))
   try {
     return body.action === 'lend'
-      ? await handleLend(store, body.itemId, body)
-      : await handleReturn(store, body.itemId)
+      ? await handleLend(store, user, body.itemId, body)
+      : await handleReturn(store, user, body.itemId)
   } catch (err) {
     // SEC-3.7 (#200): never surface the internal message to the client.
     return safeError(err, req)
@@ -104,13 +117,17 @@ function featureGate(user, collection) {
   return null
 }
 
+// SEC-7.1 (#338) non-enumeration: lending/returning targets an item the caller
+// must own. An item id not in the caller's own store is a uniform 403
+// FORBIDDEN — never a distinguishable 404 that would reveal whether the id
+// exists in another tenant's store.
 async function getItemOr404(store, itemId) {
   const item = await store.get(`item:${itemId}`, { type: 'json' })
-  if (!item) return { error: json(404, { error: 'Item not found.' }) }
+  if (!item) return { error: forbidden() }
   return { item }
 }
 
-async function handleLend(store, itemId, body) {
+async function handleLend(store, user, itemId, body) {
   const { item, error } = await getItemOr404(store, itemId)
   if (error) return error
   if (item.lending) return json(409, { error: 'Item is already on loan.' })
@@ -126,10 +143,12 @@ async function handleLend(store, itemId, body) {
   }
   const updated = { ...item, lending: loan }
   await store.setJSON(`item:${itemId}`, updated)
-  return json(200, { item: updated })
+  // SEC-7.1 (#338): the item DTO runs through the shared filter (own:true —
+  // the caller owns the item they lend).
+  return json(200, { item: filterFor(user, 'item', updated, { own: true }) })
 }
 
-async function handleReturn(store, itemId) {
+async function handleReturn(store, user, itemId) {
   const { item, error } = await getItemOr404(store, itemId)
   if (error) return error
   if (!item.lending) return json(409, { error: 'Item is not on loan.' })
@@ -138,5 +157,6 @@ async function handleReturn(store, itemId) {
   delete updated.lending
   updated.lendingHistory = [loanRecord, ...(item.lendingHistory || [])].slice(0, HISTORY_CAP)
   await store.setJSON(`item:${itemId}`, updated)
-  return json(200, { item: updated })
+  // SEC-7.1 (#338): the item DTO runs through the shared filter (own:true).
+  return json(200, { item: filterFor(user, 'item', updated, { own: true }) })
 }

@@ -383,10 +383,13 @@ describe('DELETE — only the author (or the owner)', () => {
     expect(stores['runout-reviews'].data.get(`release:records:${SOURCE_ID}`).reviews).toHaveLength(1)
   })
 
-  it('404s when the review does not exist', async () => {
+  it('403s FORBIDDEN when the review does not exist (non-enumerating)', async () => {
     seedMember()
+    // SEC-7.1 (#338): a non-admin caller gets a uniform 403 whether the review
+    // is someone else's or doesn't exist (was 404).
     const res = await call('DELETE', `?kind=records&sourceId=${SOURCE_ID}&id=00000000-0000-0000-0000-00000000dead`)
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
   })
 
   it('400s MISSING_ID without an id', async () => {

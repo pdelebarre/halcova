@@ -316,12 +316,15 @@ describe('PUT / DELETE', () => {
     expect(body.title).toBe('Title 1') // merged, not replaced
   })
 
-  it('404s on a missing item (mirrors the blob PUT)', async () => {
+  it('403 FORBIDDEN on a missing item (non-enumerating, mirrors the blob PUT)', async () => {
+    // SEC-7.1 (#338): object-by-id access on an item the caller doesn't own is
+    // a uniform 403 FORBIDDEN (was 404).
     const res = await call('PUT', '?collection=records&id=00000000-0000-0000-0000-000000000099', { notes: 'x' })
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
   })
 
-  it('deletes idempotently and removes from Postgres + Blobs mirror', async () => {
+  it('deletes and removes from Postgres + Blobs mirror; a second delete is 403 FORBIDDEN (non-enumerating)', async () => {
     await repo.items.insertItem(MEMBER.id, 'records', item(1))
     const store = createStore()
     stores[`collection-${MEMBER.id}-records`] = store
@@ -334,9 +337,10 @@ describe('PUT / DELETE', () => {
     expect(await repo.items.listItems(MEMBER.id, 'records')).toEqual([])
     expect(store.data.has(`item:${item(1).id}`)).toBe(false)
 
-    // Deleting again still 200s (idempotent).
+    // SEC-7.1 (#338): deleting an already-gone item is now a uniform 403
+    // FORBIDDEN (the old idempotent 200 was non-enumerating behavior).
     const res2 = await call('DELETE', '?collection=records&id=00000000-0000-0000-0000-000000000001')
-    expect(res2.status).toBe(200)
+    expect(res2.status).toBe(403)
   })
 
   it('400s on a missing id', async () => {
