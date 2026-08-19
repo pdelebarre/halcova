@@ -51,7 +51,10 @@ describe('searchByBarcode', () => {
   it('maps a missing results array to an empty list', async () => {
     global.fetch.mockResolvedValue(okJson({}))
     const results = await discogs.searchByBarcode('123')
-    expect(results).toEqual([])
+    // RES-1.5 T5 (#290): still an empty array (backwards-compat + NO_MATCH),
+    // now with metadata props attached — so assert length, not deep-equal [].
+    expect(results).toHaveLength(0)
+    expect(results.outcome).toBe('NO_MATCH')
   })
 
   it('leaves the cover empty when the raw cover URL is missing or unsafe', async () => {
@@ -263,6 +266,7 @@ describe('error mapping', () => {
     ['RATE_LIMIT', 429],
     ['PROVIDER_RATE_LIMIT', 429],
     ['HTTP_ERROR', 500],
+    ['ALL_PROVIDERS_FAILED', 502],
   ])('surfaces the proxy %s code as err.code', async (code, status) => {
     global.fetch.mockResolvedValue(errorJson(status, { error: 'proxy failure', code }))
     await expect(discogs.searchByBarcode('123')).rejects.toMatchObject({ code })
@@ -271,5 +275,40 @@ describe('error mapping', () => {
   it('falls back to HTTP_ERROR when the error body has no code', async () => {
     global.fetch.mockResolvedValue(errorJson(503, { error: 'boom' }))
     await expect(discogs.searchByBarcode('123')).rejects.toMatchObject({ code: 'HTTP_ERROR' })
+  })
+})
+
+// RES-1.5 T5 (#290): the array-with-metadata contract. The functions still return
+// an ARRAY (backwards-compat for `results.length` / `results[0]` / `.map`), with
+// `source`/`outcome` attached as extra props so callers can tell NO_MATCH from a
+// healthy hit.
+describe('RES-1.5 T5 — source/outcome metadata on search results', () => {
+  it('attaches source + outcome "ok" on a Discogs primary hit', async () => {
+    global.fetch.mockResolvedValue(okJson({ source: 'discogs', results: [{ id: 1, title: 'A - B' }] }))
+    const results = await discogs.searchByBarcode('123')
+    expect(Array.isArray(results)).toBe(true) // still an array
+    expect(results).toHaveLength(1)
+    expect(results.source).toBe('discogs')
+    expect(results.outcome).toBe('ok')
+  })
+
+  it('maps a fallback hit id fields from source (mbid set, discogsId null) and marks source', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      source: 'musicbrainz',
+      results: [{ id: null, mbid: 'm1', source: 'musicbrainz', title: 'Miles Davis - Kind of Blue', format: ['CD'] }],
+    }))
+    const results = await discogs.searchByBarcode('123')
+    expect(results).toHaveLength(1)
+    expect(results.source).toBe('musicbrainz')
+    expect(results.outcome).toBe('ok')
+    expect(results[0].discogsId).toBeNull()
+    expect(results[0].mbid).toBe('m1')
+  })
+
+  it('healthy-empty -> empty array with outcome NO_MATCH (distinct from all-failed throw)', async () => {
+    global.fetch.mockResolvedValue(okJson({ results: [] }))
+    const results = await discogs.searchByBarcode('123')
+    expect(results).toHaveLength(0)
+    expect(results.outcome).toBe('NO_MATCH')
   })
 })

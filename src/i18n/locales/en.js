@@ -93,6 +93,16 @@ const en = {
   'coverScan.error': 'Something went wrong with the camera or photo.',
   'coverScan.close': 'Cancel cover scan',
 
+  // RES-1.5 T5 (#290): lookup error-contract copy. Other locales inherit EN
+  // (no raw-key rendering — the completeness test asserts every key resolves
+  // to a real string in every locale). `coverScan.noText` is reused for the
+  // unreadable-cover path rather than duplicating it.
+  'lookup.scanCover': 'Scan a cover',
+  'lookup.fallbackNote': 'Matched via the fallback catalog source.',
+  'lookup.tryingFallback': 'No primary match — trying the fallback catalog…',
+  'lookup.foundVia': 'Matched via {source}',
+  'lookup.allFailed': "Couldn't reach any lookup service — try again in a moment.",
+
   // §7 Manual add (records & books)
   'add.searchResults': 'Search results',
   'add.lookingUpDiscogs': 'Looking it up on Discogs…',

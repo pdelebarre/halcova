@@ -106,6 +106,18 @@ export const recordsCatalog = {
     removeLabel: 'Remove from crate',
     lookingUp: 'Looking it up on Discogs…',
     noMatch: 'No matches found on Discogs.',
+    // RES-1.5 T5 (#290): lookup error-contract copy. `tryingFallback` is shown
+    // when the chain falls through to MusicBrainz; `foundVia` labels a fallback
+    // win ("matched via MusicBrainz"); `allFailed` surfaces ALL_PROVIDERS_FAILED
+    // (distinct from noMatch = NO_MATCH); `fallbackNote` sits under a result.
+    // `scanCover` reuses the shared coverScan flow (no raw-key rendering).
+    lookup: {
+      scanCover: 'Scan a cover',
+      fallbackNote: 'Matched via the fallback catalog source.',
+      tryingFallback: 'No primary match — trying the fallback catalog…',
+      foundVia: (name) => `Matched via ${name}`,
+      allFailed: "Couldn't reach any lookup service — try again in a moment.",
+    },
     resultGood: { label: 'Not in your crate yet', sub: "You don't have this one." },
     resultOwned: { label: 'Already in your crate', sub: 'This exact record is already yours.' },
     resultSame: { label: 'You already own this album', sub: 'Different pressing or format — check before buying.' },
@@ -603,6 +615,17 @@ export const booksCatalog = {
     removeLabel: 'Remove from shelf',
     lookingUp: 'Looking it up on Google Books…',
     noMatch: 'No matches found on Google Books.',
+    // RES-1.5 T5 (#290): lookup error-contract copy (mirror of the records
+    // block). `tryingFallback` -> OpenLibrary; `foundVia` labels a fallback
+    // win; `allFailed` surfaces ALL_PROVIDERS_FAILED (distinct from noMatch =
+    // NO_MATCH).
+    lookup: {
+      scanCover: 'Scan a cover',
+      fallbackNote: 'Matched via the fallback catalog source.',
+      tryingFallback: 'No primary match — trying the fallback catalog…',
+      foundVia: (name) => `Matched via ${name}`,
+      allFailed: "Couldn't reach any lookup service — try again in a moment.",
+    },
     resultGood: { label: 'Not on your shelf yet', sub: "You don't have this one." },
     resultOwned: { label: 'Already on your shelf', sub: 'This exact book is already yours.' },
     resultSame: { label: 'You already own this book', sub: 'Different edition — check before buying.' },

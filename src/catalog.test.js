@@ -56,6 +56,17 @@ describe('recordsCatalog', () => {
     expect(recordsCatalog.copy.trySampleCta).toBe("That's the idea")
   })
 
+  it('exposes the RES-1.5 T5 lookup error-contract copy (issue #290)', () => {
+    // Shared lookup copy block — the collection flow reads these for the
+    // barcode/text lookup picker and the cover-scan entry point.
+    expect(recordsCatalog.copy.lookup.scanCover).toBe('Scan a cover')
+    expect(recordsCatalog.copy.lookup.allFailed).toContain('lookup service')
+    // foundVia is a function override: "Matched via {name}".
+    expect(recordsCatalog.copy.lookup.foundVia('MusicBrainz')).toBe('Matched via MusicBrainz')
+    // coverScan.noText is reused (no raw-key rendering when the cover OCR fails).
+    expect(recordsCatalog.copy.coverScan.noText).toContain("Couldn't read the cover")
+  })
+
   it('exposes browse axes (Genre · Artist · Decade · Format · Label)', () => {
     expect(recordsCatalog.browseAxes.map((a) => a.id)).toEqual(['genre', 'artist', 'decade', 'format', 'label'])
     for (const axis of recordsCatalog.browseAxes) {

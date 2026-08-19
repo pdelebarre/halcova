@@ -168,16 +168,18 @@ describe('error-code mapping through the real lookupFetch (T1 handler integratio
     expect(body.code).not.toBe('RATE_LIMIT')
   })
 
-  it('persistent network failure -> 502 HTTP_ERROR', async () => {
+  it('persistent network failure -> 502 ALL_PROVIDERS_FAILED (RES-1.5 T5)', async () => {
     // A network failure is a genuine service outage, so the MusicBrainz fallback
-    // (RES-1.2 T2) also attempts and also fails; the PRIMARY's 502 HTTP_ERROR
-    // is still what surfaces. The fallback's ~1 req/s throttle + retry backoff
-    // make this slower than the pre-fallback path, so give it a larger timeout.
+    // (RES-1.2 T2) also attempts and also fails; RES-1.5 T5 (#290) collapses the
+    // "every provider down" case into a distinct ALL_PROVIDERS_FAILED code
+    // (instead of surfacing HTTP_ERROR). The fallback's ~1 req/s throttle +
+    // retry backoff make this slower than the pre-fallback path, so give it a
+    // larger timeout.
     global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
     const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=test'))
     expect(res.status).toBe(502)
     const body = await res.json()
-    expect(body.code).toBe('HTTP_ERROR')
+    expect(body.code).toBe('ALL_PROVIDERS_FAILED')
   }, 15000)
 
   it('upstream 401 -> BAD_TOKEN with no retry (non-retryable)', async () => {
@@ -238,6 +240,8 @@ describe('MusicBrainz fallback chain (RES-1.2 T2, #288)', () => {
     const body = await res.json()
     expect(Array.isArray(body.results)).toBe(true)
     expect(body.results).toHaveLength(1)
+    // RES-1.5 T5 (#290): top-level source marks the winning (fallback) provider.
+    expect(body.source).toBe('musicbrainz')
     const hit = body.results[0]
     expect(hit.source).toBe('musicbrainz')
     expect(hit.mbid).toBe(MBID)
@@ -267,19 +271,45 @@ describe('MusicBrainz fallback chain (RES-1.2 T2, #288)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.results[0].id).toBe(101)
+    // RES-1.5 T5 (#290): the top-level source marks the winning provider.
+    expect(body.source).toBe('discogs')
     expect(global.fetch).toHaveBeenCalledTimes(1)
     const only = new URL(String(global.fetch.mock.calls[0][0]))
     expect(only.hostname).toBe('api.discogs.com') // MusicBrainz never contacted
   })
 
-  it('Discogs error + MusicBrainz empty -> returns the ORIGINAL primary error', async () => {
+  it('Discogs healthy-empty + MusicBrainz healthy-empty -> 200 NO_MATCH ([]), NOT all-failed', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(200, { results: [] }))             // Discogs healthy-empty
+      .mockResolvedValueOnce(upstream(200, { releases: [] }))            // MusicBrainz healthy-empty
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    // A healthy-empty across ALL providers is "no match anywhere" — a 200 empty
+    // result set, NOT an error (distinct from ALL_PROVIDERS_FAILED).
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ results: [] })
+  })
+
+  it('Discogs error + MusicBrainz error -> 502 ALL_PROVIDERS_FAILED', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(404, {}))             // Discogs upstream error
+      .mockResolvedValueOnce(upstream(500, {}))              // MusicBrainz service error
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(res.status).toBe(502)
+    const body = await res.json()
+    expect(body.code).toBe('ALL_PROVIDERS_FAILED')
+  })
+
+  it('Discogs error + MusicBrainz empty -> ALL_PROVIDERS_FAILED (RES-1.5 T5)', async () => {
     global.fetch
       .mockResolvedValueOnce(upstream(404, {}))            // Discogs upstream error (non-retryable)
       .mockResolvedValueOnce(upstream(200, { releases: [] })) // MusicBrainz healthy-empty
     const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    // The primary ERRORED (a genuine outage, not a healthy-empty), so the
+    // overall outcome is "all providers unavailable" — distinct from NO_MATCH.
     expect(res.status).toBe(502)
     const body = await res.json()
-    expect(body.code).toBe('HTTP_ERROR') // primary's original error code preserved
+    expect(body.code).toBe('ALL_PROVIDERS_FAILED')
   })
 
   // Explicit regression pin for the NO_FALLBACK_CODES suppression behavior
@@ -404,12 +434,13 @@ describe('RES-1.4 T4 — negative cache + circuit-breaker cooldown (discogs chai
   })
 
   it('a down provider (5xx) records cooldown, is skipped within the cooldown window, and is retried after', async () => {
-    // First call: Discogs persistent 5xx (3 retryable attempts) -> HTTP_ERROR,
-    // which arms the circuit breaker; fallback also fails -> HTTP_ERROR surfaces.
+    // First call: Discogs persistent 5xx (3 retryable attempts) -> provider-down,
+    // which arms the circuit breaker; fallback also fails -> ALL_PROVIDERS_FAILED
+    // surfaces (RES-1.5 T5: every provider is unavailable).
     global.fetch.mockResolvedValue(upstream(500, {}))
     const r1 = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
     expect(r1.status).toBe(502)
-    expect((await r1.json()).code).toBe('HTTP_ERROR')
+    expect((await r1.json()).code).toBe('ALL_PROVIDERS_FAILED')
 
     // Cooldown recorded in the SEPARATE provider-state store (not lookup_cache).
     const down = stores['runout-provider-state'].data.get('discogs')
@@ -458,7 +489,7 @@ describe('RES-1.4 T4 — negative cache + circuit-breaker cooldown (discogs chai
     global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
     const r1 = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
     expect(r1.status).toBe(502)
-    expect((await r1.json()).code).toBe('HTTP_ERROR')
+    expect((await r1.json()).code).toBe('ALL_PROVIDERS_FAILED')
     expect(stores['runout-provider-state'].data.get('discogs')).toBeTruthy()
 
     // Within the window: Discogs skipped, MusicBrainz fallback consulted.

@@ -122,6 +122,14 @@
 }
 .sheet-error { color: var(--danger); }
 
+/* RES-1.5 T5 (#290): quiet "matched via fallback" note above the match list. */
+.sheet-note {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--jacket-kraft-dim);
+  padding: 0 0 8px;
+}
+
 .sheet-empty {
   padding: 24px 0;
   text-align: center;

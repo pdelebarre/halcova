@@ -255,6 +255,21 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const { Grid, Detail, ManualAdd, Card } = catalog.components
   const copy = catalog.copy
 
+  // RES-1.5 T5 (#290): map the server's "winning source" marker to a friendly,
+  // localizable note. Returns '' for a primary/unknown source so the picker
+  // shows nothing (no raw-key rendering, no dark-screen risk if copy is absent).
+  function fallbackNote(source) {
+    if (!source) return ''
+    // Fallback providers only — the primary source needs no note.
+    const fallbackNames = {
+      musicbrainz: 'MusicBrainz',
+      openlibrary: 'OpenLibrary',
+    }
+    const name = fallbackNames[source]
+    if (!name) return ''
+    return copy.lookup?.foundVia ? copy.lookup.foundVia(name) : ''
+  }
+
   function showToast(msg, kind = 'add') {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast({ msg, kind })
@@ -595,10 +610,15 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       const results = await catalog.api.searchByBarcode(clean)
       // A successful lookup means a token is configured — drop any hint.
       setRecordsNoToken(false)
+      // RES-1.5 T5 (#290): when the WINNING provider is a fallback (server's
+      // top-level source marker), the array carries `source` — surface a small
+      // "matched via …" note so the user knows the origin. NO_MATCH (empty +
+      // outcome 'NO_MATCH') vs ALL_PROVIDERS_FAILED (thrown err.code) are kept
+      // distinct by the picker paths below.
       if (results.length === 1) {
         presentCandidate(results[0], 'scan')
       } else {
-        setPickerState({ matches: results, loading: false, errorMsg: '' })
+        setPickerState({ matches: results, loading: false, errorMsg: '', note: fallbackNote(results.source) })
       }
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
@@ -609,6 +629,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         showToast(`${catalog.lookupName} ${t('view.lookupsNotConfigured', { lookupName: catalog.lookupName })}`, 'error')
         return
       }
+      // RES-1.5 T5 (#290): ALL_PROVIDERS_FAILED throws here with err.code —
+      // the error path (vs the empty NO_MATCH path) keeps the two distinct.
       setPickerState({ matches: [], loading: false, errorMsg: err.message })
     }
   }
@@ -643,12 +665,14 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       setCoverState({ busy: false, error: '' })
       if (safeResults.length === 0) {
         setModal('pick')
+        // RES-1.5 T5 (#290): NO_MATCH — a healthy empty set (outcome
+        // 'NO_MATCH'), distinct from ALL_PROVIDERS_FAILED below.
         setPickerState({ matches: [], loading: false, errorMsg: '' })
       } else if (safeResults.length === 1 && safeResults[0] && typeof safeResults[0] === 'object') {
         presentCandidate(safeResults[0], 'scan')
       } else {
         setModal('pick')
-        setPickerState({ matches: safeResults, loading: false, errorMsg: '' })
+        setPickerState({ matches: safeResults, loading: false, errorMsg: '', note: fallbackNote(safeResults.source) })
       }
     } catch (err) {
       if (err.code === 'SERVER_NO_TOKEN') {
@@ -1246,6 +1270,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           matches={pickerState.matches}
           loading={pickerState.loading}
           errorMsg={pickerState.errorMsg}
+          note={pickerState.note}
           onPick={presentCandidate}
           onRetrySearch={() => setModal('manual')}
           onManual={() => setModal('manual')}
