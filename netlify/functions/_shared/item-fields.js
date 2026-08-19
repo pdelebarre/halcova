@@ -38,6 +38,10 @@ export const ITEM_FIELD_ALLOWLIST = new Set([
   'artists', 'masterId', 'tracklist', 'released',
   // Phase A enrichment (§5bis.1) — books
   'authorsList', 'subtitle', 'series', 'mainCategory', 'snippet',
+  // (RES-1.2 T2, #288) additive fallback-provider id for records: the
+  // MusicBrainz release MBID, used when a lookup came from the MusicBrainz
+  // fallback (discogsId is null for those). String (a UUID), like googleBooksId.
+  'mbid',
 ])
 
 // Identity / privilege fields that a client must NEVER be able to write on a
@@ -232,6 +236,9 @@ export function validateItem(body, { partial = false } = {}) {
     str(body?.coverImage, { max: 2000 }),
     str(body?.barcode, { max: 64 }),
     str(body?.googleBooksId, { max: 200 }),
+    // (RES-1.2 T2, #288) additive fallback id — a MusicBrainz release MBID (a
+    // UUID string). Optional; validated as a string like googleBooksId.
+    str(body?.mbid, { max: 64 }),
     str(body?.isbn, { max: 32 }),
     str(body?.dateAdded, { max: 40 }),
     str(body?.notes, { max: 5000 }),

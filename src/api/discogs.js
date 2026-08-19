@@ -78,8 +78,11 @@ export async function searchByBarcode(barcode) {
   const data = await discogsFetch('searchBarcode', { barcode: clean })
   const results = data.results || []
   return results.map((r) => ({
-    discogsId: r.id,
+    discogsId: r.id, // null for a MusicBrainz fallback hit (id is null)
     discogsType: r.type,
+    // (RES-1.2 T2, #288) additive fallback-provider id: the MusicBrainz release
+    // MBID, present only on fallback hits (where discogsId is null).
+    mbid: r.mbid || null,
     title: r.title, // "Artist - Release Title"
     year: r.year || '',
     label: (r.label && r.label[0]) || '',
@@ -100,8 +103,10 @@ export async function searchByText(query) {
   const data = await discogsFetch('searchText', { q: query })
   const results = data.results || []
   return results.slice(0, 20).map((r) => ({
-    discogsId: r.id,
+    discogsId: r.id, // null for a MusicBrainz fallback hit (id is null)
     discogsType: r.type,
+    // (RES-1.2 T2, #288) additive fallback-provider id (see searchByBarcode).
+    mbid: r.mbid || null,
     title: r.title,
     year: r.year || '',
     label: (r.label && r.label[0]) || '',

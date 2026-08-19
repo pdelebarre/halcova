@@ -30,11 +30,15 @@ export const COVER_CACHE_SECONDS = 24 * 60 * 60 // 1 day
 // on i.discogs.com today (legacy: st./img./s.discogs.com) — the whole
 // *.discogs.com domain is Discogs-controlled, so proxying it is safe. Google
 // Books thumbnails come from books.google.com. The Amazon CDNs are allowed for
-// metadata that historically pointed at them.
+// metadata that historically pointed at them. coverartarchive.org serves the
+// Cover Art Archive covers emitted by the MusicBrainz fallback provider
+// (RES-1.2 T2, #288) — a single, explicit, https-only host used only by the
+// allowlisted cover-routing path (never passed arbitrary user URLs).
 const EXTRA_COVER_HOSTS = new Set([
   'books.google.com',
   'images-na.ssl-images-amazon.com',
   'm.media-amazon.com',
+  'coverartarchive.org',
 ])
 
 export function isAllowedCoverHost(hostname) {
