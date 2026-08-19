@@ -1,0 +1,40 @@
+/* Online/offline status pill (M1 shell, #157).
+   Fixed to the viewport bottom-center so it stays readable over any scroll
+   position, styled as a compact, non-blocking status instead of a banner that
+   competes with the nav. Uses the neutral surface + danger tones from the
+   design tokens. */
+.online-indicator {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 1200; /* above modals/banners, below nothing critical */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(92vw, 420px);
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--jacket-kraft);
+  background: var(--color-surface-2, var(--vinyl-groove-2));
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.online-indicator-icon {
+  flex-shrink: 0;
+  color: var(--color-danger-bright, var(--danger-bright));
+}
+
+.online-indicator-text {
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .online-indicator { animation: none; }
+}

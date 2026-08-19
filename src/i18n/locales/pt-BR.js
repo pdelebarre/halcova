@@ -336,6 +336,8 @@ const ptBR = {
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
 
+  'offline.status': 'Offline — mostrando conteúdo salvo',
+
   // §17 Plano gratuito e demo
   'plan.freeCounter': '{count} de {cap} itens adicionados',
   // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only
