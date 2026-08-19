@@ -6,7 +6,7 @@
 .online-indicator {
   position: fixed;
   left: 50%;
-  bottom: 18px;
+  bottom: calc(var(--safe-bottom) + 96px); /* clear the add-FAB band; +96px mirrors ListView convention */
   transform: translateX(-50%);
   z-index: 1200; /* above modals/banners, below nothing critical */
   display: flex;
