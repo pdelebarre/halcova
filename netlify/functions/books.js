@@ -16,8 +16,9 @@ import { getStore } from '@netlify/blobs'
 import { enforce } from './_shared/policy'
 import { rateLimitGuard, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
-import { readCache, writeCache } from './_shared/lookup-cache'
+import { readCache, writeCache, isNegativeCached, writeEmptyCache } from './_shared/lookup-cache'
 import { lookupFetch } from './_shared/lookup-fetch'
+import { readCooldownMs, recordProviderDown, PROVIDER_STATE_STORE } from './_shared/provider-state'
 import { openlibrary } from './_shared/providers/openlibrary'
 import { json, safeError } from './_shared/security'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
@@ -143,7 +144,16 @@ async function lookup(lookupSpec, ttlMs, identity) {
   // the legacy Blobs cache otherwise / on miss / on error. A failed read is a
   // miss — never fail a valid lookup.
   const cached = await readCache('books', lookupSpec.cacheKey, ttlMs)
-  if (cached) return { data: cached }
+  if (cached) {
+    // RES-1.4 T4 (#291): a negative-cache sentinel ({empty:true}) is "no match
+    // here", NOT a real result and NOT a failure. It must never be returned to
+    // the client as a real payload — surface a HEALTHY-EMPTY envelope so the
+    // lookup chain falls through to the fallback without spending another
+    // provider call. (The chain normally skips the primary before we reach
+    // here; this is defense-in-depth against a mixed store.)
+    if (cached.empty === true) return { data: { items: [] } }
+    return { data: cached }
+  }
 
   // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
   // overall cap protects the shared quota even across different users.
@@ -234,7 +244,7 @@ const NO_FALLBACK_CODES = new Set([
   'RATE_LIMIT',
 ])
 
-// Primary-then-fallback lookup chain (RES-1.3 T3, #283).
+// Primary-then-fallback lookup chain (RES-1.3 T3, #283; RES-1.4 T4, #291).
 //
 // Google Books is the PRIMARY books provider and stays first, and every result
 // keeps the `{ items:[...] }` Google Books envelope. When the primary call
@@ -249,9 +259,61 @@ const NO_FALLBACK_CODES = new Set([
 //   - Both empty/errored -> return the PRIMARY's original result verbatim, so
 //     today's error codes / empty-search behavior are preserved exactly.
 //
+// RES-1.4 T4 (#291) — negative cache + circuit-breaker cooldown. Two
+// SKIP-PRIMARY signals are checked BEFORE any provider call:
+//   - Circuit-breaker cooldown (provider-state store): when Google was
+//     recently recorded down (genuine 5xx/network outage), we skip it for
+//     ~60s and go straight to the fallback, then retry after the cooldown.
+//   - Negative cache: when this specific key is negative-cached as
+//     HEALTHY-EMPTY ({empty:true} sentinel), we skip the empty provider call
+//     and fall through to the fallback — "no match HERE" is not a failure.
+// In BOTH skip cases the fallback's first non-empty result wins; if the
+// fallback is also empty/errored we return what the primary would have
+// produced: healthy-empty (`{ data: { items: [] } }`) for a negative-cached
+// key, or HTTP_ERROR for a cooldown (a provider in cooldown is down).
+//
+// 429 / NO_FALLBACK tension (explicitly resolved here, #291): NO_FALLBACK_CODES
+// (BAD_TOKEN / SERVER_NO_TOKEN / PROVIDER_RATE_LIMIT / RATE_LIMIT) still
+// short-circuit WITHOUT falling back AND WITHOUT recording cooldown — an
+// operator/token problem or an upstream/OUR rate limit is NOT a "skipped down
+// provider", so it neither spends the fallback provider nor arms the breaker.
+// Only a genuine provider-down outcome (5xx / network / timeout -> HTTP_ERROR
+// by a non-NO_FALLBACK path) calls recordProviderDown. Provider-outage state
+// lives in the SEPARATE provider-state store, NEVER in the 30d lookup_cache (no
+// poisoning risk).
+//
 // `result` is the { data } | { error: Response } shape from lookup(). We read
 // the primary body defensively to decide on healthy-empty vs error + code.
-async function lookupWithFallback(lookupSpec, ttlMs, identity, fallback) {
+async function lookupWithFallback({
+  providerStateStore,
+  provider,
+  key,
+  action,
+  lookupSpec,
+  ttlMs,
+  identity,
+  fallback,
+}) {
+  // Skip-primary signal #1: circuit breaker (down provider in cooldown).
+  const cooldownMs = await readCooldownMs(providerStateStore, provider)
+  // Skip-primary signal #2: this key is negative-cached as healthy-empty.
+  const negativeEmpty = cooldownMs <= 0 && (await isNegativeCached(provider, key, action))
+
+  if (cooldownMs > 0 || negativeEmpty) {
+    // Skip the primary ENTIRELY (no provider hit) — either it is in cooldown
+    // (down) or this specific key is negative-cached as empty ("no match here").
+    const fb = await fallback()
+    if (fb && Array.isArray(fb.items) && fb.items.length > 0) {
+      return { data: fb }
+    }
+    // Fallback also empty/errored: mirror what the primary would have returned.
+    // A negative-cached key -> healthy-empty primary -> empty envelope. A
+    // provider in cooldown -> down primary -> its original HTTP_ERROR outage.
+    return negativeEmpty
+      ? { data: { items: [] } }
+      : { error: json(502, { error: 'Google Books request failed.', code: 'HTTP_ERROR' }) }
+  }
+
   const result = await lookup(lookupSpec, ttlMs, identity)
 
   // A healthy, non-empty primary result wins — no fallback call.
@@ -260,7 +322,7 @@ async function lookupWithFallback(lookupSpec, ttlMs, identity, fallback) {
   }
 
   // An error whose code is an authoritative outcome (auth/config/rate-limit)
-  // is returned as-is — never mask it by falling back.
+  // is returned as-is — never mask it by falling back, never arm the breaker.
   if (result.error) {
     let code = null
     try {
@@ -273,6 +335,16 @@ async function lookupWithFallback(lookupSpec, ttlMs, identity, fallback) {
   }
 
   // Fallback fires on a Google service error OR a healthy-empty result set.
+  const healthyEmpty = !result.error && result.data && Array.isArray(result.data.items) && result.data.items.length === 0
+  // A genuine provider-down outcome (5xx/network -> HTTP_ERROR by a
+  // non-NO_FALLBACK path): arm the circuit breaker (~60s). Outage state never
+  // goes into lookup_cache — only provider-state.
+  if (result.error) await recordProviderDown(providerStateStore, provider)
+  // A healthy-empty result is negative-cached so we stop re-spending the empty
+  // provider call within the short empty TTL (isbn 1d / text 6h). Only a
+  // HEALTHY empty is cached — never an error body.
+  if (healthyEmpty) await writeEmptyCache(provider, key, action)
+
   const fb = await fallback()
   if (fb && Array.isArray(fb.items) && fb.items.length > 0) {
     return { data: fb }
@@ -334,13 +406,31 @@ export default async (req) => {
     // OpenLibrary provider on a Google service error or healthy-empty result.
     // `detail` stays Google-only — a fallback hit has no googleBooksId, so the
     // frontend's BookDetail googleBooksId guard never asks for detail here.
+    // RES-1.4 T4 (#291): skip the primary when Google is in circuit-breaker
+    // cooldown or this key is negative-cached as empty.
     let result
     if (action === 'searchBarcode') {
-      result = await lookupWithFallback(lookupSpec, TTL_MS[action], identity,
-        () => openlibrary.searchBarcode(url.searchParams.get('isbn') || ''))
+      result = await lookupWithFallback({
+        providerStateStore: getStore(PROVIDER_STATE_STORE),
+        provider: 'books',
+        key: lookupSpec.cacheKey,
+        action,
+        lookupSpec,
+        ttlMs: TTL_MS[action],
+        identity,
+        fallback: () => openlibrary.searchBarcode(url.searchParams.get('isbn') || ''),
+      })
     } else if (action === 'searchText') {
-      result = await lookupWithFallback(lookupSpec, TTL_MS[action], identity,
-        () => openlibrary.searchText(url.searchParams.get('q') || ''))
+      result = await lookupWithFallback({
+        providerStateStore: getStore(PROVIDER_STATE_STORE),
+        provider: 'books',
+        key: lookupSpec.cacheKey,
+        action,
+        lookupSpec,
+        ttlMs: TTL_MS[action],
+        identity,
+        fallback: () => openlibrary.searchText(url.searchParams.get('q') || ''),
+      })
     } else {
       result = await lookup(lookupSpec, TTL_MS[action], identity)
     }

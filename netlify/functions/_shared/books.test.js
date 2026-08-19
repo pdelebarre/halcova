@@ -9,6 +9,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import booksHandler from '../books'
 import { adminSessionToken } from './session-test-helpers'
+import { EMPTY_SENTINEL, writeEmptyCache } from './lookup-cache'
+import { PROVIDER_COOLDOWN_MS, recordProviderDown } from './provider-state'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
@@ -272,6 +274,130 @@ describe('OpenLibrary fallback chain (RES-1.3 T3, #283)', () => {
     expect(body.id).toBe('g1')
     // detail is Google-only and must never touch OpenLibrary.
     expect(callsToHost('openlibrary.org')).toHaveLength(0)
+  })
+})
+
+// RES-1.4 T4 (#291) — negative cache + circuit-breaker cooldown through the REAL
+// books handler. The primary Google fetch and the OpenLibrary fallback both run
+// against the mocked global.fetch (the providers use the real lookupFetch), and
+// the shared lookup_cache / provider-state stores use the in-memory @netlify/blobs
+// mock (no Postgres here, so the Blob path is exercised).
+describe('RES-1.4 T4 — negative cache + circuit-breaker cooldown (books chain)', () => {
+  function upstream(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (String(name).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify(body),
+    }
+  }
+  function callsToHost(host) {
+    return global.fetch.mock.calls
+      .map(([u]) => { try { return new URL(String(u)).hostname } catch { return '' } })
+      .filter((h) => h === host)
+  }
+  const OL_ISBN = {
+    'ISBN:9780452284234': {
+      info_url: 'https://openlibrary.org/books/OL20891788M/x',
+      thumbnail_url: 'https://covers.openlibrary.org/b/id/8125329-M.jpg',
+      details: { title: "The Handmaid's Tale", key: '/books/OL20891788M', authors: [{ name: 'Margaret Atwood' }] },
+    },
+  }
+
+  it('a no-result ISBN is negative-cached as empty, so a second call skips the primary and falls through to the fallback', async () => {
+    // First call: Google healthy-empty -> negative-cache written, fallback wins.
+    global.fetch
+      .mockResolvedValueOnce(upstream(200, { items: [] }))
+      .mockResolvedValueOnce(upstream(200, OL_ISBN))
+    const r1 = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(r1.status).toBe(200)
+    expect((await r1.json()).items[0].source).toBe('openlibrary')
+    expect(callsToHost('www.googleapis.com')).toHaveLength(1)
+
+    // The negative-cache sentinel is now in the lookup_cache (Blob store here).
+    const cached = stores['books-cache'].data.get('isbn:9780452284234')
+    expect(cached.data).toEqual(EMPTY_SENTINEL)
+
+    // Second call within the empty TTL: Google is NEGATIVE-CACHED as empty ->
+    // the primary is SKIPPED (no www.googleapis.com call) and we go straight to
+    // the fallback, which wins again.
+    global.fetch.mockClear()
+    global.fetch.mockResolvedValueOnce(upstream(200, OL_ISBN))
+    const r2 = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(r2.status).toBe(200)
+    expect((await r2.json()).items[0].source).toBe('openlibrary')
+    expect(callsToHost('www.googleapis.com')).toHaveLength(0)
+    expect(callsToHost('openlibrary.org')).toHaveLength(1)
+  })
+
+  it('the {empty:true} sentinel is NEVER returned to the client as a real result (books)', async () => {
+    await writeEmptyCache('books', 'isbn:9780452284234', 'searchBarcode')
+    // Fallback empty too -> healthy-empty envelope, NOT the sentinel.
+    global.fetch.mockReset()
+    global.fetch.mockResolvedValueOnce(upstream(200, {})) // OpenLibrary: no ISBN key -> empty
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ items: [] }) // never { empty:true }, never a sentinel leak
+    expect(body.empty).toBeUndefined()
+  })
+
+  it('a down provider (5xx) records cooldown, is skipped within the cooldown window, and is retried after', async () => {
+    // First call: Google persistent 5xx (3 retryable attempts) -> HTTP_ERROR,
+    // which arms the circuit breaker; fallback also fails -> HTTP_ERROR surfaces.
+    global.fetch.mockResolvedValue(upstream(500, {}))
+    const r1 = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(r1.status).toBe(502)
+    expect((await r1.json()).code).toBe('HTTP_ERROR')
+
+    // Cooldown recorded in the SEPARATE provider-state store (not lookup_cache).
+    const down = stores['runout-provider-state'].data.get('books')
+    expect(down).toBeTruthy()
+    expect(down.provider).toBe('books')
+    expect(down.cooldownMs).toBe(PROVIDER_COOLDOWN_MS)
+    // And it is NOT in lookup_cache — no outage/cooldown sentinel there.
+    for (const value of stores['books-cache'].data.values()) {
+      expect(value.data.empty).toBeUndefined()
+    }
+
+    // Second call within the cooldown window: Google is SKIPPED (no
+    // www.googleapis.com call) and we go straight to the fallback.
+    global.fetch.mockClear()
+    global.fetch.mockResolvedValueOnce(upstream(200, OL_ISBN))
+    const r2 = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(r2.status).toBe(200)
+    expect((await r2.json()).items[0].source).toBe('openlibrary')
+    expect(callsToHost('www.googleapis.com')).toHaveLength(0)
+    expect(callsToHost('openlibrary.org')).toHaveLength(1)
+  }, 15000)
+
+  it('after the cooldown window elapses the primary provider is retried (books)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-08-19T12:00:00Z') })
+    try {
+      await recordProviderDown(stores['runout-provider-state'], 'books')
+      vi.advanceTimersByTime(PROVIDER_COOLDOWN_MS + 1000)
+
+      global.fetch.mockResolvedValueOnce(upstream(200, { items: [{ id: 'g7', volumeInfo: { title: 'Google Hit' } }] }))
+      const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=handmaid'))
+      expect(res.status).toBe(200)
+      expect((await res.json()).items[0].id).toBe('g7')
+      expect(callsToHost('www.googleapis.com')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a rate limit (PROVIDER_RATE_LIMIT) does NOT record cooldown and does NOT fall back (429 resolution)', async () => {
+    global.fetch.mockResolvedValue(upstream(429, {}))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=handmaid'))
+    expect(res.status).toBe(429)
+    expect((await res.json()).code).toBe('PROVIDER_RATE_LIMIT')
+    // NO cooldown was armed (a rate limit is not a "skipped down provider").
+    expect(stores['runout-provider-state'].data.get('books')).toBeFalsy()
+    // And nothing was negative-cached (an error body is never cached).
+    for (const value of stores['books-cache'].data.values()) {
+      expect(value.data.empty).toBeUndefined()
+    }
   })
 })
 
