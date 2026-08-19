@@ -74,6 +74,12 @@ export const POLICY = {
   'lending:item:lend': { owner: 'self', deny: ['demo'] },
   'lending:item:return': { owner: 'self', deny: ['demo'] },
 
+  // --- private assets (SEC-7.3 #340; per-user store, owner is 'self') --------
+  // Demo is read-only: it has no private assets, and can never sign/delete.
+  'asset:list': { owner: 'self' },
+  'asset:sign': { owner: 'self', deny: ['demo'] },
+  'asset:delete': { owner: 'self', deny: ['demo'] },
+
   // --- reviews (shared; DELETE is owner-or-admin) ---------------------------
   'review:read': {},
   'review:create': { deny: ['demo'] },

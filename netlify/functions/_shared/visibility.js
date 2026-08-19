@@ -99,6 +99,16 @@ export const ITEM_PRIVATE_FIELDS = Object.freeze([
   'price', 'serial', 'notes', 'receipts', 'contact', 'location', 'adminNote',
 ])
 
+// The private-assets / file-ref class (C6-private-assets, SEC-7.3 #340). Any
+// field that references stored user files/photos on an item. A NON-OWNER item
+// DTO must NEVER carry these — they are stripped by the allowlist in
+// filter.js, and asset ids/signed URLs only ever surface via the owner DTO
+// and the dedicated asset:sign endpoint. Exported so the negative test can
+// assert the strip and future refs can be added here in one place.
+export const PRIVATE_ASSET_FIELDS = Object.freeze([
+  'assets', 'receipts', 'attachments', 'photoRefs',
+])
+
 // --- review ----------------------------------------------------------------
 // C9 — public to authenticated: rating/body/authorName/kind/sourceId/
 // createdAt/updatedAt. authorId (C2 ownership) is stripped for non-authors;
