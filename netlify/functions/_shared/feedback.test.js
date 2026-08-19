@@ -15,7 +15,7 @@
 //   - POST auth: 401 no/unknown code, 403 disabled, 403 demo read-only
 //   - validation: message required + capped at 4000, type/category allow-lists,
 //     junk input never 500s (malformed JSON → 400)
-//   - rate limiting: 429 RATE_LIMITED + Retry-After once the hourly window
+//   - rate limiting: 429 RATE_LIMIT + Retry-After once the hourly window
 //     per identity is exhausted
 //   - secret hygiene: responses never contain the access code / admin key /
 //     code_hash
@@ -356,7 +356,7 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
     expect(res.status).toBe(400)
   })
 
-  it('429s RATE_LIMITED once the hourly submission window is exhausted (with Retry-After)', async () => {
+  it('429s RATE_LIMIT once the hourly submission window is exhausted (with Retry-After)', async () => {
     seedMemberBlobs()
     stores['runout-rate-limits'] = createStore()
     stores['runout-rate-limits'].data.set(
@@ -365,7 +365,7 @@ describe('POST auth & validation — backend-independent guards (Blobs path)', (
     )
     const res = await call('POST', '', submitBody(), `Bearer ${MEMBER_TOKEN}`)
     expect(res.status).toBe(429)
-    expect((await res.json()).code).toBe('RATE_LIMITED')
+    expect((await res.json()).code).toBe('RATE_LIMIT')
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 

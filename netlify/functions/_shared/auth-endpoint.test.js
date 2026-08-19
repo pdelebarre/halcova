@@ -33,6 +33,7 @@ import { signMagicLink } from './magic-link'
 import { resolveSession } from './session-auth'
 import { createSession, getSessionByToken } from './sessions'
 import { getUser, listRequests, listUsers, saveUser } from './users'
+import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
@@ -377,6 +378,45 @@ describe('logoutAll — sign out all devices', () => {
     expect(status).toBe(200)
     expect((await getSessionByToken(token)).status).toBe('revoked')
     expect((await resolveSession(sessionReq(token))).error.status).toBe(401)
+  })
+})
+
+// SEC-7.4 (#341) — logout is throttled per-Token and logoutAll per-IP.
+describe('SEC-7.4 (#341) — logout / logoutAll rate limits', () => {
+  it('429s RATE_LIMIT once a single session token exceeds the per-token logout limit', async () => {
+    await saveUser({ id: 'u-limit', name: 'u', email: 'limit@example.com', code: 'RU-LIMIT-XXXX-XXXX', collections: { records: true, books: true }, role: 'member', status: 'active', features: {} })
+    const { token } = await createSession({ userId: 'u-limit', role: 'member' })
+    // Pre-fill the per-token logout counter at its (default 60) limit.
+    stores['runout-rate-limits'] = createStore()
+    stores['runout-rate-limits'].data.set(`rl:auth:logout:${token}`, { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 60 })
+
+    const { status, body } = await call({ action: 'logout' }, { token })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
+  })
+
+  it('a different token is not throttled by another token’s logout exhaustion', async () => {
+    await saveUser({ id: 'u-limit2', name: 'u', email: 'limit2@example.com', code: 'RU-LIM2-XXXX-XXXX', collections: { records: true, books: true }, role: 'member', status: 'active', features: {} })
+    const a = await createSession({ userId: 'u-limit2', role: 'member' })
+    const b = await createSession({ userId: 'u-limit2', role: 'member' })
+    stores['runout-rate-limits'] = createStore()
+    stores['runout-rate-limits'].data.set(`rl:auth:logout:${a.token}`, { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 60 })
+
+    expect((await call({ action: 'logout' }, { token: a.token })).status).toBe(429)
+    expect((await call({ action: 'logout' }, { token: b.token })).status).toBe(200)
+  })
+
+  it('429s RATE_LIMIT once the per-IP logoutAll limit is exhausted', async () => {
+    await saveUser({ id: 'u-limit3', name: 'u', email: 'limit3@example.com', code: 'RU-LIM3-XXXX-XXXX', collections: { records: true, books: true }, role: 'member', status: 'active', features: {} })
+    const { token } = await createSession({ userId: 'u-limit3', role: 'member' })
+    const ip = '203.0.113.77'
+    // Pre-fill the per-IP logoutAll counter at its (default 60) limit.
+    stores['runout-rate-limits'] = createStore()
+    stores['runout-rate-limits'].data.set(`rl:auth:logoutAll:ip:${ip}`, { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 60 })
+
+    const { status, body } = await call({ action: 'logoutAll' }, { token, ip })
+    expect(status).toBe(429)
+    expect(body.code).toBe('RATE_LIMIT')
   })
 })
 

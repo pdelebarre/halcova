@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   RATE_LIMIT_WINDOW_MS,
   rateLimitKey,
@@ -11,6 +11,8 @@ import {
   createRateLimiter,
   clientIp,
   rateLimitIdentity,
+  rateLimitGuard,
+  RL_EXHAUST_ANOMALY_THRESHOLD,
 } from './rate-limit'
 
 describe('rateLimitKey', () => {
@@ -154,5 +156,67 @@ describe('rateLimitIdentity', () => {
 
   it('returns an empty string when the demo has no IP to key on', () => {
     expect(rateLimitIdentity({ id: 'demo', role: 'demo' }, { headers: { get: () => null } })).toBe('')
+  })
+})
+
+describe('rateLimitGuard', () => {
+  const memStore = (data = {}) => ({
+    data,
+    async get(k, { type } = {}) {
+      const v = this.data[k]
+      return v === undefined ? null : (type === 'json' ? JSON.parse(JSON.stringify(v)) : v)
+    },
+    async setJSON(k, v) { this.data[k] = JSON.parse(JSON.stringify(v)) },
+  })
+
+  it('allows up to the limit and returns a uniform 429 RATE_LIMIT + Retry-After beyond it', async () => {
+    const store = memStore()
+    for (let i = 0; i < 2; i += 1) {
+      expect(await rateLimitGuard({ store, scope: 'lending', identity: 'u1', limit: 2, anomalyStore: store, now: 10_000 })).toBeNull()
+    }
+    const limited = await rateLimitGuard({ store, scope: 'lending', identity: 'u1', limit: 2, anomalyStore: store, now: 10_000 })
+    expect(limited.status).toBe(429)
+    const body = await limited.json()
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThan(0)
+  })
+
+  it('skips the limit when there is no identity (degrades open)', async () => {
+    const store = memStore()
+    expect(await rateLimitGuard({ store, scope: 's', identity: '', limit: 1, anomalyStore: store })).toBeNull()
+  })
+
+  it('never throws when the store read/write fails — degrades to allowing', async () => {
+    const broken = {
+      get: async () => { throw new Error('boom') },
+      setJSON: async () => { throw new Error('boom') },
+    }
+    await expect(rateLimitGuard({ store: broken, scope: 's', identity: 'u1', limit: 1, anomalyStore: broken })).resolves.toBeNull()
+  })
+
+  it('emits a rate_limit_exhaustion_burst anomaly once per window after N 429s (no raw identity)', async () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      const store = memStore()
+      const limit = 1
+      // Fire the limiter `threshold + 1` times with limit=1: the first call is
+      // allowed (no 429), so the remaining `threshold` calls are all 429s — the
+      // last one crosses the exhaustion-anomaly threshold exactly once.
+      let limited = null
+      for (let i = 0; i < RL_EXHAUST_ANOMALY_THRESHOLD + 1; i += 1) {
+        limited = await rateLimitGuard({ store, scope: 'collection:records:write', identity: 'u1', limit, anomalyStore: store, burstScope: 'rlx:collection:records:write', now: 10_000 })
+      }
+      expect(limited.status).toBe(429)
+      // The threshold of 429s produced exactly ONE anomaly audit line.
+      const anomalyLines = spy.mock.calls.map(([line]) => String(line)).filter((l) => l.includes('rate_limit_exhaustion_burst'))
+      expect(anomalyLines).toHaveLength(1)
+      expect(anomalyLines[0]).not.toContain('u1')
+      expect(anomalyLines[0]).toContain('rlx:collection:records:write')
+      // Each 429 also emitted a cardinality-free rate_limit.served audit.
+      const served = spy.mock.calls.map(([line]) => String(line)).filter((l) => l.includes('rate_limit.served'))
+      expect(served).toHaveLength(RL_EXHAUST_ANOMALY_THRESHOLD)
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

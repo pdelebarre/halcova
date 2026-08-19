@@ -156,7 +156,7 @@ describe('FeedbackModal — member-facing form (feat/feedback #82, epic #74)', (
 
   it('shows a friendly error and keeps the form for a retry on a coded failure', async () => {
     const err = new Error('Too many submissions')
-    err.code = 'RATE_LIMITED'
+    err.code = 'RATE_LIMIT'
     feedbackApi.submitFeedback.mockRejectedValue(err)
     render(<FeedbackModal onClose={vi.fn()} />)
 

@@ -77,9 +77,9 @@ describe('reviews API', () => {
     })
   })
 
-  it('attaches other contract codes (RATE_LIMITED / NOT_FOUND / BAD_REQUEST)', async () => {
-    global.fetch.mockResolvedValue(errorJson(429, { error: 'Slow down', code: 'RATE_LIMITED' }))
-    await expect(reviews.upsertReview({ kind: 'records', sourceId: '1', rating: 5 })).rejects.toMatchObject({ code: 'RATE_LIMITED' })
+  it('attaches other contract codes (RATE_LIMIT / NOT_FOUND / BAD_REQUEST)', async () => {
+    global.fetch.mockResolvedValue(errorJson(429, { error: 'Slow down', code: 'RATE_LIMIT' }))
+    await expect(reviews.upsertReview({ kind: 'records', sourceId: '1', rating: 5 })).rejects.toMatchObject({ code: 'RATE_LIMIT' })
 
     global.fetch.mockResolvedValue(errorJson(404, { error: 'Gone', code: 'NOT_FOUND' }))
     await expect(reviews.deleteReview({ kind: 'records', sourceId: '1', id: 'x' })).rejects.toMatchObject({ code: 'NOT_FOUND' })

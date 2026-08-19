@@ -6,10 +6,11 @@
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { enforce } from './_shared/policy'
-import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { createRateLimiter, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
 import { json, safeError } from './_shared/security'
+import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 // Discogs policy requires a User-Agent header on every request.
@@ -35,6 +36,10 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 // matches it; the per-user cap stops one account from exhausting it.
 const DISCOGS_USER_LIMIT = Number(process.env.RUNOUT_DISCOGS_RATE_LIMIT) || 30
 const DISCOGS_OVERALL_LIMIT = Number(process.env.RUNOUT_DISCOGS_OVERALL_RATE_LIMIT) || 60
+// SEC-7.4 (#341): the cover action is PUBLIC (unauthenticated), per-IP limited
+// BEFORE handleCover (see books.js for the same block).
+const COVER_IP_LIMIT = Number(process.env.RUNOUT_COVER_IP_RATE_LIMIT) || 60
+const COVER_BURST_THRESHOLD = Number(process.env.RUNOUT_COVER_BURST_THRESHOLD) || 20
 
 const DAY = 24 * 60 * 60 * 1000
 const TTL = {
@@ -111,7 +116,16 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
     }
     if (!res.ok) {
       if (res.status === 401) return json(502, { error: 'Discogs token rejected.', code: 'BAD_TOKEN' })
-      if (res.status === 429) return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' })
+      if (res.status === 429) {
+        // SEC-7.4 (#341): upstream provider 429 — distinct `PROVIDER_RATE_LIMIT`
+        // code (server-side only) + Retry-After (upstream's own when present,
+        // else our fixed-window hint). `RATE_LIMIT` stays for OUR throttling.
+        const upstreamRetry = res.headers?.get?.('retry-after')
+        const retryAfter = (upstreamRetry && Number(upstreamRetry) > 0)
+          ? String(upstreamRetry)
+          : String(retryAfterSeconds())
+        return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'PROVIDER_RATE_LIMIT' }, { 'Retry-After': retryAfter })
+      }
       return json(502, { error: 'Discogs request failed.', code: 'HTTP_ERROR' })
     }
     // SEC-3.2 (#195): cap the provider body before parsing/caching.
@@ -141,8 +155,19 @@ export default async (req) => {
   // Authorization header — so this action is deliberately PUBLIC (T6). It is
   // safe because handleCover only ever fetches small images from an explicit
   // host allowlist (https-only, size-capped). Every other action stays
-  // authenticated below.
+  // authenticated below. SEC-7.4 (#341): the public cover path is per-IP
+  // rate-limited BEFORE handleCover so a flood can never reach the upstream.
   if (action === 'cover') {
+    const coverIp = clientIp(req)
+    if (coverIp) {
+      const coverLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'cover:ip', limit: COVER_IP_LIMIT })
+      const rl = await coverLimiter(coverIp)
+      if (rl.limited) {
+        // Abuse signal: a cover flood from one IP (NIT M5 — hashed scope).
+        await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:cover:ip:${coverIp}`, { threshold: COVER_BURST_THRESHOLD, signal: 'cover_burst', scope: anomalyScope('anom:cover:ip', coverIp) })
+        return json(429, { error: 'Too many cover requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+      }
+    }
     return handleCover(url.searchParams, getStore(CACHE_STORE))
   }
 

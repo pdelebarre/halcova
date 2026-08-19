@@ -25,7 +25,7 @@ function fnUrl(extra = {}) {
 }
 
 // Mirror the collection/lookup clients: surface the server's error message
-// AND its machine-readable `code` (e.g. PLAN_FORBIDDEN, RATE_LIMITED,
+// AND its machine-readable `code` (e.g. PLAN_FORBIDDEN, RATE_LIMIT,
 // NOT_FOUND, BAD_REQUEST) so callers can branch on the failure instead of
 // string-matching. Code-less errors just carry the message.
 async function handle(res) {

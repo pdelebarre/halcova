@@ -20,9 +20,16 @@ import { filterFor } from './_shared/filter'
 import { effectiveFeatures } from './_shared/entitlements'
 import { storeNameFor } from './_shared/users'
 import { readJsonBody, safeError } from './_shared/security'
+import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 
 const FEATURE_OFF_MSG = "Lending isn't enabled for your account."
 const HISTORY_CAP = 10
+
+// SEC-7.4 (#341): per-user write limiter for lending actions (POST only — this
+// function is POST-only). Bounds a runaway client / stuck loop from hammering
+// the item blob stores. Members/owner keyed by user id; demo keyed by IP.
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+const LENDING_RATE_LIMIT = Number(process.env.RUNOUT_LENDING_RATE_LIMIT) || 30
 
 export default async function lending(req) {
   // SEC-7.1 (#338): route authorization through the shared policy layer. The
@@ -34,6 +41,20 @@ export default async function lending(req) {
   const user = pre.user
 
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
+
+  // SEC-7.4 (#341): every lending write (lend/return) is per-identity
+  // rate-limited. Lending mutates the caller's item blobs, so a runaway client
+  // / stuck loop must not hammer it. Members/owner keyed by user id; the
+  // shared demo identity is keyed by client IP (and demo is read-only anyway).
+  // The limiter degrades open — a store failure never 500s the request.
+  const identity = rateLimitIdentity(user, req)
+  if (identity) {
+    const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'lending', limit: LENDING_RATE_LIMIT })
+    const rl = await limiter(identity)
+    if (rl.limited) {
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+    }
+  }
 
   const body = await readBody(req)
   if (body.error) return body.error

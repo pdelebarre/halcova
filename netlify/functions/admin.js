@@ -45,6 +45,12 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 // limit is generous (the owner is expected to act) but present and
 // env-tunable, matching the collection/auth limiters.
 const ADMIN_LIMIT = Number(process.env.RUNOUT_ADMIN_RATE_LIMIT) || 120
+// SEC-7.4 (#341): per-ACCOUNT admin limiter (keyed on the resolved admin user
+// id) on TOP of the per-IP limit, so a single admin account is bounded even if
+// it rotates IPs; and an OVERALL cap so one account (or one IP) can't consume
+// the whole per-window admin budget. See docs/operational-thresholds.md.
+const ADMIN_ACCOUNT_LIMIT = Number(process.env.RUNOUT_ADMIN_ACCOUNT_RATE_LIMIT) || 120
+const ADMIN_OVERALL_LIMIT = Number(process.env.RUNOUT_ADMIN_OVERALL_RATE_LIMIT) || 400
 
 
 function sanitizeCollections(collections) {
@@ -347,6 +353,8 @@ export default async (req) => {
 
     // SEC-3.6 (#199): admin writes are rate-limited per IP. The owner is a
     // single identity, so keying on the client IP bounds a flood source.
+    // SEC-7.4 (#341): also per-ACCOUNT (the resolved admin user id) and an
+    // OVERALL cap so one account/IP can't consume the whole budget.
     if (req.method === 'POST') {
       const ip = clientIp(req)
       if (ip) {
@@ -355,6 +363,19 @@ export default async (req) => {
         if (rl.limited) {
           return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
         }
+      }
+      // Per-account (keyed on the resolved admin user id) + overall caps.
+      if (admin.user?.id) {
+        const acctLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'admin:account', limit: ADMIN_ACCOUNT_LIMIT })
+        const acctRl = await acctLimiter(admin.user.id)
+        if (acctRl.limited) {
+          return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(acctRl.retryAfter) })
+        }
+      }
+      const overallLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'admin:overall', limit: ADMIN_OVERALL_LIMIT })
+      const overallRl = await overallLimiter('all')
+      if (overallRl.limited) {
+        return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(overallRl.retryAfter) })
       }
     }
 

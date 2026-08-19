@@ -55,6 +55,12 @@ const MAGIC_LINK_EMAIL_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_RATE_LIM
 // the cost of hammering tokens (the HMAC + randomUUID jti makes a practical
 // brute force infeasible; this is defense in depth, like the login limiter).
 export const MAGIC_LINK_VERIFY_IP_LIMIT = Number(process.env.RUNOUT_AUTH_MAGICLINK_VERIFY_IP_RATE_LIMIT) || 20
+// SEC-7.4 (#341): logout is a cheap, unrate-limited primitive today — a runaway
+// client could spam it to churn session records. Per-token bounds one session
+// being logged out repeatedly; logoutAll is per-IP (below) so one stolen token
+// can't revoke every session in a flood.
+const LOGOUT_LIMIT = Number(process.env.RUNOUT_AUTH_LOGOUT_RATE_LIMIT) || 60
+const LOGOUT_ALL_IP_LIMIT = Number(process.env.RUNOUT_AUTH_LOGOUT_ALL_IP_RATE_LIMIT) || 60
 
 // A light shape check before we email someone — enough to reject obvious
 // garbage without a backtracking-prone regex.
@@ -231,6 +237,13 @@ async function handleMe(req) {
 async function handleLogout(req) {
   const token = bearer(req)
   if (!token) return json(400, { error: 'Not signed in.' })
+  // SEC-7.4 (#341): per-token logout limiter — bounds a runaway client's logout
+  // churn against a single session token.
+  const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:logout', limit: LOGOUT_LIMIT })
+  const rl = await limiter(token)
+  if (rl.limited) {
+    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+  }
   await revokeSession(token)
   logAudit('auth.logout', {})
   return json(200, { ok: true })
@@ -248,6 +261,16 @@ async function handleLogoutAll(req) {
   // layer (`auth:logoutAll`, principal scoped to the session's own user).
   const resolved = await enforce(req, 'auth:logoutAll')
   if (resolved.error) return resolved.error
+  // SEC-7.4 (#341): logoutAll revokes EVERY session — a costly, irreversible
+  // action — so it is throttled per-IP to bound a flood from one source.
+  const ip = clientIp(req)
+  if (ip) {
+    const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:logoutAll:ip', limit: LOGOUT_ALL_IP_LIMIT })
+    const rl = await limiter(ip)
+    if (rl.limited) {
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+    }
+  }
   await revokeAllForUser(resolved.user.id)
   logAudit('auth.logout_all', { userId: resolved.user.id })
   return json(200, { ok: true })

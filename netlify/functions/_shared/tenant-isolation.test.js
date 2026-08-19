@@ -22,6 +22,7 @@ import lendingHandler from '../lending'
 import reviewsHandler from '../reviews'
 import feedbackHandler from '../feedback'
 import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
+import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
 
 // Hoisted so the @netlify/blobs mock (which must be registered before the
 // modules under test are imported) can share the in-memory store registry.
@@ -543,3 +544,63 @@ describe('#338 — SEC-7.1 follower/blocked (non-owner) + private-field negative
     expect(list.mine.id).toBe(created.review.id)
   })
 })
+
+// SEC-7.4 (#341) — every lending WRITE is per-identity rate-limited. Members/
+// owner key on user id; a single account cannot hammer the item stores beyond
+// the (default 30/min) budget. The limiter is keyed on the resolved user id
+// (never a spoofable body field), and it degrades open (a store failure never
+// 500s a legitimate request).
+describe('SEC-7.4 (#341) — lending writes are rate-limited per user', () => {
+  function lendReq(token, itemId = 'a1') {
+    return {
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/lending',
+      headers: {
+        get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${token}` : null),
+      },
+      json: async () => ({ action: 'lend', collection: RECORDS, itemId, borrower: { name: 'B' } }),
+    }
+  }
+
+  it('429s RATE_LIMIT once a single user exhausts the per-identity lending budget', async () => {
+    seedMember(A, { features: { lending: true } })
+    collectionStore(A, RECORDS, [item('a1')])
+    // Pre-fill the per-user lending counter at its (default 30) limit.
+    stores['runout-rate-limits'] = createStore()
+    stores['runout-rate-limits'].data.set(
+      `rl:lending:${A}`,
+      { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 30 },
+    )
+
+    const res = await lendingHandler(lendReq(A_TOKEN))
+    expect(res.status).toBe(429)
+    expect((await res.json()).code).toBe('RATE_LIMIT')
+    expect(res.headers.get('Retry-After')).toBeTruthy()
+    // Nothing was lent.
+    expect(stores[`collection-${A}-${RECORDS}`].data.get('item:a1').lending).toBeUndefined()
+  })
+
+  it('a different user is NOT throttled by another user’s lending exhaustion', async () => {
+    seedMember(A, { features: { lending: true } })
+    seedMember(B, { features: { lending: true } })
+    collectionStore(A, RECORDS, [item('a1')])
+    collectionStore(B, RECORDS, [item('b1')])
+    stores['runout-rate-limits'] = createStore()
+    // A's budget is exhausted; B's is untouched.
+    stores['runout-rate-limits'].data.set(
+      `rl:lending:${A}`,
+      { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 30 },
+    )
+
+    // B lends from B's OWN store (item 'b1'); A's item 'a1' is off-limits to B.
+    expect((await lendingHandler(lendReq(A_TOKEN, 'a1'))).status).toBe(429)
+    expect((await lendingHandler(lendReq(B_TOKEN, 'b1'))).status).toBe(200)
+  })
+
+  it('an authorization failure is NOT rate-limited (the limiter runs after a valid session)', async () => {
+    stores['runout-rate-limits'] = createStore()
+    // No session → enforce ends at 401 before the limiter is reached.
+    expect((await lendingHandler(lendReq('bad-token'))).status).toBe(401)
+  })
+})
+

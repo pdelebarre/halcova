@@ -409,7 +409,7 @@ describe('DELETE — only the author (or the owner)', () => {
 })
 
 describe('rate limit — writes only', () => {
-  it('429s RATE_LIMITED once the per-identity write window is exhausted', async () => {
+  it('429s RATE_LIMIT once the per-identity write window is exhausted', async () => {
     seedMember()
     // Burn the whole write window for this identity/kind up front.
     stores['runout-rate-limits'] = createStore()
@@ -418,7 +418,7 @@ describe('rate limit — writes only', () => {
     const res = await call('POST', '', postBody({ rating: 5 }))
     expect(res.status).toBe(429)
     const body = await res.json()
-    expect(body.code).toBe('RATE_LIMITED')
+    expect(body.code).toBe('RATE_LIMIT')
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 
@@ -431,7 +431,20 @@ describe('rate limit — writes only', () => {
     expect(res.status).toBe(200)
   })
 
-  it('429s RATE_LIMITED once the per-release (distinct sourceId) write cap is hit (M3)', async () => {
+  it('429s RATE_LIMIT once the GENEROUS per-identity READ limiter is exhausted (SEC-7.4)', async () => {
+    seedMember()
+    stores['runout-rate-limits'] = createStore()
+    // The read bucket (reviews:read) is at its 300/min cap for this identity.
+    stores['runout-rate-limits'].data.set('rl:reviews:read:u1', { w: windowIndex(), count: 300 })
+
+    const res = await call('GET', `?kind=records&sourceId=${SOURCE_ID}`)
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(res.headers.get('Retry-After')).toBeTruthy()
+  })
+
+  it('429s RATE_LIMIT once the per-release (distinct sourceId) write cap is hit (M3)', async () => {
     seedMember()
     // The distinct-release counter for this identity+kind is already at the cap.
     stores['runout-rate-limits'] = createStore()
@@ -443,7 +456,7 @@ describe('rate limit — writes only', () => {
     const res = await call('POST', '', postBody({ sourceId: '999' }))
     expect(res.status).toBe(429)
     const body = await res.json()
-    expect(body.code).toBe('RATE_LIMITED')
+    expect(body.code).toBe('RATE_LIMIT')
     expect(res.headers.get('Retry-After')).toBeTruthy()
   })
 

@@ -67,7 +67,7 @@ export default function FeedbackModal({ onClose, initialType = 'suggestion' }) {
       setReferenceId(created?.id ? `#fb-${String(created.id).slice(0, 8)}` : t('feedback.referenceUnknown'))
       setStatus('success')
     } catch (err) {
-      // Coded failure (NO_TOKEN, RATE_LIMITED, MESSAGE_TOO_LONG, DEMO_READONLY
+      // Coded failure (NO_TOKEN, RATE_LIMIT, MESSAGE_TOO_LONG, DEMO_READONLY
       // …) → map to a friendly line; anything unknown degrades to generic
       // copy. Never throws uncaught.
       setErrorCode(err?.code || null)
@@ -78,7 +78,8 @@ export default function FeedbackModal({ onClose, initialType = 'suggestion' }) {
   function errorCopy() {
     switch (errorCode) {
       case 'NO_TOKEN': return t('feedback.error.NO_TOKEN')
-      case 'RATE_LIMITED': return t('feedback.error.RATE_LIMITED')
+      // SEC-7.4 (#341): the server 429 code is now RATE_LIMIT (was RATE_LIMITED).
+      case 'RATE_LIMIT': return t('feedback.error.RATE_LIMITED')
       case 'MESSAGE_TOO_LONG': return t('feedback.error.MESSAGE_TOO_LONG')
       case 'DEMO_READONLY': return t('feedback.error.DEMO_READONLY')
       default: return t('feedback.error.generic')

@@ -198,7 +198,7 @@ async function submissionGuardError(req, user) {
   })
   const rl = await limiter(identity)
   if (rl.limited) {
-    return json(429, { error: 'Too many submissions — try again later.', code: 'RATE_LIMITED' }, { 'Retry-After': String(rl.retryAfter) })
+    return json(429, { error: 'Too many submissions — try again later.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
   }
   return null
 }
