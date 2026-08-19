@@ -1,6 +1,6 @@
 # ADR-0016: Offline capability and trust matrix
 
-- **Status:** Accepted
+- **Status:** Proposed — pending specialist review
 - **Date:** 2026-08-19
 - **Related roadmap:** #150, #152, #157, #158, #159, #162, #289, #292
 
@@ -30,14 +30,18 @@
 
 1. Offline data is scoped to the authenticated user, tenant and device context.
 2. No raw password, access code, bearer token or session credential is persisted in IndexedDB.
-3. Offline access is limited to a previously trusted session/device and an approved capability set.
-4. Local records are deleted or invalidated on sign-out/account switch according to the security policy.
-5. Server synchronization re-authorizes every operation; browser-supplied tenant/owner identifiers are never authoritative.
-6. Outbox operation IDs are unique and cannot be replayed by another user/tenant.
-7. Cached provider responses are not treated as authorization evidence.
-8. Offline UI must distinguish local, pending, synchronized, failed and conflicted states.
-9. No offline operation may silently discard a user mutation.
-10. Sensitive operations remain online-only unless a later ADR explicitly changes this matrix.
+3. Offline access requires a previously trusted session/device with a defined expiry and capability scope.
+4. Trust is established only after successful online authentication and is invalidated on sign-out/account switch, local security reset, expiry, or confirmed server-side revocation/disable.
+5. A stale cached trust record never extends authorization indefinitely; capabilities requiring current authorization fail closed.
+6. Local records are deleted or cryptographically invalidated on sign-out/account switch according to the security policy.
+7. Server synchronization re-authorizes every operation; browser-supplied tenant/owner identifiers are never authoritative.
+8. Outbox operation IDs are unique and cannot be replayed by another user/tenant.
+9. Cached provider responses are not treated as authorization evidence.
+10. Private collection responses must not be stored in generic service-worker HTTP caches.
+11. Offline UI must distinguish local, pending, synchronized, failed and conflicted states.
+12. No offline operation may silently discard a user mutation.
+13. Sensitive operations remain online-only unless a later ADR explicitly changes this matrix.
+14. Telemetry must not expose credentials, raw private collection contents, access codes, bearer/session tokens, or user/tenant identifiers.
 
 ## Synchronization invariants
 
@@ -48,6 +52,7 @@
 - Local state never becomes a source of truth for tenant ownership.
 - Conflict-sensitive entities use explicit optimistic concurrency/version checks.
 - User edits are never overwritten silently by metadata enrichment.
+- Local schema migrations are versioned, deterministic and fail closed on incompatible data.
 
 ## UX requirements
 
@@ -60,3 +65,7 @@ Offline state is a normal application state, not an error screen. The UI must co
 - conflicts requiring user action.
 
 No feature may imply that an offline mutation is permanently saved to the server until synchronization succeeds.
+
+## Gate
+
+This matrix remains **Proposed** until the Offline Architect, Data Architect and Security Auditor have independently reviewed the PR and the PM has accepted all required findings. Only then may dependent M1 implementation proceed.
