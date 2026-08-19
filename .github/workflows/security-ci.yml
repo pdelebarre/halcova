@@ -39,9 +39,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      # Node 22: the jsdom@30/undici@8 stack requires Node >= 22.19.0 (see
+      # undici engines). Node 20 crashes the vitest worker with
+      # `webidl.util.markAsUncloneable is not a function` and drops test files
+      # (OPS-3.1, #375). 22 is an Active LTS and matches the local toolchain.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install dependencies
         run: npm install --legacy-peer-deps
       - name: Run lint
@@ -61,7 +65,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install dependencies
         run: npm install --legacy-peer-deps
       # BLOCKING: fails on any high/critical advisory (no continue-on-error).
@@ -79,13 +83,21 @@ jobs:
           fetch-depth: 0
       # BLOCKING: Gitleaks fails (exit 1) on any detected secret. Output is
       # redacted so nothing secret is logged.
-      - name: Run Gitleaks
+      #
+      # The previous step invoked gitleaks via a public Docker image
+      # (gitleaks/gitleaks:v8.24.3); CI intermittently failed with "pull access
+      # denied" (exit 125) because the image is not reliably pullable on hosted
+      # runners (OPS-3.1, #375). We now run the standalone release binary
+      # (same v8.24.3 engine, same .gitleaks.toml) so the scan never depends on
+      # the Docker daemon. Over the full git history with fetch-depth 0 this
+      # scan reports no leaks.
+      - name: Run Gitleaks (blocking)
         run: |
-          docker run --rm \
-            -v "${PWD}:/repo" \
-            --workdir /repo \
-            gitleaks/gitleaks:v8.24.3 \
-            git --redact --no-banner --exit-code 1
+          mkdir -p /tmp/gitleaks
+          curl -sSL -o /tmp/gitleaks/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks/gitleaks.tar.gz -C /tmp/gitleaks
+          /tmp/gitleaks/gitleaks git --redact --no-banner --exit-code 1
 
   sast:
     name: SAST (CodeQL, blocking on high/critical)

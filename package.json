@@ -52,7 +52,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
     "jsdom": "^30.0.1",
-    "netlify-cli": "^27.1.1",
+    "netlify-cli": "^27.1.2",
     "oxlint": "^1.11.0",
     "pg": "^8.16.3",
     "pg-mem": "^3.0.5",
