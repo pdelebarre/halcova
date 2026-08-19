@@ -87,4 +87,56 @@ describe('SEC-3.6 (#199) — admin actions are rate-limited per IP', () => {
     expect(body.code).toBe('RATE_LIMIT')
     expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThan(0)
   })
+
+  it('throttles a single admin ACCOUNT (keyed on user id) independently of its IP (SEC-7.4)', async () => {
+    const ip = '203.0.113.2'
+    const mk = () => ({
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/admin',
+      headers: {
+        get: (k) => {
+          const key = String(k).toLowerCase()
+          if (key === 'authorization') return `Bearer ${ADMIN_TOKEN}`
+          if (key === 'x-nf-client-connection-ip') return ip
+          return null
+        },
+      },
+      json: async () => ({ action: 'approve' }),
+    })
+
+    // The owner user id is 'owner' (see auth.js OWNER_ID). Pre-fill the
+    // per-account counter at its (default 120) limit in the current window.
+    const rlStore = stores['runout-rate-limits'] || (stores['runout-rate-limits'] = createStore())
+    const w = Math.floor(Date.now() / 60_000)
+    rlStore.data.set('rl:admin:account:owner', { w, count: 120 })
+
+    const limited = await handler(mk())
+    expect(limited.status).toBe(429)
+    expect((await limited.json()).code).toBe('RATE_LIMIT')
+  })
+
+  it('applies the OVERALL admin cap so one account/IP cannot consume the whole budget (SEC-7.4)', async () => {
+    const ip = '203.0.113.3'
+    const mk = () => ({
+      method: 'POST',
+      url: 'http://localhost/.netlify/functions/admin',
+      headers: {
+        get: (k) => {
+          const key = String(k).toLowerCase()
+          if (key === 'authorization') return `Bearer ${ADMIN_TOKEN}`
+          if (key === 'x-nf-client-connection-ip') return ip
+          return null
+        },
+      },
+      json: async () => ({ action: 'approve' }),
+    })
+
+    const rlStore = stores['runout-rate-limits'] || (stores['runout-rate-limits'] = createStore())
+    const w = Math.floor(Date.now() / 60_000)
+    rlStore.data.set('rl:admin:overall:all', { w, count: 400 }) // default ADMIN_OVERALL_LIMIT
+
+    const limited = await handler(mk())
+    expect(limited.status).toBe(429)
+    expect((await limited.json()).code).toBe('RATE_LIMIT')
+  })
 })

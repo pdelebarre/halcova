@@ -41,6 +41,11 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity fixed-window limit for review WRITES (POST/DELETE); GET stays
 // open (the list + aggregate are public once you're authenticated).
 const REVIEWS_RATE_LIMIT = Number(process.env.RUNOUT_REVIEWS_RATE_LIMIT) || 30
+// SEC-7.4 (#341): per-identity READ limiter for the GET path. Reviews are
+// public-but-shared (the list + aggregate are expensive scans across a shared
+// store), so a runaway client hammering one release's thread is throttled.
+// Deliberately GENEROUS (300/min default) — must never throttle legit reads.
+const REVIEWS_READ_LIMIT = Number(process.env.RUNOUT_REVIEWS_READ_RATE_LIMIT) || 300
 // M3 — per-release write limiting: how many DISTINCT sourceIds one identity can
 // open a review thread on per kind per window (see writeGuardError). Bounds
 // new-thread creation across arbitrary releases; editing releases you already
@@ -240,7 +245,7 @@ async function writeGuardError(req, user, kind, sourceId) {
     })
     const rl = await limiter(identity)
     if (rl.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMITED' }, { 'Retry-After': String(rl.retryAfter) })
+      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
     }
     // M3 — per-release write limiting: the limiter above counts every write
     // (edits included) per identity per kind, so one member could open
@@ -257,12 +262,30 @@ async function writeGuardError(req, user, kind, sourceId) {
         REVIEWS_DISTINCT_LIMIT,
       )
       if (distinct.limited) {
-        return json(429, { error: 'Too many new releases reviewed — try again shortly.', code: 'RATE_LIMITED' }, { 'Retry-After': String(distinct.retryAfter) })
+        return json(429, { error: 'Too many new releases reviewed — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(distinct.retryAfter) })
       }
     }
   }
   if (user.role === 'demo') {
     return json(403, { error: 'The demo space is read-only. Sign in to write reviews.', code: 'DEMO_READONLY' })
+  }
+  return null
+}
+
+// GET reads are rate-limited per identity with a GENEROUS cap; the shared
+// reviews store must not be scanned unbounded times by one client. Returns a
+// 429 Response on limit, else null.
+async function readGuardError(req, user) {
+  const identity = rateLimitIdentity(user, req)
+  if (!identity) return null
+  const limiter = createRateLimiter({
+    store: getStore(RATE_LIMITS_STORE),
+    scope: 'reviews:read',
+    limit: REVIEWS_READ_LIMIT,
+  })
+  const rl = await limiter(identity)
+  if (rl.limited) {
+    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
   }
   return null
 }
@@ -308,6 +331,9 @@ export default async function reviewsHandler(req) {
     if (req.method === 'POST' || req.method === 'DELETE') {
       const guardErr = await writeGuardError(req, user, kind, sourceId)
       if (guardErr) return guardErr
+    } else if (req.method === 'GET') {
+      const readErr = await readGuardError(req, user)
+      if (readErr) return readErr
     }
 
     const ctx = { user, kind, sourceId, id, body }

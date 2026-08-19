@@ -235,6 +235,7 @@ describe('error mapping', () => {
     ['SERVER_NO_TOKEN', 500],
     ['BAD_TOKEN', 502],
     ['RATE_LIMIT', 429],
+    ['PROVIDER_RATE_LIMIT', 429],
     ['HTTP_ERROR', 500],
   ])('surfaces the proxy %s code as err.code', async (code, status) => {
     global.fetch.mockResolvedValue(errorJson(status, { error: 'proxy failure', code }))

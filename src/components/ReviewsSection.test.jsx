@@ -281,7 +281,7 @@ describe('ReviewsSection', () => {
 
   it('maps every known server error code to its i18n message', async () => {
     const cases = [
-      ['RATE_LIMITED', 'Too many reviews right now — wait a moment and try again.'],
+      ['RATE_LIMIT', 'Too many reviews right now — wait a moment and try again.'],
       ['NOT_FOUND', 'That review is gone. Refresh to see the latest.'],
       ['BAD_REQUEST', "Couldn't save your review — check the details."],
     ]

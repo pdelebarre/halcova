@@ -37,7 +37,7 @@ function noTokenError() {
 }
 
 // Mirror the collection/reviews/lookup clients: surface the server's error
-// message AND its machine-readable `code` (e.g. RATE_LIMITED, INVALID_TYPE,
+// message AND its machine-readable `code` (e.g. RATE_LIMIT, INVALID_TYPE,
 // DEMO_READONLY, MESSAGE_TOO_LONG) so callers can branch on the failure.
 // Every thrown Error carries a `code` — `HTTP_ERROR` when the server didn't
 // provide one. A bodyless 204 (DELETE) resolves to `undefined` rather than

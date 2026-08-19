@@ -18,6 +18,11 @@ import { badRequest, readJsonBody, safeError } from './_shared/security'
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 // Per-identity fixed-window limit for collection reads/writes (T5).
 const COLLECTION_RATE_LIMIT = Number(process.env.RUNOUT_COLLECTION_RATE_LIMIT) || 60
+// SEC-7.4 (#341): WRITE sub-limit (create/update/delete) BELOW the shared read
+// limit. Writes mutate the per-user blob store + counts, so they're the
+// sensitive/costly path; a generous read budget (60/min above) is preserved
+// while writes are capped lower (30/min default).
+const COLLECTION_WRITE_LIMIT = Number(process.env.RUNOUT_COLLECTION_WRITE_RATE_LIMIT) || 30
 
 // The Blobs-backed handler — the pre-Phase-1 behavior, unchanged. Reached when
 // DATABASE_URL is absent, or as the read-through fallback when Postgres errors.
@@ -237,6 +242,20 @@ export default async (req) => {
     const rl = await limiter(identity)
     if (rl.limited) {
       return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+    }
+    // SEC-7.4 (#341): write sub-limit on top of the shared read limit. Only
+    // POST/PUT/DELETE (state-changing) consume this bucket; reads stay at the
+    // higher COLLECTION_RATE_LIMIT.
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+      const writeLimiter = createRateLimiter({
+        store: getStore(RATE_LIMITS_STORE),
+        scope: `collection:${collection}:write`,
+        limit: COLLECTION_WRITE_LIMIT,
+      })
+      const writeRl = await writeLimiter(identity)
+      if (writeRl.limited) {
+        return json(429, { error: 'Too many changes — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(writeRl.retryAfter) })
+      }
     }
   }
 

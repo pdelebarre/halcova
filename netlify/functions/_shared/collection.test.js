@@ -466,6 +466,36 @@ describe('collection rate limiting (T5)', () => {
     expect(Number(res.headers.get('Retry-After'))).toBeGreaterThanOrEqual(1)
   })
 
+  it('429s a WRITE (POST) once the per-identity write sub-limit is exhausted (SEC-7.4)', async () => {
+    seedMember()
+    collectionStore([])
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    // Pre-fill the WRITE bucket at its limit in the current window. Reads use a
+    // different scope, so a write is throttled even though reads are open.
+    rlStore.data.set('rl:collection:records:write:u1', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 30 })
+
+    const res = await call('POST', '?collection=records', {
+      artist: 'Radiohead', title: 'OK Computer', format: 'LP',
+    })
+    expect(res.status).toBe(429)
+    const body = await res.json()
+    expect(body.code).toBe('RATE_LIMIT')
+    expect(Number(res.headers.get('Retry-After'))).toBeGreaterThanOrEqual(1)
+  })
+
+  it('reads are NOT throttled by the write sub-limit (separate buckets) (SEC-7.4)', async () => {
+    seedMember()
+    collectionStore([{ id: 'a' }])
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    // Write bucket exhausted; the read bucket is untouched.
+    rlStore.data.set('rl:collection:records:write:u1', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 30 })
+
+    const res = await call('GET', '?collection=records')
+    expect(res.status).toBe(200)
+  })
+
   it('still rejects a write with 403 DEMO_READONLY before touching the store', async () => {
     // The demo identity is a CONSTANT (see _shared/auth.js) — authorize()
     // resolves it before any user-store lookup, so no identity seeding is

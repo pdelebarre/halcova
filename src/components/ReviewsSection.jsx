@@ -20,7 +20,8 @@ const STAR_MAX = 5
 // message or a generic line — never a stack trace.
 const ERROR_KEYS = {
   PLAN_FORBIDDEN: 'reviews.error.PLAN_FORBIDDEN',
-  RATE_LIMITED: 'reviews.error.RATE_LIMITED',
+  // SEC-7.4 (#341): the server 429 code is now RATE_LIMIT (was RATE_LIMITED).
+  RATE_LIMIT: 'reviews.error.RATE_LIMITED',
   NOT_FOUND: 'reviews.error.NOT_FOUND',
   BAD_REQUEST: 'reviews.error.BAD_REQUEST',
 }

@@ -14,10 +14,11 @@
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { enforce } from './_shared/policy'
-import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { createRateLimiter, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
 import { json, safeError } from './_shared/security'
+import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
 
@@ -57,6 +58,13 @@ const TTL_MS = {
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 const BOOKS_USER_LIMIT = Number(process.env.RUNOUT_BOOKS_RATE_LIMIT) || 60
 const BOOKS_OVERALL_LIMIT = Number(process.env.RUNOUT_BOOKS_OVERALL_RATE_LIMIT) || 300
+// SEC-7.4 (#341): the cover action is PUBLIC (unauthenticated — loaded by
+// <img> tags), so it gets its own per-IP limiter enforced BEFORE handleCover.
+// Keyed on clientIp (Netlify x-nf-client-connection-ip, never spoofable XFF)
+// so one source can't hammer the image proxy / upstream CDNs. A cover_burst
+// per-IP anomaly fires when a single IP crosses a flood threshold.
+const COVER_IP_LIMIT = Number(process.env.RUNOUT_COVER_IP_RATE_LIMIT) || 60
+const COVER_BURST_THRESHOLD = Number(process.env.RUNOUT_COVER_BURST_THRESHOLD) || 20
 
 // Blob keys are character/length restricted, and free-text user input can't be
 // trusted to stay inside them — hash `q` and `detail` into a fixed-size hex
@@ -186,7 +194,15 @@ async function lookup(lookupSpec, ttlMs, identity) {
     // function logs instead of surfacing as an opaque HTTP_ERROR.
     console.warn(`[books] Google responded ${res.status}${res.headers?.get('location') ? ` (location: ${res.headers.get('location')})` : ''} for ${lookupSpec.cacheKey} (key=${GOOGLE_API_KEY ? 'set' : 'MISSING'})`)
     if (res.status === 429) {
-      return { error: json(429, { error: 'Google Books rate limit hit.', code: 'RATE_LIMIT' }) }
+      // SEC-7.4 (#341): upstream provider 429 — surface a DISTINCT
+      // `PROVIDER_RATE_LIMIT` code (server-side only) and pass through
+      // Retry-After, preferring the upstream's own value when present, else our
+      // fixed-window retry hint. `RATE_LIMIT` stays reserved for OUR throttling.
+      const upstreamRetry = res.headers?.get?.('retry-after')
+      const retryAfter = (upstreamRetry && Number(upstreamRetry) > 0)
+        ? String(upstreamRetry)
+        : String(retryAfterSeconds())
+      return { error: json(429, { error: 'Google Books rate limit hit.', code: 'PROVIDER_RATE_LIMIT' }, { 'Retry-After': retryAfter }) }
     }
     return { error: json(502, { error: 'Google Books request failed.', code: 'HTTP_ERROR' }) }
   }
@@ -217,23 +233,35 @@ export default async (req) => {
     // Authorization header — so this action is deliberately PUBLIC (T6). It is
     // safe because handleCover only ever fetches small images from an explicit
     // host allowlist (https-only, size-capped). Every other action stays
-    // authenticated below.
+    // authenticated below. SEC-7.4 (#341): the public cover path is per-IP
+    // rate-limited BEFORE handleCover so a flood can never reach the upstream.
     if (action === 'cover') {
       if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
+      const coverIp = clientIp(req)
+      if (coverIp) {
+        const coverLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'cover:ip', limit: COVER_IP_LIMIT })
+        const rl = await coverLimiter(coverIp)
+        if (rl.limited) {
+          // Abuse signal: a cover flood from one IP (NIT M5 — audit a hashed
+          // scope, never the raw address).
+          await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:cover:ip:${coverIp}`, { threshold: COVER_BURST_THRESHOLD, signal: 'cover_burst', scope: anomalyScope('anom:cover:ip', coverIp) })
+          return json(429, { error: 'Too many cover requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+        }
+      }
+      // PUBLIC cover — always an unauthenticated handleCover; never flows into
+      // the authenticated lookup path below (which needs `user`).
       return handleCover(url.searchParams, getStore(CACHE_STORE))
     }
 
     const { user, error } = await enforce(req, 'lookup:read')
     if (error) return error
 
-    if (req.method !== 'GET') return json(405, { error: 'Method not allowed' })
-
-    const lookupSpec = buildLookup(action, url.searchParams)
-    if (!lookupSpec) return json(400, { error: 'Unknown action.' })
-
     // Members/owner key provider limits by user id; the shared demo identity is
     // keyed by client IP so one demo visitor can't throttle every other.
     const identity = rateLimitIdentity(user, req)
+
+    const lookupSpec = buildLookup(action, url.searchParams)
+    if (!lookupSpec) return json(400, { error: 'Unknown action.' })
 
     const result = await lookup(lookupSpec, TTL_MS[action], identity)
     if (result.error) return result.error

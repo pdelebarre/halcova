@@ -48,6 +48,16 @@ function coverReq(fnPath, url) {
   }
 }
 
+// A cover request carrying a real client IP header (x-nf-client-connection-ip)
+// — the per-IP cover limiter only engages when an IP is present.
+function coverReqFrom(fnPath, url, ip) {
+  return {
+    method: 'GET',
+    url: `http://localhost${fnPath}?action=cover&url=${encodeURIComponent(url)}`,
+    headers: { get: (k) => (String(k).toLowerCase() === 'x-nf-client-connection-ip' ? ip : null) },
+  }
+}
+
 function imageResponse(contentType = 'image/jpeg', body = IMG) {
   return {
     ok: true,
@@ -224,3 +234,41 @@ describe('cover action — public proxied image (T6)', () => {
     expect(global.fetch.mock.calls.some(([url]) => url === target)).toBe(false)
   })
 })
+
+// SEC-7.4 (#341) — the PUBLIC cover action is per-IP rate-limited BEFORE
+// handleCover. The default COVER_IP_LIMIT is 60/min; the 61st request from the
+// same IP is a 429 RATE_LIMIT + Retry-After and never reaches the upstream.
+describe('cover action — per-IP rate limit (SEC-7.4)', () => {
+  const url = 'https://i.discogs.com/hash/cover-1.jpeg'
+  const IP = '203.0.113.55'
+
+  it('is keyed on x-nf-client-connection-ip and throttles at 429 without an upstream fetch', async () => {
+    global.fetch.mockResolvedValue(imageResponse('image/jpeg'))
+
+    // Drive the whole default 60/min window from one IP. Cover is cached by URL,
+    // so all 60 identical requests serve from the cache after the first fetch —
+    // they are allowed through the limiter regardless.
+    for (let i = 0; i < 60; i += 1) {
+      expect((await discogsHandler(coverReqFrom(DISC, url, IP))).status).toBe(200)
+    }
+    // The 61st from the SAME IP is throttled — and never touches the upstream
+    // (enforced BEFORE handleCover, so it adds no fetch beyond the cached one).
+    const limited = await discogsHandler(coverReqFrom(DISC, url, IP))
+    expect(limited.status).toBe(429)
+    expect((await limited.json()).code).toBe('RATE_LIMIT')
+    expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThan(0)
+    // Only the FIRST cover request fetched upstream (handleCover caches); the
+    // other 59 allowed requests served from cache, and the 429 added nothing.
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('a different IP is not throttled by another IP’s exhaustion', async () => {
+    global.fetch.mockResolvedValue(imageResponse('image/jpeg'))
+    for (let i = 0; i < 60; i += 1) {
+      expect((await booksHandler(coverReqFrom(BOOKS, url, IP))).status).toBe(200)
+    }
+    // A second IP starts a fresh budget.
+    expect((await booksHandler(coverReqFrom(BOOKS, url, '198.51.100.9'))).status).toBe(200)
+  })
+})
+

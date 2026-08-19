@@ -20,6 +20,7 @@ import { createHmac } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../billing'
 import { findUserByStripeSession, findUserByStripeSubscription, getUser, listRequests, listUsers, saveRequest, saveUser } from './users'
+import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
@@ -61,6 +62,23 @@ function req(rawBody, signature) {
   return {
     method: 'POST',
     headers: { get: (name) => (String(name).toLowerCase() === 'stripe-signature' ? signature : '') },
+    text: async () => rawBody,
+    json: async () => JSON.parse(rawBody),
+  }
+}
+
+// A mock request carrying an explicit client IP (for the invalid-sig 429 test).
+function reqFromIp(rawBody, signature, ip) {
+  return {
+    method: 'POST',
+    headers: {
+      get: (name) => {
+        const key = String(name).toLowerCase()
+        if (key === 'stripe-signature') return signature
+        if (key === 'x-nf-client-connection-ip') return ip
+        return ''
+      },
+    },
     text: async () => rawBody,
     json: async () => JSON.parse(rawBody),
   }
@@ -114,6 +132,25 @@ describe('webhook authentication', () => {
     expect(await res.json()).toEqual({ error: 'Invalid signature.' })
     // Nothing was materialized.
     expect(await listUsers()).toHaveLength(0)
+  })
+
+  it('hard-throttles invalid-signature bursts per IP with 429 RATE_LIMIT (SEC-7.4)', async () => {
+    const rawBody = JSON.stringify({ type: 'checkout.session.completed' })
+    const ip = '203.0.113.88'
+    // Pre-fill the per-IP invalid-sig counter at the (default 20) limit.
+    stores['runout-rate-limits'] = createStore()
+    stores['runout-rate-limits'].data.set(
+      `rl:webhook:invalidsig:ip:${ip}`,
+      { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 20 },
+    )
+
+    const res = await handler(reqFromIp(rawBody, 't=123,v1=deadbeef', ip))
+    expect(res.status).toBe(429)
+    expect((await res.json()).code).toBe('RATE_LIMIT')
+    expect(Number(res.headers.get('Retry-After'))).toBeGreaterThan(0)
+    // A different IP is still just a 400 (its own budget untouched).
+    const other = await handler(reqFromIp(rawBody, 't=123,v1=deadbeef', '198.51.100.9'))
+    expect(other.status).toBe(400)
   })
 
   it('rejects a request signed with a different webhook secret', async () => {

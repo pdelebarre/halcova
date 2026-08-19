@@ -109,14 +109,14 @@ describe('feedback API', () => {
     expect(init.headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`)
   })
 
-  it('surfaces a server-provided error message and its code (429 RATE_LIMITED)', async () => {
+  it('surfaces a server-provided error message and its code (429 RATE_LIMIT)', async () => {
     global.fetch.mockResolvedValue(errorJson(429, {
       error: 'Too many submissions — try again later.',
-      code: 'RATE_LIMITED',
+      code: 'RATE_LIMIT',
     }))
     await expect(feedback.submitFeedback({ message: 'hi' })).rejects.toMatchObject({
       message: 'Too many submissions — try again later.',
-      code: 'RATE_LIMITED',
+      code: 'RATE_LIMIT',
     })
   })
 

@@ -12,6 +12,10 @@ const FN_BASE = '/.netlify/functions/books'
 
 const ERROR_MESSAGES = {
   RATE_LIMIT: 'Google Books rate limit hit — wait a moment and try again.',
+  // SEC-7.4 (#341): upstream-provider 429 vs our own 429. Both are handled
+  // gracefully; PROVIDER_RATE_LIMIT copy tells the user the lookup service is
+  // temporarily exhausted rather than something they did.
+  PROVIDER_RATE_LIMIT: 'Google Books is temporarily rate-limited — try again in a moment.',
   HTTP_ERROR: 'Google Books request failed.',
 }
 

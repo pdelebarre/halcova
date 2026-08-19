@@ -11,6 +11,8 @@ const ERROR_MESSAGES = {
   SERVER_NO_TOKEN: "Lookups aren't configured yet — tell the owner to set the Discogs token.",
   BAD_TOKEN: 'Discogs token rejected.',
   RATE_LIMIT: 'Discogs rate limit hit — wait a moment and try again.',
+  // SEC-7.4 (#341): upstream-provider 429 vs our own 429.
+  PROVIDER_RATE_LIMIT: 'Discogs is temporarily rate-limited — try again in a moment.',
   HTTP_ERROR: 'Discogs request failed.',
 }
 
