@@ -15,6 +15,7 @@ import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { extractSearchQuery } from './utils/ocrText'
 import { itemInBin } from './utils/browse'
+import { sanitizeItemForCreate } from './utils/sanitizeItem'
 import { track } from './utils/track'
 import { SAMPLE_RECORD, SAMPLE_BOOK } from './utils/sample'
 import { t, getLocale } from './i18n'
@@ -433,7 +434,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       showToast(copy.trySampleNote || t('catalog.trySampleNote'), 'add')
       return
     }
-    const payload = { ...candidate, wishlist: true }
+    const payload = sanitizeItemForCreate({ ...candidate, wishlist: true })
     delete payload.id
     delete payload.dateAdded
     delete payload.notes
@@ -689,9 +690,11 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       openPaywall('cap')
       return
     }
-    // Strip anything carried over from an already-owned item (id, dateAdded,
-    // notes) so "Add anyway" creates a genuinely new entry, not a stale clone.
-    const payload = { ...candidate }
+    // Normalize year/pageCount to the server's integer contract (lookup,
+    // manual and legacy candidates can carry strings) and strip anything
+    // carried over from an already-owned item (id, dateAdded, notes) so
+    // "Add anyway" creates a genuinely new entry, not a stale clone.
+    const payload = sanitizeItemForCreate(candidate)
     delete payload.id
     delete payload.dateAdded
     delete payload.notes

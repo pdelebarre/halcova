@@ -51,7 +51,7 @@ describe('searchByBarcode', () => {
     expect(results[0]).toMatchObject({
       googleBooksId: 'vol1',
       title: 'Ursula K. Le Guin - A Wizard of Earthsea',
-      year: '1968',
+      year: 1968,
       label: 'Parnassus Press',
       isbn: '9780140349434',
       barcode: '9780140349434',
@@ -106,9 +106,28 @@ describe('searchByBarcode', () => {
     const results = await books.searchByBarcode('123')
     expect(results[0]).toMatchObject({
       title: 'Solo Title',
-      year: '2020',
+      year: 2020,
       isbn: '123',
     })
+  })
+
+  it('omits year and pageCount when the volume has none — never empty strings', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-noyr', volumeInfo: { title: 'No Year', authors: ['A. Author'] } }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0].year).toBeUndefined()
+    expect(results[0].pageCount).toBeUndefined()
+  })
+
+  it('drops a year outside 1000–2100 (non-integer or out of range)', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol-bad-yr', volumeInfo: { title: 'Old', publishedDate: '0999-01-01' } }],
+    }))
+
+    const results = await books.searchByBarcode('123')
+    expect(results[0].year).toBeUndefined()
   })
 
   it('maps a missing items array to an empty list', async () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as books from '../api/books'
 import { t } from '../i18n'
+import { sanitizeItemForCreate } from '../utils/sanitizeItem'
 import MatchPicker from './MatchPicker'
 import './ManualAddModal.css'
 
@@ -38,7 +39,7 @@ export default function BookManualAddModal({ onPick, onClose, copy = {} }) {
       setTitleError(copy.manualTitleRequired || t('add.titleRequired'))
       return
     }
-    onPick({
+    onPick(sanitizeItemForCreate({
       title: form.author ? `${form.author} - ${form.title}` : form.title,
       year: form.year,
       label: form.publisher,
@@ -56,7 +57,7 @@ export default function BookManualAddModal({ onPick, onClose, copy = {} }) {
       barcode: '',
       description: '',
       pageCount: '',
-    })
+    }))
   }
 
   if (mode === 'picking') {
