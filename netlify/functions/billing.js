@@ -36,8 +36,8 @@ import { applyEntitlement, materializeCheckoutSession } from './_shared/entitlem
 import { generateAccessCode } from './_shared/auth'
 import { json } from './_shared/security'
 import { logAudit, safeLog } from './_shared/audit'
-import { recordAnomaly } from './_shared/anomaly'
-import { createRateLimiter, clientIp } from './_shared/rate-limit'
+import { anomalyScope, recordAnomaly } from './_shared/anomaly'
+import { clientIp, rateLimitGuard } from './_shared/rate-limit'
 
 const RATE_LIMITS_STORE = 'runout-rate-limits'
 
@@ -140,13 +140,19 @@ export default async (req) => {
     // event source that keeps hammering gets a deterministic 429 + Retry-After.
     // Signatures are verified BEFORE this limiter key is touched so a flood can't
     // push work past the HMAC check (and the limiter only counts REJECTED sigs).
+    // SEC-7.4.x (#383): routed through rateLimitGuard; per-IP limiter gets an
+    // anonymous burstScope (the raw IP never becomes a burst scope).
     const ip = clientIp(req)
     if (ip) {
-      const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'webhook:invalidsig:ip', limit: WEBHOOK_INVALID_SIG_IP_LIMIT })
-      const rl = await limiter(ip)
-      if (rl.limited) {
-        return json(429, { error: 'Too many invalid webhook signatures.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-      }
+      const rl = await rateLimitGuard({
+        store: getStore(RATE_LIMITS_STORE),
+        scope: 'webhook:invalidsig:ip',
+        limit: WEBHOOK_INVALID_SIG_IP_LIMIT,
+        identity: ip,
+        anomalyStore: getStore(RATE_LIMITS_STORE),
+        burstScope: anomalyScope('rlx:webhook:invalidsig:ip', ip),
+      })
+      if (rl) return rl
     }
     return json(400, { error: 'Invalid signature.' })
   }

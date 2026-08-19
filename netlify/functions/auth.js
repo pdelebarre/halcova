@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { ADMIN_KEY, DEMO_USER, OWNER_ID, bearer, generateAccessCode, isDemoCode, publicUser } from './_shared/auth'
 import { normalizeCode } from './_shared/codes'
-import { createRateLimiter, clientIp } from './_shared/rate-limit'
+import { clientIp, rateLimitGuard } from './_shared/rate-limit'
 import { consumeMagicLink, isMagicLinkConfigured, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
 import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
 import { enforce } from './_shared/policy'
@@ -109,12 +109,17 @@ async function handleRequest(body) {
   if (!email) return json(400, { error: 'Add an email so the admin can reach you.' })
 
   // Anti-spam (T5): a burst of signup requests from one email can't flood the
-  // request store (the admin panel lists them all).
-  const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:request', limit: REQUEST_LIMIT })
-  const rl = await limiter(String(email).trim().toLowerCase())
-  if (rl.limited) {
-    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-  }
+  // request store (the admin panel lists them all). SEC-7.4.x (#383): routed
+  // through rateLimitGuard so a 429 emits `rate_limit.served` + the exhaust
+  // burst signal (user-keyed scope, anonymous).
+  const rl = await rateLimitGuard({
+    store: getStore(RATE_LIMITS_STORE),
+    scope: 'auth:request',
+    limit: REQUEST_LIMIT,
+    identity: String(email).trim().toLowerCase(),
+    anomalyStore: getStore(RATE_LIMITS_STORE),
+  })
+  if (rl) return rl
 
   const existing = await findPendingRequestByEmail(email)
   if (existing) {
@@ -166,18 +171,31 @@ async function handleLogin(body, req) {
 
   // Brute-force / runaway protection (T5). Per-IP applies to every code
   // (including the public demo code); per-code throttles a single account.
+  // SEC-7.4.x (#383): routed through rateLimitGuard so each 429 emits
+  // `rate_limit.served` + the exhaust burst signal. The per-IP limiter keys
+  // on the client IP, so its burstScope is an anonymous anomalyScope hash —
+  // the raw IP never becomes a burst scope.
   const ip = clientIp(req)
   if (ip) {
-    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:login:ip', limit: LOGIN_IP_LIMIT })(ip)
-    if (byIp.limited) {
-      return json(429, { error: 'Too many attempts — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byIp.retryAfter) })
-    }
+    const byIp = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'auth:login:ip',
+      limit: LOGIN_IP_LIMIT,
+      identity: ip,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope: anomalyScope('rlx:auth:login:ip', ip),
+    })
+    if (byIp) return byIp
   }
   if (!isDemoCode(code)) {
-    const byCode = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:login:code', limit: LOGIN_CODE_LIMIT })(normalizeCode(code))
-    if (byCode.limited) {
-      return json(429, { error: 'Too many attempts — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byCode.retryAfter) })
-    }
+    const byCode = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'auth:login:code',
+      limit: LOGIN_CODE_LIMIT,
+      identity: normalizeCode(code),
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+    })
+    if (byCode) return byCode
   }
 
   const user = await profileForCode(code)
@@ -212,11 +230,15 @@ async function handleMe(req) {
   if (!token) return json(401, { error: 'Not signed in.' })
 
   // Session-validation is called on app load; a runaway client can't spam it.
-  const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:me', limit: ME_LIMIT })
-  const rl = await limiter(token)
-  if (rl.limited) {
-    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-  }
+  // SEC-7.4.x (#383): routed through rateLimitGuard for abuse signals.
+  const rl = await rateLimitGuard({
+    store: getStore(RATE_LIMITS_STORE),
+    scope: 'auth:me',
+    limit: ME_LIMIT,
+    identity: token,
+    anomalyStore: getStore(RATE_LIMITS_STORE),
+  })
+  if (rl) return rl
 
   // The Bearer is now a session token, not an access code — a live session
   // resolves to the user (disabled accounts are rejected here too, SEC-1.9).
@@ -238,12 +260,16 @@ async function handleLogout(req) {
   const token = bearer(req)
   if (!token) return json(400, { error: 'Not signed in.' })
   // SEC-7.4 (#341): per-token logout limiter — bounds a runaway client's logout
-  // churn against a single session token.
-  const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:logout', limit: LOGOUT_LIMIT })
-  const rl = await limiter(token)
-  if (rl.limited) {
-    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-  }
+  // churn against a single session token. SEC-7.4.x (#383): routed through
+  // rateLimitGuard for abuse signals.
+  const rl = await rateLimitGuard({
+    store: getStore(RATE_LIMITS_STORE),
+    scope: 'auth:logout',
+    limit: LOGOUT_LIMIT,
+    identity: token,
+    anomalyStore: getStore(RATE_LIMITS_STORE),
+  })
+  if (rl) return rl
   await revokeSession(token)
   logAudit('auth.logout', {})
   return json(200, { ok: true })
@@ -263,13 +289,19 @@ async function handleLogoutAll(req) {
   if (resolved.error) return resolved.error
   // SEC-7.4 (#341): logoutAll revokes EVERY session — a costly, irreversible
   // action — so it is throttled per-IP to bound a flood from one source.
+  // SEC-7.4.x (#383): routed through rateLimitGuard; per-IP limiter gets an
+  // anonymous burstScope (the raw IP never becomes a burst scope).
   const ip = clientIp(req)
   if (ip) {
-    const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:logoutAll:ip', limit: LOGOUT_ALL_IP_LIMIT })
-    const rl = await limiter(ip)
-    if (rl.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-    }
+    const rl = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'auth:logoutAll:ip',
+      limit: LOGOUT_ALL_IP_LIMIT,
+      identity: ip,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope: anomalyScope('rlx:auth:logoutAll:ip', ip),
+    })
+    if (rl) return rl
   }
   await revokeAllForUser(resolved.user.id)
   logAudit('auth.logout_all', { userId: resolved.user.id })
@@ -291,18 +323,28 @@ async function handleRequestMagicLink(body, req) {
   const normEmail = email.toLowerCase()
 
   // Anti-spam (T5): per-IP bounds a flood of links from one source; per-email
-  // bounds a single inbox being hammered.
+  // bounds a single inbox being hammered. SEC-7.4.x (#383): routed through
+  // rateLimitGuard; per-IP limiter gets an anonymous burstScope.
   const ip = clientIp(req)
   if (ip) {
-    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:magiclink:ip', limit: MAGIC_LINK_IP_LIMIT })(ip)
-    if (byIp.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byIp.retryAfter) })
-    }
+    const byIp = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'auth:magiclink:ip',
+      limit: MAGIC_LINK_IP_LIMIT,
+      identity: ip,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope: anomalyScope('rlx:auth:magiclink:ip', ip),
+    })
+    if (byIp) return byIp
   }
-  const byEmail = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:magiclink:email', limit: MAGIC_LINK_EMAIL_LIMIT })(normEmail)
-  if (byEmail.limited) {
-    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byEmail.retryAfter) })
-  }
+  const byEmail = await rateLimitGuard({
+    store: getStore(RATE_LIMITS_STORE),
+    scope: 'auth:magiclink:email',
+    limit: MAGIC_LINK_EMAIL_LIMIT,
+    identity: normEmail,
+    anomalyStore: getStore(RATE_LIMITS_STORE),
+  })
+  if (byEmail) return byEmail
 
   // M3 (S8, #54): FAIL CLOSED. In production the mail key is REQUIRED — check
   // BEFORE issuing a token or recording a request, so a misconfigured prod can
@@ -353,12 +395,19 @@ async function handleVerifyMagicLink(body, req) {
   // SEC-1.7 (#182): rate-limit the VERIFY path (previously unthrottled) before
   // any token parsing — the real brute-force surface for magic links. Per-IP
   // bounds one source hammering tokens; a legitimate click is 1-2 requests.
+  // SEC-7.4.x (#383): routed through rateLimitGuard; per-IP limiter gets an
+  // anonymous burstScope.
   const ip = clientIp(req)
   if (ip) {
-    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'auth:magiclink:verify:ip', limit: MAGIC_LINK_VERIFY_IP_LIMIT })(ip)
-    if (byIp.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(byIp.retryAfter) })
-    }
+    const byIp = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'auth:magiclink:verify:ip',
+      limit: MAGIC_LINK_VERIFY_IP_LIMIT,
+      identity: ip,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope: anomalyScope('rlx:auth:magiclink:verify:ip', ip),
+    })
+    if (byIp) return byIp
   }
 
   // CWE-287/346 (#184): FAIL CLOSED when no magic-link secret is configured

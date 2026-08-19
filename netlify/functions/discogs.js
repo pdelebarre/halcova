@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto'
 import { getStore } from '@netlify/blobs'
 import { enforce } from './_shared/policy'
-import { createRateLimiter, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
+import { rateLimitGuard, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
 import { json, safeError } from './_shared/security'
@@ -81,16 +81,26 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
 
   // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
   // overall cap protects the shared token/quota even across different users.
+  // SEC-7.4.x (#383): routed through rateLimitGuard so each 429 emits
+  // `rate_limit.served` + the exhaust burst signal.
   if (identity) {
-    const userRl = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'discogs:user', limit: DISCOGS_USER_LIMIT })(identity)
-    if (userRl.limited) {
-      return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(userRl.retryAfter) })
-    }
+    const userRl = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'discogs:user',
+      limit: DISCOGS_USER_LIMIT,
+      identity,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+    })
+    if (userRl) return userRl
   }
-  const overallRl = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'discogs:overall', limit: DISCOGS_OVERALL_LIMIT })('all')
-  if (overallRl.limited) {
-    return json(429, { error: 'Discogs rate limit hit — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(overallRl.retryAfter) })
-  }
+  const overallRl = await rateLimitGuard({
+    store: getStore(RATE_LIMITS_STORE),
+    scope: 'discogs:overall',
+    limit: DISCOGS_OVERALL_LIMIT,
+    identity: 'all',
+    anomalyStore: getStore(RATE_LIMITS_STORE),
+  })
+  if (overallRl) return overallRl
 
   const url = new URL(DISCOGS_BASE + path)
   Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') url.searchParams.set(k, v) })
@@ -160,12 +170,23 @@ export default async (req) => {
   if (action === 'cover') {
     const coverIp = clientIp(req)
     if (coverIp) {
-      const coverLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'cover:ip', limit: COVER_IP_LIMIT })
-      const rl = await coverLimiter(coverIp)
-      if (rl.limited) {
+      // SEC-7.4.x (#383): the public cover limiter routes through rateLimitGuard
+      // so each 429 emits `rate_limit.served` + the exhaust burst signal.
+      // Per-IP, so its burstScope is an anonymous anomalyScope hash (the raw IP
+      // never becomes a burst scope). The distinct `cover_burst` anomaly below
+      // (recordAnomaly) is preserved alongside.
+      const rl = await rateLimitGuard({
+        store: getStore(RATE_LIMITS_STORE),
+        scope: 'cover:ip',
+        limit: COVER_IP_LIMIT,
+        identity: coverIp,
+        anomalyStore: getStore(RATE_LIMITS_STORE),
+        burstScope: anomalyScope('rlx:cover:ip', coverIp),
+      })
+      if (rl) {
         // Abuse signal: a cover flood from one IP (NIT M5 — hashed scope).
         await recordAnomaly(getStore(RATE_LIMITS_STORE), `anom:cover:ip:${coverIp}`, { threshold: COVER_BURST_THRESHOLD, signal: 'cover_burst', scope: anomalyScope('anom:cover:ip', coverIp) })
-        return json(429, { error: 'Too many cover requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
+        return rl
       }
     }
     return handleCover(url.searchParams, getStore(CACHE_STORE))

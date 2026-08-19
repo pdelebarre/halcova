@@ -94,3 +94,19 @@ All limiter 429s are uniform:
 | `webhook_invalid_signature_burst` | forged webhook events | threshold 5 |
 | `rate_limit.served` | every limiter 429 | per-scope only (no identity/IP/cardinality) |
 | `ai.cost_limit` | every AI ceiling hit | ceiling + userId/emailHash |
+
+**`rate_limit.served` and `rate_limit_exhaustion_burst` are emitted by the
+`rateLimitGuard` helper (`netlify/functions/_shared/rate-limit.js`), and every
+production endpoint limiter is routed through it (SEC-7.4.x, #383): `admin`,
+`auth` (login per-IP + per-code, request, me, logout, logoutAll per-IP, magic
+link request per-IP + per-email, magic link verify per-IP), `billing`
+(invalid-signature per-IP), `books` (cover per-IP, user, overall), `collection`
+(read + write), `discogs` (cover per-IP, user, overall), `feedback`,
+`lending`, `payment` (checkout per-IP + per-email, status per-IP), and
+`reviews` (write + distinct, read). Every 429 these serve therefore appears in
+the log as a `rate_limit.served` audit (scope-only, no identity/IP), and a
+sustained flood of 429s on one scope+identity emits a single
+`rate_limit_exhaustion_burst` per window. The exhaust-burst audit `scope` is
+always anonymous — for the per-IP limiters it is a truncated sha256 of the
+client IP (`anomalyScope`), never the raw address. (`ai.cost_limit` remains
+latent: no AI provider is wired yet, per the Section 3 note.)

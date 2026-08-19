@@ -156,14 +156,18 @@ export async function rateLimitGuard({
   return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(limited.retryAfter) })
 }
 
-// Client IP for per-IP limits (the real brute-force defense). Netlify sets
-// `x-nf-client-connection-ip`; x-forwarded-for is the usual fallback. Returns
-// '' when no header is present (callers skip the limit then).
+// Client IP for per-IP limits (the real brute-force defense). SEC-7.4.x
+// (#383, F-2): we key EXCLUSIVELY on Netlify's `x-nf-client-connection-ip` and
+// NO LONGER fall back to `x-forwarded-for`. Assumption: every caller here runs
+// on Netlify Functions, and Netlify reliably sets `x-nf-client-connection-ip`
+// to the real client address (netlify dev sets it too), so XFF — which a
+// client can spoof — is never trusted as an abuse-limit key. Returns '' when
+// the header is absent (callers skip the limit then). If a future caller
+// genuinely needs a forwarded-IP reading (e.g. a non-Netlify proxy), add an
+// explicit separate helper for it — do not reintroduce XFF here.
 export function clientIp(req) {
   const nf = req?.headers?.get?.('x-nf-client-connection-ip')
   if (nf) return nf.trim()
-  const fwd = req?.headers?.get?.('x-forwarded-for')
-  if (fwd) return String(fwd).split(',')[0].trim()
   return ''
 }
 

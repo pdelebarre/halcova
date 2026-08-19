@@ -22,7 +22,7 @@ import { createReviewsRepo } from './_shared/repositories/reviews-repo'
 import { createReviewsBlobStore } from './_shared/reviews-blob'
 import { createFeedbackRepo } from './_shared/repositories/feedback-repo'
 import { createFeedbackBlobStore } from './_shared/feedback-blob'
-import { createRateLimiter, clientIp } from './_shared/rate-limit'
+import { clientIp, rateLimitGuard } from './_shared/rate-limit'
 import { badRequest, json, readJsonBody, safeError } from './_shared/security'
 import { emailHash, logAudit } from './_shared/audit'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
@@ -355,28 +355,41 @@ export default async (req) => {
     // single identity, so keying on the client IP bounds a flood source.
     // SEC-7.4 (#341): also per-ACCOUNT (the resolved admin user id) and an
     // OVERALL cap so one account/IP can't consume the whole budget.
+    // SEC-7.4.x (#383): each limiter routed through rateLimitGuard so 429s emit
+    // `rate_limit.served` + the exhaust burst signal. The per-IP limiter keys
+    // on the client IP, so its burstScope is an anonymous anomalyScope hash.
     if (req.method === 'POST') {
       const ip = clientIp(req)
       if (ip) {
-        const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'admin', limit: ADMIN_LIMIT })
-        const rl = await limiter(ip)
-        if (rl.limited) {
-          return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-        }
+        const rl = await rateLimitGuard({
+          store: getStore(RATE_LIMITS_STORE),
+          scope: 'admin',
+          limit: ADMIN_LIMIT,
+          identity: ip,
+          anomalyStore: getStore(RATE_LIMITS_STORE),
+          burstScope: anomalyScope('rlx:admin', ip),
+        })
+        if (rl) return rl
       }
       // Per-account (keyed on the resolved admin user id) + overall caps.
       if (admin.user?.id) {
-        const acctLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'admin:account', limit: ADMIN_ACCOUNT_LIMIT })
-        const acctRl = await acctLimiter(admin.user.id)
-        if (acctRl.limited) {
-          return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(acctRl.retryAfter) })
-        }
+        const acctRl = await rateLimitGuard({
+          store: getStore(RATE_LIMITS_STORE),
+          scope: 'admin:account',
+          limit: ADMIN_ACCOUNT_LIMIT,
+          identity: admin.user.id,
+          anomalyStore: getStore(RATE_LIMITS_STORE),
+        })
+        if (acctRl) return acctRl
       }
-      const overallLimiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'admin:overall', limit: ADMIN_OVERALL_LIMIT })
-      const overallRl = await overallLimiter('all')
-      if (overallRl.limited) {
-        return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(overallRl.retryAfter) })
-      }
+      const overallRl = await rateLimitGuard({
+        store: getStore(RATE_LIMITS_STORE),
+        scope: 'admin:overall',
+        limit: ADMIN_OVERALL_LIMIT,
+        identity: 'all',
+        anomalyStore: getStore(RATE_LIMITS_STORE),
+      })
+      if (overallRl) return overallRl
     }
 
     if (req.method === 'GET') {
