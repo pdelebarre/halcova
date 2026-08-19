@@ -8,7 +8,7 @@
 //     encodes no client-visible error text on failure.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { config, handler } from './lookup-queue-drain'
+import { config, handler } from '../lookup-queue-drain'
 
 // Avoid touching a real repository; mock getRepository to hand back an in-memory
 // queue + items double so the handler path is exercised in isolation.
@@ -27,9 +27,9 @@ const { q } = vi.hoisted(() => {
 })
 
 const { repoRef } = vi.hoisted(() => ({ repoRef: { current: null } }))
-vi.mock('./_shared/repository', () => ({ getRepository: () => repoRef.current }))
+vi.mock('./repository', () => ({ getRepository: () => repoRef.current }))
 // Stub the fixed-host lookup to avoid any real network in tests.
-vi.mock('./_shared/lookup-fetch', () => ({ lookupFetch: async () => ({ ok: false, status: 503 }) }))
+vi.mock('./lookup-fetch', () => ({ lookupFetch: async () => ({ ok: false, status: 503 }) }))
 
 let calledLookupRows
 
