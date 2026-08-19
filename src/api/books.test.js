@@ -135,6 +135,49 @@ describe('searchByBarcode', () => {
     expect(await books.searchByBarcode('123')).toEqual([])
   })
 
+  it('carries openLibraryId for a fallback hit and keeps googleBooksId null (RES-1.3 T3)', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{
+        // A normalized OpenLibrary fallback hit: no Google id (id null), but the
+        // additive openLibraryId is present; volumeInfo has the Google shape.
+        id: null,
+        openLibraryId: 'OL168469W',
+        selfLink: 'https://openlibrary.org/works/OL168469W',
+        volumeInfo: {
+          title: 'The Handmaid\'s Tale',
+          authors: ['Margaret Atwood'],
+          publisher: 'McClelland and Stewart',
+          publishedDate: '1985',
+          industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780452284234' }],
+          imageLinks: { thumbnail: 'https://covers.openlibrary.org/b/id/8125329-M.jpg' },
+        },
+      }],
+    }))
+
+    const results = await books.searchByBarcode('9780452284234')
+    expect(results).toHaveLength(1)
+    expect(results[0]).toMatchObject({
+      googleBooksId: null, // fallback hit -> googleBooksId stays null
+      openLibraryId: 'OL168469W',
+      barcode: '9780452284234',
+      isbn: '9780452284234',
+    })
+    // The OpenLibrary cover is routed through the books cover proxy.
+    const url = new URL(global.fetch.mock.calls[0][0], 'http://localhost')
+    expect(results[0].coverImage).toBe(
+      `${url.pathname}?action=cover&url=${encodeURIComponent('https://covers.openlibrary.org/b/id/8125329-M.jpg')}`,
+    )
+  })
+
+  it('keeps openLibraryId null on a Google primary hit (additive, absent)', async () => {
+    global.fetch.mockResolvedValue(okJson({
+      items: [{ id: 'vol1', volumeInfo: { title: 'G', authors: ['A. Author'] } }],
+    }))
+    const results = await books.searchByBarcode('123')
+    expect(results[0].openLibraryId).toBeNull()
+    expect(results[0].googleBooksId).toBe('vol1')
+  })
+
   it('surfaces averageRating and ratingsCount when present', async () => {
     global.fetch.mockResolvedValue(okJson({
       items: [{

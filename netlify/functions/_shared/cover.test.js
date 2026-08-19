@@ -20,6 +20,10 @@ describe('isAllowedCoverHost', () => {
     expect(isAllowedCoverHost('coverartarchive.org')).toBe(true)
   })
 
+  it('allows the OpenLibrary cover host (books fallback covers, RES-1.3 T3)', () => {
+    expect(isAllowedCoverHost('covers.openlibrary.org')).toBe(true)
+  })
+
   it('rejects arbitrary hosts — the SSRF guard', () => {
     expect(isAllowedCoverHost('example.com')).toBe(false)
     expect(isAllowedCoverHost('evil.com')).toBe(false)
@@ -28,6 +32,9 @@ describe('isAllowedCoverHost', () => {
     expect(isAllowedCoverHost('')).toBe(false)
     // Subdomains or suffix tricks of coverartarchive are NOT allowed.
     expect(isAllowedCoverHost('coverartarchive.org.evil.com')).toBe(false)
+    // Subdomains or suffix tricks of covers.openlibrary.org are NOT allowed.
+    expect(isAllowedCoverHost('covers.openlibrary.org.evil.com')).toBe(false)
+    expect(isAllowedCoverHost('openlibrary.org')).toBe(false) // only the cover host, not the API
   })
 
   it('matches the Discogs suffix on a dot boundary only', () => {
@@ -47,6 +54,13 @@ describe('isAllowedCoverUrl', () => {
     expect(isAllowedCoverUrl('https://coverartarchive.org/release/b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12/front-250')).toBe(true)
     expect(isAllowedCoverUrl('http://coverartarchive.org/release/x/front-250')).toBe(false)
     expect(isAllowedCoverUrl('https://coverartarchive.org.evil.com/x.jpg')).toBe(false)
+  })
+
+  it('accepts OpenLibrary covers (RES-1.3 T3 #283) but only https + exact host', () => {
+    expect(isAllowedCoverUrl('https://covers.openlibrary.org/b/id/8654919-M.jpg')).toBe(true)
+    expect(isAllowedCoverUrl('http://covers.openlibrary.org/b/id/1-M.jpg')).toBe(false)
+    expect(isAllowedCoverUrl('https://covers.openlibrary.org.evil.com/x.jpg')).toBe(false)
+    expect(isAllowedCoverUrl('https://openlibrary.org/b/id/1-M.jpg')).toBe(false) // API host is not a cover host
   })
 
   it('rejects non-https covers even on an allowed host', () => {

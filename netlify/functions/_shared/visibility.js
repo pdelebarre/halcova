@@ -85,6 +85,9 @@ export const ITEM_PUBLIC_FIELDS = Object.freeze([
   // (RES-1.2 T2, #288) additive fallback id for records — public catalog
   // metadata (C1), same class as discogsId/googleBooksId. MusicBrainz MBID.
   'mbid',
+  // (RES-1.3 T3, #283) additive fallback id for books — public catalog
+  // metadata (C1), same class as googleBooksId/discogsId. OpenLibrary OLID.
+  'openLibraryId',
 ])
 
 // Retained on a non-owner item DTO for parity with #338 (#338 kept them; a

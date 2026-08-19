@@ -204,8 +204,21 @@ describe('cover action — public proxied image (T6)', () => {
     expect(Array.from(bytes)).toEqual(Array.from(IMG))
   })
 
+  it('routes an OpenLibrary cover through the cover proxy (RES-1.3 T3 allowlist)', async () => {
+    global.fetch.mockResolvedValue(imageResponse('image/jpeg'))
+
+    const res = await booksHandler(
+      coverReq(BOOKS, 'https://covers.openlibrary.org/b/isbn/9780452284234-M.jpg'),
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/jpeg')
+    // The upstream fetch went to the exact allowlisted OpenLibrary cover host.
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(global.fetch.mock.calls[0][0]).toBe('https://covers.openlibrary.org/b/isbn/9780452284234-M.jpg')
+  })
+
   it('rejects a books cover from an off-allowlist host via the books function', async () => {
-    const res = await booksHandler(coverReq(BOOKS, 'https://covers.openlibrary.org/b/isbn/123-M.jpg'))
+    const res = await booksHandler(coverReq(BOOKS, 'https://evil.example.com/steal.png'))
     expect(res.status).toBe(400)
     expect(global.fetch).not.toHaveBeenCalled()
   })

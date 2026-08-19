@@ -35,7 +35,10 @@ beforeEach(async () => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
-    text: async () => JSON.stringify({ items: [] }),
+    // Non-empty so the SSRF/host tests exercise the Google PRIMARY path only
+    // (the OpenLibrary fallback wouldn't fire on a healthy non-empty result,
+    // keeping these tests fast and focused on the fixed-Google-host assertion).
+    text: async () => JSON.stringify({ items: [{ id: 'seed-primary' }] }),
     headers: { get: () => 'application/json' },
   })
   TOKEN = await adminSessionToken()
@@ -152,3 +155,123 @@ describe('error-code mapping through the real lookupFetch (T1 handler integratio
     expect(body.code).toBe('HTTP_ERROR')
   })
 })
+
+// RES-1.3 T3 (#283) — OpenLibrary fallback chain through the REAL handler.
+//
+// The OpenLibrary adapter (providers/openlibrary.js) calls the REAL shared T1
+// lookupFetch helper, which in turn uses global.fetch — so we drive the whole
+// chain with a sequenced global.fetch mock: Google primary first, then the
+// OpenLibrary fallback request when it fires. `retry-after: 1` keeps the T1
+// helper's real backoff deterministic (each retry sleeps ~1s instead of jitter).
+describe('OpenLibrary fallback chain (RES-1.3 T3, #283)', () => {
+  function upstream(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (String(name).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify(body),
+    }
+  }
+
+  function callsToHost(host) {
+    return global.fetch.mock.calls
+      .map(([u]) => { try { return new URL(String(u)).hostname } catch { return '' } })
+      .filter((h) => h === host)
+  }
+
+  // A realistic OpenLibrary /api/books jscmd=data ISBN response.
+  const OL_ISBN = {
+    'ISBN:9780452284234': {
+      info_url: 'https://openlibrary.org/books/OL20891788M/x',
+      thumbnail_url: 'https://covers.openlibrary.org/b/id/8125329-M.jpg',
+      details: {
+        title: "The Handmaid's Tale",
+        key: '/books/OL20891788M',
+        authors: [{ name: 'Margaret Atwood' }],
+        publishers: ['Anchor Books'],
+        publish_date: '1998',
+        number_of_pages: 311,
+        covers: [8125329],
+      },
+    },
+  }
+
+  it('Google healthy-empty -> OpenLibrary fallback resolves the ISBN (source/openLibraryId, googleBooksId null)', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(200, { items: [] })) // Google healthy-empty
+      .mockResolvedValueOnce(upstream(200, OL_ISBN))        // OpenLibrary fallback
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body.items)).toBe(true)
+    expect(body.items).toHaveLength(1)
+    const v = body.items[0]
+    // The fallback hit is marked + carries the additive id; googleBooksId null.
+    expect(v.source).toBe('openlibrary')
+    expect(v.openLibraryId).toBe('OL20891788M') // edition OLID for the ISBN endpoint
+    expect(v.id).toBeNull()
+    // The fallback hit normalized into the Google envelope (toBookItem shape).
+    expect(v.volumeInfo.title).toBe("The Handmaid's Tale")
+    expect(v.volumeInfo.imageLinks.thumbnail).toBe('https://covers.openlibrary.org/b/id/8125329-M.jpg')
+    // OpenLibrary WAS contacted (Google was empty).
+    expect(callsToHost('openlibrary.org')).toHaveLength(1)
+  })
+
+  it('Google service error (5xx) -> OpenLibrary fallback fires', async () => {
+    // lookupFetch retries a persistent 5xx across 3 attempts, then books maps
+    // the last 500 to HTTP_ERROR (not a NO_FALLBACK code) -> fallback fires.
+    global.fetch
+      .mockResolvedValueOnce(upstream(500, {}))
+      .mockResolvedValueOnce(upstream(500, {}))
+      .mockResolvedValueOnce(upstream(500, {}))
+      .mockResolvedValueOnce(upstream(200, OL_ISBN))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0].source).toBe('openlibrary')
+    expect(callsToHost('openlibrary.org')).toHaveLength(1)
+  })
+
+  it('Google non-empty -> primary wins, OpenLibrary never contacted', async () => {
+    global.fetch.mockResolvedValue(upstream(200, { items: [{ id: 'g1', volumeInfo: { title: 'Google Hit' } }] }))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.items).toHaveLength(1)
+    expect(body.items[0].id).toBe('g1')
+    expect(callsToHost('openlibrary.org')).toHaveLength(0)
+  })
+
+  it('Google empty + OpenLibrary empty -> primary empty result is preserved', async () => {
+    global.fetch
+      .mockResolvedValueOnce(upstream(200, { items: [] })) // Google healthy-empty
+      .mockResolvedValueOnce(upstream(200, {}))             // OpenLibrary: no ISBN key -> empty
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // Primary empty result preserved, not an error, not a fallback hit.
+    expect(body.items).toEqual([])
+  })
+
+  it('NO_FALLBACK on a provider rate limit — OpenLibrary is never contacted', async () => {
+    global.fetch.mockResolvedValue(upstream(429, {}))
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchText&q=handmaid'))
+    expect(res.status).toBe(429)
+    expect((await res.json()).code).toBe('PROVIDER_RATE_LIMIT')
+    // The rate-limited primary is authoritative — no extra load on the fallback.
+    expect(callsToHost('openlibrary.org')).toHaveLength(0)
+  })
+
+  it('NO_FALLBACK on HTTP-related auth codes is honored by the books chain (additive ids not offered for detail)', async () => {
+    // books has no fallback surface for `detail` at all — only search actions do.
+    global.fetch.mockResolvedValue(upstream(200, { id: 'g1', volumeInfo: { title: 'X' } }))
+    const res = await booksHandler(req('/.netlify/functions/books?action=detail&id=g1'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.id).toBe('g1')
+    // detail is Google-only and must never touch OpenLibrary.
+    expect(callsToHost('openlibrary.org')).toHaveLength(0)
+  })
+})
+

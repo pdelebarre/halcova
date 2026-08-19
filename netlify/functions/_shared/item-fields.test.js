@@ -128,6 +128,27 @@ describe('pickItemFields — Phase A enrichment does not widen the privilege sur
     // An over-length mbid is rejected.
     expect(validateItem({ title: 'A - B', mbid: 'x'.repeat(100) }).error.code).toBe('TOO_LONG')
   })
+
+  it('carries the additive openLibraryId fallback id (RES-1.3 T3 #283) alongside googleBooksId', () => {
+    expect(ITEM_FIELD_ALLOWLIST.has('openLibraryId')).toBe(true)
+    const out = pickItemFields({
+      title: 'Margaret Atwood - The Handmaid\'s Tale',
+      googleBooksId: null, // null for an OpenLibrary fallback hit
+      openLibraryId: 'OL168469W',
+    })
+    expect(out.googleBooksId).toBeNull()
+    expect(out.openLibraryId).toBe('OL168469W')
+  })
+
+  it('validates openLibraryId as an optional string and rejects a non-string', () => {
+    const { item, error } = validateItem({ title: 'A - B', openLibraryId: 'OL168469W' })
+    expect(error).toBeUndefined()
+    expect(item.openLibraryId).toBe('OL168469W')
+    // A numeric openLibraryId is a type error (OLIDs are strings).
+    expect(validateItem({ title: 'A - B', openLibraryId: 123 }).error.code).toBe('TYPE_ERROR')
+    // An over-length openLibraryId is rejected.
+    expect(validateItem({ title: 'A - B', openLibraryId: 'x'.repeat(300) }).error.code).toBe('TOO_LONG')
+  })
 })
 
 describe('validateItem — accepts well-formed Phase A enrichment (FEAT-EPIC-5 #276)', () => {

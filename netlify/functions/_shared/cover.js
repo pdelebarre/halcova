@@ -34,11 +34,15 @@ export const COVER_CACHE_SECONDS = 24 * 60 * 60 // 1 day
 // Cover Art Archive covers emitted by the MusicBrainz fallback provider
 // (RES-1.2 T2, #288) — a single, explicit, https-only host used only by the
 // allowlisted cover-routing path (never passed arbitrary user URLs).
+// covers.openlibrary.org serves the OpenLibrary covers emitted by the
+// OpenLibrary fallback provider (RES-1.3 T3, #283) — same explicit, https-only,
+// exact-host posture.
 const EXTRA_COVER_HOSTS = new Set([
   'books.google.com',
   'images-na.ssl-images-amazon.com',
   'm.media-amazon.com',
   'coverartarchive.org',
+  'covers.openlibrary.org',
 ])
 
 export function isAllowedCoverHost(hostname) {
