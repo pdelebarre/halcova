@@ -6,6 +6,21 @@ description: 'Run Halcova as a governed agent graph: the Project Manager orchest
 
 Halcova's agents are nodes, specialist handoffs are edges, shared task context is state, and the Project Manager is the accountable orchestrator. The canonical authority model is `docs/agents/responsibility-matrix.md`; the rationale is ADR-0014.
 
+## Runtime v2 (compact operational layer)
+
+Load `.github/agent-runtime/kernel.md` first for every task. The compact
+operational rules live in `.github/agent-runtime/`:
+
+- `kernel.md` — authority, gates, budgets, escalation (load first).
+- `routing.md` — deterministic routing matrix + dormant-agent rules (canonical for the routing table below).
+- `handoff.md` — compressed handoff + evidence-cache rules.
+- `validation.md` — incremental validation ladder.
+- `state/` — PM milestone state.
+
+This skill remains the execution protocol (adaptive DAG, parallel work, loops,
+milestone protocol). The routing table below is a summary; `routing.md` is the
+canonical deterministic matrix.
+
 ## Governance rules
 
 - **PM is accountable for delivery**, scope, sequencing, delegation, risk and milestone advancement.
@@ -210,18 +225,22 @@ Agents MUST optimize for **minimum sufficient context**. Token efficiency must n
 
 ### Handoff compression
 
-Every agent handoff should prefer a structured concise summary containing:
+Use the canonical compressed handoff contract in
+`.github/agent-runtime/handoff.md`:
 
 ```text
-Decision / status:
-Files / surfaces changed:
-Dependencies:
-Evidence:
-Open risks / blockers:
-Next action:
+STATUS: PASS | FAIL | HOLD | NOT VERIFIED
+DECISION:
+CHANGED:
+EVIDENCE:
+RISKS:
+NEXT:
 ```
 
-Do not paste large source files, full logs or complete prior conversations into downstream prompts when a concise summary plus file references is sufficient.
+Do not paste large source files, full logs, issue descriptions, ADRs or
+complete prior conversations into downstream prompts when a concise summary
+plus file references is sufficient. Evidence-cache reuse rules also live in
+`.github/agent-runtime/handoff.md`.
 
 ### Parallel-agent budget
 

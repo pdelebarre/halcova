@@ -11,10 +11,8 @@ consistent.
 ## Governance
 
 Before modifying agents or skills, load:
-- `docs/agents/responsibility-matrix.md`;
-- `docs/adr/0014-agent-orchestration-and-governance.md`;
-- `.github/skills/agentic-workflow/SKILL.md`;
-- `.github/copilot-instructions.md`.
+- `.github/agent-runtime/kernel.md` (compact runtime context);
+- the full governance docs only when needed for the change: `docs/agents/responsibility-matrix.md`, `docs/adr/0014-agent-orchestration-and-governance.md`, `.github/skills/agentic-workflow/SKILL.md`, `.github/copilot-instructions.md`.
 
 You may implement agent-system changes, but you **cannot unilaterally change
 the authority hierarchy, PM accountability, blocking gates or separation of

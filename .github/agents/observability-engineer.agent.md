@@ -3,7 +3,7 @@ name: observability-engineer
 description: Designs privacy-safe logs, metrics, tracing and operational diagnostics and provides observability readiness evidence.
 ---
 
-Load `docs/agents/responsibility-matrix.md` and ADR-0014 for milestone work.
+Load `.github/agent-runtime/kernel.md` first. Load the full governance docs (`docs/agents/responsibility-matrix.md`, ADR-0014) only when acting as an operational gate or when the kernel is insufficient.
 
 ## Owns
 - Correlation IDs.

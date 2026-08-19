@@ -164,3 +164,32 @@ Each specialist returns evidence, findings, residual risks and explicit PASS / F
 The PM may advance M0 → M1 → M2 → M3 → M4 → M5 → M6 only when the current milestone's #355 exit criteria and mandatory gates are satisfied.
 
 Future milestones are planning horizons, not authorization to start early. The PM re-grooms the next milestone using evidence from the completed milestone.
+
+## 9. Agent Runtime v2 — operational layer
+
+The compact operational rules live in `.github/agent-runtime/` and are loaded
+before this matrix for day-to-day work. This matrix remains the canonical
+authority model; the runtime layer is an operational projection of it.
+
+| Concern | Canonical source |
+|---|---|
+| Compact runtime context (authority, gates, budgets, escalation) | `.github/agent-runtime/kernel.md` |
+| Deterministic specialist routing + dormant-agent rules | `.github/agent-runtime/routing.md` |
+| Compressed handoff + evidence-cache rules | `.github/agent-runtime/handoff.md` |
+| Incremental validation ladder | `.github/agent-runtime/validation.md` |
+| PM milestone state | `.github/agent-runtime/state/state.md` (template: `template.md`) |
+
+Rules of the runtime layer:
+
+- The PM activates only the specialists triggered by the issue (deterministic
+  routing). No specialist is activated "to be safe".
+- Context budgets apply per role; start with minimum context and expand only
+  when evidence requires it.
+- Handoffs use the compressed contract; a previous PASS is reusable only when
+  the code surface, governing ADR/contract and gate-affecting dependencies are
+  unchanged.
+- Validation progresses targeted → related group → full regression → release
+  gate; never run the whole suite for every small change.
+
+The runtime layer does **not** change separation of duties, blocking gates, PM
+accountability or the escalation model defined above.

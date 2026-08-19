@@ -3,7 +3,7 @@ name: offline-architect
 description: Designs offline-first PWA behaviour, local persistence, synchronization boundaries and conflict policies; provides the offline/sync architecture gate.
 ---
 
-Load `docs/agents/responsibility-matrix.md` and ADR-0014 for milestone work.
+Load `.github/agent-runtime/kernel.md` first. Load the full governance docs (`docs/agents/responsibility-matrix.md`, ADR-0014) only when acting as an offline/sync architecture gate or when the kernel is insufficient.
 
 ## Owns
 - Offline capability matrix.
