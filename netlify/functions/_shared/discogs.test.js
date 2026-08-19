@@ -10,6 +10,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import discogsHandler from '../discogs'
 import { adminSessionToken } from './session-test-helpers'
+import { EMPTY_SENTINEL, writeEmptyCache } from './lookup-cache'
+import { PROVIDER_COOLDOWN_MS, recordProviderDown } from './provider-state'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
@@ -326,5 +328,158 @@ describe('MusicBrainz fallback chain (RES-1.2 T2, #288)', () => {
     const body = await res.json()
     expect(body.code).toBe('SERVER_NO_TOKEN')
     expect(global.fetch).not.toHaveBeenCalled() // neither Discogs nor MusicBrainz
+  })
+})
+
+// RES-1.4 T4 (#291) — negative cache + circuit-breaker cooldown through the REAL
+// discogs handler. The primary Discogs fetch and the MusicBrainz fallback both
+// run against the mocked global.fetch (the providers use the real lookupFetch),
+// and the shared lookup_cache / provider-state stores use the in-memory
+// @netlify/blobs mock (no Postgres here, so the Blob path is exercised).
+describe('RES-1.4 T4 — negative cache + circuit-breaker cooldown (discogs chain)', () => {
+  function upstream(status, body) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (name) => (String(name).toLowerCase() === 'retry-after' ? '1' : 'application/json') },
+      text: async () => JSON.stringify(body),
+    }
+  }
+  function callsToHost(host) {
+    return global.fetch.mock.calls
+      .map(([u]) => { try { return new URL(String(u)).hostname } catch { return '' } })
+      .filter((h) => h === host)
+  }
+  const MBID = 'b7f9f0b2-6a5d-4d24-8f4a-0f0e3c1c9a12'
+  const mbRelease = {
+    id: MBID, title: 'Kind of Blue', date: '1959-08-17', country: 'US',
+    'artist-credit': [{ name: 'Miles Davis', artist: { id: 'a1', name: 'Miles Davis' } }],
+    'label-info': [{ label: { name: 'Columbia' }, 'catalog-number': 'CL 1355' }],
+    media: [{ format: 'CD' }],
+  }
+  function mbUpstream() {
+    return upstream(200, { releases: [mbRelease] })
+  }
+
+  it('a no-result barcode is negative-cached as empty, so a second call reuses the negative cache, skips the primary, and falls through to the fallback', async () => {
+    // First call: Discogs healthy-empty -> negative-cache written, fallback wins.
+    global.fetch
+      .mockResolvedValueOnce(upstream(200, { results: [] }))
+      .mockResolvedValueOnce(mbUpstream())
+    const r1 = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(r1.status).toBe(200)
+    expect((await r1.json()).results[0].source).toBe('musicbrainz')
+    // Only ONE Discogs call happened (the empty one was freshly fetched).
+    expect(callsToHost('api.discogs.com')).toHaveLength(1)
+
+    // The negative-cache sentinel is now in the lookup_cache (Blob store here).
+    const cached = stores['discogs-cache'].data.get('barcode:07464405491')
+    expect(cached.data).toEqual(EMPTY_SENTINEL)
+
+    // Second call: within the empty TTL, Discogs is NEGATIVE-CACHED as empty ->
+    // the primary is SKIPPED (no api.discogs.com call) and we go straight to
+    // the fallback, which wins again.
+    global.fetch.mockClear()
+    global.fetch.mockResolvedValueOnce(mbUpstream())
+    const r2 = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(r2.status).toBe(200)
+    expect((await r2.json()).results[0].source).toBe('musicbrainz')
+    // Discogs was NEVER hit on the second call — only MusicBrainz.
+    expect(callsToHost('api.discogs.com')).toHaveLength(0)
+    expect(callsToHost('musicbrainz.org')).toHaveLength(1)
+  })
+
+  it('the {empty:true} sentinel is NEVER returned to the client as a real result', async () => {
+    // Pre-seed the negative-cache sentinel directly.
+    await writeEmptyCache('discogs', 'barcode:07464405491', 'searchBarcode')
+    // Fallback is empty too -> the chain returns a healthy-empty envelope, NOT
+    // the sentinel payload.
+    global.fetch.mockReset()
+    global.fetch.mockResolvedValueOnce(upstream(200, { releases: [] })) // MusicBrainz empty
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ results: [] }) // never { empty:true }, never a sentinel leak
+    expect(body.empty).toBeUndefined()
+  })
+
+  it('a down provider (5xx) records cooldown, is skipped within the cooldown window, and is retried after', async () => {
+    // First call: Discogs persistent 5xx (3 retryable attempts) -> HTTP_ERROR,
+    // which arms the circuit breaker; fallback also fails -> HTTP_ERROR surfaces.
+    global.fetch.mockResolvedValue(upstream(500, {}))
+    const r1 = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(r1.status).toBe(502)
+    expect((await r1.json()).code).toBe('HTTP_ERROR')
+
+    // Cooldown recorded in the SEPARATE provider-state store (not lookup_cache).
+    const down = stores['runout-provider-state'].data.get('discogs')
+    expect(down).toBeTruthy()
+    expect(down.provider).toBe('discogs')
+    expect(down.cooldownMs).toBe(PROVIDER_COOLDOWN_MS)
+    // And it is NOT in lookup_cache — no outage/cooldown sentinel there.
+    for (const [key, value] of stores['discogs-cache'].data.entries()) {
+      expect(value.data).not.toEqual(EMPTY_SENTINEL)
+      expect(value.data.empty).toBeUndefined()
+    }
+
+    // Second call within the cooldown window: Discogs is SKIPPED (no
+    // api.discogs.com call at all) and we go straight to the fallback.
+    global.fetch.mockClear()
+    global.fetch.mockResolvedValueOnce(mbUpstream())
+    const r2 = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(r2.status).toBe(200)
+    expect((await r2.json()).results[0].source).toBe('musicbrainz')
+    expect(callsToHost('api.discogs.com')).toHaveLength(0)
+    expect(callsToHost('musicbrainz.org')).toHaveLength(1)
+  }, 15000)
+
+  it('after the cooldown window elapses the primary provider is retried', async () => {
+    // Fake timers let us elapse the ~60s cooldown deterministically, then we
+    // restore real timers (the lookup-fetch path sleeps in real time).
+    vi.useFakeTimers({ now: new Date('2026-08-19T12:00:00Z') })
+    try {
+      // Seed a cooldown, then elapse the window.
+      await recordProviderDown(stores['runout-provider-state'], 'discogs')
+      vi.advanceTimersByTime(PROVIDER_COOLDOWN_MS + 1000)
+
+      // Provider recovered -> a normal primary hit succeeds.
+      global.fetch.mockResolvedValueOnce(upstream(200, { results: [{ id: 7, title: 'Miles Davis - Kind of Blue' }] }))
+      const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+      expect(res.status).toBe(200)
+      expect((await res.json()).results[0].id).toBe(7)
+      // api.discogs.com WAS hit again after cooldown.
+      expect(callsToHost('api.discogs.com')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a network failure records cooldown (genuine provider-down) and skips the primary within the window', async () => {
+    global.fetch.mockRejectedValue(new TypeError('Failed to fetch'))
+    const r1 = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(r1.status).toBe(502)
+    expect((await r1.json()).code).toBe('HTTP_ERROR')
+    expect(stores['runout-provider-state'].data.get('discogs')).toBeTruthy()
+
+    // Within the window: Discogs skipped, MusicBrainz fallback consulted.
+    global.fetch.mockClear()
+    global.fetch.mockResolvedValueOnce(mbUpstream())
+    const r2 = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(r2.status).toBe(200)
+    expect(callsToHost('api.discogs.com')).toHaveLength(0)
+    expect(callsToHost('musicbrainz.org')).toHaveLength(1)
+  }, 15000)
+
+  it('a rate limit (PROVIDER_RATE_LIMIT) does NOT record cooldown and does NOT fall back (429 resolution)', async () => {
+    global.fetch.mockResolvedValue(upstream(429, {}))
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchText&q=kind of blue'))
+    expect(res.status).toBe(429)
+    expect((await res.json()).code).toBe('PROVIDER_RATE_LIMIT')
+    // NO cooldown was armed (a rate limit is not a "skipped down provider").
+    expect(stores['runout-provider-state'].data.get('discogs')).toBeFalsy()
+    // And nothing was negative-cached (an error body is never cached).
+    for (const value of stores['discogs-cache'].data.values()) {
+      expect(value.data.empty).toBeUndefined()
+    }
   })
 })

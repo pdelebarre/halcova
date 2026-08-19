@@ -8,8 +8,9 @@ import { getStore } from '@netlify/blobs'
 import { enforce } from './_shared/policy'
 import { rateLimitGuard, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
-import { readCache, writeCache } from './_shared/lookup-cache'
+import { readCache, writeCache, isNegativeCached, writeEmptyCache } from './_shared/lookup-cache'
 import { lookupFetch } from './_shared/lookup-fetch'
+import { readCooldownMs, recordProviderDown, PROVIDER_STATE_STORE } from './_shared/provider-state'
 import { json, safeError } from './_shared/security'
 import { musicbrainz } from './_shared/providers/musicbrainz'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
@@ -79,7 +80,16 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
   // the legacy Blobs cache otherwise / on miss / on error. A failed read is a
   // miss — never fail a valid lookup.
   const cached = await readCache('discogs', key, ttl)
-  if (cached) return json(200, cached)
+  if (cached) {
+    // RES-1.4 T4 (#291): a negative-cache sentinel ({empty:true}) is "no match
+    // here", NOT a real result and NOT a failure. It must never be returned to
+    // the client as a real payload — surface a HEALTHY-EMPTY envelope so the
+    // lookup chain falls through to the fallback without spending another
+    // provider call. (The chain normally skips the primary before we reach
+    // here; this is defense-in-depth against a mixed store.)
+    if (cached.empty === true) return json(200, { results: [] })
+    return json(200, cached)
+  }
 
   // Rate-limit the cache-MISS (provider) path (T5): per user and overall. The
   // overall cap protects the shared token/quota even across different users.
@@ -169,7 +179,7 @@ const NO_FALLBACK_CODES = new Set([
   'RATE_LIMIT',
 ])
 
-// Primary-then-fallback lookup chain (RES-1.2 T2, #288).
+// Primary-then-fallback lookup chain (RES-1.2 T2, #288; RES-1.4 T4, #291).
 //
 // Discogs is the PRIMARY records provider and stays first. When the primary
 // call ERRORS (a genuine service outage — 5xx / network / timeout, i.e. NOT an
@@ -183,10 +193,62 @@ const NO_FALLBACK_CODES = new Set([
 //   - Both empty/errored  -> return the PRIMARY's original response verbatim,
 //     so today's error codes / empty-search behavior are preserved exactly.
 //
+// RES-1.4 T4 (#291) — negative cache + circuit-breaker cooldown. Two
+// SKIP-PRIMARY signals are checked BEFORE any provider call:
+//   - Circuit-breaker cooldown (provider-state store): when Discogs was
+//     recently recorded down (genuine 5xx/network outage), we skip it for
+//     ~60s and go straight to the fallback, then retry after the cooldown.
+//   - Negative cache: when this specific key is negative-cached as
+//     HEALTHY-EMPTY ({empty:true} sentinel), we skip the empty provider call
+//     and fall through to the fallback — "no match HERE" is not a failure.
+// In BOTH skip cases the fallback's first non-empty result wins; if the
+// fallback is also empty/errored we return what the primary would have
+// produced: healthy-empty (`{ results: [] }`) for a negative-cached key (the
+// primary WOULD have been healthy-empty), or HTTP_ERROR for a cooldown (a
+// provider in cooldown is down).
+//
+// 429 / NO_FALLBACK tension (explicitly resolved here, #291): NO_FALLBACK_CODES
+// (BAD_TOKEN / SERVER_NO_TOKEN / PROVIDER_RATE_LIMIT / RATE_LIMIT) still
+// short-circuit WITHOUT falling back AND WITHOUT recording cooldown — an
+// operator/token problem or an upstream/OUR rate limit is NOT a "skipped down
+// provider", so it neither spends the fallback provider nor arms the breaker
+// (which would otherwise mask a token/config fix for 60s and pile load onto
+// MusicBrainz while Discogs is already throttled). Only a genuine provider-down
+// outcome (5xx / network / timeout -> HTTP_ERROR by a non-NO_FALLBACK path)
+// calls recordProviderDown. Provider-outage state lives in the SEPARATE
+// provider-state store, NEVER in the 30d lookup_cache (no poisoning risk).
+//
 // `primary` returns a `Response` (from fetchDiscogs -> json(...)). We clone it
 // so reading its JSON to decide on empty-results never consumes the response we
 // might return unchanged.
-async function lookupWithFallback(primary, fallback) {
+async function lookupWithFallback({
+  providerStateStore,
+  provider,
+  key,
+  action,
+  primary,
+  fallback,
+}) {
+  // Skip-primary signal #1: circuit breaker (down provider in cooldown).
+  const cooldownMs = await readCooldownMs(providerStateStore, provider)
+  // Skip-primary signal #2: this key is negative-cached as healthy-empty.
+  const negativeEmpty = cooldownMs <= 0 && (await isNegativeCached(provider, key, action))
+
+  if (cooldownMs > 0 || negativeEmpty) {
+    // Skip the primary ENTIRELY (no provider hit) — either it is in cooldown
+    // (down) or this specific key is negative-cached as empty ("no match here").
+    const fb = await fallback()
+    if (fb && Array.isArray(fb.results) && fb.results.length > 0) {
+      return json(200, fb)
+    }
+    // Fallback also empty/errored: mirror what the primary would have returned.
+    // A negative-cached key -> healthy-empty primary -> empty envelope. A
+    // provider in cooldown -> down primary -> its original HTTP_ERROR outage.
+    return negativeEmpty
+      ? json(200, { results: [] })
+      : json(502, { error: 'Discogs request failed.', code: 'HTTP_ERROR' })
+  }
+
   const res = await primary()
   let primaryBody = null
   try {
@@ -195,11 +257,20 @@ async function lookupWithFallback(primary, fallback) {
     primaryBody = null
   }
   const code = primaryBody?.code
-  // Auth/config and rate-limit outcomes are authoritative — no fallback.
+  // Auth/config and rate-limit outcomes are authoritative — no fallback, no
+  // cooldown (see the 429 resolution in the comment above).
   if (!res.ok && code && NO_FALLBACK_CODES.has(code)) return res
   const primaryEmpty = primaryBody && Array.isArray(primaryBody.results) && primaryBody.results.length === 0
   // Fallback fires on a Discogs service error OR a healthy-empty result set.
   if (!res.ok || primaryEmpty) {
+    // A genuine provider-down outcome (5xx/network/timeout -> HTTP_ERROR by a
+    // non-NO_FALLBACK path): arm the circuit breaker so we skip Discogs for
+    // ~60s. Outage state NEVER goes into lookup_cache — only provider-state.
+    if (!res.ok) await recordProviderDown(providerStateStore, provider)
+    // A healthy-empty result is negative-cached so we stop re-spending the
+    // empty provider call within the short empty TTL (barcode 1d / text 6h).
+    // Only a HEALTHY empty is cached — never an error body.
+    if (primaryEmpty) await writeEmptyCache(provider, key, action)
     const fb = await fallback()
     if (fb && Array.isArray(fb.results) && fb.results.length > 0) {
       return json(200, fb)
@@ -257,10 +328,16 @@ export default async (req) => {
     const barcode = cleanDigits(url.searchParams.get('barcode'))
     if (!barcode) return json(400, { error: 'Missing barcode.' })
     // Discogs first; on error or healthy-empty, fall back to MusicBrainz.
-    return lookupWithFallback(
-      () => fetchDiscogs('/database/search', { barcode, type: 'release' }, `barcode:${barcode}`, TTL.barcode, identity),
-      () => musicbrainz.searchBarcode(barcode),
-    )
+    // RES-1.4 T4 (#291): skip Discogs when it's in circuit-breaker cooldown or
+    // this key is negative-cached as empty.
+    return lookupWithFallback({
+      providerStateStore: getStore(PROVIDER_STATE_STORE),
+      provider: 'discogs',
+      key: `barcode:${barcode}`,
+      action,
+      primary: () => fetchDiscogs('/database/search', { barcode, type: 'release' }, `barcode:${barcode}`, TTL.barcode, identity),
+      fallback: () => musicbrainz.searchBarcode(barcode),
+    })
   }
 
   if (action === 'searchText') {
@@ -269,10 +346,16 @@ export default async (req) => {
     const q = String(url.searchParams.get('q') || '').trim().slice(0, 200)
     if (!q) return json(400, { error: 'Missing q.' })
     // Discogs first; on error or healthy-empty, fall back to MusicBrainz.
-    return lookupWithFallback(
-      () => fetchDiscogs('/database/search', { q, type: 'release' }, cacheKey('q', q.toLowerCase()), TTL.q, identity),
-      () => musicbrainz.searchText(q),
-    )
+    // RES-1.4 T4 (#291): skip Discogs when it's in circuit-breaker cooldown or
+    // this key is negative-cached as empty.
+    return lookupWithFallback({
+      providerStateStore: getStore(PROVIDER_STATE_STORE),
+      provider: 'discogs',
+      key: cacheKey('q', q.toLowerCase()),
+      action,
+      primary: () => fetchDiscogs('/database/search', { q, type: 'release' }, cacheKey('q', q.toLowerCase()), TTL.q, identity),
+      fallback: () => musicbrainz.searchText(q),
+    })
   }
 
   if (action === 'release') {

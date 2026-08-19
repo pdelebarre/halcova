@@ -14,7 +14,7 @@
 // `repo.lookupCache.set` (no Blob mirror) to isolate DB behavior.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readCache, writeCache } from './lookup-cache'
+import { readCache, writeCache, EMPTY_SENTINEL, emptyCacheTtlMs, writeEmptyCache, isNegativeCached } from './lookup-cache'
 import { createPostgresRepository } from './repositories/postgres-repository'
 import { createMemDb } from './repositories/test-helpers'
 
@@ -142,5 +142,80 @@ describe('readCache — Blobs-only when Postgres is NOT configured', () => {
     expect(await readCache('discogs', 'release:7', 30 * DAY)).toEqual({ from: 'blobs' })
     expect(await readCache('discogs', 'release:8', 30 * DAY)).toBeNull()
     expect(await readCache('discogs', 'missing', 30 * DAY)).toBeNull()
+  })
+})
+
+// RES-1.4 T4 (#291) — negative caching: a HEALTHY-EMPTY provider result is
+// cached under (provider, key) as the { empty:true } sentinel with a SHORTER
+// TTL than the positive cache so a "no match today" is both re-usable (skip the
+// empty provider call) and quickly re-checkable (it churns as data is added).
+describe('negative caching — emptyCacheTtlMs / EMPTY_SENTINEL / writeEmptyCache / isNegativeCached', () => {
+  it('EMPTY_SENTINEL is a frozen { empty:true } object that cannot collide with a results/items envelope', () => {
+    expect(EMPTY_SENTINEL).toEqual({ empty: true })
+    expect(Object.isFrozen(EMPTY_SENTINEL)).toBe(true)
+    // A real Discogs {results} or Google {items} envelope never has empty:true.
+    expect(EMPTY_SENTINEL.results).toBeUndefined()
+    expect(EMPTY_SENTINEL.items).toBeUndefined()
+  })
+
+  it('emptyCacheTtlMs: barcode/ISBN 1 day, text q 6 hours', () => {
+    const HOUR = 60 * 60 * 1000
+    expect(emptyCacheTtlMs('searchBarcode')).toBe(24 * HOUR)
+    expect(emptyCacheTtlMs('barcode')).toBe(24 * HOUR)
+    expect(emptyCacheTtlMs('isbn')).toBe(24 * HOUR)
+    expect(emptyCacheTtlMs('searchText')).toBe(6 * HOUR)
+    expect(emptyCacheTtlMs('q')).toBe(6 * HOUR)
+  })
+
+  it('writeEmptyCache writes the sentinel to lookup_cache with the empty TTL (DB) AND the Blob mirror', async () => {
+    withPostgres()
+    await writeEmptyCache('discogs', 'barcode:1', 'searchBarcode')
+
+    const { rows } = await db.query('SELECT data, expires_at FROM lookup_cache WHERE provider = $1 AND key = $2', ['discogs', 'barcode:1'])
+    expect(rows[0].data).toEqual({ empty: true })
+    // The empty TTL is 1 day for barcode (not the 30d positive TTL).
+    const remaining = new Date(rows[0].expires_at).getTime() - Date.now()
+    expect(remaining).toBeGreaterThan(emptyCacheTtlMs('searchBarcode') - 60_000)
+    expect(remaining).toBeLessThanOrEqual(emptyCacheTtlMs('searchBarcode'))
+    expect(remaining).toBeLessThan(30 * DAY)
+
+    // The legacy Blob mirror holds the same { ts, data } shape for the fallback.
+    const blob = stores['discogs-cache'].data.get('barcode:1')
+    expect(blob.data).toEqual({ empty: true })
+  })
+
+  it('writeEmptyCache uses the 6h TTL for a text q key', async () => {
+    withPostgres()
+    await writeEmptyCache('books', 'q:abc', 'searchText')
+    const { rows } = await db.query('SELECT expires_at FROM lookup_cache WHERE provider = $1 AND key = $2', ['books', 'q:abc'])
+    const remaining = new Date(rows[0].expires_at).getTime() - Date.now()
+    expect(remaining).toBeGreaterThan(emptyCacheTtlMs('searchText') - 60_000)
+    expect(remaining).toBeLessThanOrEqual(emptyCacheTtlMs('searchText'))
+  })
+
+  it('isNegativeCached is true for a sentinel and false for real payloads / misses', async () => {
+    withPostgres()
+    await writeEmptyCache('discogs', 'barcode:1', 'searchBarcode')
+    await seedDb('discogs', 'barcode:2', { results: [{ id: 1 }] }, 30 * DAY)
+
+    expect(await isNegativeCached('discogs', 'barcode:1', 'searchBarcode')).toBe(true)
+    expect(await isNegativeCached('discogs', 'barcode:2', 'searchBarcode')).toBe(false)
+    expect(await isNegativeCached('discogs', 'missing', 'searchBarcode')).toBe(false)
+    // Providers stay scoped — the books sentinel is not a discogs sentinel.
+    expect(await isNegativeCached('books', 'barcode:1', 'searchBarcode')).toBe(false)
+  })
+
+  it('isNegativeCached reads the Blob-only path when Postgres is NOT configured', async () => {
+    delete process.env.DATABASE_URL
+    await writeEmptyCache('discogs', 'isbn:5', 'isbn')
+    expect(await isNegativeCached('discogs', 'isbn:5', 'isbn')).toBe(true)
+    expect(await isNegativeCached('discogs', 'isbn:6', 'isbn')).toBe(false)
+  })
+
+  it('readCache returns the sentinel so callers can distinguish (used by the chain skip)', async () => {
+    withPostgres()
+    await writeEmptyCache('discogs', 'q:foo', 'searchText')
+    const data = await readCache('discogs', 'q:foo', emptyCacheTtlMs('searchText'))
+    expect(data).toEqual({ empty: true })
   })
 })

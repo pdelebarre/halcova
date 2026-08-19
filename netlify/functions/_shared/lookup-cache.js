@@ -20,6 +20,60 @@ import { getRepository } from './repository'
 // The legacy shared Blob store per provider.
 const BLOB_STORES = { discogs: 'discogs-cache', books: 'books-cache' }
 
+// ---------------------------------------------------------------------------
+// RES-1.4 T4 (#291) — negative caching.
+//
+// When a provider returns a HEALTHY-EMPTY result (200 + zero results), we cache
+// a sentinel under (provider, key) so subsequent identical lookups skip the
+// empty provider call within the (shorter) negative-cache TTL and fall straight
+// through to the fallback provider. The sentinel is a real object `{ empty:true }`
+// — it can never collide with a real Discogs `{ results }` or Google
+// `{ items }` envelope. The lookup chains treat it as "no match here" (falls
+// through to the fallback), NOT as a failure and NEVER as a real result.
+//
+// Negative empties live in the SAME lookup_cache under (provider, key),
+// reusing writeCache -> DB + Blobs write-through, so the read-through contract
+// is preserved exactly. They carry a deliberately SHORTER TTL than the positive
+// caches because an empty result reflects "no known match today", which changes
+// as new records/books are published.
+// ---------------------------------------------------------------------------
+export const EMPTY_SENTINEL = Object.freeze({ empty: true })
+
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+
+// The actions with a fallback chain (searchBarcode / searchText) drive the
+// negative-cache TTL: barcode/ISBN keys barely change and are re-scanned rarely
+// -> 1 day. Free-text `q` results churn as new releases/volumes publish -> 6h.
+// Any other action falls back to the shorter 6h window (not used in practice).
+export function emptyCacheTtlMs(action) {
+  if (action === 'searchBarcode' || action === 'barcode' || action === 'isbn') {
+    return DAY
+  }
+  return 6 * HOUR
+}
+
+// Best-effort write of a negative-cache sentinel (healthy-empty result) for a
+// provider lookup key. Reuses the shared writeCache so it lands in BOTH the DB
+// (lookup_cache) and the legacy Blob store — contract preserved — with the
+// shorter empty TTL. A failed write must never fail a successful lookup.
+export async function writeEmptyCache(provider, key, action) {
+  return writeCache(provider, key, EMPTY_SENTINEL, emptyCacheTtlMs(action))
+}
+
+// Read a provider key and report whether its cached value is the negative-cache
+// sentinel (a HEALTHY-EMPTY result). Used by the lookup chains to skip an empty
+// provider call within the empty TTL. A failed/expired read is treated as NOT
+// negative-cached so a suppression can never silently wedge a lookup.
+export async function isNegativeCached(provider, key, action) {
+  try {
+    const data = await readCache(provider, key, emptyCacheTtlMs(action))
+    return data?.empty === true
+  } catch {
+    return false
+  }
+}
+
 // Read a cached provider payload, DB-first when Postgres is configured, Blobs
 // otherwise. Returns the raw payload or null on a miss / expired / error.
 // A failed read is always a miss — it must never fail a valid lookup.
