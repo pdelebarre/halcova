@@ -9,6 +9,7 @@ import { enforce } from './_shared/policy'
 import { rateLimitGuard, rateLimitIdentity, clientIp, retryAfterSeconds } from './_shared/rate-limit'
 import { handleCover } from './_shared/cover'
 import { readCache, writeCache } from './_shared/lookup-cache'
+import { lookupFetch } from './_shared/lookup-fetch'
 import { json, safeError } from './_shared/security'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
@@ -107,13 +108,13 @@ async function fetchDiscogs(path, params, key, ttl, identity) {
 
   let data
   try {
-    // SSRF guard (NIT M5, consistent with the cover proxy): never follow a
-    // redirect. The upstream is the fixed DISCOGS_BASE and user input only ever
-    // rides as encoded query-param values, but `redirect:'manual'` makes a
-    // hostile upstream 3xx surface as the raw response, which we reject below —
-    // it can never be followed to an internal target.
-    const res = await fetch(url.toString(), {
-      redirect: 'manual',
+    // Shared T1 helper (identical to books.js) — retries transient 429/5xx and
+    // network failures with a bounded Retry-After + full-jitter backoff inside
+    // an overall 8s deadline, and ALWAYS sets redirect:'manual' (SSRF control:
+    // a hostile upstream 3xx surfaces as the raw response, rejected below —
+    // never followed to an internal target). The single RUNOUT_DISCOGS_TOKEN
+    // rides in the Authorization header, never a query string.
+    const res = await lookupFetch(url.toString(), {
       headers: {
         'User-Agent': USER_AGENT,
         'Authorization': `Discogs token=${token}`,
