@@ -15,9 +15,12 @@
 import { DEFAULT_LIMIT, MAX_LIMIT } from '../pagination'
 
 // All first-class columns except id/owner_id/kind (those are WHERE/INSERT keyed).
+// `enriched_at` (T6, #285) is a mirror of data.enrichedAt — the deferred-
+// enrichment drain stamps it when it fills missing metadata. Same convention
+// as date_added <- data.dateAdded.
 const COLUMNS = `title, year, label, genre, style, country, format_type, barcode,
   discogs_id, google_books_id, cover_image, data, date_added, wishlist,
-  lending, lending_history, page_count, notes`
+  lending, lending_history, page_count, notes, enriched_at`
 
 // A number, or null when the client value isn't numeric (e.g. '' from a lookup).
 function asInt(value) {
@@ -67,12 +70,13 @@ export function itemRowValues(item) {
     lending_history: data.lendingHistory == null ? null : JSON.stringify(data.lendingHistory),
     page_count: asInt(data.pageCount),
     notes: data.notes == null ? null : String(data.notes),
+    enriched_at: asDate(data.enrichedAt),
   }
 }
 
 const INSERT_SQL = `
   INSERT INTO items (id, owner_id, kind, ${COLUMNS})
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
   ON CONFLICT (id) DO NOTHING
 `
 
@@ -81,20 +85,23 @@ const UPDATE_SQL = `
     title = $1, year = $2, label = $3, genre = $4, style = $5, country = $6,
     format_type = $7, barcode = $8, discogs_id = $9, google_books_id = $10,
     cover_image = $11, data = $12, date_added = $13, wishlist = $14,
-    lending = $15, lending_history = $16, page_count = $17, notes = $18
-  WHERE owner_id = $19 AND kind = $20 AND id = $21
+    lending = $15, lending_history = $16, page_count = $17, notes = $18,
+    enriched_at = $19
+  WHERE owner_id = $20 AND kind = $21 AND id = $22
 `
 
 function insertParams(v, ownerId, kind) {
   return [v.id, ownerId, kind, v.title, v.year, v.label, v.genre, v.style, v.country,
     v.format_type, v.barcode, v.discogs_id, v.google_books_id, v.cover_image, v.data,
-    v.date_added, v.wishlist, v.lending, v.lending_history, v.page_count, v.notes]
+    v.date_added, v.wishlist, v.lending, v.lending_history, v.page_count, v.notes,
+    v.enriched_at]
 }
 
 function updateParams(v, ownerId, kind, id) {
   return [v.title, v.year, v.label, v.genre, v.style, v.country, v.format_type,
     v.barcode, v.discogs_id, v.google_books_id, v.cover_image, v.data, v.date_added,
-    v.wishlist, v.lending, v.lending_history, v.page_count, v.notes, ownerId, kind, id]
+    v.wishlist, v.lending, v.lending_history, v.page_count, v.notes, v.enriched_at,
+    ownerId, kind, id]
 }
 
 export function createItemsRepo(db) {
@@ -190,6 +197,23 @@ export function createItemsRepo(db) {
     return (rowCount || 0) > 0
   }
 
+  // (T6, #285) — idempotent deferred-enrichment merge. Reads the CURRENT item,
+  // fills ONLY missing/null/empty fields from `additions` (the provider lookup
+  // result), stamps `enrichedAt` and clears `metadataPending`, then writes the
+  // merged item back. User-edited values are NEVER overwritten (a non-empty
+  // current value always wins). Returns the merged item, or null when the row
+  // doesn't exist. Owner-scoped: a merge for user A can never touch user B.
+  async function mergeEnriched(ownerId, kind, id, additions) {
+    if (!isUuid(id)) return null
+    const current = await getItem(ownerId, kind, id)
+    if (!current) return null
+    const merged = mergeMissing(current, additions || {})
+    merged.enrichedAt = new Date().toISOString()
+    merged.metadataPending = false
+    await updateItem(ownerId, kind, id, merged)
+    return merged
+  }
+
   // Run `fn(repo)` inside a BEGIN/COMMIT/ROLLBACK transaction. `fn` receives a
   // repo bound to the same client so every statement in it commits atomically;
   // any throw rolls back and rethrows. The plan-limit check + insert live in
@@ -216,9 +240,33 @@ export function createItemsRepo(db) {
     insertItem,
     updateItem,
     deleteItem,
+    mergeEnriched,
     countOwned,
     countsByKind,
     deleteAllForOwner,
     transaction,
   }
 }
+
+// The metadata keys the drain may fill via mergeEnriched — mirrors
+// DEFAULT_FILLABLE in _shared/lookup-queue.js. Only fills missing values.
+function mergeMissing(current, additions) {
+  const merged = { ...current }
+  for (const key of ENRICH_FILLABLE) {
+    const cur = current[key]
+    const add = additions[key]
+    if (add === undefined) continue
+    const missing = cur == null || cur === '' || (Array.isArray(cur) && cur.length === 0)
+    const populated = Array.isArray(add) ? add.length > 0 : add !== ''
+    if (missing && populated) merged[key] = add
+  }
+  return merged
+}
+
+const ENRICH_FILLABLE = [
+  'title', 'subtitle', 'year', 'label', 'genre', 'style', 'country', 'formatType',
+  'formatRaw', 'catno', 'coverImage', 'description', 'artists', 'masterId',
+  'tracklist', 'released', 'authorsList', 'series', 'mainCategory', 'snippet',
+  'pageCount', 'isbn', 'discogsId', 'googleBooksId', 'mbid', 'openLibraryId',
+  'barcode',
+]

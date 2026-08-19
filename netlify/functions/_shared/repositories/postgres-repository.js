@@ -27,6 +27,7 @@ import { db as postgresDb } from '../postgres'
 import { createUsersRepo } from './users-repo'
 import { createItemsRepo } from './items-repo'
 import { createLookupCacheRepo } from './lookup-cache-repo'
+import { createLookupQueueRepo } from './lookup-queue-repo'
 import { createFeedbackRepo } from './feedback-repo'
 import { createSessionsRepo } from './sessions-repo'
 import * as blobUsers from './blob-users'
@@ -268,6 +269,7 @@ export function createPostgresRepository({ db = postgresDb } = {}) {
   const sessionsPg = createSessionsRepo(db)
   const items = createItemsRepo(db)
   const lookupCache = createLookupCacheRepo(db)
+  const lookupQueue = createLookupQueueRepo(db)
   const feedback = createFeedbackRepo(db)
 
   const users = {
@@ -308,5 +310,6 @@ export function createPostgresRepository({ db = postgresDb } = {}) {
     feedback,
     items,
     lookupCache,
+    lookupQueue,
   }
 }
