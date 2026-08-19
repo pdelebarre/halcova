@@ -18,6 +18,7 @@ offline/PWA strategy, and the deployment pipeline. For *what the app does*, see
 - [12. Deployment](#12-deployment)
 - [13. Security & privacy](#13-security--privacy)
 - [14. Tooling & scripts](#14-tooling--scripts)
+- [15. Performance budget (M1)](#15-performance-budget-m1)
 
 ---
 
@@ -796,6 +797,86 @@ cover: `src/**/*.test.{js,jsx}`. Coverage includes `src/**`, excluding
 `src/main.jsx` and `src/test/`. Netlify functions are syntax-checked with
 `node --check` but don't have a runner (they're exercised end-to-end with
 `netlify dev`).
+
+## 15. Performance budget (M1)
+
+> Issue: #364 · Front End Architect decision (ARCH-0.3.1): do NOT raise
+> `chunkSizeWarningLimit`. Split the initial shell instead.
+
+### Dated baseline (2026-08-19, before the split)
+
+Captured from `npm run build` on branch `feat/m1-perf-364-bundle-budget` before
+applying the `manualChunks` split. The initial-shell entry chunk exceeded the
+500 kB threshold, so Vite emitted the `>500 kB` warning. This is release
+-impacting — the shell is the eager, first-load entry, not an intentionally
+deferred asset.
+
+| Chunk (pre-split) | Raw (min) | Gzip |
+| ----------------- | --------- | ---- |
+| `assets/index-*.js` (initial shell) | 630.43 kB | 163.36 kB |
+| `assets/src-*.js` | 17.24 kB | 7.31 kB |
+| `assets/worker.min-*.js` (deferred, scanner) | 111.30 kB | — |
+| `assets/ScannerModal-*.js` (deferred, scanner) | 40.51 kB | 14.44 kB |
+| `assets/zxing_reader-*.wasm` (deferred) | 1,065.86 kB | 453.37 kB |
+| `assets/tesseract-core-lstm.wasm-*.js` (deferred) | 3,896.48 kB | — |
+
+Vite warning (before): `(!) Some chunks are larger than 500 kB after
+minification.` Precache: **59 entries** (17315.91 KiB).
+
+### Approved budgets
+
+| Budget | Value | Disposition |
+| ------ | ----- | ----------- |
+| Initial shell — entry JS per chunk | ≤ 500 kB minified | **Enforced** by Vite's `chunkSizeWarningLimit`. The shell is split via `manualChunks` into `index` / `vendor-react` / `vendor` so the app chunk drops under the threshold. `npm run build` output is the enforcement signal. |
+| Deferred features — scanner (zxing-wasm) | ≤ ~1.1 MB wasm raw | **ACCEPTED** as intentionally precached deferred assets (dynamic imports). Not release-impacting; never folded back into the eager shell. |
+| Deferred features — OCR / Tesseract (`worker.min`, `tesseract-core`, `eng.traineddata.gz`) | ≤ 30 MB total precache ceiling | **ACCEPTED** as intentionally precached deferred assets. Larger than budget by design (offline cover scanning); `maximumFileSizeToCacheInBytes` set to 30 MB to hold them. |
+| Payment path | stays eager-but-small | Re-verified during build review; no separate lazy route. |
+
+### Disposition table
+
+| Chunk | Owner | Intentional deferred? | Verdict after split |
+| ----- | ----- | --------------------- | ------------------- |
+| `index-*.js` initial shell | shell | no | **Split** → ≤ 500 kB per chunk (via `vendor-react` / `vendor`) |
+| `vendor-react-*.js` | React vendor | no (eager) | New chunk holding `react`, `react-dom`, `scheduler` |
+| `vendor-*.js` | other node_modules | no (eager) | New chunk holding remaining third-party deps |
+| scanner / OCR modules | deferred | yes | Accepted, precached, untouched |
+
+### After the split (2026-08-19)
+
+Captured from `npm run build` after applying the `manualChunks` split. The
+`>500 kB` warning is **gone**; the eager shell is now three small chunks.
+
+| Chunk (post-split) | Raw (min) | Gzip | Notes |
+| ------------------ | --------- | ---- | ----- |
+| `assets/index-*.js` (app shell) | 440.66 kB | 104.09 kB | ≤ 500 kB ✓ |
+| `assets/vendor-react-*.js` (react/react-dom/scheduler) | 189.59 kB | 59.61 kB | eager vendor |
+| `assets/vendor-*.js` (other node_modules) | 59.37 kB | 21.74 kB | eager vendor |
+| `assets/vendor-*.css` | 4.23 kB | 0.84 kB | new, from split |
+| `assets/rolldown-runtime-*.js` | 1.29 kB | 0.71 kB | runtime |
+
+`dist/index.html` loads `index` + `rolldown-runtime` + `vendor-react` + `vendor`
+for the shell. Precache grew from **59 → 60 entries** solely because the split
+produced one extra small `vendor-*.css` asset; all original 59 entries remain
+intact (scanner `worker.min`, `zxing_reader.wasm`, `tesseract-core`,
+`eng.traineddata.gz` all still precached).
+
+### Enforcement
+
+`npm run build` output is the canonical enforcement signal:
+
+- No `>500 kB` warning for the eager shell chunk.
+- `dist/index.html` references the split shell chunks (`index`, `vendor-react`,
+  `vendor`).
+- Precache manifest stays intact (scanner/OCR deferred assets preserved). A
+  change of exactly +1 entry from the vendor split is expected and benign.
+
+Any future change that pushes the eager shell back over 500 kB must be addressed
+with a real split (not a silent `chunkSizeWarningLimit` raise) unless an ADR
+approves otherwise.
+
+---
+
+## Existing gotchas
 
 ### Known gotchas
 

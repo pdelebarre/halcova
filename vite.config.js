@@ -89,6 +89,30 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Performance budget (M1, #364): split the initial shell into a React
+        // vendor chunk so the app chunk drops under the 500 kB warning
+        // threshold. This is a deliberate split of the eager initial-shell
+        // entry, NOT a silent chunkSizeWarningLimit increase. The PWA
+        // precache config above is untouched and still captures every split
+        // chunk (index/vendor-react/vendor) as part of the shell.
+        manualChunks(id) {
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/scheduler')
+          ) {
+            return 'vendor-react'
+          }
+          if (id.includes('node_modules')) {
+            return 'vendor'
+          }
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       // In local dev, forward function calls to `netlify dev` (port 8888) if running.
