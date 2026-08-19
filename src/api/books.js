@@ -53,8 +53,12 @@ function pickIsbn(volume) {
 }
 
 // The "year" Google Books gives is often "2012-03-01" — keep just the year.
+// The collection API requires an integer year (1000–2100) or omits it
+// (netlify/functions/_shared/item-fields.js intInRange), so return an integer
+// or undefined — never a string or ''.
 function yearFrom(publishedDate) {
-  return (publishedDate || '').slice(0, 4)
+  const year = Number(String(publishedDate || '').slice(0, 4))
+  return Number.isInteger(year) && year >= 1000 && year <= 2100 ? year : undefined
 }
 
 // Google Books thumbnails are served over http:// in the metadata — upshift to
@@ -116,7 +120,6 @@ function toBookItem(volume, scannedIsbn) {
   const item = {
     googleBooksId: volume.id || null,
     title: itemTitle,
-    year: yearFrom(v.publishedDate),
     label: v.publisher || '',
     catno: isbn,
     isbn,
@@ -128,7 +131,6 @@ function toBookItem(volume, scannedIsbn) {
     coverImage: proxyCoverUrl(FN_BASE, httpsUrl(v.imageLinks?.thumbnail || '')),
     barcode: isbn,
     description: v.description || '',
-    pageCount: v.pageCount || '',
     language: v.language || '',
     infoLink: volume.selfLink || '',
     resourceUrl: volume.selfLink || '',
@@ -141,6 +143,11 @@ function toBookItem(volume, scannedIsbn) {
     mainCategory: mainCategoryOf(v),
     snippet: snippetFrom(volume.searchInfo),
   }
+  // `year`/`pageCount` must match the server's integer contract (a string or
+  // '' is a 400 TYPE_ERROR on POST) — emit them only as valid integers.
+  const year = yearFrom(v.publishedDate)
+  if (year !== undefined) item.year = year
+  if (Number.isInteger(v.pageCount) && v.pageCount >= 0) item.pageCount = v.pageCount
   // Google Books volumes carry averageRating (0–5) + ratingsCount — surface
   // them on the item when present (absent or 0 = no community votes).
   if (typeof v.averageRating === 'number' && v.averageRating > 0) item.rating = v.averageRating

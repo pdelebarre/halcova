@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as discogs from '../api/discogs'
 import { t } from '../i18n'
+import { sanitizeItemForCreate } from '../utils/sanitizeItem'
 import MatchPicker from './MatchPicker'
 import './ManualAddModal.css'
 
@@ -41,7 +42,7 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
       setTitleError(copy.manualTitleRequired || t('add.titleRequired'))
       return
     }
-    onPick({
+    onPick(sanitizeItemForCreate({
       title: form.artist ? `${form.artist} - ${form.title}` : form.title,
       year: form.year,
       label: form.label,
@@ -55,7 +56,7 @@ export default function ManualAddModal({ onPick, onClose, copy = {} }) {
       discogsId: null,
       resourceUrl: '',
       barcode: '',
-    })
+    }))
   }
 
   if (mode === 'picking') {
