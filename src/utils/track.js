@@ -9,8 +9,8 @@
 // - Events queue in localStorage.runout.events, capped at MAX_EVENTS (oldest
 //   dropped) until a future opt-in flush endpoint exists.
 // - sanitize() drops secret-like keys (access codes, the admin key, tokens,
-//   barcodes, ISBNs, pins, ciphers, credentials) and nested objects before
-//   anything is queued — nothing secret ever leaves the client.
+//   barcodes, ISBNs, pins, ciphers, credentials) and identifying browse data
+//   before anything is queued — nothing sensitive ever leaves the client.
 
 const EVENTS_KEY = 'runout.events'
 const ENABLED_KEY = 'runout.events.enabled'
@@ -20,6 +20,9 @@ const BROWSE_PREFIX = 'runout.events.browse.'
 
 /** Secret-like key pattern — any matching prop key is dropped before queueing. */
 const SECRET_KEY = /code|token|key|secret|barcode|isbn|pin|cipher|pass|session|credential|auth|jwt/i
+
+/** Identifying collection metadata is never appropriate for privacy-preserving telemetry. */
+const IDENTIFYING_KEY = /^(title|artist)$/i
 
 /** True when the user has opted in ('1' in localStorage.runout.events.enabled). */
 export function isTrackingEnabled() {
@@ -38,12 +41,12 @@ export function setTrackingEnabled(on) {
   } catch { /* never throw */ }
 }
 
-/** Drop secret-like keys and any non-primitive value before queueing. */
+/** Drop secret-like keys, identifying metadata, and any non-primitive value before queueing. */
 function sanitize(props) {
   if (!props || typeof props !== 'object' || Array.isArray(props)) return {}
   const out = {}
   for (const [k, v] of Object.entries(props)) {
-    if (SECRET_KEY.test(k)) continue
+    if (SECRET_KEY.test(k) || IDENTIFYING_KEY.test(k)) continue
     if (v !== null && typeof v === 'object') continue
     out[k] = v
   }
