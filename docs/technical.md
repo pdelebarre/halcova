@@ -184,13 +184,17 @@ by Netlify Blobs (no database to provision):
 | `netlify/functions/collection.js` | CRUD for a signed-in user's collections | `Authorization: Bearer <access code>` |
 | `netlify/functions/auth.js` | Request access, sign in, validate session | none / bearer for `me` |
 | `netlify/functions/admin.js` | Admin panel: approve requests, manage members | `Authorization: Bearer <admin key>` |
-| `netlify/functions/discogs.js` | Discogs lookup proxy (single server-side token, shared cache) | `Authorization: Bearer <access code>` |
-| `netlify/functions/books.js` | Google Books lookup proxy (shared cache, optional API key) | `Authorization: Bearer <access code>` |
+| `netlify/functions/discogs.js` | Discogs lookup proxy (single server-side token, shared cache) + MusicBrainz fallback | `Authorization: Bearer <access code>` |
+| `netlify/functions/books.js` | Google Books lookup proxy (shared cache, optional API key) + OpenLibrary fallback | `Authorization: Bearer <access code>` |
+| `netlify/functions/lookup-queue-drain.js` | **Scheduled** `@hourly` deferred-enrichment drain (service identity, no client) | none (Netlify schedule) |
 
 Shared helpers live in `netlify/functions/_shared/` (`auth.js`: admin key,
 bearer parsing, `publicUser`, code generation; `users.js`: identity store CRUD
 + per-member store naming). Files in the underscore folder are bundled into each
-function by esbuild, never deployed as functions themselves.
+function by esbuild, never deployed as functions themselves. Lookup resilience
+helpers (see "Lookup resilience" below) also live here: `lookup-fetch.js`,
+`lookup-cache.js`, `provider-state.js`, `lookup-queue.js` + `lookup-queue-store.js`,
+and `providers/musicbrainz.js` + `providers/openlibrary.js`.
 
 ### Identity store
 
@@ -259,6 +263,49 @@ account can't be edited or deleted.
 
 Responses are always JSON via a small `json()` helper; unexpected errors return
 `500` with the message.
+
+### Lookup resilience (RES-EPIC-1 #281)
+
+The lookup proxies (`discogs.js` / `books.js`) resolve **primary → fallback
+server-side in one request** and layer the resilience controls below (see
+ADR-0017). All outbound fetches go through the shared, SSRF-safe helper
+`_shared/lookup-fetch.js` (T1): retry only 429/5xx/network, bounded
+`Retry-After` + full-jitter backoff, per-attempt timeout + overall 8s deadline,
+and `redirect:'manual'` on every attempt.
+
+- **Fallback providers (T2/T3):** records fall back to MusicBrainz
+  (`providers/musicbrainz.js`), books to OpenLibrary (`providers/openlibrary.js`),
+  on a primary service error or a **healthy-empty** result set. Fallback
+  adapters normalize into the same `{ results }` / `{ items }` envelope, mark
+  each hit `source:'musicbrainz'` / `source:'openlibrary'` with the additive id
+  (`mbid` / `openLibraryId`), and leave the primary id null. Auth/config and
+  rate-limit codes (`NO_FALLBACK_CODES`) never fall back and never arm the
+  breaker. Both providers down → a distinct `ALL_PROVIDERS_FAILED` code
+  (T5); both healthy-empty → `200 []` (`NO_MATCH`).
+- **Negative cache (T4):** a healthy-empty result is cached under
+  `(provider, key)` as a frozen `EMPTY_SENTINEL = { empty:true }`
+  (`_shared/lookup-cache.js`) with a shorter TTL (barcode/ISBN 1d, text `q` 6h);
+  the chain skips the empty primary call and falls through. The sentinel is
+  never returned to a client as a real payload.
+- **Circuit breaker (T4):** a genuine provider-down outcome arms a ~60s
+  cooldown in the **separate** `runout-provider-state` store
+  (`_shared/provider-state.js`) — never in the 30-day `lookup_cache`, so no
+  cache-poisoning of long-lived entries.
+- **Deferred-enrichment queue (T6):** partial saves can be completed by the
+  `@hourly` `lookup-queue-drain.js` function. It iterates tenants one at a
+  time, re-runs the fixed-host lookup, and idempotently merges **only missing
+  fields** (`_shared/lookup-queue.js` `mergeFields`) — never clobbering user
+  edits — then stamps `enrichedAt` + clears `metadataPending`. The queue is
+  Postgres `lookup_queue` (`repositories/lookup-queue-repo.js`) or the
+  `runout-lookup-queue` Blobs store, idempotent by stable row id, back-off +
+  abandon (5 attempts / 7 days / permanent-once), tenant-scoped per `user_id`
+  with matching RLS (`db/rls/009_lookup_queue_rls.sql`). The drain returns only
+  a counter summary — the queue is never echoed to a client.
+
+On the client, `src/api/lookupChain.js` + `src/hooks/useLookup.js` (T7) walk
+the provider list over a **single** memoized server endpoint and surface
+`NO_MATCH` vs `ALL_PROVIDERS_FAILED`; `useLookup.runOcr` (T8) feeds on-device
+OCR cover text back through the same chain.
 
 ### Local development
 
@@ -486,6 +533,17 @@ The **collection data is intentionally not cached** — it is server-of-record i
 Netlify Blobs. Offline, the shell and lookup caches still let the app open, and
 already-owned barcodes still match from local state.
 
+**Offline mirror/outbox posture (ADR-0017, M2/offline-strategy):** there is
+deliberately **no** client-side offline collection mirror or mutation outbox
+yet. The lookup `lookup_queue` is a *server-side, service-identity* enrichment
+queue, and the shared `lookup_cache` is a shared dedup cache — neither is a
+mirror of private user data, and the service worker never runtime-caches
+user-scoped endpoints. A future offline mirror/outbox remains an M2 item
+governed by ADR-0011 (client-generated op ids, server idempotency,
+re-authorization on submit, no secrets in queues); any user-scoped local data
+it adds must be keyed per user and cleared on sign-out/switch (the invariant is
+locked in by `src/utils/offline-isolation.test.js`).
+
 `index.html` carries the iOS web-app meta tags (`apple-mobile-web-app-capable`,
 `black-translucent` status bar, `Halcova` title) and `theme-color`.
 
@@ -507,9 +565,17 @@ already-owned barcodes still match from local state.
   `Authorization: Bearer <code>` (the admin key for the owner). Responses are
   cached in the shared `discogs-cache` Blob store so one user's lookup serves
   the next (barcode/release TTL 30 days, text search 1 day).
-- Errors: the proxy maps Discogs `429` → `RATE_LIMIT`, `401` → `BAD_TOKEN`
-  (token rejected), a missing `RUNOUT_DISCOGS_TOKEN` → `SERVER_NO_TOKEN`, and
-  other failures → `HTTP_ERROR`.
+- Errors: the proxy maps Discogs `429` → `PROVIDER_RATE_LIMIT` (upstream) vs
+  `RATE_LIMIT` (our throttling), `401` → `BAD_TOKEN` (token rejected), a
+  missing `RUNOUT_DISCOGS_TOKEN` → `SERVER_NO_TOKEN`, and other failures →
+  `HTTP_ERROR`. All providers down → `ALL_PROVIDERS_FAILED` (a genuine outage,
+  distinct from `NO_MATCH`).
+- **Fallback (T2):** on a Discogs service error (5xx/network/timeout) or a
+  healthy-empty result set, the proxy falls back to the tokenless **MusicBrainz**
+  provider (`_shared/providers/musicbrainz.js`), normalizing results into the
+  same `{ results:[...] }` envelope with `source:'musicbrainz'` + `mbid`
+  (`discogsId` null). Covers route through the public cover proxy's
+  `coverartarchive.org` allowlist.
 
 ### Google Books
 
@@ -528,9 +594,29 @@ already-owned barcodes still match from local state.
   the outbound request (never exposed to the browser), attributing quota to
   the project (a per-project quota, default ~1000 requests/100s, raiseable in
   the Google Cloud console). The proxy also retries transient failures
-  (429/5xx/network errors) once with a short backoff before surfacing
-  `RATE_LIMIT`/`HTTP_ERROR`. Caller auth stays the same Bearer access-code
-  contract as every other function.
+  (429/5xx/network errors) with a bounded Retry-After + full-jitter backoff
+  before surfacing `PROVIDER_RATE_LIMIT`/`HTTP_ERROR`. Caller auth stays the
+  same Bearer access-code contract as every other function.
+- **Fallback (T3):** on a Google Books service error or a healthy-empty result
+  set, the proxy falls back to the tokenless **OpenLibrary** provider
+  (`_shared/providers/openlibrary.js`), normalizing into the same
+  `{ items:[...] }` envelope with `source:'openlibrary'` + `openLibraryId`
+  (`googleBooksId` null). Covers route through the `covers.openlibrary.org`
+  allowlist.
+
+### Lookup resilience (shared across both proxies)
+
+- **Negative cache (T4):** a healthy-empty result is cached as the frozen
+  `EMPTY_SENTINEL = { empty:true }` in `_shared/lookup-cache.js` (DB-first
+  `lookup_cache` + Blobs write-through) with a shorter TTL (barcode/ISBN 1 day,
+  text `q` 6h). The chain skips the empty primary and falls through; the
+  sentinel is never returned raw.
+- **Circuit breaker (T4):** a genuine provider-down outcome arms a ~60s
+  cooldown in the separate `runout-provider-state` store
+  (`_shared/provider-state.js`) — never in the 30-day `lookup_cache`.
+- **Deferred enrichment (T6):** a partial save can be completed by the
+  `@hourly` `lookup-queue-drain.js` scheduled function, which re-runs the
+  SSRF-safe fixed-host lookup and idempotently fills only missing fields.
 
 ---
 
@@ -617,6 +703,30 @@ skips functions), or Git-connected import.
 - All lookups go through the Netlify function proxies and are cached in shared
   Blob stores (`discogs-cache` / `books-cache`); the browser never calls
   `api.discogs.com` or `www.googleapis.com` directly.
+- **Lookup resilience security (RES-EPIC-1 #281, ADR-0017)** —
+  - **SSRF:** every outbound lookup (and every cover) is fetched with
+    `redirect:'manual'` (a hostile 3xx surfaces as a raw response and is
+    rejected — never followed to an internal target); connect hosts are fixed
+    allowlists only (`_shared/lookup-fetch.js`, `_shared/cover.js`, the
+    fallback providers). Provider payloads are **size-capped** before
+    parse/cache (Discogs 2 MiB, Google Books 1 MiB, MusicBrainz/OpenLibrary
+    2 MiB, covers capped in `_shared/cover.js`).
+  - **Cache-poisoning resistance:** the negative-cache `EMPTY_SENTINEL`
+    (`{ empty:true }`, frozen) can never collide with a real results/items
+    envelope, is written with a shorter TTL, and is **never** returned to a
+    client as a real payload. Provider circuit-breaker cooldown lives in a
+    **separate** `runout-provider-state` store — never in the 30-day
+    `lookup_cache`, so a 30-day "provider is down" poisoning is impossible.
+  - **Tenant-isolated drain:** `lookup-queue-drain.js` runs under a service
+    identity (no client session), iterates tenants one at a time, and every
+    queue op + item merge is `user_id`-scoped (RLS in
+    `db/rls/009_lookup_queue_rls.sql`); the queue and its payloads are **never
+    echoed to a client** (counter summary only).
+  - **No internal leakage:** `safeError` returns a fixed generic 500
+    (`code:'INTERNAL'`) and logs only redacted detail; the drain's failures are
+    internal counters, and client API modules surface only known mapped codes
+    (`SERVER_NO_TOKEN` / `BAD_TOKEN` / `RATE_LIMIT` / `PROVIDER_RATE_LIMIT` /
+    `HTTP_ERROR` / `ALL_PROVIDERS_FAILED`), never raw provider/stack text.
 - No tracking by default, no third-party analytics. (The gamification
   instrument `src/utils/track.js` is first-party and **opt-in only** — it
   queues `gamif_*` events in `localStorage` (capped, sanitized) and does

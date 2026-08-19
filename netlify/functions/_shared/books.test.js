@@ -94,6 +94,35 @@ describe('lookup actions — fixed base host only (no host injection)', () => {
   })
 })
 
+// SEC-3.2 (#195) — the proxy-level provider body cap (books.js MAX_PROXY_BYTES
+// = 1 MiB). The provider ADAPTERS cap their own bodies (tested in
+// providers/openlibrary.test.js), but the proxy cap is what stops a hostile/
+// degenerate Google body from being buffered into the function or the shared
+// cache. The OpenLibrary fallback is also size-capped (2 MiB), so an oversized
+// primary body degrades the whole chain to ALL_PROVIDERS_FAILED and is never
+// cached.
+describe('SEC-3.2 (#195) — proxy-level provider body cap (books.js)', () => {
+  it('rejects an oversized Google Books response — never cached, safe ALL_PROVIDERS_FAILED', async () => {
+    // Primary body just over the 1 MiB proxy cap; fallback body just over the
+    // OpenLibrary adapter's own 2 MiB cap.
+    const hugeGoogle = JSON.stringify({ items: [{ id: 'x', volumeInfo: { title: 'y'.repeat(1 * 1024 * 1024 + 1) } }] })
+    const hugeOpenLibrary = JSON.stringify({ 'ISBN:9780452284234': { details: { title: 'z'.repeat(2 * 1024 * 1024 + 1) } } })
+    global.fetch
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => hugeGoogle, headers: { get: () => 'application/json' } })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => hugeOpenLibrary, headers: { get: () => 'application/json' } })
+
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(502)
+    expect((await res.json()).code).toBe('ALL_PROVIDERS_FAILED')
+    // Both hosts were contacted (primary then fallback) — but the oversized
+    // body was NEVER written into the shared cache.
+    const hosts = global.fetch.mock.calls.map((c) => new URL(String(c[0])).hostname)
+    expect(hosts[0]).toBe('www.googleapis.com')
+    expect(hosts[1]).toBe('openlibrary.org')
+    expect(Object.keys(stores['books-cache']?.data || {})).toEqual([])
+  })
+})
+
 describe('cover action — public SSRF surface (via the books handler)', () => {
   const malicious = [
     'https://127.0.0.1/x.png',

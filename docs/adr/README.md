@@ -22,6 +22,7 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
 | 0014 | Data migration and backward compatibility | Accepted |
 | 0015 | Architecture decision governance | Accepted |
 | 0016 | Passkeys and Sign in with Apple evaluation | Accepted — Deferred |
+| 0017 | Lookup resilience and provider fallbacks | Accepted |
 
 ## Important relationships
 
@@ -43,6 +44,12 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
   |
   +-- 0016 Passkeys/Apple evaluation
   +-- 0004 Security/privacy
+
+0013 External providers/caches
+  |
+  +-- 0017 Lookup resilience & provider fallbacks
+          |
+          +-- 0011 Offline-first boundaries (future mirror/outbox posture)
 ```
 
 ## Numbering note

@@ -99,6 +99,35 @@ describe('lookup actions — fixed base host only (no host injection)', () => {
   })
 })
 
+// SEC-3.2 (#195) — the proxy-level provider body cap (discogs.js MAX_PROXY_BYTES
+// = 2 MiB). The provider ADAPTERS cap their own bodies (tested in
+// providers/musicbrainz.test.js), but the proxy cap is what stops a hostile/
+// degenerate Discogs body from being buffered into the function or the shared
+// cache. The MusicBrainz fallback is also size-capped (2 MiB), so an oversized
+// primary body degrades the whole chain to ALL_PROVIDERS_FAILED and is never
+// cached.
+describe('SEC-3.2 (#195) — proxy-level provider body cap (discogs.js)', () => {
+  it('rejects an oversized Discogs response — never cached, safe ALL_PROVIDERS_FAILED', async () => {
+    // Primary body just over the 2 MiB proxy cap; fallback body just over the
+    // MusicBrainz adapter's own 2 MiB cap.
+    const hugeDiscogs = JSON.stringify({ results: [{ id: 1, title: 'y'.repeat(2 * 1024 * 1024 + 1) }] })
+    const hugeMusicBrainz = JSON.stringify({ releases: [{ id: 'r1', title: 'z'.repeat(2 * 1024 * 1024 + 1) }] })
+    global.fetch
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => hugeDiscogs, headers: { get: () => 'application/json' } })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => hugeMusicBrainz, headers: { get: () => 'application/json' } })
+
+    const res = await discogsHandler(req('/.netlify/functions/discogs?action=searchBarcode&barcode=07464405491'))
+    expect(res.status).toBe(502)
+    expect((await res.json()).code).toBe('ALL_PROVIDERS_FAILED')
+    // Both hosts were contacted (primary then fallback) — but the oversized
+    // body was NEVER written into the shared cache.
+    const hosts = global.fetch.mock.calls.map((c) => new URL(String(c[0])).hostname)
+    expect(hosts[0]).toBe('api.discogs.com')
+    expect(hosts[1]).toBe('musicbrainz.org')
+    expect(Object.keys(stores['discogs-cache']?.data || {})).toEqual([])
+  })
+})
+
 describe('cover action — public SSRF surface (via the discogs handler)', () => {
   const malicious = [
     'https://127.0.0.1/x.png',

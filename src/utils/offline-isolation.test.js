@@ -294,3 +294,45 @@ describe('M1 offline navigation fallback (#157)', () => {
     expect(navRule).toMatch(/request\.mode\s*===?\s*'navigate'/)
   })
 })
+
+// RES-EPIC-1 T11 (#287) — offline mirror/outbox posture (ADR-0017).
+//
+// No offline collection mirror / mutation outbox storage exists in the code
+// yet (it is an M2/offline-strategy item per ADR-0011/ADR-0017). This locks in
+// the offline-isolation INVARIANT any future user-scoped local data must
+// satisfy: (a) per-user namespacing — one user's data can never be read under
+// another user's key — and (b) cleared on sign-out/switch. We do NOT implement
+// a mirror/outbox storage layer; we assert the invariant against the per-user
+// key pattern such a mirror would use and confirm the user-bound local record
+// that exists today (the offline-trust marker) already satisfies the clearing
+// half via the documented clearLocalUserData() path.
+describe('M2 offline mirror/outbox posture — per-user local-data invariant (#287)', () => {
+  it('any user-scoped local data pattern must be per-user namespaced AND cleared on switch (CWE-200)', async () => {
+    // Half 1 — per-user namespacing: seed A's and B's data under the
+    // representative runout.<scope>.<userId> pattern a future mirror would use.
+    // B reading under its OWN key gets only B's data — A's payload is never
+    // reachable through B's key (key-name namespacing is the boundary).
+    localStorage.setItem('runout.offline.mirror.u1.items', JSON.stringify(['a-only']))
+    localStorage.setItem('runout.offline.mirror.u2.items', JSON.stringify(['b-only']))
+    expect(JSON.parse(localStorage.getItem('runout.offline.mirror.u2.items'))).toEqual(['b-only'])
+    expect(localStorage.getItem('runout.offline.mirror.u1.items')).toBe(JSON.stringify(['a-only']))
+    // The two users' values live in distinct slots — no shared/colliding key.
+    expect(localStorage.getItem('runout.offline.mirror.u1.items')).not.toBe(JSON.stringify(['b-only']))
+
+    // Half 2 — cleared on sign-out/switch: the user-bound local record that
+    // exists today (runout.offlineTrust) is registered in clearLocalUserData()
+    // and is removed by the documented clearing path, so it can never survive
+    // into the next account. (The full login-flow assertion lives above; this
+    // pins the invariant's clearing half directly.)
+    seedUserAData()
+    establishOfflineTrust(MEMBER_A, { sessionFp: sessionFingerprint('tok-a') })
+    saveSession({ user: MEMBER_A, session: 'tok-a' })
+    expect(localStorage.getItem('runout.offlineTrust')).not.toBeNull()
+
+    clearLocalUserData()
+    saveSession(null)
+    expect(localStorage.getItem('runout.offlineTrust')).toBeNull()
+    expect(localStorage.getItem('runout.recentSearches.records')).toBeNull()
+    expect(getSession()).toBeNull()
+  })
+})

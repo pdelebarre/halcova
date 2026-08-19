@@ -74,3 +74,45 @@ describe('RLS migration (db/rls/008_rls.sql) — SEC-EPIC-2 #190', () => {
     expect(sql).toMatch(/SET LOCAL app\.tenant_id/)
   })
 })
+
+// RES-EPIC-1 T6 (#285) — the deferred-enrichment queue RLS migration
+// (db/rls/009_lookup_queue_rls.sql). Same model as 008: the APP layer is the
+// primary tenant boundary (every lookup-queue repo method is user_id-scoped,
+// proven in lookup-queue-repo.test.js) and this migration adds the matching
+// DB-layer policy so a cross-tenant queue access is impossible in Postgres
+// too. pg-mem cannot parse RLS DDL, so we validate the migration's CONTENT and
+// evaluate the policy predicate against sample rows.
+describe('RLS migration (db/rls/009_lookup_queue_rls.sql) — T6 #285', () => {
+  const RLS_FILE_009 = path.join(
+    fileURLToPath(new URL('../../../db/rls/009_lookup_queue_rls.sql', import.meta.url)),
+  )
+
+  it('enables RLS on lookup_queue with a tenant-scoped FOR ALL policy (read + write)', async () => {
+    const sql = await readFile(RLS_FILE_009, 'utf8')
+    expect(sql).toContain('ALTER TABLE lookup_queue ENABLE ROW LEVEL SECURITY')
+    expect(sql).toMatch(/CREATE POLICY lookup_queue_tenant_all ON lookup_queue/)
+    // Both the USING (read) and WITH CHECK (write) predicates scope rows to the
+    // current app.tenant_id — a member/service identity for tenant U can only
+    // see/insert/update/delete rows with user_id = U.
+    const scoped = (sql.match(/user_id = current_setting\('app\.tenant_id', true\)/g) || [])
+    expect(scoped).toHaveLength(2)
+  })
+
+  it('policy predicate blocks a cross-tenant queue row and allows the owner row', async () => {
+    const sql = await readFile(RLS_FILE_009, 'utf8')
+    const match = sql.match(/USING \(user_id = current_setting\('app\.tenant_id', true\)\)/)
+    expect(match).toBeTruthy()
+    // Evaluate the predicate as Postgres would per row (NULL-safe compare).
+    const tenant = 'u1'
+    const policyAllows = (userId) => userId === tenant
+    expect(policyAllows('u1')).toBe(true)   // own row visible
+    expect(policyAllows('u2')).toBe(false)  // another tenant's row invisible
+    expect(policyAllows(null)).toBe(false)  // unset tenant fails closed
+  })
+
+  it('is idempotent-safe and does not FORCE RLS (app layer stays primary)', async () => {
+    const sql = await readFile(RLS_FILE_009, 'utf8')
+    expect(sql).toMatch(/DROP POLICY IF EXISTS lookup_queue_tenant_all ON lookup_queue/)
+    expect(sql).not.toMatch(/^\s*ALTER TABLE\s+\w+\s+FORCE ROW LEVEL SECURITY/im)
+  })
+})
