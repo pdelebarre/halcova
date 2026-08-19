@@ -45,6 +45,12 @@ describe('POLICY predicate table (SEC-7.1)', () => {
     expect(POLICY['collection:item:create'].deny).toContain('demo')
     // lending (owner self; demo AND admin cannot lend — admin has no items to lend)
     expect(POLICY['lending:item:lend'].deny).toContain('demo')
+    // private assets (SEC-7.3 #340): list is owner-self; sign/delete deny demo
+    expect(POLICY['asset:list'].owner).toBe('self')
+    expect(POLICY['asset:sign'].owner).toBe('self')
+    expect(POLICY['asset:sign'].deny).toContain('demo')
+    expect(POLICY['asset:delete'].owner).toBe('self')
+    expect(POLICY['asset:delete'].deny).toContain('demo')
     // reviews: delete is owner-or-admin
     expect(POLICY['review:delete'].owner).toBe('target')
     expect(POLICY['review:delete'].allowOverride).toContain('admin')
@@ -88,6 +94,28 @@ describe('POLICY predicate table (SEC-7.1)', () => {
     mocks.sessionAuth.resolveSession = vi.fn().mockResolvedValue(okResolved(demo))
     const r = await enforce({}, 'collection:item:read')
     expect(r.user.role).toBe('demo')
+  })
+
+  it('denies the demo identity asset signing and deletion (read-only demo, no private assets)', async () => {
+    mocks.sessionAuth.resolveSession = vi.fn().mockResolvedValue(okResolved(demo))
+    const sign = await enforce({}, 'asset:sign')
+    expect(sign.error.status).toBe(403)
+    expect((await sign.error.json()).code).toBe('FORBIDDEN')
+    const del = await enforce({}, 'asset:delete')
+    expect(del.error.status).toBe(403)
+    expect((await del.error.json()).code).toBe('FORBIDDEN')
+  })
+
+  it('allows a member to sign/list/delete their own assets (owner self), rejects unauthenticated with 401', async () => {
+    mocks.sessionAuth.resolveSession = vi.fn().mockResolvedValue(okResolved(member))
+    for (const action of ['asset:sign', 'asset:list', 'asset:delete']) {
+      const r = await enforce({}, action)
+      expect(r.user.id).toBe('u1')
+    }
+    mocks.sessionAuth.resolveSession = vi.fn().mockResolvedValue(errResolved(401))
+    const unauth = await enforce({}, 'asset:sign')
+    expect(unauth.error.status).toBe(401)
+    expect((await unauth.error.json()).code).toBe('NOT_SIGNED_IN')
   })
 
   it('owner:target: a non-owner is denied whether or not the target exists (non-enumerating)', async () => {
@@ -236,6 +264,31 @@ describe('filter.js — property-level DTO filtering (SEC-7.1)', () => {
     expect(out.lendingHistory[0].borrower.contact).toBeUndefined()
   })
 
+  it('N3b (SEC-7.3 #340) — private asset refs (assets/receipts/attachments/photoRefs) never leak through the non-owner item DTO', () => {
+    const rich = {
+      id: 'i1', title: 'T', year: 2000, label: 'L',
+      // C6/private-assets refs — must ALL be stripped:
+      assets: [{ assetId: 'a-1', mimeType: 'image/jpeg' }],
+      receipts: [{ assetId: 'a-2' }],
+      attachments: [{ assetId: 'a-3' }],
+      photoRefs: ['a-4'],
+    }
+    const out = filterFor(member, 'item', rich, { own: false })
+    expect(out.assets).toBeUndefined()
+    expect(out.receipts).toBeUndefined()
+    expect(out.attachments).toBeUndefined()
+    expect(out.photoRefs).toBeUndefined()
+    // Non-owner neither sees asset ids nor signed URLs.
+    expect(Object.keys(out)).not.toContain('assetIds')
+    expect(Object.keys(out)).not.toContain('signedUrl')
+    // Public metadata retained.
+    expect(out.id).toBe('i1')
+    expect(out.title).toBe('T')
+    // The OWNER DTO keeps the asset refs (ids, never signed URLs).
+    const owned = filterFor(member, 'item', rich, { own: true })
+    expect(owned.assets).toEqual([{ assetId: 'a-1', mimeType: 'image/jpeg' }])
+  })
+
   it('N4 — a non-author review DTO drops authorId (author keeps it)', () => {
     const review = { id: 'r1', authorId: 'bob', rating: 5, body: 'hi' }
     const theirs = filterFor(member, 'review', review, { own: false })
@@ -275,8 +328,19 @@ describe('filter.js — property-level DTO filtering (SEC-7.1)', () => {
 })
 
 describe('visibility.js — visibility-state model + allowlist registry (SEC-7.2 #339)', () => {
-  const { VISIBILITY, resolveVisibility, ITEM_PUBLIC_FIELDS, ITEM_PRIVATE_FIELDS, REVIEW_PUBLIC_FIELDS, isOwnerRole } = visibility
+  const { VISIBILITY, resolveVisibility, ITEM_PUBLIC_FIELDS, ITEM_PRIVATE_FIELDS, PRIVATE_ASSET_FIELDS, REVIEW_PUBLIC_FIELDS, isOwnerRole } = visibility
 
+  it('registers the SEC-7.3 #340 private-assets class and never admits it to the public item allowlist', () => {
+    expect(PRIVATE_ASSET_FIELDS).toContain('assets')
+    expect(PRIVATE_ASSET_FIELDS).toContain('receipts')
+    expect(PRIVATE_ASSET_FIELDS).toContain('attachments')
+    expect(PRIVATE_ASSET_FIELDS).toContain('photoRefs')
+    // C6/private-assets refs must never appear in the PUBLIC item allowlist.
+    const publicSet = new Set(ITEM_PUBLIC_FIELDS)
+    for (const f of PRIVATE_ASSET_FIELDS) {
+      expect(publicSet.has(f)).toBe(false)
+    }
+  })
   it('reserved visibility values (FOLLOWERS/GROUP) and unknowns fail closed to PRIVATE', () => {
     expect(resolveVisibility(VISIBILITY.PUBLIC)).toBe(VISIBILITY.PUBLIC)
     expect(resolveVisibility(VISIBILITY.OWNER)).toBe(VISIBILITY.OWNER)

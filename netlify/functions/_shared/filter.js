@@ -29,13 +29,25 @@
 // public surface.
 
 import { publicUser } from './auth'
-import { ITEM_NON_OWNER_RETAINED, ITEM_PUBLIC_FIELDS } from './visibility'
+import { ITEM_NON_OWNER_RETAINED, ITEM_PUBLIC_FIELDS, PRIVATE_ASSET_FIELDS } from './visibility'
 
 // The allowlisted top-level fields on a NON-OWNER item DTO: C1 public catalog
 // metadata + the retained ownership-adjacent keys. Everything else (C3–C7:
 // price/serial/notes/receipts/contact/location/adminNote, plus any future
 // private field) is dropped — an EXPLICIT per-role allowlist, not a strip.
 const ITEM_NON_OWNER_FIELDS = new Set([...ITEM_PUBLIC_FIELDS, ...ITEM_NON_OWNER_RETAINED])
+
+// SEC-7.3 (#340): the private-assets class (assets/receipts/attachments/
+// photoRefs) is NOT in the non-owner allowlist, so it is dropped by the
+// allowlist above. This set is asserted here so the ownership of that strip is
+// explicit and auditable — a future edit that adds a file-ref field to the
+// non-owner DTO will also have to update this guard.
+const PRIVATE_ASSET_SET = new Set(PRIVATE_ASSET_FIELDS)
+for (const field of PRIVATE_ASSET_SET) {
+  if (ITEM_NON_OWNER_FIELDS.has(field)) {
+    throw new Error(`Security invariant violated: private asset field "${field}" leaked into the non-owner item allowlist`)
+  }
+}
 
 // Strip the C8 borrower.contact from a single lending object while keeping the
 // rest (the borrower name and timestamps stay public on an owned surface).
