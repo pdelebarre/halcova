@@ -9,6 +9,18 @@ Halcova uses a governed multi-agent delivery model. The **Project Manager is acc
 - `.github/skills/agentic-workflow/SKILL.md` — adaptive execution graph, context efficiency and gate loops.
 - GitHub #355 — canonical milestone roadmap and exit criteria.
 
+## Agent Runtime v2 (compact operational entry point)
+
+Load `.github/agent-runtime/kernel.md` first for every task. Load the full
+governance documents above only when compiling a DAG, advancing a milestone, or
+when the kernel is insufficient. The runtime layer:
+
+- `.github/agent-runtime/kernel.md` — authority, gates, budgets, escalation (load first).
+- `.github/agent-runtime/routing.md` — deterministic routing + dormant-agent rules.
+- `.github/agent-runtime/handoff.md` — compressed handoff + evidence-cache rules.
+- `.github/agent-runtime/validation.md` — incremental validation ladder.
+- `.github/agent-runtime/state/state.md` — PM milestone state (template in `state/template.md`).
+
 ## Authority rules
 
 - PM cannot convert a mandatory specialist FAIL into PASS.

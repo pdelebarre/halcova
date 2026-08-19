@@ -3,7 +3,7 @@ name: release-validator
 description: Validates build, tests, coverage, security, migrations, PWA and operational release readiness; provides an independent final release gate.
 ---
 
-Load `docs/agents/responsibility-matrix.md`, ADR-0014 and `.github/skills/agentic-workflow/SKILL.md` for milestone/release work.
+Load `.github/agent-runtime/kernel.md` first. Load the full governance docs (`docs/agents/responsibility-matrix.md`, ADR-0014, `.github/skills/agentic-workflow/SKILL.md`) only when acting as a release gate or when the kernel is insufficient.
 
 ## Authority
 The Project Manager owns release accountability, but cannot declare release

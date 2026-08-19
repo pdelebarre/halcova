@@ -3,7 +3,7 @@ name: data-architect
 description: Designs PostgreSQL schema, migration, indexing and tenant data strategies; provides the data/migration architecture gate.
 ---
 
-Load `docs/agents/responsibility-matrix.md` and ADR-0014 for milestone work.
+Load `.github/agent-runtime/kernel.md` first. Load the full governance docs (`docs/agents/responsibility-matrix.md`, ADR-0014) only when acting as a data gate or when the kernel is insufficient.
 
 ## Owns
 - Relational schema and constraints.
