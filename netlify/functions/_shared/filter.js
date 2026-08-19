@@ -1,73 +1,97 @@
-// filter.js — shared property-level response filtering (SEC-7.1, #338).
+// filter.js — shared property-level response filtering (SEC-7.1 #338,
+// SEC-7.2 #339).
 //
-// A single place that strips private/ownership fields from DTOs before they
-// reach the client, generalized from the legacy `publicUser` (which strips the
-// access code / hashes / Stripe billing ids from a user object) and the
-// reviews `withoutAuthorId` strip.
+// A single place that applies PER-ROLE ALLOWLISTS to DTOs before they reach
+// the client. The allowlist registry lives in visibility.js; this module is the
+// entry point that maps an object + principal through the right allowlist, and
+// it owns the nested-object handling (e.g. lending.borrower.contact) that a
+// flat list can't express. It generalizes the legacy `publicUser` (user) and
+// the reviews `withoutAuthorId` (review) strips.
 //
-// `filterFor(principal, resource, object)` returns the object with the
-// resource's private fields removed UNLESS the principal owns the object.
+// `filterFor(principal, resource, object, opts)` returns the object shaped by
+// the resource's allowlist for that principal. Supported resources:
+//   - 'user'     -> strips SECRET/credential fields (C12) from any user DTO —
+//                   exactly `publicUser`, kept here so policy consumers share
+//                   one source of truth.
+//   - 'item'     -> a non-owner gets the C1 + retained allowlist (price/serial/
+//                   notes/receipts/contact/location/adminNote stripped, and
+//                   lending.borrower.contact + lendingHistory[].borrower.contact
+//                   stripped); the owner/admin/self gets the full object.
+//   - 'review'   -> strips the internal authorId (C2) unless the principal is
+//                   the author (own); status only surfaces via `mine`.
+//   - 'feedback' -> the AUTHOR-facing DTO never includes adminNote (admin-only,
+//                   C7); the ADMIN view (`admin: true`) includes it.
 //
-// Two resources:
-//   - 'user'   -> strips SECRET_FIELDS (code, code_hash, Stripe ids) from any
-//                 user DTO (owner or not) — this is exactly `publicUser`, kept
-//                 here so policy consumers share one source of truth.
-//   - 'item'   -> strips the private COLLECTION-ITEM fields (price, serial,
-//                 notes, receipts, contact, location, adminNote, and
-//                 lending.borrower.contact) unless the principal owns the item.
-//                 `adminNote` is BOTH unwritable (see ITEM_PROTECTED_FIELDS)
-//                 and now non-leakable here too.
-//   - 'review' -> strips the internal authorId unless the principal wrote it
-//                 (generalizes the old reviews `withoutAuthorId`).
-//
-// The collection item store is per-user (a member only ever lists their OWN
-// items), so in practice item DTOs are always owned — the filter is a
-// defense-in-depth guarantee that any future shared/exposed item DTO cannot
-// leak the private fields. Reviews are shared, so the authorId strip matters.
+// Enforcement invariant (SEC-7.2, #339): authorization lives in policy.js
+// rules; WHAT fields appear in a DTO live in these allowlists + handler-
+// controlled surfaces. A rule change never bypasses the filter; a filter
+// change never bypasses the rule. Both layers are required for any shared or
+// public surface.
 
 import { publicUser } from './auth'
+import { ITEM_NON_OWNER_RETAINED, ITEM_PUBLIC_FIELDS } from './visibility'
 
-// Private fields on a collection item that must never reach a NON-OWNER's
-// DTO. These are stripped regardless of whether the field exists (optional
-// field). `notes` is user's private notes; `adminNote` is the internal
-// moderation note; `lending.borrower.contact` is the borrower's private phone/
-// email. Some (price/serial/receipts/contact/location) are not currently
-// client-writable but are enumerated here so a future schema addition can't
-// silently leak.
-const ITEM_PRIVATE_FIELDS = new Set([
-  'price', 'serial', 'notes', 'receipts', 'contact', 'location', 'adminNote',
-])
+// The allowlisted top-level fields on a NON-OWNER item DTO: C1 public catalog
+// metadata + the retained ownership-adjacent keys. Everything else (C3–C7:
+// price/serial/notes/receipts/contact/location/adminNote, plus any future
+// private field) is dropped — an EXPLICIT per-role allowlist, not a strip.
+const ITEM_NON_OWNER_FIELDS = new Set([...ITEM_PUBLIC_FIELDS, ...ITEM_NON_OWNER_RETAINED])
 
-// Strip the private fields from one item object. Deep-copies just the affected
-// keys (the rest of the object is returned unchanged).
-function stripItemPrivate(item) {
-  if (!item || typeof item !== 'object') return item
-  const rest = {}
-  for (const key of Object.keys(item)) {
-    if (ITEM_PRIVATE_FIELDS.has(key)) continue
-    if (key === 'lending' && item.lending && typeof item.lending === 'object') {
-      if (item.lending.borrower && typeof item.lending.borrower === 'object') {
-        rest.lending = { ...item.lending, borrower: { ...item.lending.borrower } }
-        delete rest.lending.borrower.contact
-      } else {
-        rest.lending = item.lending
-      }
-      continue
-    }
-    rest[key] = item[key]
+// Strip the C8 borrower.contact from a single lending object while keeping the
+// rest (the borrower name and timestamps stay public on an owned surface).
+function stripBorrowerContact(lending) {
+  if (!lending || typeof lending !== 'object') return lending
+  if (lending.borrower && typeof lending.borrower === 'object') {
+    const borrower = { ...lending.borrower }
+    delete borrower.contact
+    return { ...lending, borrower }
   }
-  return rest
+  return lending
+}
+
+// Strip borrower.contact from every entry of a lendingHistory array (C8).
+function stripHistoryContacts(history) {
+  if (!Array.isArray(history)) return history
+  return history.map((entry) => {
+    if (!entry || typeof entry !== 'object') return entry
+    if (entry.borrower && typeof entry.borrower === 'object') {
+      const borrower = { ...entry.borrower }
+      delete borrower.contact
+      return { ...entry, borrower }
+    }
+    return entry
+  })
+}
+
+// Shape a clean NON-OWNER item DTO: only allowlisted top-level fields, with the
+// lending objects present but their borrower.contact stripped. Unknown or
+// private fields are dropped entirely.
+function shapeNonOwnerItem(item) {
+  const out = {}
+  for (const key of Object.keys(item)) {
+    if (!ITEM_NON_OWNER_FIELDS.has(key)) continue
+    const value = item[key]
+    if (key === 'lending') {
+      out.lending = stripBorrowerContact(value)
+    } else if (key === 'lendingHistory') {
+      out.lendingHistory = stripHistoryContacts(value)
+    } else {
+      out[key] = value
+    }
+  }
+  return out
 }
 
 // Filter a single object for a principal. `own` tells the filter whether the
-// principal owns the object (e.g. the caller's own item / own review / the
-// owner-admin acting on any object). Returns the (possibly stripped) object.
-export function filterFor(principal, resource, object, { own = false } = {}) {
+// principal owns the object (e.g. the caller's own item / own review). `admin`
+// selects the admin view where the resource differentiates it (feedback).
+export function filterFor(principal, resource, object, { own = false, admin = false } = {}) {
   if (object === null || object === undefined) return object
   if (resource === 'user') return publicUser(object)
   if (resource === 'item') {
-    // Owner/admin sees everything; a non-owner gets the private fields stripped.
-    return own ? object : stripItemPrivate(object)
+    // Owner/self sees everything; a non-owner gets the explicit C1 + retained
+    // allowlist (private fields + borrower.contact stripped).
+    return own ? object : shapeNonOwnerItem(object)
   }
   if (resource === 'review') {
     if (own) return object
@@ -75,13 +99,22 @@ export function filterFor(principal, resource, object, { own = false } = {}) {
     delete rest.authorId
     return rest
   }
+  if (resource === 'feedback') {
+    // The ADMIN view (inbox / triage) carries the internal adminNote; the
+    // AUTHOR-facing view never does — adminNote is admin-only by construction
+    // (C7). This holds regardless of `own`.
+    if (admin === true) return object
+    const rest = { ...object }
+    delete rest.adminNote
+    return rest
+  }
   return object
 }
 
 // Filter an ARRAY of objects for a principal, with a per-item ownership
-// predicate `owns(item)`. Non-owner entries get the resource's private fields
-// stripped; the caller's own entries are untouched (so the client can still
+// predicate `owns(item)`. Non-owner entries get the resource's allowlist
+// applied; the caller's own entries are untouched (so the client can still
 // dedupe "mine").
-export function filterMany(principal, resource, objects, { owns = () => false } = {}) {
-  return objects.map((o) => filterFor(principal, resource, o, { own: owns(o) }))
+export function filterMany(principal, resource, objects, { owns = () => false, admin = false } = {}) {
+  return objects.map((o) => filterFor(principal, resource, o, { own: owns(o), admin }))
 }

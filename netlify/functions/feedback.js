@@ -32,6 +32,7 @@
 import { getStore } from '@netlify/blobs'
 import { json } from './_shared/collection-store'
 import { enforce } from './_shared/policy'
+import { filterFor } from './_shared/filter'
 import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
 import { getRepository } from './_shared/repository'
 import { readJsonBody, safeError } from './_shared/security'
@@ -133,6 +134,11 @@ function validateTriage(body, url) {
 // POST — create a feedback row/entry. The author (id + display name) comes
 // from the authenticated session, never the body; the user-agent is read from
 // the request header, also server-side.
+//
+// SEC-7.2 (#339): the POST response is the AUTHOR-facing DTO — it routes
+// through the feedback allowlist (filterFor), which strips the admin-only
+// `adminNote` (C7). The internal note is only ever present in the admin inbox
+// view, never in a submission response.
 async function handleCreate(req, feedback, user, v) {
   const item = await feedback.createFeedback({
     type: v.type,
@@ -144,7 +150,7 @@ async function handleCreate(req, feedback, user, v) {
     appVersion: v.appVersion,
     userAgent: String(req.headers?.get?.('user-agent') || '').slice(0, USER_AGENT_MAX),
   })
-  return json(201, item)
+  return json(201, filterFor(user, 'feedback', item))
 }
 
 // GET — the admin inbox, newest first, optionally status- AND/OR type-filtered.
@@ -152,19 +158,23 @@ async function handleCreate(req, feedback, user, v) {
 // private member feedback (PII-adjacent), so the response is explicitly
 // uncacheable (no-store) and never shared (private) — a proxy/CDN must not
 // serve a cached copy to a different admin session.
-async function handleList(feedback, url) {
+async function handleList(feedback, url, user) {
   const items = await feedback.listFeedback({
     status: url.searchParams.get('status') || undefined,
     type: url.searchParams.get('type') || undefined,
   })
-  return json(200, { items }, { 'Cache-Control': 'no-store, private' })
+  // SEC-7.2 (#339): the inbox is the ADMIN view — each entry keeps the internal
+  // adminNote (admin-only, C7) via the feedback allowlist (admin:true).
+  const visible = items.map((f) => filterFor(user, 'feedback', f, { admin: true }))
+  return json(200, { items: visible }, { 'Cache-Control': 'no-store, private' })
 }
 
 // PATCH — admin triage (status and/or adminNote). 404 for an unknown/junk id.
-async function handleUpdate(feedback, id, patch) {
+// The response is the ADMIN view (keeps adminNote, C7).
+async function handleUpdate(feedback, id, patch, user) {
   const updated = await feedback.updateFeedback(id, patch)
   if (!updated) return json(404, { error: 'Not found' })
-  return json(200, updated)
+  return json(200, filterFor(user, 'feedback', updated, { admin: true }))
 }
 
 // DELETE — admin removes a row. 204 on success, 404 unknown/junk id.
@@ -218,16 +228,17 @@ async function dispatch(op) {
 }
 
 // Admin inbox operations (GET/PATCH/DELETE) — already gated on the admin key
-// by the caller. Returns 405 for any other method.
-async function routeAdmin(req, url) {
-  if (req.method === 'GET') return dispatch((feedback) => handleList(feedback, url))
+// by the caller. `user` is the resolved admin session identity (used for the
+// admin-view DTO allowlist). Returns 405 for any other method.
+async function routeAdmin(req, url, user) {
+  if (req.method === 'GET') return dispatch((feedback) => handleList(feedback, url, user))
   if (req.method === 'PATCH') {
     const parsed = await readBody(req)
     if (parsed.error) return parsed.error
     const body = parsed.value
     const v = validateTriage(body, url)
     if (v.error) return v.error
-    return dispatch((feedback) => handleUpdate(feedback, v.id, v.patch))
+    return dispatch((feedback) => handleUpdate(feedback, v.id, v.patch, user))
   }
   if (req.method === 'DELETE') {
     const id = url.searchParams.get('id')
@@ -248,7 +259,7 @@ export default async function feedbackHandler(req) {
     if (req.method !== 'POST') {
       const admin = await enforce(req, 'feedback:moderate')
       if (admin.error) return admin.error
-      return routeAdmin(req, url)
+      return routeAdmin(req, url, admin.user)
     }
 
     // POST — the member submission (Bearer access code OR admin key). The

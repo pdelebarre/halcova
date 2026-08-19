@@ -211,10 +211,16 @@ describe.each(BACKENDS)('four operations on the %s backend (via the repository s
     const created = await res.json()
     expect(created).toMatchObject({
       type: 'bug', category: 'scanner', message: 'Scanner crashes on iOS 17.',
-      status: 'open', adminNote: '', authorId: USER_ID, authorName: 'Ada',
+      status: 'open', authorId: USER_ID, authorName: 'Ada',
     })
+    // SEC-7.2 (#339, N7): the AUTHOR-facing POST response never carries the
+    // admin-only `adminNote` — even when empty, it is stripped by the feedback
+    // allowlist.
+    expect(created.adminNote).toBeUndefined()
     expect(created.id).toMatch(UUID_RE)
     expect(created.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    // The admin inbox view (below) DOES carry adminNote — the admin-only field
+    // is present only on the admin surface.
 
     // GET — the admin inbox shows it, newest first.
     const list = await call('GET', '', null, `Bearer ${ADMIN_TOKEN}`)

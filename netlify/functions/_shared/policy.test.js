@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { enforce, FORBIDDEN, forbidden, POLICY, unauthorized } from './policy'
 import { filterFor, filterMany } from './filter'
+import * as visibility from './visibility'
 
 // Build the session-auth resolution mocks for enforce().
 const mocks = vi.hoisted(() => ({
@@ -189,5 +190,126 @@ describe('filter.js — property-level DTO filtering (SEC-7.1)', () => {
     expect(out.code).toBeUndefined()
     expect(out.code_hash).toBeUndefined()
     expect(out.plan).toBe('free')
+  })
+
+  // -------------------------------------------------------------------------
+  // SEC-7.2 (#339) — explicit per-role DTO allowlists (filter/visibility).
+  // These pin the classification matrix at the property level: a non-owner can
+  // never see C3–C8 on an item, a non-author never sees a review's authorId,
+  // and the author-facing feedback DTO never carries adminNote.
+  // -------------------------------------------------------------------------
+
+  it('N3 — a non-owner item DTO strips the full C3–C8 set (price/serial/notes/receipts/contact/location/adminNote + borrower.contact in lending AND lendingHistory)', () => {
+    const rich = {
+      id: 'i1', title: 'T', year: 2000, label: 'L', genre: ['Rock'],
+      // C1 metadata — retained:
+      style: ['Alt'], country: 'US', formatType: 'LP', coverImage: 'img', barcode: 'B',
+      discogsId: 1, googleBooksId: 'GB', artists: [{ id: 1, name: 'A' }], tracklist: [{ position: 'A1', title: 'T1' }],
+      released: '2000', authorsList: [{ name: 'W' }], subtitle: 'Sub', series: 'S', mainCategory: 'M',
+      snippet: 'snip', catno: 'CAT-1', formatRaw: 'LP', isbn: 'ISBN', pageCount: 100, description: 'desc',
+      // C2 ownership-adjacent (retained for #338 parity):
+      dateAdded: '2026-01-01', wishlist: true,
+      // C3–C8 — must ALL be stripped:
+      price: 20, serial: 'S1', notes: 'private', receipts: [], contact: 'c', location: 'loc',
+      adminNote: 'mod',
+      lending: { borrower: { name: 'B', contact: '555' }, lentOn: '2026-01-01' },
+      lendingHistory: [{ borrower: { name: 'Prev', contact: '000' }, lentOn: '2025-01-01', returnedOn: '2025-06-01' }],
+    }
+    const out = filterFor(member, 'item', rich, { own: false })
+    // C1 metadata retained.
+    expect(out.title).toBe('T')
+    expect(out.label).toBe('L')
+    expect(out.artists).toEqual([{ id: 1, name: 'A' }])
+    expect(out.pageCount).toBe(100)
+    // C3–C7 stripped.
+    expect(out.price).toBeUndefined()
+    expect(out.serial).toBeUndefined()
+    expect(out.notes).toBeUndefined()
+    expect(out.receipts).toBeUndefined()
+    expect(out.contact).toBeUndefined()
+    expect(out.location).toBeUndefined()
+    expect(out.adminNote).toBeUndefined()
+    // C8 — borrower.contact stripped in both lending and lendingHistory.
+    expect(out.lending.borrower.name).toBe('B')
+    expect(out.lending.borrower.contact).toBeUndefined()
+    expect(out.lendingHistory[0].borrower.name).toBe('Prev')
+    expect(out.lendingHistory[0].borrower.contact).toBeUndefined()
+  })
+
+  it('N4 — a non-author review DTO drops authorId (author keeps it)', () => {
+    const review = { id: 'r1', authorId: 'bob', rating: 5, body: 'hi' }
+    const theirs = filterFor(member, 'review', review, { own: false })
+    expect(theirs.authorId).toBeUndefined()
+    expect(theirs.rating).toBe(5)
+    const mine = filterFor(member, 'review', review, { own: true })
+    expect(mine.authorId).toBe('bob')
+  })
+
+  it('N7 — the feedback allowlist separates author vs admin views (adminNote never reaches the author)', () => {
+    const entry = { id: 'f1', message: 'hi', authorId: 'u1', status: 'open', adminNote: 'internal note', createdAt: '2026-01-01' }
+    // Author-facing view: adminNote stripped, everything else kept.
+    const author = filterFor(member, 'feedback', entry)
+    expect(author.adminNote).toBeUndefined()
+    expect(author.message).toBe('hi')
+    expect(author.status).toBe('open')
+    // Admin view: adminNote retained.
+    const adminView = filterFor(admin, 'feedback', entry, { admin: true })
+    expect(adminView.adminNote).toBe('internal note')
+  })
+
+  it('N9 — a user DTO (publicUser) never contains credentials (code/code_hash/Stripe ids)', () => {
+    const user = {
+      id: 'u1', name: 'A', email: 'a@x.com', code: 'RU-XXXX', code_hash: 'h',
+      stripeCustomerId: 'cus_x', stripeSubscriptionId: 'sub_x', stripeCheckoutSessionId: 'cs_x',
+    }
+    const out = filterFor(member, 'user', user)
+    expect(out.code).toBeUndefined()
+    expect(out.code_hash).toBeUndefined()
+    expect(out.stripeCustomerId).toBeUndefined()
+    expect(out.stripeSubscriptionId).toBeUndefined()
+    expect(out.stripeCheckoutSessionId).toBeUndefined()
+    // Public identity fields survive.
+    expect(out.name).toBe('A')
+    expect(out.email).toBe('a@x.com')
+  })
+})
+
+describe('visibility.js — visibility-state model + allowlist registry (SEC-7.2 #339)', () => {
+  const { VISIBILITY, resolveVisibility, ITEM_PUBLIC_FIELDS, ITEM_PRIVATE_FIELDS, REVIEW_PUBLIC_FIELDS, isOwnerRole } = visibility
+
+  it('reserved visibility values (FOLLOWERS/GROUP) and unknowns fail closed to PRIVATE', () => {
+    expect(resolveVisibility(VISIBILITY.PUBLIC)).toBe(VISIBILITY.PUBLIC)
+    expect(resolveVisibility(VISIBILITY.OWNER)).toBe(VISIBILITY.OWNER)
+    expect(resolveVisibility(VISIBILITY.PRIVATE)).toBe(VISIBILITY.PRIVATE)
+    // Reserved / unknown values can never widen exposure.
+    expect(resolveVisibility(VISIBILITY.FOLLOWERS)).toBe(VISIBILITY.PRIVATE)
+    expect(resolveVisibility(VISIBILITY.GROUP)).toBe(VISIBILITY.PRIVATE)
+    expect(resolveVisibility('hacker-value')).toBe(VISIBILITY.PRIVATE)
+  })
+
+  it('the public item allowlist covers exactly C1 catalog metadata + id', () => {
+    const publicSet = new Set(ITEM_PUBLIC_FIELDS)
+    for (const f of ['id', 'title', 'year', 'label', 'genre', 'style', 'country', 'formatType', 'coverImage', 'barcode', 'discogsId', 'googleBooksId', 'artists', 'tracklist', 'released', 'authorsList', 'subtitle', 'series', 'mainCategory', 'snippet', 'catno', 'formatRaw', 'isbn', 'pageCount', 'description']) {
+      expect(publicSet.has(f)).toBe(true)
+    }
+    // Private classes are NOT in the public allowlist.
+    for (const f of ITEM_PRIVATE_FIELDS) {
+      expect(publicSet.has(f)).toBe(false)
+    }
+  })
+
+  it('review public allowlist carries C9 fields, never authorId/status', () => {
+    expect(REVIEW_PUBLIC_FIELDS).toContain('rating')
+    expect(REVIEW_PUBLIC_FIELDS).toContain('body')
+    expect(REVIEW_PUBLIC_FIELDS).toContain('authorName')
+    expect(REVIEW_PUBLIC_FIELDS).not.toContain('authorId')
+    expect(REVIEW_PUBLIC_FIELDS).not.toContain('status')
+  })
+
+  it('admin/owner are the bypass roles; member/demo are not', () => {
+    expect(isOwnerRole('admin')).toBe(true)
+    expect(isOwnerRole('owner')).toBe(true)
+    expect(isOwnerRole('member')).toBe(false)
+    expect(isOwnerRole('demo')).toBe(false)
   })
 })
