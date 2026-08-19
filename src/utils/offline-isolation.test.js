@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useAuth } from '../hooks/useAuth'
 import { clearLocalUserData, getSession, saveSession } from './session'
+import { establishOfflineTrust, sessionFingerprint } from './offlineTrust'
 
 vi.mock('../api/auth', () => ({
   me: vi.fn(),
@@ -121,12 +122,19 @@ describe('sign out as A, sign in as B — B never sees A\'s local data', () => {
   })
 
   it('useAuth.login into a DIFFERENT account clears the previous account\'s local data', async () => {
-    // A is signed in with local data present. me() rejects offline on mount so
-    // the startup revalidation keeps A's cached session (never signs A out).
+    // A is signed in with local data present and is an explicitly-trusted
+    // device (#162/ADR-0015 Dec 4). me() rejects offline on mount so the
+    // startup revalidation keeps A's cached session (never signs A out).
     seedUserAData()
     saveSession({ user: MEMBER_A, session: 'tok-a' })
+    establishOfflineTrust(MEMBER_A, { sessionFp: sessionFingerprint('tok-a') })
     authApi.me.mockRejectedValue(new Error('offline'))
-    authApi.login.mockResolvedValue(MEMBER_B)
+    // Mirror the real authApi.login: exchange for a NEW session token and
+    // persist it (so getSessionToken() actually rotates, as in production).
+    authApi.login.mockImplementation(async () => {
+      saveSession({ user: MEMBER_B, session: 'tok-b' })
+      return MEMBER_B
+    })
 
     const { result } = renderHook(() => useAuth())
     await act(async () => {
@@ -141,9 +149,11 @@ describe('sign out as A, sign in as B — B never sees A\'s local data', () => {
     expect(localStorage.getItem('runout.gamif.ledger.records')).toBeNull()
   })
 
-  it('useAuth.logout clears the session AND the per-kind local data', async () => {
+  it('useAuth.logout clears the session, the per-kind local data, AND the offline-trust record (#162)', async () => {
     seedUserAData()
     saveSession({ user: MEMBER_A, session: 'tok-a' })
+    // A is an explicitly trusted device with a live bounded offline-trust grant.
+    establishOfflineTrust(MEMBER_A, { sessionFp: sessionFingerprint('tok-a') })
     authApi.me.mockRejectedValue(new Error('offline'))
     // Mirror the real authApi.logout: revoke + saveSession(null).
     authApi.logout.mockImplementation(() => { saveSession(null); return Promise.resolve() })
@@ -157,6 +167,37 @@ describe('sign out as A, sign in as B — B never sees A\'s local data', () => {
     expect(localStorage.getItem('runout.session')).toBeNull()
     expect(localStorage.getItem('runout.recentSearches.records')).toBeNull()
     expect(localStorage.getItem('runout.gamif.level.records')).toBeNull()
+    // #162: the offline-trust grant must be revoked on sign-out so the signed
+    // out account can never render cached private state offline.
+    expect(localStorage.getItem('runout.offlineTrust')).toBeNull()
+  })
+
+  it('account switch A→B clears A\'s offline-trust grant so B can never inherit it (#162)', async () => {
+    seedUserAData()
+    saveSession({ user: MEMBER_A, session: 'tok-a' })
+    establishOfflineTrust(MEMBER_A, { sessionFp: sessionFingerprint('tok-a') })
+    authApi.me.mockRejectedValue(new Error('offline'))
+    // Mirror the real authApi.login side-effect (persist the new session).
+    authApi.login.mockImplementation(async () => {
+      saveSession({ user: MEMBER_B, session: 'tok-b' })
+      return MEMBER_B
+    })
+
+    const { result } = renderHook(() => useAuth())
+    // Confirm A's trust grant exists before the switch.
+    expect(localStorage.getItem('runout.offlineTrust')).not.toBeNull()
+    await act(async () => {
+      await result.current.login('RU-BOB-CODE')
+    })
+
+    // B is signed in with a FRESH trust grant; A's trust record is gone and
+    // must not have been inherited by B (B's record is bound to B's user id).
+    expect(result.current.session.user.id).toBe('u2')
+    const trust = JSON.parse(localStorage.getItem('runout.offlineTrust') || 'null')
+    expect(trust?.userId).toBe('u2')
+    // And A can no longer pass offlineAccessAllowed (its record is gone).
+    const { offlineAccessAllowed } = await import('./offlineTrust')
+    expect(offlineAccessAllowed(MEMBER_A, { token: 'tok-a' })).toBe(false)
   })
 })
 

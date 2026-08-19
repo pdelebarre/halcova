@@ -45,6 +45,12 @@ export function getUserId() {
 //   runout.gamif.*                 local gameplay progression (ledger, level,
 //                                  badges-seen)
 //   runout.events[.enabled]        first-party opt-in analytics queue + flag
+//   runout.offlineTrust            the trusted-device/offline-authorization
+//                                  marker (#162, ADR-0015 Dec 4). It holds NO
+//                                  credential (never the token/access code); it
+//                                  must still be cleared on sign-out/account
+//                                  switch so stale offline trust never survives
+//                                  a change of account.
 // Left in place, switching accounts would surface the previous account's
 // browsing/search/view/progression state to the next user. `clearLocalUserData`
 // removes exactly those per-kind keys on sign-out and on account switch so one
@@ -64,6 +70,10 @@ const USER_SCOPED_KEY_PREFIXES = [
   // user-namespaced, so both must be cleared on account switch/logout.
   'runout.events.',
   'runout.events',
+  // Offline trust marker — cleared with the rest of the user-scoped local
+  // state (it is bound to the signed-in user, so it must not survive a
+  // sign-out or account switch).
+  'runout.offlineTrust',
 ]
 
 export function clearLocalUserData() {
