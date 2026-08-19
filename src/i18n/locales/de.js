@@ -336,6 +336,8 @@ const de = {
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
 
+  'offline.status': 'Offline — gespeicherte Inhalte werden angezeigt',
+
   // §17 Kostenloser Plan & Demo
   'plan.freeCounter': '{count} von {cap} Artikeln hinzugefügt',
   // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only

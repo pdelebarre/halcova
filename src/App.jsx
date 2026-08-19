@@ -19,6 +19,7 @@ import { useAuth } from './hooks/useAuth'
 import { getSessionToken } from './utils/session'
 import { isOverdue } from './utils/lending'
 import { t } from './i18n'
+import OnlineIndicator from './components/OnlineIndicator'
 import './App.css'
 
 const CATALOGS = { records: recordsCatalog, books: booksCatalog }
@@ -392,6 +393,13 @@ export default function App() {
         pendingCount={pendingCount}
         onLogout={logout}
       />
+
+      {/* M1 offline shell (#157): a small, accessible offline-status pill that
+          appears only when the network drops, so the user understands why live
+          data (lookups/sync) is paused while the precached shell keeps
+          rendering. Rendered globally — even on the auth screen — so it never
+          surprises anyone mid-session. */}
+      <OnlineIndicator />
 
       {/* Read-only demo notice (ADR-0001): demo visitors browse but can't add
           or edit. Leaving the demo signs out back to the auth screen. */}

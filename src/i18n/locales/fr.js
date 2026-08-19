@@ -336,6 +336,8 @@ const fr = {
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
 
+  'offline.status': 'Hors ligne — contenu enregistré affiché',
+
   // §17 Plan gratuit & démo
   'plan.freeCounter': '{count} / {cap} articles ajoutés',
   // plan.onboardNote / plan.nearLimitHint / plan.counterLabel — EN master only

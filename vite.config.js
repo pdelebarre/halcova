@@ -40,7 +40,27 @@ export default defineConfig({
         // blow past workbox's default 2 MiB precache cap — raise it so cover
         // scanning is fully available offline.
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
+        // Offline navigation fallback (M1 shell, #157): the app is an SPA with
+        // a single precached `index.html`. Without a navigateFallback, a
+        // reload or deep-link navigation while offline returns a network error
+        // for any URL that isn't literally `/`. Serving the precached shell
+        // for every navigation means the installed app reloads offline and the
+        // client router shows the right view from its own route state. Only
+        // non-asset navigations are affected; the `navigations` runtime rule
+        // below is what actually routes them.
+        navigateFallback: 'index.html',
         runtimeCaching: [
+          {
+            // Route navigations (client-route changes, reloads, deep links)
+            // NetworkFirst so online navigations always fetch fresh HTML, but
+            // fall back to the precached index.html when offline — this is
+            // what makes "reload the installed app offline" succeed. It is
+            // scoped strictly to `request.mode === 'navigate'`, so it can
+            // never capture an API/private data response.
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: { cacheName: 'navigations', networkTimeoutSeconds: 3 },
+          },
           {
             // Cover images are re-hosted through the lookup functions (T6,
             // ADR-0002) so the browser never touches 3rd-party hosts. Cache

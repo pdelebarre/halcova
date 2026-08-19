@@ -338,6 +338,9 @@ const enGB = {
   'update.newVersion': 'New version available',
   'update.reload': 'Reload',
 
+  // §16b Offline status (M1 shell, #157)
+  'offline.status': "You're offline — showing saved content",
+
   // §17 Free plan & demo — same copy as en for the baseline
   'plan.freeCounter': '{count} of {cap} items added',
   // Free-tier guidance (free-tier-guidance.md #143/#144) — mirrors en.
