@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from '../collection'
 import { LIST_CACHE_KEY } from './list-cache'
-import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
+import { RATE_LIMIT_WINDOW_MS, RL_EXHAUST_ANOMALY_THRESHOLD, windowIndex } from './rate-limit'
 import { adminSessionToken, demoSessionToken, sessionTokenFor } from './session-test-helpers'
 
 // Hoisted so the @netlify/blobs mock (which must be registered before the
@@ -494,6 +494,46 @@ describe('collection rate limiting (T5)', () => {
 
     const res = await call('GET', '?collection=records')
     expect(res.status).toBe(200)
+  })
+
+  it('emits rate_limit.served + rate_limit_exhaustion_burst when a real production write limiter is exhausted (SEC-7.4.x #383)', async () => {
+    // Drive the ACTUAL collection handler to exhaustion so the abuse signals
+    // wired through rateLimitGuard on the production endpoint actually fire.
+    // Pre-fill the WRITE bucket at its limit so every POST below is a 429.
+    seedMember()
+    collectionStore([])
+    const rlStore = createStore()
+    stores['runout-rate-limits'] = rlStore
+    rlStore.data.set('rl:collection:records:write:u1', { w: windowIndex(Date.now(), RATE_LIMIT_WINDOW_MS), count: 30 })
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      // Fire one 429 per iteration up to the exhaust-burst threshold + 1. The
+      // write limiter lives BELOW the read limiter (30 < 60), so every POST is
+      // throttled by the write bucket and never reaches the store write.
+      for (let i = 0; i < RL_EXHAUST_ANOMALY_THRESHOLD + 1; i += 1) {
+        const res = await call('POST', '?collection=records', {
+          artist: 'Radiohead', title: 'OK Computer', format: 'LP',
+        })
+        expect(res.status).toBe(429)
+        expect((await res.json()).code).toBe('RATE_LIMIT')
+        expect(Number(res.headers.get('Retry-After'))).toBeGreaterThanOrEqual(1)
+      }
+
+      const lines = spy.mock.calls.map(([line]) => String(line))
+      // Each 429 emitted a cardinality-free rate_limit.served audit (scope only
+      // — no identity/IP/cardinality).
+      const served = lines.filter((l) => l.includes('rate_limit.served'))
+      expect(served.length).toBeGreaterThanOrEqual(RL_EXHAUST_ANOMALY_THRESHOLD)
+      // The same scope+identity being 429'd N times fired the exhaust-burst
+      // anomaly ONCE per window, with an anonymous scope (never the user id).
+      const burst = lines.filter((l) => l.includes('rate_limit_exhaustion_burst'))
+      expect(burst).toHaveLength(1)
+      expect(burst[0]).not.toContain('u1')
+      expect(burst[0]).toContain('collection:records:write')
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('still rejects a write with 403 DEMO_READONLY before touching the store', async () => {

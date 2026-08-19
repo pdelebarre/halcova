@@ -132,9 +132,11 @@ describe('clientIp', () => {
     expect(clientIp(req)).toBe('203.0.113.5')
   })
 
-  it('falls back to the first x-forwarded-for entry', () => {
+  it('keys on x-nf-client-connection-ip ONLY and never trusts a client-spoofable x-forwarded-for (SEC-7.4.x F-2)', () => {
+    // With no x-nf-client-connection-ip, an x-forwarded-for must NOT be used as
+    // the abuse-limit key — XFF can be spoofed by a client, so it is dropped.
     const req = { headers: headers({ 'x-forwarded-for': '198.51.100.9, 10.0.0.1' }) }
-    expect(clientIp(req)).toBe('198.51.100.9')
+    expect(clientIp(req)).toBe('')
   })
 
   it('returns an empty string when no IP header is present', () => {

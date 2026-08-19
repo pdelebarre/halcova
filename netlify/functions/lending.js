@@ -20,7 +20,8 @@ import { filterFor } from './_shared/filter'
 import { effectiveFeatures } from './_shared/entitlements'
 import { storeNameFor } from './_shared/users'
 import { readJsonBody, safeError } from './_shared/security'
-import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { rateLimitGuard, rateLimitIdentity } from './_shared/rate-limit'
+import { anomalyScope } from './_shared/anomaly'
 
 const FEATURE_OFF_MSG = "Lending isn't enabled for your account."
 const HISTORY_CAP = 10
@@ -47,13 +48,20 @@ export default async function lending(req) {
   // / stuck loop must not hammer it. Members/owner keyed by user id; the
   // shared demo identity is keyed by client IP (and demo is read-only anyway).
   // The limiter degrades open — a store failure never 500s the request.
+  // SEC-7.4.x (#383): routed through rateLimitGuard; the demo IP-keyed limiter
+  // gets an anonymous burstScope (the raw IP never becomes a burst scope).
   const identity = rateLimitIdentity(user, req)
   if (identity) {
-    const limiter = createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'lending', limit: LENDING_RATE_LIMIT })
-    const rl = await limiter(identity)
-    if (rl.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-    }
+    const burstScope = user.role === 'demo' ? anomalyScope('rlx:lending', identity) : undefined
+    const rl = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'lending',
+      limit: LENDING_RATE_LIMIT,
+      identity,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope,
+    })
+    if (rl) return rl
   }
 
   const body = await readBody(req)

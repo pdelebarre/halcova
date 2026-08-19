@@ -51,7 +51,8 @@ import {
   priceIdForPlan,
   retrieveSession,
 } from './_shared/stripe'
-import { createRateLimiter, clientIp } from './_shared/rate-limit'
+import { clientIp, rateLimitGuard } from './_shared/rate-limit'
+import { anomalyScope } from './_shared/anomaly'
 import { materializeCheckoutSession } from './_shared/entitlements'
 import { json, readJsonBody, safeError } from './_shared/security'
 import { emailHash, logAudit } from './_shared/audit'
@@ -65,12 +66,6 @@ const RATE_LIMITS_STORE = 'runout-rate-limits'
 const CHECKOUT_IP_LIMIT = Number(process.env.RUNOUT_PAYMENT_CHECKOUT_IP_RATE_LIMIT) || 20
 const CHECKOUT_EMAIL_LIMIT = Number(process.env.RUNOUT_PAYMENT_CHECKOUT_RATE_LIMIT) || 5
 const STATUS_IP_LIMIT = Number(process.env.RUNOUT_PAYMENT_STATUS_IP_RATE_LIMIT) || 60
-
-// The shared 429 for both limited surfaces — same `{ error, code }` + Retry-After
-// contract as auth.js (RATE_LIMIT).
-function rateLimited(rl) {
-  return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-}
 
 // A thrown helper error carrying its own HTTP status + `{ error, code }` body —
 // caught once in the default export and formatted there.
@@ -169,18 +164,32 @@ async function handleCheckout(body, req) {
   // M1: `checkout` is pre-auth (a prospect checks out with email alone) — rate
   // limit before any identity/Stripe work. Per-IP bounds a flood from one
   // source; per-email bounds one inbox being spammed into unbounded pending
-  // requests + Checkout sessions (Stripe cost/quota).
+  // requests + Checkout sessions (Stripe cost/quota). SEC-7.4.x (#383): routed
+  // through rateLimitGuard; per-IP limiter gets an anonymous burstScope.
   const ip = clientIp(req)
   if (ip) {
-    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'payment:checkout:ip', limit: CHECKOUT_IP_LIMIT })(ip)
-    if (byIp.limited) return rateLimited(byIp)
+    const byIp = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'payment:checkout:ip',
+      limit: CHECKOUT_IP_LIMIT,
+      identity: ip,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope: anomalyScope('rlx:payment:checkout:ip', ip),
+    })
+    if (byIp) return byIp
   }
 
   const identity = await resolveIdentity(req, body)
   const email = identity.kind === 'member' ? cleanEmail(identity.user.email) : cleanEmail(identity.email)
   if (email) {
-    const byEmail = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'payment:checkout:email', limit: CHECKOUT_EMAIL_LIMIT })(email)
-    if (byEmail.limited) return rateLimited(byEmail)
+    const byEmail = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'payment:checkout:email',
+      limit: CHECKOUT_EMAIL_LIMIT,
+      identity: email,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+    })
+    if (byEmail) return byEmail
   }
 
   const plan = String(body.plan || '').trim()
@@ -239,11 +248,19 @@ async function handleStatus(body, req) {
 
   // M1: `status` is unauthenticated (anyone who ever sees `?session_id=…` can
   // poll it) — per-IP limit so one source can't hammer Stripe retrieve calls
-  // (cost/quota) and can't brute-force a session id.
+  // (cost/quota) and can't brute-force a session id. SEC-7.4.x (#383): routed
+  // through rateLimitGuard; per-IP limiter gets an anonymous burstScope.
   const ip = clientIp(req)
   if (ip) {
-    const byIp = await createRateLimiter({ store: getStore(RATE_LIMITS_STORE), scope: 'payment:status:ip', limit: STATUS_IP_LIMIT })(ip)
-    if (byIp.limited) return rateLimited(byIp)
+    const byIp = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'payment:status:ip',
+      limit: STATUS_IP_LIMIT,
+      identity: ip,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope: anomalyScope('rlx:payment:status:ip', ip),
+    })
+    if (byIp) return byIp
   }
 
   // M2 (SEC-EPIC-1, #176): a signed-in member ALREADY holds a session —

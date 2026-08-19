@@ -30,7 +30,8 @@ import { getStore } from '@netlify/blobs'
 import { COLLECTIONS, json } from './_shared/collection-store'
 import { enforce, forbidden } from './_shared/policy'
 import { filterMany } from './_shared/filter'
-import { consumeDistinct, createRateLimiter, rateLimitIdentity, rateLimitKey } from './_shared/rate-limit'
+import { consumeDistinct, rateLimitGuard, rateLimitIdentity, rateLimitKey } from './_shared/rate-limit'
+import { anomalyScope } from './_shared/anomaly'
 import { isPostgresConfigured, db } from './_shared/postgres'
 import { createReviewsRepo } from './_shared/repositories/reviews-repo'
 import { createReviewsBlobStore } from './_shared/reviews-blob'
@@ -234,19 +235,22 @@ function planError(user, kind) {
 
 // Writes are rate-limited per identity and blocked for the read-only demo (the
 // SHARED reviews store must never be polluted by the constant demo identity).
-// Order mirrors collection.js: rate limit, then demo guard.
+// Order mirrors collection.js: rate limit, then demo guard. SEC-7.4.x (#383):
+// routed through rateLimitGuard so each 429 emits `rate_limit.served` + the
+// exhaust burst signal; the demo IP-keyed limiter gets an anonymous burstScope.
 async function writeGuardError(req, user, kind, sourceId) {
   const identity = rateLimitIdentity(user, req)
   if (identity) {
-    const limiter = createRateLimiter({
+    const burstScope = user.role === 'demo' ? anomalyScope(`rlx:reviews:${kind}`, identity) : undefined
+    const rl = await rateLimitGuard({
       store: getStore(RATE_LIMITS_STORE),
       scope: `reviews:${kind}`,
       limit: REVIEWS_RATE_LIMIT,
+      identity,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope,
     })
-    const rl = await limiter(identity)
-    if (rl.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-    }
+    if (rl) return rl
     // M3 — per-release write limiting: the limiter above counts every write
     // (edits included) per identity per kind, so one member could open
     // REVIEWS_RATE_LIMIT new threads/min across arbitrary releases. This cap
@@ -274,20 +278,21 @@ async function writeGuardError(req, user, kind, sourceId) {
 
 // GET reads are rate-limited per identity with a GENEROUS cap; the shared
 // reviews store must not be scanned unbounded times by one client. Returns a
-// 429 Response on limit, else null.
+// 429 Response on limit, else null. SEC-7.4.x (#383): routed through
+// rateLimitGuard; the demo IP-keyed limiter gets an anonymous burstScope.
 async function readGuardError(req, user) {
   const identity = rateLimitIdentity(user, req)
   if (!identity) return null
-  const limiter = createRateLimiter({
+  const burstScope = user.role === 'demo' ? anomalyScope('rlx:reviews:read', identity) : undefined
+  const rl = await rateLimitGuard({
     store: getStore(RATE_LIMITS_STORE),
     scope: 'reviews:read',
     limit: REVIEWS_READ_LIMIT,
+    identity,
+    anomalyStore: getStore(RATE_LIMITS_STORE),
+    burstScope,
   })
-  const rl = await limiter(identity)
-  if (rl.limited) {
-    return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-  }
-  return null
+  return rl
 }
 
 // Map the HTTP method to the SEC-7.1 policy action. Unknown methods fall back

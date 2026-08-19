@@ -10,7 +10,8 @@ import { parsePagination, sliceIds, isDefaultPage } from './_shared/pagination'
 import { ensureOwnedCount, adjustOwnedCount, wishlistToggleDelta } from './_shared/counts'
 import { readListCache, writeListCache, invalidateListCache } from './_shared/list-cache'
 import { pickItemFields, validateItem } from './_shared/item-fields'
-import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { rateLimitGuard, rateLimitIdentity } from './_shared/rate-limit'
+import { anomalyScope } from './_shared/anomaly'
 import { isPostgresConfigured } from './_shared/postgres'
 import { handlePostgres } from './_shared/collection-postgres'
 import { badRequest, readJsonBody, safeError } from './_shared/security'
@@ -231,31 +232,35 @@ export default async (req) => {
   // the blob store. Members/owner are keyed by user id; the shared demo
   // identity is keyed by client IP so one demo visitor never throttles the
   // whole demo. Skipped when there's no identity to key on (e.g. a demo
-  // visitor with no forwarded IP header).
+  // visitor with no forwarded IP header). SEC-7.4.x (#383): routed through
+  // rateLimitGuard so 429s emit `rate_limit.served` + the exhaust burst signal.
+  // The demo identity keys on the client IP, so its burstScope is an anonymous
+  // anomalyScope hash — the raw IP never becomes a burst scope.
   const identity = rateLimitIdentity(user, req)
   if (identity) {
-    const limiter = createRateLimiter({
+    const burstScope = user.role === 'demo' ? anomalyScope(`rlx:collection:${collection}`, identity) : undefined
+    const rl = await rateLimitGuard({
       store: getStore(RATE_LIMITS_STORE),
       scope: `collection:${collection}`,
       limit: COLLECTION_RATE_LIMIT,
+      identity,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope,
     })
-    const rl = await limiter(identity)
-    if (rl.limited) {
-      return json(429, { error: 'Too many requests — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-    }
+    if (rl) return rl
     // SEC-7.4 (#341): write sub-limit on top of the shared read limit. Only
     // POST/PUT/DELETE (state-changing) consume this bucket; reads stay at the
     // higher COLLECTION_RATE_LIMIT.
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      const writeLimiter = createRateLimiter({
+      const writeRl = await rateLimitGuard({
         store: getStore(RATE_LIMITS_STORE),
         scope: `collection:${collection}:write`,
         limit: COLLECTION_WRITE_LIMIT,
+        identity,
+        anomalyStore: getStore(RATE_LIMITS_STORE),
+        burstScope,
       })
-      const writeRl = await writeLimiter(identity)
-      if (writeRl.limited) {
-        return json(429, { error: 'Too many changes — try again shortly.', code: 'RATE_LIMIT' }, { 'Retry-After': String(writeRl.retryAfter) })
-      }
+      if (writeRl) return writeRl
     }
   }
 

@@ -33,7 +33,7 @@ import { getStore } from '@netlify/blobs'
 import { json } from './_shared/collection-store'
 import { enforce } from './_shared/policy'
 import { filterFor } from './_shared/filter'
-import { createRateLimiter, rateLimitIdentity } from './_shared/rate-limit'
+import { rateLimitGuard, rateLimitIdentity } from './_shared/rate-limit'
 import { getRepository } from './_shared/repository'
 import { readJsonBody, safeError } from './_shared/security'
 
@@ -187,20 +187,20 @@ async function handleDelete(feedback, id) {
 // Rate-limit POST submissions per identity (user id; owner is 'owner'). A
 // limited identity gets a 429 + Retry-After; the limiter degrades to letting
 // the request through if its own store read/write fails (never a 500).
+// SEC-7.4.x (#383): routed through rateLimitGuard so each 429 emits
+// `rate_limit.served` + the exhaust burst signal (user-keyed scope anonymous).
 async function submissionGuardError(req, user) {
   const identity = rateLimitIdentity(user, req)
   if (!identity) return null
-  const limiter = createRateLimiter({
+  const rl = await rateLimitGuard({
     store: getStore(RATE_LIMITS_STORE),
     scope: 'feedback',
     limit: FEEDBACK_RATE_LIMIT,
     windowMs: FEEDBACK_RATE_WINDOW_MS,
+    identity,
+    anomalyStore: getStore(RATE_LIMITS_STORE),
   })
-  const rl = await limiter(identity)
-  if (rl.limited) {
-    return json(429, { error: 'Too many submissions — try again later.', code: 'RATE_LIMIT' }, { 'Retry-After': String(rl.retryAfter) })
-  }
-  return null
+  return rl
 }
 
 // Run one op against the repository seam's feedback store. When Postgres is
