@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useLookup } from './useLookup'
 
+// T8 (#286): the on-device Tesseract worker can't run in jsdom — stub
+// recognizeImage and let the REAL extractSearchQuery turn the fake lines into
+// query/barcode (same pattern as cover-scan.int.test.jsx).
+vi.mock('../utils/ocr', () => ({
+  recognizeImage: vi.fn(),
+}))
+import * as ocr from '../utils/ocr'
+
 const RECORD_PROVIDERS = ['discogs', 'musicbrainz']
 
 function makeApi() {
@@ -25,6 +33,9 @@ describe('useLookup', () => {
 
   beforeEach(() => {
     api = makeApi()
+    // vi.fn() call history from a previous test leaks otherwise (e.g. a
+    // barcode lookup would still "have been called" in the next test).
+    vi.clearAllMocks()
   })
 
   it('starts idle with no results/error and a clean OCR phase', () => {
@@ -191,5 +202,106 @@ describe('useLookup', () => {
     act(() => result.current.finishOcr())
     expect(result.current.ocr).toBe('idle')
     expect(result.current.state).toBe('idle')
+  })
+
+  // T8 (#286): OCR-as-automatic-fallback — runOcr reads a cover, then feeds
+  // the extracted barcode/text back through the SAME chain as a scan.
+  describe('runOcr (cover OCR fallback)', () => {
+    // Build a fake Tesseract line; bbox area drives the ranking (same as the
+    // cover-scan integration test).
+    function ocrLine(text, { confidence = 85, area = 1000 } = {}) {
+      const side = Math.sqrt(area)
+      return { text, confidence, bbox: { x0: 0, y0: 0, x1: side, y1: side, width: side, height: side } }
+    }
+
+    it('a readable barcode re-enters the chain via barcode lookup (barcode wins over text)', async () => {
+      ocr.recognizeImage.mockResolvedValue({
+        text: 'Kind of Blue\n0 76732-57341-2 9',
+        lines: [ocrLine('Kind of Blue', { area: 3000 }), ocrLine('0 76732-57341-2 9', { area: 900 })],
+      })
+      api.searchByBarcode.mockResolvedValue(attachSource([{ discogsId: 101, title: 'Miles Davis - Kind of Blue' }], 'discogs'))
+
+      const { result } = renderHook(() => useLookup({ api, providers: RECORD_PROVIDERS, kind: 'records' }))
+      let out
+      await act(async () => {
+        out = await result.current.runOcr(new Blob(['cover']))
+      })
+
+      expect(ocr.recognizeImage).toHaveBeenCalledTimes(1)
+      expect(api.searchByBarcode).toHaveBeenCalledWith('0767325734129')
+      expect(api.searchByText).not.toHaveBeenCalled()
+      expect(out.provider).toBe('discogs')
+      expect(result.current.state).toBe('done')
+      // runOcr drove the capture phase; the caller resets it with finishOcr().
+      expect(result.current.ocr).toBe('ocr-capturing')
+    })
+
+    it('readable text re-enters the chain via text lookup when no barcode shows', async () => {
+      ocr.recognizeImage.mockResolvedValue({
+        text: 'Miles Davis\nKind of Blue',
+        lines: [ocrLine('Miles Davis', { area: 5000 }), ocrLine('Kind of Blue', { area: 3000 })],
+      })
+      api.searchByText.mockResolvedValue(attachSource([{ discogsId: 101, title: 'Miles Davis - Kind of Blue' }], 'discogs'))
+
+      const { result } = renderHook(() => useLookup({ api, providers: RECORD_PROVIDERS, kind: 'records' }))
+      let out
+      await act(async () => {
+        out = await result.current.runOcr(new Blob(['cover']))
+      })
+
+      expect(ocr.recognizeImage).toHaveBeenCalledTimes(1)
+      expect(api.searchByText).toHaveBeenCalledWith('Miles Davis Kind of Blue')
+      expect(api.searchByBarcode).not.toHaveBeenCalled()
+      expect(out.results).toBeTruthy()
+    })
+
+    it('passes kind through to extractSearchQuery (books title+author query)', async () => {
+      ocr.recognizeImage.mockResolvedValue({
+        text: 'A Wizard of Earthsea\nUrsula K. Le Guin',
+        lines: [ocrLine('A Wizard of Earthsea', { area: 5000 }), ocrLine('Ursula K. Le Guin', { area: 3000 })],
+      })
+      api.searchByText.mockResolvedValue(attachSource([{ googleBooksId: 'g1', title: 'A Wizard of Earthsea' }], 'books'))
+
+      const { result } = renderHook(() => useLookup({ api, providers: ['books', 'openLibrary'], kind: 'books' }))
+      let out
+      await act(async () => {
+        out = await result.current.runOcr(new Blob(['cover']))
+      })
+
+      expect(api.searchByText).toHaveBeenCalledWith('A Wizard of Earthsea Ursula K. Le Guin')
+      expect(out.provider).toBe('books')
+    })
+
+    it('no readable text → NO_READABLE_TEXT, never searches and never opens a camera', async () => {
+      ocr.recognizeImage.mockResolvedValue({
+        text: '',
+        lines: [ocrLine('© 2024 All Rights Reserved', { confidence: 40, area: 4000 })],
+      })
+
+      const { result } = renderHook(() => useLookup({ api, providers: RECORD_PROVIDERS, kind: 'records' }))
+      await act(async () => {
+        // The hook owns NO camera — it throws a coded error instead, which the
+        // caller maps to coverScan.noText; opening the camera is always a tap.
+        await expect(result.current.runOcr(new Blob(['cover']))).rejects.toMatchObject({ code: 'NO_READABLE_TEXT' })
+      })
+
+      expect(api.searchByBarcode).not.toHaveBeenCalled()
+      expect(api.searchByText).not.toHaveBeenCalled()
+    })
+
+    it('re-enters the chain exactly once through the single server endpoint', async () => {
+      ocr.recognizeImage.mockResolvedValue({
+        text: 'Kind of Blue\n0 76732-57341-2 9',
+        lines: [ocrLine('Kind of Blue', { area: 3000 }), ocrLine('0 76732-57341-2 9', { area: 900 })],
+      })
+      api.searchByBarcode.mockResolvedValue(attachSource([{ discogsId: 101 }], 'discogs'))
+
+      const { result } = renderHook(() => useLookup({ api, providers: RECORD_PROVIDERS, kind: 'records' }))
+      await act(async () => {
+        await result.current.runOcr(new Blob(['cover']))
+      })
+
+      expect(api.searchByBarcode).toHaveBeenCalledTimes(1)
+    })
   })
 })

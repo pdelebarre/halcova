@@ -25,10 +25,14 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { lookupChain } from '../api/lookupChain'
+import { extractSearchQuery } from '../utils/ocrText'
 
 const NO_MATCH = 'NO_MATCH'
+// T8 (#286): coded error for "OCR read nothing usable" — the caller maps it to
+// the catalog's `coverScan.noText` copy. The camera is NEVER auto-opened.
+const NO_READABLE_TEXT = 'NO_READABLE_TEXT'
 
-export function useLookup({ api, providers }) {
+export function useLookup({ api, providers, kind }) {
   const [state, setState] = useState('idle') // idle | searching | done | no-match | error
   const [ocr, setOcr] = useState('idle') // idle | ocr-needed | ocr-capturing
   const [results, setResults] = useState(null)
@@ -99,5 +103,25 @@ export function useLookup({ api, providers }) {
     setError(null)
   }, [])
 
-  return { state, ocr, results, error, provider, attempts, run, retry, beginOcr, capturingOcr, finishOcr }
+  // T8 (#286): OCR-as-fallback. Run on-device OCR on a captured cover blob and
+  // feed whatever is readable back through the SAME chain as a scan: a
+  // readable barcode re-enters via `run('barcode', …)` first, else the text
+  // query via `run('text', …)`. `kind` (records|books) is captured from the
+  // caller's catalog so `extractSearchQuery` ranks the right lines — its
+  // signature is untouched. When nothing readable survives, throws a coded
+  // NO_READABLE_TEXT error (the camera never auto-opens). The heavy Tesseract
+  // worker is lazy-imported per capture — never on shell mount.
+  const runOcr = useCallback(async (blob) => {
+    capturingOcr()
+    const { recognizeImage } = await import('../utils/ocr')
+    const { lines } = await recognizeImage(blob)
+    const { query, barcode } = extractSearchQuery(lines, kind)
+    if (barcode) return run('barcode', barcode)
+    if (query) return run('text', query)
+    const err = new Error('No readable text on the cover.')
+    err.code = NO_READABLE_TEXT
+    throw err
+  }, [capturingOcr, run, kind])
+
+  return { state, ocr, results, error, provider, attempts, run, retry, runOcr, beginOcr, capturingOcr, finishOcr }
 }

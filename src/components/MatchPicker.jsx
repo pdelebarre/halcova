@@ -4,6 +4,10 @@ import './MatchPicker.css'
 export default function MatchPicker({
   title, matches, loading, errorMsg, note,
   onPick, onRetrySearch, onManual, onClose,
+  // T8 (#286): optional cover-OCR fallback offer. Only rendered when
+  // `onScanCover` is provided — existing callers (manual-add modals) that
+  // don't pass it are unchanged.
+  onScanCover, coverScanLabel = t('lookup.scanCoverOffer'),
   loadingLabel = 'Looking it up…',
   noMatchLabel = 'No matches found.',
 }) {
@@ -21,6 +25,11 @@ export default function MatchPicker({
         {!loading && !errorMsg && matches?.length === 0 && (
           <div className="sheet-empty">
             <p>{noMatchLabel}</p>
+            {onScanCover && (
+              <button type="button" className="btn btn-ghost" onClick={onScanCover} style={{ marginTop: 8 }}>
+                {coverScanLabel}
+              </button>
+            )}
           </div>
         )}
 
@@ -54,6 +63,11 @@ export default function MatchPicker({
         <div className="sheet-actions">
           {onRetrySearch && (
             <button className="btn btn-ghost" onClick={onRetrySearch}>{t('add.searchByTitleInstead')}</button>
+          )}
+          {/* T8 (#286): in the error state the user gets Retry + Scan the cover —
+              the offer only appears when the caller wired onScanCover. */}
+          {onScanCover && errorMsg && !loading && (
+            <button type="button" className="btn btn-ghost" onClick={onScanCover}>{coverScanLabel}</button>
           )}
           <button className="btn btn-ghost" onClick={onManual}>{t('add.addManually')}</button>
         </div>

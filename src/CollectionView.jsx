@@ -14,7 +14,6 @@ import { useCollection } from './hooks/useCollection'
 import { useLookup } from './hooks/useLookup'
 import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
-import { extractSearchQuery } from './utils/ocrText'
 import { itemInBin } from './utils/browse'
 import { sanitizeItemForCreate } from './utils/sanitizeItem'
 import { track } from './utils/track'
@@ -260,7 +259,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // scan, cover OCR, manual-add text search). The hook walks catalog.providers
   // through lookupChain; catalog.api stays the single primary endpoint (the
   // server resolves primary → fallback in one call and marks the winner).
-  const lookup = useLookup({ api: catalog.api, providers: catalog.providers })
+  // T8 (#286): `kind` feeds runOcr's extractSearchQuery (verbatim signature).
+  const lookup = useLookup({ api: catalog.api, providers: catalog.providers, kind: catalog.kind })
 
   // RES-1.5 T5 (#290): map the server's "winning source" marker to a friendly,
   // localizable note. Returns '' for a primary/unknown source so the picker
@@ -275,6 +275,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     const name = fallbackNames[source]
     if (!name) return ''
     return copy.lookup?.foundVia ? copy.lookup.foundVia(name) : ''
+  }
+
+  // T8 (#286): offline detection follows the app's existing convention
+  // (OnlineIndicator / PaywallModal read navigator.onLine). Cover OCR runs
+  // on-device, so the scan-cover offer stays up offline; only the chain's
+  // network steps fail — when they do, the picker shows the offline line.
+  function isOfflineNow() {
+    return typeof navigator !== 'undefined' && navigator.onLine === false
+  }
+  function offlineLine() {
+    return copy.lookup?.offline || t('lookup.offline')
   }
 
   function showToast(msg, kind = 'add') {
@@ -645,42 +656,31 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       // empty picker as today's empty-array path); ALL_PROVIDERS_FAILED /
       // RATE_LIMIT / etc. throw with err.code — the error path keeps the two
       // distinct.
-      setPickerState({
-        matches: [],
-        loading: false,
-        errorMsg: err.code === 'NO_MATCH' ? '' : err.message,
-      })
+      // T8 (#286): offline — the chain can only fail with a network error when
+      // there's no connection, so show the offline line instead of the generic
+      // message (manual-add + scan-cover offer still show in the picker).
+      let errorMsg = err.message
+      if (err.code === 'NO_MATCH') errorMsg = ''
+      if (isOfflineNow()) errorMsg = offlineLine()
+      setPickerState({ matches: [], loading: false, errorMsg })
     }
   }
 
-  // Cover OCR (§ cover-scan-ocr): read artist/title (or a visible barcode) off
-  // a photo of the cover with on-device Tesseract, then funnel whatever we get
-  // through the SAME duplicate-checked add path as a barcode scan. The modal
-  // stays open on a visible "Reading the cover…" progress (`coverState.busy`)
-  // while OCR + lookup run; on success it switches to the picker/result, on
-  // failure the error is shown INSIDE the cover flow (retry / re-pick). Must
-  // never crash on empty/weird OCR output — there's no error boundary.
+  // Cover OCR (§ cover-scan-ocr, T8 #286): the capture modal hands over a
+  // downscaled blob; the shared hook (`useLookup.runOcr`) lazy-imports the
+  // on-device Tesseract worker, extracts a barcode/text via extractSearchQuery
+  // and re-enters the SAME lookupChain as a scan. The modal stays open on a
+  // visible "Reading the cover…" progress (`coverState.busy`) while OCR +
+  // lookup run; on success it switches to the picker/result, on failure the
+  // error is shown INSIDE the cover flow (retry / re-pick) — unless offline,
+  // where the picker surfaces the offline line + manual-add (OCR itself is
+  // on-device, so the scan-cover offer stays available). Must never crash on
+  // empty/weird OCR output — there's no error boundary.
   async function handleCoverCaptured(blob) {
     setCoverState({ busy: true, error: '' })
     lookup.beginOcr()
     try {
-      const { recognizeImage } = await import('./utils/ocr')
-      lookup.capturingOcr()
-      const { lines } = await recognizeImage(blob)
-      const { query, barcode } = extractSearchQuery(lines, catalog.kind)
-      // RES-1.7 T7 (#293): a readable barcode → barcode lookup, readable text
-      // → text lookup — both funnel through the shared useLookup + lookupChain.
-      let out = null
-      if (barcode) {
-        out = await lookup.run('barcode', barcode)
-      } else if (query) {
-        out = await lookup.run('text', query)
-      }
-      // Nothing readable on the cover — surface a friendly hint instead of
-      // fabricating a search. Stays inside the cover flow.
-      if (out === null) {
-        throw new Error(copy.coverScan?.noText || t('coverScan.noText'))
-      }
+      const out = await lookup.runOcr(blob)
       const safeResults = Array.isArray(out.results) ? out.results : []
       // A successful lookup means a token is configured — drop any hint.
       setRecordsNoToken(false)
@@ -712,6 +712,22 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
         setCoverState({ busy: false, error: '' })
         setModal('pick')
         setPickerState({ matches: [], loading: false, errorMsg: '' })
+        return
+      }
+      // T8 (#286): offline — the chain can only fail with a network error when
+      // there's no connection. Land in the picker with the offline line +
+      // manual-add; the scan-cover offer is still shown (OCR is on-device).
+      if (err?.code === 'ALL_ERROR' && isOfflineNow()) {
+        setCoverState({ busy: false, error: '' })
+        setModal('pick')
+        setPickerState({ matches: [], loading: false, errorMsg: offlineLine() })
+        return
+      }
+      // T8 (#286): nothing readable on the cover — reuse coverScan.noText copy
+      // (the hook surfaced NO_READABLE_TEXT). Stays inside the cover flow so
+      // the user can retry / pick a photo again — never a blank picker.
+      if (err?.code === 'NO_READABLE_TEXT') {
+        setCoverState({ busy: false, error: copy.coverScan?.noText || t('coverScan.noText') })
         return
       }
       // OCR or lookup failure: surface the error inside the cover flow so the
@@ -1307,6 +1323,12 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
           onRetrySearch={() => setModal('manual')}
           onManual={() => setModal('manual')}
           onClose={() => setModal(null)}
+          // T8 (#286): OFFER (never auto-open) cover OCR from the picker's
+          // empty/error states. Opening the camera is always a user tap —
+          // openCoverScan is only ever invoked from a button click. OCR runs
+          // on-device, so the offer stays up offline too.
+          onScanCover={isDemo ? undefined : openCoverScan}
+          coverScanLabel={copy.lookup?.scanCoverOffer || t('lookup.scanCoverOffer')}
           loadingLabel={copy.lookingUp}
           noMatchLabel={copy.noMatch}
         />

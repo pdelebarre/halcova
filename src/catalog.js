@@ -119,6 +119,10 @@ export const recordsCatalog = {
     // `scanCover` reuses the shared coverScan flow (no raw-key rendering).
     lookup: {
       scanCover: 'Scan a cover',
+      // T8 (#286): picker offer (empty/error states) — OCR can read the cover.
+      scanCoverOffer: 'Scan the cover — the app can read it',
+      // T8 (#286): offline line — OCR is on-device, only the chain needs a net.
+      offline: "You're offline — lookups need a connection. Cover scanning still works on-device.",
       fallbackNote: 'Matched via the fallback catalog source.',
       tryingFallback: 'No primary match — trying the fallback catalog…',
       foundVia: (name) => `Matched via ${name}`,
@@ -632,6 +636,10 @@ export const booksCatalog = {
     // NO_MATCH).
     lookup: {
       scanCover: 'Scan a cover',
+      // T8 (#286): picker offer (empty/error states) — OCR can read the cover.
+      scanCoverOffer: 'Scan the cover — the app can read it',
+      // T8 (#286): offline line — OCR is on-device, only the chain needs a net.
+      offline: "You're offline — lookups need a connection. Cover scanning still works on-device.",
       fallbackNote: 'Matched via the fallback catalog source.',
       tryingFallback: 'No primary match — trying the fallback catalog…',
       foundVia: (name) => `Matched via ${name}`,
