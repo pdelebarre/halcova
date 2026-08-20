@@ -14,6 +14,8 @@ import {
   shouldAbandon,
   enqueue,
   drain,
+  enqueuePartialSave,
+  piggybackDrain,
 } from './lookup-queue'
 
 describe('mergeFields — idempotent field merge', () => {
@@ -224,5 +226,54 @@ describe('drain — tenant isolation + idempotent merge + re-run no-op', () => {
     const summary = await drain({ queue, items, lookup }, { now: Date.now() })
     expect(summary.failed).toBe(1)
     expect(summary.abandoned).toBe(1)
+  })
+})
+
+describe('piggybackDrain + enqueuePartialSave — opportunistic wiring (T6, #285)', () => {
+  function makeRepo(queue) {
+    const rows = queue?._rows || {}
+    return {
+      lookupQueue: queue || null,
+      items: null, // no merge repo -> the drained data itself counts as merged
+      _rows: rows,
+    }
+  }
+
+  it('enqueuePartialSave enqueues a barcode re-trigger for a partial item', async () => {
+    const rows = {}
+    const queue = { enqueue: async (e) => { rows[e.key] = e; return e.key } }
+    const id = await enqueuePartialSave(queue, {
+      user_id: 'u1', kind: 'records', item_id: 'item-1', barcode: '0123456789012', provider: 'discogs',
+    })
+    expect(id).toBe('barcode:0123456789012')
+    expect(rows['barcode:0123456789012']).toMatchObject({
+      user_id: 'u1', kind: 'records', item_id: 'item-1',
+      payload: { provider: 'discogs', action: 'searchBarcode', barcode: '0123456789012' },
+    })
+  })
+
+  it('piggybackDrain drains THIS tenant\'s due rows on a later successful lookup', async () => {
+    const rows = {}
+    const due = [{
+      id: 'row-1', kind: 'records', item_id: 'item-1', attempts: 0,
+      payload: { provider: 'discogs', key: 'barcode:0123456789012' },
+    }]
+    const queue = {
+      _rows: rows,
+      async listPendingUsers() { return ['u1'] },
+      async claimDue() { return due },
+      async markDone(userId, id) { rows[id] = { ...(rows[id] || {}), status: 'done' } },
+      async markFailed() {},
+    }
+    const lookup = async () => ({ ok: true, data: { title: 'Completed', label: 'Label' } })
+    const summary = await piggybackDrain(makeRepo(queue), lookup, { maxPerRun: 3 })
+    expect(summary.processed).toBe(1)
+    expect(summary.enriched).toBe(1)
+    expect(rows['row-1'].status).toBe('done')
+  })
+
+  it('piggybackDrain is best-effort: a missing queue returns zeros without throwing', async () => {
+    const summary = await piggybackDrain(makeRepo(null), async () => ({ ok: true, data: {} }))
+    expect(summary).toEqual({ processed: 0, enriched: 0, failed: 0, abandoned: 0 })
   })
 })

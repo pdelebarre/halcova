@@ -29,8 +29,9 @@ import { lookupFetch } from './_shared/lookup-fetch'
 export const config = { schedule: '@hourly' }
 
 // The fixed, allow-listed provider base hosts the drain may re-fetch (SSRF
-// control — never derived from client input, never arbitrary).
-const FIXED_BASES = {
+// control — never derived from client input, never arbitrary). Exported for the
+// drain-logic tests (SSRF fixed-host assertion).
+export const FIXED_BASES = {
   discogs: 'https://api.discogs.com',
   musicbrainz: 'https://musicbrainz.org',
   books: 'https://www.googleapis.com',
@@ -41,7 +42,7 @@ const FIXED_BASES = {
 // redirect:'manual' + a body cap and hits ONLY the fixed base for the queued
 // provider. On any uncertainty (missing token, error, empty) we return
 // { ok:false } so the row backs off and is never half-merged.
-function providerLookupFor(row) {
+export function providerLookupFor(row) {
   const payload = row.payload || {}
   const provider = payload.provider
   const base = FIXED_BASES[provider]
@@ -71,15 +72,20 @@ function providerLookupFor(row) {
   return runFixedLookup(base + path)
 }
 
-async function runFixedLookup(url) {
+export async function runFixedLookup(url) {
   try {
     const res = await lookupFetch(url, { headers: {} })
     if (!res.ok) return { ok: false, permanent: res.status >= 400 && res.status < 500, error: `HTTP_${res.status}` }
     const raw = await res.json()
-    const results = raw.results || raw.items
-    const hit = Array.isArray(results) ? results[0] : raw
-    if (!hit) return { ok: false, permanent: true, error: 'EMPTY' }
-    return { ok: true, data: normalizeHit(hit) }
+    // The provider may return the array directly, or an envelope holding it
+    // ({ results } for Discogs, { items } for Google Books). A missing or empty
+    // result set is a permanent EMPTY — never treat the envelope object itself
+    // as a hit (that would mark a row done without merging anything).
+    const results = Array.isArray(raw) ? raw : (raw.results || raw.items)
+    if (!Array.isArray(results) || results.length === 0) {
+      return { ok: false, permanent: true, error: 'EMPTY' }
+    }
+    return { ok: true, data: normalizeHit(results[0]) }
   } catch {
     return { ok: false, error: 'LOOKUP_ERROR' }
   }
@@ -89,13 +95,13 @@ async function runFixedLookup(url) {
 // top-level fields; unknown/absent fields are simply left for the merge to
 // skip. Deliberately conservative — the merge only fills MISSING fields, so a
 // sparse normalization can never clobber user data.
-function genreOf(hit) {
+export function genreOf(hit) {
   if (Array.isArray(hit.genres)) return hit.genres
   if (hit.genre) return [hit.genre]
   return undefined
 }
 
-function normalizeHit(hit) {
+export function normalizeHit(hit) {
   const yearSource = hit.year || (hit.volumeInfo?.publishedDate || '').slice(0, 4)
   return {
     title: hit.title || hit.volumeInfo?.title,
