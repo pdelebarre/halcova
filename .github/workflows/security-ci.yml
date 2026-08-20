@@ -78,11 +78,38 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-      # BLOCKING: fails on any high/critical advisory (no continue-on-error).
+      # BLOCKING: fails on any high/critical advisory (no continue-on-error),
+      # EXCEPT the Security-Auditor-approved dev-only no-fix set (issue #386).
+      # Only the advisory sources in scripts/security/dependency-audit-allowlist.js
+      # are exempted (extract-zip GHSA-jmr9-qjv8-65gv and sharp/libvips
+      # GHSA-f88m-g3jw-g9cj); anything else — a new advisory, a new CVE on the
+      # same package, or a non-exempt package — fails the job (fail-closed).
       # Exceptions require a filed ticket + Security Auditor sign-off (see
-      # .github/ai/README.md).
-      - name: npm audit (blocking on high/critical)
-        run: npm audit --audit-level=high
+      # .github/ai/README.md, #213).
+      - name: "npm audit (blocking on high/critical, with approved #386 allowlist)"
+        run: |
+          set -o pipefail
+          # Capture the full JSON report AND npm's own exit code. The allowlist
+          # gate decides pass/fail on high/critical findings, but npm's exit
+          # state is forwarded to the gate so an audit failure (registry/network/
+          # DNS/auth) cannot be masked. The gate FAILS CLOSED if the report is
+          # error-shaped/incomplete (npm's `{"message","error"}` shape has no
+          # `vulnerabilities`) — the BLOCKING gate must never pass while it
+          # scanned nothing. `|| true` is deliberately removed: npm's exit code
+          # is captured explicitly and the gate enforces the verdict.
+          set +e
+          npm audit --json > /tmp/npm-audit.json
+          npm_exit=$?
+          set -e
+          node scripts/security/dependency-audit-allowlist.js "$npm_exit" < /tmp/npm-audit.json
+      # BLOCKING regression gate (#413): the allowlist tests prove the gate is
+      # FAIL-CLOSED (clean=pass, approved#386=pass, new-high=fail, new-CVE=fail,
+      # audit-error-shape=fail, incomplete-report=fail). They run as a plain
+      # `node` invocation (the test's documented entrypoint) so no test-runner
+      # fragility is introduced for .mjs scripts, and a regression that makes
+      # the gate fail-open fails this job.
+      - name: Run dependency-audit allowlist regression tests (fail-closed, #413)
+        run: node scripts/security/dependency-audit-allowlist.test.mjs
 
   secret-scan:
     name: Secret scan (Gitleaks)
