@@ -38,7 +38,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_rls') THEN
     CREATE ROLE app_rls NOLOGIN;
   END IF;
-END
+END;
 $$;
 -- The operator grants LOGIN + sets a password when wiring DATABASE_URL, e.g.:
 --   ALTER ROLE app_rls WITH LOGIN PASSWORD '<managed-secret>';
@@ -82,14 +82,52 @@ ALTER TABLE feedback FORCE ROW LEVEL SECURITY;
 -- BYPASSES RLS. GRANT EXECUTE to app_rls so the app can call them through the
 -- requireAdmin-gated repo layer. The app NEVER grants app_rls blanket
 -- cross-tenant DML — only these narrow, reviewed functions.
+--
+-- PRIVILEGE-ESCALATION BACKSTOP (Multi-tenant-Security HOLD A, #165):
+-- `app_rls` is the SINGLE DB role that serves BOTH admin and non-admin app
+-- sessions, so EXECUTE on the function is NOT by itself an admin gate — an
+-- ordinary tenant session could call it and read/mutate every tenant's rows.
+-- Every admin function below therefore asserts an ADMIN session context
+-- (assert_admin_session()) FIRST and RAISES (fails closed, no DML) when it is
+-- absent. The app sets `app.admin_session` ONLY after requireAdmin() passes in
+-- the repo layer (_shared/tenant-rls.js setAdminContext). A buggy/missing
+-- requireAdmin on any future route can no longer reach these functions — the
+-- DB layer refuses the call. This is the DB-level control; it does not rely on
+-- the app-layer requireAdmin alone.
+--
+-- REQUIRED OWNER (BYPASSRLS): SECURITY DEFINER alone does NOT bypass FORCE RLS
+-- — that requires the function OWNER to be superuser or to hold the BYPASSRLS
+-- attribute. This migration is applied by the owner/superuser that provisions
+-- the schema; if provisioning with a non-superuser owner, run:
+--   ALTER ROLE <owner> BYPASSRLS;   (after schema provision)
+-- so the admin cross-tenant functions keep working under FORCE RLS. Integration
+-- tests in rls-integration.test.js verify the owner has this capability.
+
+-- Fail-closed ADMIN gate, called by every SECURITY DEFINER admin function
+-- below. Raises (SQLSTATE 42501, insufficient_privilege) unless the session
+-- carries the admin context that the requireAdmin-gated app layer set.
+CREATE OR REPLACE FUNCTION assert_admin_session()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF coalesce(current_setting('app.admin_session', true), '') <> '1' THEN
+    RAISE EXCEPTION 'insufficient_privilege: admin session context required'
+      USING ERRCODE = '42501';
+  END IF;
+END;
+$$;
 
 -- Feedback inbox: cross-tenant read for the admin triage view.
 CREATE OR REPLACE FUNCTION admin_feedback_list()
 RETURNS SETOF feedback
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT * FROM feedback ORDER BY created_at DESC
+BEGIN
+  PERFORM assert_admin_session();
+  RETURN QUERY SELECT * FROM feedback ORDER BY created_at DESC;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_feedback_list() TO app_rls;
 
@@ -100,25 +138,31 @@ CREATE OR REPLACE FUNCTION admin_feedback_triage(
   note text DEFAULT ''
 )
 RETURNS void
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
+BEGIN
+  PERFORM assert_admin_session();
   UPDATE feedback
      SET status = new_status,
          admin_note = note,
          updated_at = now(),
          version = version + 1
-   WHERE id = fb_id
+   WHERE id = fb_id;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_feedback_triage(uuid, text, text) TO app_rls;
 
 -- Feedback delete: cross-tenant delete for the admin inbox.
 CREATE OR REPLACE FUNCTION admin_feedback_delete(fb_id uuid)
 RETURNS void
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
-  DELETE FROM feedback WHERE id = fb_id
+BEGIN
+  PERFORM assert_admin_session();
+  DELETE FROM feedback WHERE id = fb_id;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_feedback_delete(uuid) TO app_rls;
 
@@ -126,13 +170,19 @@ GRANT EXECUTE ON FUNCTION admin_feedback_delete(uuid) TO app_rls;
 -- kinds (the owner-scoped repository's deleteAllForOwner under binding RLS).
 CREATE OR REPLACE FUNCTION admin_delete_items_for_owner(owner text)
 RETURNS integer
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  n integer;
+BEGIN
+  PERFORM assert_admin_session();
   WITH deleted AS (
     DELETE FROM items WHERE owner_id = owner RETURNING id
   )
-  SELECT count(*)::integer FROM deleted
+  SELECT count(*)::integer INTO n FROM deleted;
+  RETURN n;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_delete_items_for_owner(text) TO app_rls;
 
@@ -140,36 +190,46 @@ GRANT EXECUTE ON FUNCTION admin_delete_items_for_owner(text) TO app_rls;
 -- dashboard's countsByKind under binding RLS).
 CREATE OR REPLACE FUNCTION admin_counts_by_kind()
 RETURNS TABLE(kind text, count integer)
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT i.kind, count(*)::integer
-    FROM items i
-   WHERE NOT i.wishlist
-   GROUP BY i.kind
+BEGIN
+  PERFORM assert_admin_session();
+  RETURN QUERY
+    SELECT i.kind, count(*)::integer
+      FROM items i
+     WHERE NOT i.wishlist
+     GROUP BY i.kind;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_counts_by_kind() TO app_rls;
 
 -- Review management: admin hide/show of any review (cross-author).
 CREATE OR REPLACE FUNCTION admin_review_set_status(rev_id uuid, new_status text)
 RETURNS void
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
+BEGIN
+  PERFORM assert_admin_session();
   UPDATE reviews
      SET status = new_status,
          updated_at = now(),
          version = version + 1
-   WHERE id = rev_id
+   WHERE id = rev_id;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_review_set_status(uuid, text) TO app_rls;
 
 -- Reviews listing for admin moderation (all statuses, cross-author).
 CREATE OR REPLACE FUNCTION admin_reviews_all()
 RETURNS SETOF reviews
-LANGUAGE sql SECURITY DEFINER
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT * FROM reviews ORDER BY created_at DESC
+BEGIN
+  PERFORM assert_admin_session();
+  RETURN QUERY SELECT * FROM reviews ORDER BY created_at DESC;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION admin_reviews_all() TO app_rls;

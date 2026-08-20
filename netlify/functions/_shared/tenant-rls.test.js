@@ -16,7 +16,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { DataType, newDb } from 'pg-mem'
-import { setTenantContext, tenantContextSql, withTenantTransaction } from './tenant-rls'
+import { adminContextSql, setAdminContext, setTenantContext, tenantContextSql, withTenantTransaction } from './tenant-rls'
 
 function createMemDb() {
   const mem = newDb()
@@ -108,5 +108,20 @@ describe('tenant-rls wiring (ARCH-6.1 #165)', () => {
       withTenantTransaction(db, createRepo, 'user-a', async () => { throw new Error('boom') }),
     ).rejects.toThrow('boom')
     expect(calls).toEqual(['BEGIN', 'SELECT set_config($1, $2, true)', 'ROLLBACK'])
+  })
+})
+
+describe('admin session context (ARCH-6.1 #165 — Multi-tenant-Security HOLD A)', () => {
+  it('issues set_config(app.admin_session, 1, true) as the requireAdmin-gated marker', async () => {
+    const sql = adminContextSql()
+    expect(sql.text).toBe('SELECT set_config($1, $2, true)')
+    expect(sql.params).toEqual(['app.admin_session', '1'])
+  })
+
+  it('setAdminContext issues the admin marker on a connection', async () => {
+    const calls = []
+    const db = { query: async (text, params) => calls.push([text, params]) }
+    await setAdminContext(db)
+    expect(calls).toEqual([['SELECT set_config($1, $2, true)', ['app.admin_session', '1']]])
   })
 })

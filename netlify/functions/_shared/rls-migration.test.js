@@ -227,8 +227,9 @@ describe('RLS migration (db/rls/011_binding_rls.sql) — #165 binding RLS', () =
   it('deploys SECURITY DEFINER functions for every admin cross-tenant path', async () => {
     const sql = await readFile(RLS_FILE_011, 'utf8')
     // feedback inbox + triage + delete; member-deletion cleanup; dashboard
-    // aggregate; review management. Each must be SECURITY DEFINER + GRANTed to
-    // app_rls so requireAdmin flows keep working under binding RLS.
+    // aggregate; review management. Each is SECURITY DEFINER + GRANTed to
+    // app_rls so requireAdmin flows keep working under binding RLS. The admin
+    // gate inside each (assert_admin_session) is pinned by the dedicated test.
     for (const fn of [
       'admin_feedback_list', 'admin_feedback_triage', 'admin_feedback_delete',
       'admin_delete_items_for_owner', 'admin_counts_by_kind',
@@ -238,6 +239,21 @@ describe('RLS migration (db/rls/011_binding_rls.sql) — #165 binding RLS', () =
     }
     expect((sql.match(/LANGUAGE (sql|plpgsql) SECURITY DEFINER/g) || [])).toHaveLength(7)
     expect((sql.match(/GRANT EXECUTE ON FUNCTION/g) || [])).toHaveLength(7)
+  })
+
+  it('every SECURITY DEFINER admin function is gated on an admin session (fails closed)', async () => {
+    const sql = await readFile(RLS_FILE_011, 'utf8')
+    // HOLD A (#165): the single app role serves admin AND non-admin sessions, so
+    // GRANT EXECUTE alone is not an admin gate. Each admin function must assert
+    // the admin session context and fail closed (raise insufficient_privilege).
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION assert_admin_session\(\)/)
+    expect(sql).toMatch(/insufficient_privilege: admin session context required/)
+    // All 7 admin functions call the gate before doing any cross-tenant DML.
+    const gated = (sql.match(/PERFORM assert_admin_session\(\)/g) || []).length
+    expect(gated).toBe(7)
+    // app_rls is NOT granted the gate itself as a callable privilege path; the
+    // gate is invoked internally by the admin functions, not by app_rls.
+    expect(sql).not.toMatch(/GRANT EXECUTE ON FUNCTION assert_admin_session\(\)/)
   })
 })
 

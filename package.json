@@ -19,6 +19,7 @@
     "test:e2e:debug": "playwright test --debug",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:migrate:rls": "node scripts/db-migrate-rls.mjs",
+    "db:test:rls": "npm run db:migrate:rls && vitest run netlify/functions/_shared/rls-integration.test.js",
     "db:backfill": "node scripts/backfill.mjs",
     "db:seed-demo": "node scripts/seed-demo.mjs"
   },

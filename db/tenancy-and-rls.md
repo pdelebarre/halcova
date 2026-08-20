@@ -57,6 +57,15 @@ as the follow-up hardening:
   `admin_counts_by_kind`, `admin_review_set_status`, `admin_reviews_all`), each
   owned by the table owner and `GRANT EXECUTE`d to `app_rls`. The app never
   grants `app_rls` blanket cross-tenant DML.
+- **Admin escalation backstop (HOLD A)**: `app_rls` is the *single* DB role for
+  both admin and non-admin sessions, so `GRANT EXECUTE` is not itself an admin
+  gate. Every `SECURITY DEFINER` admin function therefore calls
+  `assert_admin_session()` first and **raises (fails closed, no DML)** unless
+  the session carries `app.admin_session` — which the app sets **only after**
+  `requireAdmin()` passes (`_shared/tenant-rls.js` `setAdminContext`). A
+  missing/buggy `requireAdmin` on a future route can no longer reach these
+  functions; the DB layer refuses the call. This is the DB-level control and
+  does **not** rely on app-layer `requireAdmin` alone.
 
 **Cutover ordering (safe, non-breaking):** provision `app_rls` + point
 `DATABASE_URL` at it → deploy the SET LOCAL wiring (this PR) → apply 011
@@ -64,6 +73,50 @@ as the follow-up hardening:
 the wiring would hide every tenant row (fails closed) — that is intended once
 the cutover completes. There is no live Postgres in the sandbox; the deploy
 owner performs this against the managed DB.
+
+**Wiring the admin + tenant context into the running app (cutover step, not in
+#165):** the request/pool-level plumbing of `app.tenant_id` for *every* repo
+call, and routing the admin handlers (`countsByKind`, `deleteAllForOwner`,
+feedback/review admin) through the `SECURITY DEFINER` functions with
+`setAdminContext`, is the **cutover step** that activates binding RLS in
+production. It is deliberately **not** part of #165 (which ships the schema,
+policies, role, admin gate and enforcement tests); the gate and tests here make
+the surface safe to ship un-wired. `setAdminContext` and
+`withTenantTransaction` provide the primitives the cutover wires in.
+
+**REQUIRED OWNER (BYPASSRLS):** `SECURITY DEFINER` alone does **not** bypass
+`FORCE RLS` — that requires the function owner to be superuser or to hold the
+`BYPASSRLS` attribute. This migration is applied by the schema-provisioning
+owner/superuser; if provisioning with a non-superuser owner, run
+`ALTER ROLE <owner> BYPASSRLS;` after schema provision so the admin functions
+keep working under FORCE RLS.
+
+## 3. Real-Postgres enforcement tests (HOLD B)
+
+`netlify/functions/_shared/rls-integration.test.js` connects to a **real**
+PostgreSQL server as the least-privilege `app_rls` role and proves:
+1. a cross-tenant `SELECT` returns 0 rows and a cross-tenant `INSERT`/`UPDATE`
+   is rejected (fail closed);
+2. a **non-admin** `app_rls` session **cannot** invoke the `SECURITY DEFINER`
+   admin functions (authorization fails closed via `assert_admin_session`);
+3. the same functions **do** work once the requireAdmin-gated layer sets
+   `app.admin_session`.
+
+The suite is **skipped** unless `RLS_INTEGRATION=1` and both `RLS_SUPER_URL`
+(owner/superuser) and `RLS_APP_RLS_URL` (`app_rls` with `LOGIN`) are set and
+reachable — so it can never false-pass on pg-mem or in a default `npm test`.
+Run it against a real Postgres with:
+
+```bash
+RLS_INTEGRATION=1 \
+RLS_SUPER_URL=postgres://owner@…/runout \
+RLS_APP_RLS_URL=postgres://app_rls:<pw>@…/runout \
+npm run db:test:rls     # applies db/rls then runs rls-integration.test.js
+```
+
+`npm run db:test:rls` first runs `npm run db:migrate:rls` (so `DATABASE_URL`
+must point at the owner/superuser connection too, or apply the migrations
+beforehand).
 
 ## 3. Migration tooling & repeatable initialization
 
