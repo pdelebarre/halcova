@@ -36,6 +36,23 @@ npm run db:migrate                                   # apply pending migrations
 DATABASE_URL=postgres://user:pass@host:5432/runout npm run db:migrate
 ```
 
+## Tenancy, RLS & migrations hardening (ARCH-6.1, #165)
+
+See [`tenancy-and-rls.md`](tenancy-and-rls.md) for the authoritative **isolation
+inventory** (every tenant-owned table + RLS coverage), **binding Row-Level
+Security** (least-privilege `app_rls` role + `FORCE ROW LEVEL SECURITY` + the
+per-request `app.tenant_id` wiring in `../netlify/functions/_shared/tenant-rls.js`),
+**backup / restore / retention**, and the **shared → dedicated schema** path.
+
+Apply the RLS migrations (real Postgres only — pg-mem cannot parse RLS DDL,
+so `db/rls/*.sql` is kept OUT of `db/migrations` and validated by
+`netlify/functions/_shared/rls-migration.test.js`):
+
+```bash
+npm run db:migrate:rls
+DATABASE_URL=postgres://user:pass@host:5432/runout npm run db:migrate:rls
+```
+
 ## Access-code hashing & rotation (Part B)
 
 - Postgres stores **only** `code_hash = sha256(normalize(code))` (migration

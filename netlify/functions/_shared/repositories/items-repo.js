@@ -13,6 +13,7 @@
 // node-postgres-compatible adapter.
 
 import { DEFAULT_LIMIT, MAX_LIMIT } from '../pagination'
+import { withTenantTransaction } from '../tenant-rls'
 
 // All first-class columns except id/owner_id/kind (those are WHERE/INSERT keyed).
 // `enriched_at` (T6, #285) is a mirror of data.enrichedAt — the deferred-
@@ -218,19 +219,15 @@ export function createItemsRepo(db) {
   // repo bound to the same client so every statement in it commits atomically;
   // any throw rolls back and rethrows. The plan-limit check + insert live in
   // one transaction so the cap can't drift between the count and the write.
-  async function transaction(fn) {
-    const client = await db.connect()
-    try {
-      await client.query('BEGIN')
-      const result = await fn(createItemsRepo(client))
-      await client.query('COMMIT')
-      return result
-    } catch (err) {
-      try { await client.query('ROLLBACK') } catch { /* connection may be dead */ }
-      throw err
-    } finally {
-      client.release()
-    }
+  //
+  // ARCH-6.1 #165: an OPTIONAL second arg sets the RLS tenant context
+  // (app.tenant_id = tenantId) for the transaction's duration via
+  // set_config('app.tenant_id', $1, true) — see _shared/tenant-rls.js. Pass it
+  // once the session's resolved user.id is known so binding RLS policies see
+  // the tenant; callers that already scope every query by owner_id keep
+  // working unchanged when it is omitted.
+  async function transaction(fn, tenantId) {
+    return withTenantTransaction(db, createItemsRepo, tenantId, fn)
   }
 
   return {

@@ -68,6 +68,78 @@ jobs:
       - name: Verify the production build
         run: npm run build
 
+  # Real-Postgres RLS enforcement (ARCH-6.1 #165, HOLD 1). BLOCKING (no
+  # continue-on-error): proves cross-tenant fail-closed AND admin-function
+  # authorization against an ACTUAL PostgreSQL server on every PR/merge, using
+  # the least-privilege `app_rls` role. The `npm test` job above only exercises
+  # pg-mem (which cannot parse RLS DDL), so without this job there is ZERO
+  # execution evidence for the RLS enforcement tests — that is the gap this
+  # closes. Trust auth is used so no password literal is committed (nothing for
+  # the secret scan to flag): the owner connects over the service port and the
+  # test connects as `app_rls` (created WITH LOGIN by the provisioning step).
+  rls-integration:
+    name: Real-Postgres RLS enforcement
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: runout_owner
+          POSTGRES_DB: runout
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RLS_INTEGRATION: '1'
+      RLS_SUPER_URL: postgres://runout_owner@localhost:5432/runout
+      RLS_APP_RLS_URL: postgres://app_rls@localhost:5432/runout
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      - name: Apply base migrations (owner/superuser)
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ env.RLS_SUPER_URL }}
+      - name: Provision least-privilege app_rls role (LOGIN, trust auth)
+        run: |
+          node --input-type=module <<'EOF'
+          import pg from 'pg'
+          const c = new pg.Client(process.env.RLS_SUPER_URL)
+          await c.connect()
+          await c.query(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_rls') THEN
+                CREATE ROLE app_rls WITH LOGIN;
+              ELSE
+                ALTER ROLE app_rls WITH LOGIN;
+              END IF;
+            END
+            $$;
+          `)
+          await c.end()
+          EOF
+      # BLOCKING — runs the REAL-Postgres integration suite (rls-integration
+      # .test.js). RLS_INTEGRATION=1 + both URLs mean the suite RUNS here, it
+      # does NOT skip (a missing URL would FAIL, not skip — see the test's
+      # config guard). db:migrate:rls inside db:test:rls applies the RLS files
+      # (idempotent; the role already exists WITH LOGIN, so it is left intact).
+      - name: Run real-Postgres RLS integration tests (blocking)
+        run: npm run db:test:rls
+        env:
+          DATABASE_URL: ${{ env.RLS_SUPER_URL }}
+
   dependency-audit:
     name: Dependency audit (npm audit)
     runs-on: ubuntu-latest

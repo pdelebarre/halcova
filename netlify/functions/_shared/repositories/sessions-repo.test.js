@@ -33,7 +33,7 @@ describe('sessions table (migration 007)', () => {
       `SELECT column_name FROM information_schema.columns WHERE table_name = 'sessions'`,
     )
     const cols = rows.map((r) => r.column_name).sort()
-    expect(cols).toEqual(['created_at', 'expires_at', 'revoked_at', 'role', 'status', 'token_hash', 'user_id'])
+    expect(cols).toEqual(['created_at', 'expires_at', 'revoked_at', 'role', 'status', 'token_hash', 'user_id', 'version'])
   })
 
   it('saves and reads a session by token hash (raw token never stored)', async () => {
