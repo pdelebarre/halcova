@@ -822,3 +822,92 @@ describe('Phase A enrichment — endpoint-level, Blobs write path (FEAT-EPIC-5 #
     expect(stored.email).toBeUndefined()
   })
 })
+
+// M2 #292 — idempotent offline-add push (ADR-0019 Dec 7). The outbox sends a
+// STABLE `clientOpId`; the server must honor it so a retry/flaky reconnect
+// never creates a duplicate. `clientOpId` is read from the raw body (never an
+// item field) and must NOT be persisted onto the stored item.
+describe('idempotent add push via clientOpId (#292)', () => {
+  it('creates an item and records the op→server-id dedupe mapping on first POST', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', {
+      title: 'Offline Add',
+      year: 1970,
+      clientOpId: 'local:op-0001',
+    })
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.id).toBeTruthy()
+    // The dedupe key maps the op id to the created server id.
+    expect(store.data.get('dedupe:local:op-0001')).toBe(body.id)
+  })
+
+  it('replaying the same clientOpId returns the SAME item — no duplicate', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const first = await call('POST', '?collection=records', {
+      title: 'Offline Add',
+      year: 1970,
+      clientOpId: 'local:op-0001',
+    })
+    const firstBody = await first.json()
+    // Flaky reconnect: the client retries the exact same op id.
+    const second = await call('POST', '?collection=records', {
+      title: 'Offline Add',
+      year: 1970,
+      clientOpId: 'local:op-0001',
+    })
+    expect(second.status).toBe(201)
+    const secondBody = await second.json()
+    // Same server record, not a second row.
+    expect(secondBody.id).toBe(firstBody.id)
+    const ids = store.data.get('index')
+    expect(ids).toHaveLength(1)
+  })
+
+  it('a different clientOpId creates a new item', async () => {
+    seedMember()
+    const store = collectionStore([])
+    await call('POST', '?collection=records', { title: 'A', clientOpId: 'local:op-1' })
+    await call('POST', '?collection=records', { title: 'B', clientOpId: 'local:op-2' })
+    expect(store.data.get('index')).toHaveLength(2)
+  })
+
+  it('never persists clientOpId onto the stored item (allowlist strips it)', async () => {
+    seedMember()
+    const store = collectionStore([])
+    const res = await call('POST', '?collection=records', {
+      title: 'Clean',
+      clientOpId: 'local:op-0009',
+    })
+    const body = await res.json()
+    const stored = store.data.get(`item:${body.id}`)
+    expect(stored.clientOpId).toBeUndefined()
+    expect(stored.title).toBe('Clean')
+  })
+
+  it('a replay at the free-plan cap is still honored (no spurious PLAN_LIMIT)', async () => {
+    seedMember({ plan: 'free' })
+    const store = collectionStore([])
+    store.data.set('count:owned', 10) // free plan limit
+    // First add at the cap is rejected.
+    const first = await call('POST', '?collection=records', {
+      title: 'At Cap',
+      clientOpId: 'local:op-cap',
+    })
+    expect(first.status).toBe(403)
+    expect((await first.json()).code).toBe('PLAN_LIMIT')
+    // Pretend the item was created earlier (before the cap filled) — the op id
+    // is already mapped, so the replay must return it, not 403 again.
+    store.data.set('item:pre-existing', { id: 'pre-existing', title: 'At Cap', year: 2000 })
+    store.data.set('dedupe:local:op-cap', 'pre-existing')
+    store.data.set('index', ['pre-existing'])
+    const replay = await call('POST', '?collection=records', {
+      title: 'At Cap',
+      clientOpId: 'local:op-cap',
+    })
+    expect(replay.status).toBe(201)
+    expect((await replay.json()).id).toBe('pre-existing')
+  })
+})

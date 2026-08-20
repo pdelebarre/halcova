@@ -45,11 +45,18 @@ export async function listItems(collection = 'records') {
   return data.items || []
 }
 
-export async function addItem(item, collection = 'records') {
+// `opts.clientOpId` is the durable idempotency key for the offline outbox push
+// (#292 / ADR-0019 Dec 7). The server reads it from the raw body to dedupe a
+// retry/flaky reconnect and strips it from the stored item (it is not an item
+// field — see pickItemFields). A normal online add omits it.
+export async function addItem(item, collection = 'records', opts) {
+  const body = opts?.clientOpId
+    ? { ...item, clientOpId: opts.clientOpId }
+    : item
   const res = await fetch(fnUrl(collection), {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
+    body: JSON.stringify(body),
   })
   return handle(res)
 }

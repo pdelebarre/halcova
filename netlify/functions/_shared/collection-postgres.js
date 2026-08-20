@@ -166,6 +166,22 @@ async function handlePost(req, { user, collection }) {
   const v = validateItem(body)
   if (v.error) return badRequest(v.error)
   const repo = getRepository()
+
+  // M2 #292 idempotent push (ADR-0019 Dec 7): the offline outbox sends a STABLE
+  // `clientOpId` so a retry/flaky reconnect can replay the same add without a
+  // duplicate. Read from the raw body (not an item field). We track the mapping
+  // in the per-user Blobs mirror store (the same store `mirrorAdd` keeps as the
+  // reversible mirror), so a replay returns the existing item idempotently.
+  const clientOpId = body?.clientOpId
+  const mirrorStore = getStore(storeNameFor(user.id, collection))
+  if (clientOpId != null && clientOpId !== '') {
+    const existingId = await mirrorStore.get(`dedupe:${clientOpId}`)
+    if (existingId) {
+      const existing = await mirrorStore.get(`item:${existingId}`, { type: 'json' })
+      if (existing) return json(201, filterFor(user, 'item', existing, { own: true }))
+    }
+  }
+
   const limit = planLimitFor(user)
   // SEC-EPIC-2 (#188): only allowlisted item fields are written. A crafted
   // body (ownerId/userId/role/plan/collections/id/…) is dropped here — the
@@ -210,6 +226,10 @@ async function handlePost(req, { user, collection }) {
   }
 
   await mirrorAdd(user.id, collection, item)
+  // Record the idempotency mapping so a retry of the same op returns this item.
+  if (clientOpId != null && clientOpId !== '') {
+    try { await mirrorStore.setJSON(`dedupe:${clientOpId}`, item.id) } catch { /* best-effort */ }
+  }
   // SEC-7.1 (#338): the returned item DTO runs through the shared filter.
   return json(201, filterFor(user, 'item', item, { own: true }))
 }

@@ -28,6 +28,7 @@ vi.mock('../api/lending', () => ({ lend: vi.fn(), returnItem: vi.fn() }))
 import * as api from '../api/collection'
 
 import { clearAllMirror } from '../utils/offlineMirror'
+import { clearAllOutbox } from '../utils/outbox'
 
 const USER = { id: 'u1', name: 'Ada', role: 'member' }
 const TOKEN = 'tok-a'
@@ -50,6 +51,7 @@ beforeEach(async () => {
   localStorage.clear()
   vi.clearAllMocks()
   await clearAllMirror()
+  await clearAllOutbox()
 })
 
 // Seed a signed-in session + a live M2 'collection'-scope trust grant.
@@ -165,6 +167,118 @@ describe('useCollection offline-mirror hydration (#289)', () => {
     const mirror = await readMirrorForUser()
     expect(mirror.items.map((i) => i.id)).toEqual(['r2'])
     expect(result.current.source).toBe('live')
+  })
+})
+
+describe('useCollection offline add + reconnect flush (#292)', () => {
+  it('stages an offline add into the outbox + mirror with a pending state', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([])
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    // Force the browser to report offline.
+    const originalOnLine = navigator.onLine
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+
+    let pendingItem
+    await act(async () => {
+      pendingItem = await result.current.add({
+        title: 'Miles Davis - In a Silent Way',
+        year: 1969,
+        barcode: '88985371092',
+      })
+    })
+
+    // Restore the online flag.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: originalOnLine })
+
+    // The item came back immediately with an explicit pending state.
+    expect(pendingItem.metadataPending).toBe(true)
+    expect(pendingItem.uuid).toMatch(/^local:/)
+    expect(result.current.items[0].title).toBe('Miles Davis - In a Silent Way')
+    // A durable outbox op was staged.
+    expect(result.current.pendingCount).toBe(1)
+    const { listPendingOps } = await import('../utils/outbox')
+    const ops = await listPendingOps(USER.id, { token: TOKEN })
+    expect(ops).toHaveLength(1)
+    expect(ops[0].opId).toBe(pendingItem.uuid)
+    expect(ops[0].pendingItem.metadataPending).toBe(true)
+    // The mirror also holds the pending item (durable across reload).
+    const mirror = await readMirrorForUser()
+    expect(mirror.items.map((i) => i.title)).toContain('Miles Davis - In a Silent Way')
+  })
+
+  it('flushOutbox pushes the staged op idempotently and clears the pending state', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([])
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    const originalOnLine = navigator.onLine
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    let pendingItem
+    await act(async () => {
+      pendingItem = await result.current.add({ title: 'Miles Davis - In a Silent Way', year: 1969 })
+    })
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: originalOnLine })
+
+    expect(result.current.pendingCount).toBe(1)
+
+    // Reconnect: the server accepts the add; a fresh list comes back.
+    const serverItem = {
+      id: 'srv-1',
+      serverId: 'srv-1',
+      title: 'Miles Davis - In a Silent Way',
+      year: 1969,
+    }
+    api.addItem.mockResolvedValue(serverItem)
+    api.listItems.mockResolvedValue([serverItem])
+
+    let res
+    await act(async () => { res = await result.current.flushOutbox() })
+
+    expect(res.pushed).toBe(1)
+    expect(res.failed).toBe(0)
+    // The push used the STABLE idempotency key (no duplicate on retry).
+    expect(api.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Miles Davis - In a Silent Way' }),
+      'records',
+      { clientOpId: pendingItem.uuid },
+    )
+    await waitFor(() => expect(result.current.pendingCount).toBe(0))
+    // The item is now server-backed in the refreshed list.
+    await waitFor(() => expect(result.current.items[0].id).toBe('srv-1'))
+  })
+
+  it('falls back to the outbox on a safe network failure while online', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([])
+    api.addItem.mockRejectedValue(new Error('Failed to fetch'))
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await result.current.add({ title: 'Safe Fallback', year: 1970 })
+    })
+
+    expect(result.current.pendingCount).toBe(1)
+  })
+
+  it('NEVER stages offline on a confirmed auth failure (fail closed)', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([])
+    const err = new Error('Unauthorized')
+    err.status = 401
+    api.addItem.mockRejectedValue(err)
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await expect(result.current.add({ title: 'Nope', year: 2000 })).rejects.toThrow('Unauthorized')
+    })
+    // Nothing was staged — a revoked session must not queue offline mutations.
+    expect(result.current.pendingCount).toBe(0)
   })
 })
 
