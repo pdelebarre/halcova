@@ -56,7 +56,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON collection_items TO app_rls;
 -- SECURITY DEFINER (see note above). Admin user writes go through the owner
 -- role or a SECURITY DEFINER function, not this role.
 GRANT SELECT ON users TO app_rls;
-GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO app_rls;
+-- sessions: SELECT ONLY (Multi-tenant-Security HOLD 2, #165). app_rls has NO
+-- INSERT/UPDATE/DELETE on sessions because sessions.role is the admin-authority
+-- source (session-auth.js:85-91): a DML grant would let a non-admin app_rls
+-- session self-promote to role='admin' or read/revoke others' sessions at
+-- cutover. Session writes (create/renew/revoke/delete) continue to run through
+-- the owner role / a SECURITY DEFINER path that app_rls cannot reach.
+GRANT SELECT ON sessions TO app_rls;
 
 -- --- FORCE ROW LEVEL SECURITY (binding) on the tenant-scoped tables ---------
 ALTER TABLE items FORCE ROW LEVEL SECURITY;
@@ -87,13 +93,22 @@ ALTER TABLE feedback FORCE ROW LEVEL SECURITY;
 -- `app_rls` is the SINGLE DB role that serves BOTH admin and non-admin app
 -- sessions, so EXECUTE on the function is NOT by itself an admin gate — an
 -- ordinary tenant session could call it and read/mutate every tenant's rows.
--- Every admin function below therefore asserts an ADMIN session context
--- (assert_admin_session()) FIRST and RAISES (fails closed, no DML) when it is
--- absent. The app sets `app.admin_session` ONLY after requireAdmin() passes in
--- the repo layer (_shared/tenant-rls.js setAdminContext). A buggy/missing
--- requireAdmin on any future route can no longer reach these functions — the
--- DB layer refuses the call. This is the DB-level control; it does not rely on
--- the app-layer requireAdmin alone.
+-- Every admin function below therefore asserts an ADMIN session
+-- (assert_admin_session(token_hash)) FIRST and RAISES (fails closed, no DML)
+-- when the presenting session token is not an admin session.
+--
+-- HOLD 3 (#165): the admin marker is NOT a forgeable GUC. The original
+-- `app.admin_session` gate could be bypassed by any app_rls session via
+-- set_config('app.admin_session','1',true). Instead the admin authority is
+-- DERIVED INSIDE the SECURITY DEFINER function from the resolved session token
+-- (see assert_admin_session below) — a value a non-admin cannot set. The app
+-- resolves the session server-side (session-auth.js requireAdmin) and passes
+-- the bearer session token's sha256 hash to these functions; the function
+-- re-resolves the role under owner privileges and refuses anything that is not
+-- an admin (role='admin', user_id='owner'). A buggy/missing requireAdmin on any
+-- future route can no longer reach these functions — the DB layer refuses the
+-- call. This is the DB-level control; it does not rely on the app-layer
+-- requireAdmin alone.
 --
 -- REQUIRED OWNER (BYPASSRLS): SECURITY DEFINER alone does NOT bypass FORCE RLS
 -- — that requires the function OWNER to be superuser or to hold the BYPASSRLS
@@ -104,35 +119,56 @@ ALTER TABLE feedback FORCE ROW LEVEL SECURITY;
 -- tests in rls-integration.test.js verify the owner has this capability.
 
 -- Fail-closed ADMIN gate, called by every SECURITY DEFINER admin function
--- below. Raises (SQLSTATE 42501, insufficient_privilege) unless the session
--- carries the admin context that the requireAdmin-gated app layer set.
-CREATE OR REPLACE FUNCTION assert_admin_session()
+-- below. Raises (SQLSTATE 42501, insufficient_privilege) unless the caller
+-- presents a REAL admin session token.
+--
+-- Multi-tenant-Security HOLD 3 (#165): the admin marker is NOT a settable GUC.
+-- The old `app.admin_session` marker was forgeable (any app_rls session could
+-- set_config('app.admin_session','1',true) and bypass every admin function's
+-- gate). Instead the admin authority is DERIVED INSIDE this SECURITY DEFINER
+-- function from the resolved session token: it looks up the session's role by
+-- its sha256 hash (owner privileges; sessions is not FORCE RLS) and requires
+-- role='admin' AND user_id='owner' — the exact definition session-auth.js uses
+-- (role 'admin' + userId OWNER_ID). Raw tokens are opaque and only their sha256
+-- hash is stored server-side, so a non-admin app_rls session can only present
+-- its OWN member token, whose role resolves to non-admin -> fail closed. It
+-- cannot present an admin token hash it does not possess, so the gate is
+-- unforgeable at the DB layer.
+CREATE OR REPLACE FUNCTION assert_admin_session(session_token_hash text)
 RETURNS void
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  sess_role text;
+  sess_user text;
 BEGIN
-  IF coalesce(current_setting('app.admin_session', true), '') <> '1' THEN
-    RAISE EXCEPTION 'insufficient_privilege: admin session context required'
+  SELECT role, user_id INTO sess_role, sess_user
+    FROM sessions
+   WHERE token_hash = session_token_hash;
+  -- Unknown / member / non-owner token: fail closed (42501, no DML).
+  IF sess_role IS DISTINCT FROM 'admin' OR sess_user IS DISTINCT FROM 'owner' THEN
+    RAISE EXCEPTION 'insufficient_privilege: admin session required'
       USING ERRCODE = '42501';
   END IF;
 END;
 $$;
 
 -- Feedback inbox: cross-tenant read for the admin triage view.
-CREATE OR REPLACE FUNCTION admin_feedback_list()
+CREATE OR REPLACE FUNCTION admin_feedback_list(session_token_hash text)
 RETURNS SETOF feedback
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   RETURN QUERY SELECT * FROM feedback ORDER BY created_at DESC;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_feedback_list() TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_feedback_list(text) TO app_rls;
 
 -- Feedback triage: cross-tenant status/admin_note update for the admin inbox.
 CREATE OR REPLACE FUNCTION admin_feedback_triage(
+  session_token_hash text,
   fb_id uuid,
   new_status text,
   note text DEFAULT ''
@@ -142,7 +178,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   UPDATE feedback
      SET status = new_status,
          admin_note = note,
@@ -151,24 +187,24 @@ BEGIN
    WHERE id = fb_id;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_feedback_triage(uuid, text, text) TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_feedback_triage(text, uuid, text, text) TO app_rls;
 
 -- Feedback delete: cross-tenant delete for the admin inbox.
-CREATE OR REPLACE FUNCTION admin_feedback_delete(fb_id uuid)
+CREATE OR REPLACE FUNCTION admin_feedback_delete(session_token_hash text, fb_id uuid)
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   DELETE FROM feedback WHERE id = fb_id;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_feedback_delete(uuid) TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_feedback_delete(text, uuid) TO app_rls;
 
 -- Member deletion cleanup: delete every item for a departing member across all
 -- kinds (the owner-scoped repository's deleteAllForOwner under binding RLS).
-CREATE OR REPLACE FUNCTION admin_delete_items_for_owner(owner text)
+CREATE OR REPLACE FUNCTION admin_delete_items_for_owner(session_token_hash text, owner text)
 RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
@@ -176,7 +212,7 @@ AS $$
 DECLARE
   n integer;
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   WITH deleted AS (
     DELETE FROM items WHERE owner_id = owner RETURNING id
   )
@@ -184,17 +220,17 @@ BEGIN
   RETURN n;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_delete_items_for_owner(text) TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_delete_items_for_owner(text, text) TO app_rls;
 
 -- Dashboard aggregate: owned item totals by kind across ALL owners (the admin
 -- dashboard's countsByKind under binding RLS).
-CREATE OR REPLACE FUNCTION admin_counts_by_kind()
+CREATE OR REPLACE FUNCTION admin_counts_by_kind(session_token_hash text)
 RETURNS TABLE(kind text, count integer)
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   RETURN QUERY
     SELECT i.kind, count(*)::integer
       FROM items i
@@ -202,16 +238,16 @@ BEGIN
      GROUP BY i.kind;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_counts_by_kind() TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_counts_by_kind(text) TO app_rls;
 
 -- Review management: admin hide/show of any review (cross-author).
-CREATE OR REPLACE FUNCTION admin_review_set_status(rev_id uuid, new_status text)
+CREATE OR REPLACE FUNCTION admin_review_set_status(session_token_hash text, rev_id uuid, new_status text)
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   UPDATE reviews
      SET status = new_status,
          updated_at = now(),
@@ -219,17 +255,17 @@ BEGIN
    WHERE id = rev_id;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_review_set_status(uuid, text) TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_review_set_status(text, uuid, text) TO app_rls;
 
 -- Reviews listing for admin moderation (all statuses, cross-author).
-CREATE OR REPLACE FUNCTION admin_reviews_all()
+CREATE OR REPLACE FUNCTION admin_reviews_all(session_token_hash text)
 RETURNS SETOF reviews
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  PERFORM assert_admin_session();
+  PERFORM assert_admin_session(session_token_hash);
   RETURN QUERY SELECT * FROM reviews ORDER BY created_at DESC;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION admin_reviews_all() TO app_rls;
+GRANT EXECUTE ON FUNCTION admin_reviews_all(text) TO app_rls;

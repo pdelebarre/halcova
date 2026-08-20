@@ -205,6 +205,15 @@ describe('RLS migration (db/rls/011_binding_rls.sql) — #165 binding RLS', () =
     expect(sql).not.toMatch(/GRANT ALL\s+ON (items|reviews|feedback|collections|collection_items)/i)
   })
 
+  it('grants app_rls SELECT-only on sessions (no DML / no self-promotion) — HOLD 2 #165', async () => {
+    const sql = await readFile(RLS_FILE_011, 'utf8')
+    // sessions.role is the admin-authority source; app_rls must have NO write
+    // path to it (a DML grant would allow self-promotion to 'admin').
+    expect(sql).toMatch(/GRANT SELECT ON sessions TO app_rls/)
+    expect(sql).not.toMatch(/GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO app_rls/)
+    expect(sql).not.toMatch(/GRANT INSERT, UPDATE, DELETE ON sessions TO app_rls/)
+  })
+
   it('FORCEs row-level security on every tenant-scoped table', async () => {
     const sql = await readFile(RLS_FILE_011, 'utf8')
     for (const t of ['items', 'reviews', 'feedback', 'lookup_queue', 'collections', 'collection_items']) {
@@ -241,19 +250,29 @@ describe('RLS migration (db/rls/011_binding_rls.sql) — #165 binding RLS', () =
     expect((sql.match(/GRANT EXECUTE ON FUNCTION/g) || [])).toHaveLength(7)
   })
 
-  it('every SECURITY DEFINER admin function is gated on an admin session (fails closed)', async () => {
+  it('every SECURITY DEFINER admin function is gated on a real ADMIN session token (fails closed) — HOLD 3 #165', async () => {
     const sql = await readFile(RLS_FILE_011, 'utf8')
     // HOLD A (#165): the single app role serves admin AND non-admin sessions, so
     // GRANT EXECUTE alone is not an admin gate. Each admin function must assert
-    // the admin session context and fail closed (raise insufficient_privilege).
-    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION assert_admin_session\(\)/)
-    expect(sql).toMatch(/insufficient_privilege: admin session context required/)
-    // All 7 admin functions call the gate before doing any cross-tenant DML.
-    const gated = (sql.match(/PERFORM assert_admin_session\(\)/g) || []).length
+    // the admin session and fail closed (raise insufficient_privilege).
+    // HOLD 3: the admin marker is NOT a forgeable GUC — the gate derives admin
+    // authority from the resolved session token inside the SECURITY DEFINER
+    // function (assert_admin_session(session_token_hash)), not from a settable
+    // app.admin_session parameter.
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION assert_admin_session\(session_token_hash text\)/)
+    expect(sql).toMatch(/insufficient_privilege: admin session required/)
+    // The gate reads sessions.role server-side (owner privileges) — no settable GUC.
+    expect(sql).toMatch(/FROM sessions\s+WHERE token_hash = session_token_hash/i)
+    // All 7 admin functions call the gate (with the session token) before any
+    // cross-tenant DML.
+    const gated = (sql.match(/PERFORM assert_admin_session\(session_token_hash\)/g) || []).length
     expect(gated).toBe(7)
+    // Each admin function takes the session token hash as its FIRST argument.
+    const tokenParams = (sql.match(/session_token_hash text/g) || []).length
+    expect(tokenParams).toBe(8) // assert_admin_session + 7 admin functions
     // app_rls is NOT granted the gate itself as a callable privilege path; the
     // gate is invoked internally by the admin functions, not by app_rls.
-    expect(sql).not.toMatch(/GRANT EXECUTE ON FUNCTION assert_admin_session\(\)/)
+    expect(sql).not.toMatch(/GRANT EXECUTE ON FUNCTION assert_admin_session\(/)
   })
 })
 

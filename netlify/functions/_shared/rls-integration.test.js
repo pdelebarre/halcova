@@ -6,10 +6,13 @@
 //   1. a cross-tenant SELECT returns 0 rows and a cross-tenant INSERT/UPDATE is
 //      rejected (fail closed);
 //   2. a NON-ADMIN app_rls session CANNOT invoke the SECURITY DEFINER admin
-//      cross-tenant functions (authorization fails closed via
-//      assert_admin_session), and
-//   3. once the requireAdmin-gated layer sets app.admin_session, the same
-//      functions DO work (the authorized admin path).
+//      cross-tenant functions — even after forging `app.admin_session` — because
+//      the admin authority is DERIVED from the resolved session token, not a
+//      settable GUC (HOLD 3 #165), and
+//   3. once a real ADMIN session token is presented, the same functions DO work
+//      (the authorized admin path).
+//   4. app_rls has NO DML grant on `sessions` (SELECT-only), so it cannot
+//      self-promote or tamper with sessions (HOLD 2 #165).
 //
 // Gating (never false-pass on pg-mem): the whole suite is SKIPPED unless
 // RLS_INTEGRATION=1 AND both RLS_SUPER_URL (owner/superuser) and RLS_APP_RLS_URL
@@ -27,6 +30,7 @@
 
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import pg from 'pg'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { applyMigrations } from '../../../scripts/db-migrate.mjs'
@@ -45,6 +49,12 @@ if (optIn && (!superUrl || !appRlsUrl)) {
 }
 
 const ready = () => optIn && !!superUrl && !!appRlsUrl
+
+const sha256 = (s) => createHash('sha256').update(String(s)).digest('hex')
+// Synthetic session tokens for the authorized/unauthorized paths. The DB stores
+// only the sha256 hash (mirroring _shared/sessions.js), exactly like production.
+const ADMIN_TOKEN = 'integration-admin-token-secret'
+const MEMBER_TOKEN = 'integration-member-token-secret'
 
 describe.skipIf(!ready())('Binding RLS enforcement (real Postgres, ARCH-6.1 #165)', () => {
   let superPool
@@ -69,6 +79,14 @@ describe.skipIf(!ready())('Binding RLS enforcement (real Postgres, ARCH-6.1 #165
         '00000000-0000-0000-0000-000000000003',
       ],
     )
+    // Seed sessions: one real admin session (owner) and one member session (u1).
+    await superPool.query('DELETE FROM sessions')
+    await superPool.query(
+      `INSERT INTO sessions (token_hash, user_id, role, status, expires_at) VALUES
+         ($1, 'owner', 'admin', 'active', now() + interval '1 day'),
+         ($2, 'u1',    'member', 'active', now() + interval '1 day')`,
+      [sha256(ADMIN_TOKEN), sha256(MEMBER_TOKEN)],
+    )
   }, 60000)
 
   afterAll(async () => {
@@ -78,8 +96,6 @@ describe.skipIf(!ready())('Binding RLS enforcement (real Postgres, ARCH-6.1 #165
   it('app_rls cross-tenant SELECT returns 0 rows and UPDATE/INSERT are rejected (fail closed)', async () => {
     // app_rls session scoped to tenant u1.
     await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
-    // No admin context — a normal tenant session.
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.admin_session', ''])
 
     // (1) Cross-tenant SELECT: u1's session sees only u1's rows, never u2's.
     const { rows } = await appRlsPool.query('SELECT owner_id FROM items ORDER BY owner_id')
@@ -98,33 +114,57 @@ describe.skipIf(!ready())('Binding RLS enforcement (real Postgres, ARCH-6.1 #165
     ).rejects.toThrow()
   })
 
-  it('a NON-ADMIN app_rls session cannot invoke the SECURITY DEFINER admin functions', async () => {
-    // app_rls scoped to u1 with NO admin_session context.
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.admin_session', ''])
-
-    // The function is GRANT EXECUTE to app_rls, but the internal admin gate
-    // must refuse (fail closed) — proving EXECUTE alone is not an admin gate.
-    await expect(appRlsPool.query('SELECT admin_counts_by_kind()')).rejects.toThrow(/insufficient_privilege/i)
-    await expect(
-      appRlsPool.query(`SELECT admin_delete_items_for_owner('u1')`),
-    ).rejects.toThrow(/insufficient_privilege/i)
-  })
-
-  it('the same admin functions DO work once the requireAdmin-gated layer sets app.admin_session', async () => {
-    // requireAdmin has passed -> the app sets the admin session context.
+  it('a NON-ADMIN app_rls session CANNOT invoke admin functions, even after forging app.admin_session (HOLD 3)', async () => {
+    // app_rls scoped to u1. It forges the OLD forgeable GUC marker...
     await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
     await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.admin_session', '1'])
 
+    // ...but the marker is IGNORED: admin authority is DERIVED from the resolved
+    // session token, so only the caller's own MEMBER token is available, whose
+    // role resolves to non-admin -> fail closed (HOLD 3, #165).
+    const memberHash = sha256(MEMBER_TOKEN)
+    await expect(
+      appRlsPool.query('SELECT admin_counts_by_kind($1)', [memberHash]),
+    ).rejects.toThrow(/insufficient_privilege/i)
+    await expect(
+      appRlsPool.query(`SELECT admin_delete_items_for_owner($1, 'u1')`, [memberHash]),
+    ).rejects.toThrow(/insufficient_privilege/i)
+  })
+
+  it('the same admin functions DO work once a real ADMIN session token is presented', async () => {
+    // requireAdmin resolved a REAL admin session (role='admin', user_id='owner'),
+    // so the app passes that session token's sha256 hash.
+    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
+    const adminHash = sha256(ADMIN_TOKEN)
+
     // admin_counts_by_kind is cross-tenant: it sees BOTH u1's and u2's items.
-    const { rows } = await appRlsPool.query('SELECT kind, count FROM admin_counts_by_kind()')
+    const { rows } = await appRlsPool.query('SELECT kind, count FROM admin_counts_by_kind($1)', [adminHash])
     const byKind = Object.fromEntries(rows.map((r) => [r.kind, Number(r.count)]))
     expect(byKind).toEqual({ records: 2, books: 1 })
 
     // admin_delete_items_for_owner is cross-tenant: removes u2's row entirely.
-    const deleted = await appRlsPool.query(`SELECT admin_delete_items_for_owner('u2') AS n`)
+    const deleted = await appRlsPool.query(`SELECT admin_delete_items_for_owner($1, 'u2') AS n`, [adminHash])
     expect(Number(deleted.rows[0].n)).toBe(1)
     const remaining = await superPool.query('SELECT count(*)::int AS c FROM items')
     expect(remaining.rows[0].c).toBe(2) // only u1's two rows remain
+  })
+
+  it('app_rls has NO DML grant on sessions — no self-promotion or session tampering (HOLD 2)', async () => {
+    // sessions.role is the admin-authority source; app_rls must be SELECT-only.
+    const { rows } = await superPool.query(
+      `SELECT has_table_privilege('app_rls','sessions','SELECT')  AS s,
+              has_table_privilege('app_rls','sessions','INSERT')  AS i,
+              has_table_privilege('app_rls','sessions','UPDATE')  AS u,
+              has_table_privilege('app_rls','sessions','DELETE')  AS d`,
+    )
+    expect(rows[0].s).toBe(true)
+    expect(rows[0].i).toBe(false)
+    expect(rows[0].u).toBe(false)
+    expect(rows[0].d).toBe(false)
+
+    // Self-promotion via a direct UPDATE is rejected (no UPDATE grant on sessions).
+    await expect(
+      appRlsPool.query(`UPDATE sessions SET role = 'admin' WHERE user_id = 'u1'`),
+    ).rejects.toThrow()
   })
 })

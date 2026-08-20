@@ -22,6 +22,8 @@
 // tenant is passed; the tenant context is the defense-in-depth layer that makes
 // the RLS policies effective once binding RLS is deployed.
 
+import { createHash } from 'node:crypto'
+
 // The SQL that sets app.tenant_id for the current transaction. `db` is any
 // node-postgres-shaped pool/client ({ query }).
 export function tenantContextSql(tenantId) {
@@ -37,23 +39,20 @@ export async function setTenantContext(db, tenantId) {
   await db.query(tenantContextSql(tenantId).text, tenantContextSql(tenantId).params)
 }
 
-// ADMIN session context for the SECURITY DEFINER admin cross-tenant functions
+// ADMIN authority for the SECURITY DEFINER admin cross-tenant functions
 // (db/rls/011_binding_rls.sql). Those functions execute with the owner's
-// privileges and bypass RLS, so they are a privilege-escalation surface. They
-// fail closed unless the session carries this ADMIN marker, which the app sets
-// ONLY after requireAdmin() passes (Multi-tenant-Security HOLD A #165). It uses
-// the same set_config(..., is_local=true) transaction-scoped form as the tenant
-// context, so it is parameterized and pg-mem-compatible.
-export function adminContextSql() {
-  return { text: 'SELECT set_config($1, $2, true)', params: ['app.admin_session', '1'] }
-}
-
-// Set the ADMIN session context on a connection. Call this immediately after
-// requireAdmin() succeeds and within the same transaction/connection the admin
-// DML runs on. Without it the SECURITY DEFINER admin functions raise and do no
-// DML (fail closed). No-op on pg-mem-safe consumers is handled by callers.
-export async function setAdminContext(db) {
-  await db.query(adminContextSql().text, adminContextSql().params)
+// privileges and bypass RLS, so they are a privilege-escalation surface.
+//
+// Multi-tenant-Security HOLD 3 (#165): the admin marker is NOT a forgeable GUC.
+// A settable `app.admin_session` GUC could be set by any app_rls session via
+// set_config. Instead the admin authority is DERIVED from the resolved session
+// token: the requireAdmin-gated app layer passes the bearer session token's
+// sha256 hash to the admin functions, and each function re-resolves the role
+// under owner privileges (assert_admin_session), refusing anything that is not
+// an admin session. This mirrors the login-exchange token-hash scheme
+// (_shared/sessions.js sessionTokenHash), so the two agree byte-for-byte.
+export function sessionTokenHash(token) {
+  return createHash('sha256').update(String(token)).digest('hex')
 }
 
 // Run `fn(repo)` inside a BEGIN/COMMIT/ROLLBACK transaction with

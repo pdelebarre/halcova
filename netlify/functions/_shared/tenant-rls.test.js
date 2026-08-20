@@ -16,7 +16,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { DataType, newDb } from 'pg-mem'
-import { adminContextSql, setAdminContext, setTenantContext, tenantContextSql, withTenantTransaction } from './tenant-rls'
+import { sessionTokenHash, setTenantContext, tenantContextSql, withTenantTransaction } from './tenant-rls'
 
 function createMemDb() {
   const mem = newDb()
@@ -111,17 +111,17 @@ describe('tenant-rls wiring (ARCH-6.1 #165)', () => {
   })
 })
 
-describe('admin session context (ARCH-6.1 #165 — Multi-tenant-Security HOLD A)', () => {
-  it('issues set_config(app.admin_session, 1, true) as the requireAdmin-gated marker', async () => {
-    const sql = adminContextSql()
-    expect(sql.text).toBe('SELECT set_config($1, $2, true)')
-    expect(sql.params).toEqual(['app.admin_session', '1'])
-  })
-
-  it('setAdminContext issues the admin marker on a connection', async () => {
-    const calls = []
-    const db = { query: async (text, params) => calls.push([text, params]) }
-    await setAdminContext(db)
-    expect(calls).toEqual([['SELECT set_config($1, $2, true)', ['app.admin_session', '1']]])
+describe('admin authority (ARCH-6.1 #165 — Multi-tenant-Security HOLD 3)', () => {
+  it('derives the admin session token hash as sha256 hex (mirrors _shared/sessions.js)', async () => {
+    // The admin functions (db/rls/011_binding_rls.sql) take the bearer session
+    // token's sha256 hash and re-resolve the role INSIDE the SECURITY DEFINER
+    // function (assert_admin_session), so authority is NOT a forgeable GUC.
+    // The hash must match the login-exchange scheme exactly so the DB lookup
+    // succeeds for a real admin session.
+    expect(sessionTokenHash('abc')).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    )
+    expect(sessionTokenHash('abc')).toBe(sessionTokenHash('abc'))
+    expect(sessionTokenHash('abc')).not.toBe(sessionTokenHash('abd'))
   })
 })
