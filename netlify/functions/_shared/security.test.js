@@ -123,6 +123,24 @@ describe('SEC-3.1 (#194) — reusable validators', () => {
     expect(str('a'.repeat(6000), { max: 5000 }).error.code).toBe('TOO_LONG')
   })
 
+  it('str: rejects dangerous HTML / script / event-handler content (SEC-7.5 #409)', () => {
+    expect(str('<script>alert(1)</script>').error.code).toBe('HTML_REJECTED')
+    expect(str('<SCRIPT>alert(1)</SCRIPT>').error.code).toBe('HTML_REJECTED')
+    expect(str('x onerror=alert(1)').error.code).toBe('HTML_REJECTED')
+    expect(str('see <img src=x onerror=alert(1)>').error.code).toBe('HTML_REJECTED')
+    expect(str('javascript:alert(1)').error.code).toBe('HTML_REJECTED')
+    expect(str('<svg onload=alert(1)>').error.code).toBe('HTML_REJECTED')
+    expect(str('<iframe src=evil>').error.code).toBe('HTML_REJECTED')
+    // rejectHtml can be disabled where a caller explicitly accepts markup.
+    expect(str('<script>x</script>', { rejectHtml: false }).value).toBe('<script>x</script>')
+  })
+
+  it('str: does not misflag benign text (event-handler token boundary)', () => {
+    expect(str('The Artist - Album')).toEqual({ value: 'The Artist - Album' })
+    expect(str('phone one = two')).toEqual({ value: 'phone one = two' })
+    expect(str('notes a > b, c < d')).toEqual({ value: 'notes a > b, c < d' })
+  })
+
   it('intInRange: type + range', () => {
     expect(intInRange(2020, { min: 1000, max: 2100 })).toEqual({ value: 2020 })
     expect(intInRange(1.5, { min: 1, max: 5 }).error.code).toBe('TYPE_ERROR')

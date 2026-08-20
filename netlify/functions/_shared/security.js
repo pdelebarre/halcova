@@ -132,7 +132,44 @@ export async function readJsonBody(req, { maxBytes = MAX_BODY_BYTES } = {}) {
 
 const STRING_MAX = 5000
 
-export function str(value, { max = STRING_MAX, required = false, trim = true } = {}) {
+// ---------------------------------------------------------------------------
+// XSS-in-item-fields guard (SEC-7.5, #409).
+//
+// `str()` used to trim + length-check only, so a payload like
+// `<script>alert(1)</script>` (or an `onerror=` / `javascript:` event handler)
+// was stored verbatim on the item and re-served. This is a fail-closed
+// rejection at the validation boundary: a stored item field is free text, not
+// markup, so there is no legitimate reason for it to contain a script tag, an
+// event-handler attribute, an embedded `<iframe>/<object>/<embed>/<svg>/<style>`
+// element, or a `javascript:` URI. Rejecting these outright (rather than
+// sanitizing) is the safest defense-in-depth: no encoding mistake can let the
+// payload slip through. Because every allowlisted item text field (title,
+// notes, description, artists[].name, tracklist[].title, subtitle, series, …)
+// flows through `str()`, this one guard covers the whole client-writable
+// surface.
+//
+// `on` event-handler detection is bounded to KNOWN HTML event-handler names
+// (OWASP-common list) so an ordinary word that merely starts with "on" ("one",
+// "only", "ongoing") is never misflagged. A handler only counts when it is the
+// `on<name>=` attribute form, which is the executable XSS vector.
+const EVENT_HANDLER_NAMES =
+  'error|click|load|mouseover|mouseout|mouseenter|mouseleave|mousedown|mouseup|' +
+  'focus|blur|change|submit|keydown|keyup|keypress|input|select|toggle|wheel|' +
+  'dblclick|contextmenu|auxclick|pointerdown|pointerup|pointerenter|pointerleave|' +
+  'pointermove|pointerover|pointerout|pointercancel|gotpointercapture|lostpointercapture|' +
+  'drag|dragstart|dragend|dragover|dragenter|dragleave|drop|paste|copy|cut|' +
+  'touchstart|touchmove|touchend|touchcancel|scroll|resize|timeupdate|canplay|' +
+  'play|pause|volumechange|ratechange|progress|stalled|waiting|seeking|seeked|' +
+  'ended|emptied|abort|pageshow|pagehide|hashchange|popstate|beforeunload|' +
+  'unload|online|offline|storage|message|visibilitychange|animationstart|' +
+  'animationend|animationiteration|transitionend'
+const DANGEROUS_HTML_RE = new RegExp(
+  `<script|<iframe|<object|<embed|<svg|<style|javascript\\s*:|` +
+    `(?:^|[\\s"'])(?:on(?:${EVENT_HANDLER_NAMES}))\\s*=`,
+  'i',
+)
+
+export function str(value, { max = STRING_MAX, required = false, trim = true, rejectHtml = true } = {}) {
   if (value === undefined || value === null) {
     return required ? { error: { code: 'REQUIRED', message: 'This field is required.' } } : { value: undefined }
   }
@@ -140,6 +177,11 @@ export function str(value, { max = STRING_MAX, required = false, trim = true } =
   const v = trim ? value.trim() : value
   if (required && v.length === 0) return { error: { code: 'REQUIRED', message: 'This field is required.' } }
   if (v.length > max) return { error: { code: 'TOO_LONG', message: `Must be at most ${max} characters.` } }
+  // Fail-closed: reject dangerous HTML/script/event-handler content in stored
+  // text fields (XSS defense-in-depth, SEC-7.5 #409).
+  if (rejectHtml && DANGEROUS_HTML_RE.test(v)) {
+    return { error: { code: 'HTML_REJECTED', message: 'Content is not allowed.' } }
+  }
   return { value: v }
 }
 

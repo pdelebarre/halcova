@@ -315,3 +315,45 @@ describe('validateItem — rejects malformed Phase A enrichment (FEAT-EPIC-5 #27
     expect(validateItem({ snippet: 123 }, { partial: true }).error.code).toBe('TYPE_ERROR')
   })
 })
+
+describe('validateItem — rejects XSS payloads in item fields (SEC-7.5, #409)', () => {
+  // Defense-in-depth: `str()` fails closed on script tags / event handlers /
+  // embedded dangerous elements / javascript: URIs across the whole
+  // client-writable text surface (title, notes, description, arrays, …).
+
+  it('rejects a title containing a <script> tag', () => {
+    expect(validateItem({ title: '<script>alert(1)</script>' }).error.code).toBe('HTML_REJECTED')
+    expect(validateItem({ title: '<SCRIPT>alert(1)</SCRIPT>' }).error.code).toBe('HTML_REJECTED')
+  })
+
+  it('rejects dangerous content in every string item field', () => {
+    const cases = [
+      { notes: '<script>alert(1)</script>' },
+      { description: 'see <img src=x onerror=alert(1)>' },
+      { subtitle: 'javascript:alert(1)' },
+      { series: '<svg onload=alert(1)>' },
+      { mainCategory: '<iframe src=evil>' },
+      { label: 'x onmouseover=alert(1)' },
+      { snippet: 'more <object>junk</object>' },
+    ]
+    for (const body of cases) {
+      expect(validateItem({ title: 'A', ...body }).error.code, JSON.stringify(body)).toBe('HTML_REJECTED')
+    }
+  })
+
+  it('rejects XSS payloads inside structured enrichment arrays', () => {
+    expect(validateItem({ title: 'A', artists: [{ id: 1, name: '<script>alert(1)</script>' }] }).error.code).toBe('HTML_REJECTED')
+    expect(validateItem({ title: 'A', tracklist: [{ position: 'A1', title: 'x onerror=alert(1)' }] }).error.code).toBe('HTML_REJECTED')
+    expect(validateItem({ title: 'A', authorsList: [{ name: '<img src=x onerror=alert(1)>' }] }).error.code).toBe('HTML_REJECTED')
+  })
+
+  it('still rejects XSS in a partial (PUT) patch', () => {
+    expect(validateItem({ notes: '<script>alert(1)</script>' }, { partial: true }).error.code).toBe('HTML_REJECTED')
+  })
+
+  it('accepts benign text that is not an event-handler attribute', () => {
+    const { item, error } = validateItem({ title: 'The Artist - Album', notes: 'phone one = two, a > b, c < d' })
+    expect(error).toBeUndefined()
+    expect(item.title).toBe('The Artist - Album')
+  })
+})
