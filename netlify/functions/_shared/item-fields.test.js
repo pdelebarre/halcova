@@ -347,6 +347,21 @@ describe('validateItem — rejects XSS payloads in item fields (SEC-7.5, #409)',
     expect(validateItem({ title: 'A', authorsList: [{ name: '<img src=x onerror=alert(1)>' }] }).error.code).toBe('HTML_REJECTED')
   })
 
+  it('rejects XSS payloads in genre/style ARRAYS via the same guard (SEC-7.5 #409)', () => {
+    // scalar form is already guarded; the array path must be too.
+    expect(validateItem({ title: 'A', genre: ['<script>alert(1)</script>'] }).error.code).toBe('HTML_REJECTED')
+    expect(validateItem({ title: 'A', style: ['x onerror=alert(1)'] }).error.code).toBe('HTML_REJECTED')
+    expect(validateItem({ title: 'A', genre: ['<img onmousemove=alert(1)>'] }).error.code).toBe('HTML_REJECTED')
+    expect(validateItem({ title: 'A', style: ['java&#x73;cript:alert(1)'] }).error.code).toBe('HTML_REJECTED')
+    // hostile entry anywhere in the array rejects the whole write.
+    expect(validateItem({ title: 'A', genre: ['Rock', '<svg onload=alert(1)>'] }).error.code).toBe('HTML_REJECTED')
+    // benign arrays (and a legacy scalar string) still validate.
+    const ok = validateItem({ title: 'A', genre: ['Rock', 'Jazz'], style: 'Funk' })
+    expect(ok.error).toBeUndefined()
+    expect(ok.item.genre).toEqual(['Rock', 'Jazz'])
+    expect(ok.item.style).toBe('Funk')
+  })
+
   it('still rejects XSS in a partial (PUT) patch', () => {
     expect(validateItem({ notes: '<script>alert(1)</script>' }, { partial: true }).error.code).toBe('HTML_REJECTED')
   })

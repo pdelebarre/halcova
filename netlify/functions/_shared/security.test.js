@@ -135,10 +135,54 @@ describe('SEC-3.1 (#194) — reusable validators', () => {
     expect(str('<script>x</script>', { rejectHtml: false }).value).toBe('<script>x</script>')
   })
 
+  it('str: rejects the full event-handler class across ALL tags (SEC-7.5 #409)', () => {
+    const probes = [
+      '<img src=x onmousemove=alert(1)>',
+      '<img onfocusin=alert(1)>',
+      '<input onfocusout=alert(1)>',
+      '<video onloadedmetadata=alert(1)>',
+      '<body onfocusin=alert(1)>',
+      '<img src=x onreadystatechange=alert(1)>',
+      '<input onbeforeinput=alert(1)>',
+      '<img src=x onmousewheel=alert(1)>',
+      '<a onfocusin=alert(1)>',
+      // dangerous embedded elements without any handler
+      '<iframe src=evil></iframe>',
+      '<object data=evil></object>',
+      '<embed src=evil>',
+      '<style>body{}</style>',
+      '<math><mtext>',
+      '<form action=x>',
+      '<link rel=stylesheet>',
+      '<meta http-equiv=refresh>',
+      '<base href=evil>',
+      '</script>',
+    ]
+    for (const payload of probes) {
+      expect(str(payload).error.code, payload).toBe('HTML_REJECTED')
+    }
+  })
+
+  it('str: rejects entity-obfuscated payloads (SEC-7.5 #409)', () => {
+    const probes = [
+      'java&#x73;cript:alert(1)',
+      '<scr&#x69;pt>alert(1)</scr&#x69;pt>',
+      '&lt;script&gt;alert(1)&lt;/script&gt;',
+      '&lt;img src=x onerror=alert(1)&gt;',
+      'javascript&#x3a;alert(1)',
+      '<img src=x on&#x6d;ousemove=alert(1)>',
+      'java&#115;cript:alert(1)',
+    ]
+    for (const payload of probes) {
+      expect(str(payload).error.code, payload).toBe('HTML_REJECTED')
+    }
+  })
+
   it('str: does not misflag benign text (event-handler token boundary)', () => {
     expect(str('The Artist - Album')).toEqual({ value: 'The Artist - Album' })
     expect(str('phone one = two')).toEqual({ value: 'phone one = two' })
     expect(str('notes a > b, c < d')).toEqual({ value: 'notes a > b, c < d' })
+    expect(str('only the ongoing === here')).toEqual({ value: 'only the ongoing === here' })
   })
 
   it('intInRange: type + range', () => {
@@ -166,6 +210,18 @@ describe('SEC-3.1 (#194) — reusable validators', () => {
     expect(arrayOfStrings('nope').error.code).toBe('TYPE_ERROR')
     expect(arrayOfStrings(['x', 42]).error.code).toBe('TYPE_ERROR')
     expect(arrayOfStrings(Array(101).fill('x'), { max: 100 }).error.code).toBe('TOO_LONG')
+  })
+
+  it('arrayOfStrings: rejects XSS payloads in any entry (SEC-7.5 #409)', () => {
+    expect(arrayOfStrings(['<script>alert(1)</script>']).error.code).toBe('HTML_REJECTED')
+    expect(arrayOfStrings(['x onerror=alert(1)']).error.code).toBe('HTML_REJECTED')
+    expect(arrayOfStrings(['<img onmousemove=alert(1)>']).error.code).toBe('HTML_REJECTED')
+    expect(arrayOfStrings(['java&#x73;cript:alert(1)']).error.code).toBe('HTML_REJECTED')
+    // a single benign entry next to a hostile one still rejects the whole array
+    expect(arrayOfStrings(['Rock', '<svg onload=alert(1)>']).error.code).toBe('HTML_REJECTED')
+    // benign entries pass; rejectHtml can be disabled where markup is accepted.
+    expect(arrayOfStrings(['Rock', 'Jazz'])).toEqual({ value: ['Rock', 'Jazz'] })
+    expect(arrayOfStrings(['<script>x</script>'], { rejectHtml: false })).toEqual({ value: ['<script>x</script>'] })
   })
 
   it('rejectUnknown: blocks junk/protected properties', () => {

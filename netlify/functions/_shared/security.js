@@ -144,30 +144,86 @@ const STRING_MAX = 5000
 // element, or a `javascript:` URI. Rejecting these outright (rather than
 // sanitizing) is the safest defense-in-depth: no encoding mistake can let the
 // payload slip through. Because every allowlisted item text field (title,
-// notes, description, artists[].name, tracklist[].title, subtitle, series, …)
-// flows through `str()`, this one guard covers the whole client-writable
-// surface.
+// notes, description, artists[].name, tracklist[].title, subtitle, series,
+// genre/style array entries, …) flows through `str()` / `arrayOfStrings()`,
+// this one guard covers the whole client-writable surface.
 //
-// `on` event-handler detection is bounded to KNOWN HTML event-handler names
-// (OWASP-common list) so an ordinary word that merely starts with "on" ("one",
-// "only", "ongoing") is never misflagged. A handler only counts when it is the
-// `on<name>=` attribute form, which is the executable XSS vector.
+// Fail-closed for the whole class, not a bounded blocklist:
+//   - The input is HTML-entity-decoded FIRST (`&#x73;` → `s`, `&lt;` → `<`,
+//     `&amp;` → `&`), so entity-obfuscated payloads such as
+//     `java&#x73;cript:alert(1)` or `<scr&#x69;pt>…</scr&#x69;pt>` collapse to
+//     their literal form and are then caught by the literal checks below.
+//   - ANY `<tag … on<handler>=…>` attribute is rejected across ALL tags and ALL
+//     handler names (`<\w+[^>]*\son[a-z][a-z0-9]*\s*=`), so a handler that is
+//     not on a curated list (onmousemove, onfocusin, onloadedmetadata,
+//     onbeforeinput, onmousewheel, onreadystatechange, …) on any element
+//     (<img>, <a>, <video>, <body>, <input>, …) can never bypass.
+//   - The same handler bound to a KNOWN (OWASP-common) event-handler list is
+//     also rejected WITHOUT a surrounding tag (token-boundary `x onerror=…`),
+//     so the standalone attribute form is caught while an ordinary word that
+//     merely starts with "on" ("one", "only", "ongoing") is never misflagged.
+//   - Dangerous embedded/executable elements are rejected regardless of any
+//     handler: <script>, <iframe>, <object>, <embed>, <svg>, <style>, <math>,
+//     <form>, <link>, <meta>, <base> (opening or closing).
+//   - A `javascript:` URI scheme is rejected.
 const EVENT_HANDLER_NAMES =
   'error|click|load|mouseover|mouseout|mouseenter|mouseleave|mousedown|mouseup|' +
-  'focus|blur|change|submit|keydown|keyup|keypress|input|select|toggle|wheel|' +
-  'dblclick|contextmenu|auxclick|pointerdown|pointerup|pointerenter|pointerleave|' +
-  'pointermove|pointerover|pointerout|pointercancel|gotpointercapture|lostpointercapture|' +
-  'drag|dragstart|dragend|dragover|dragenter|dragleave|drop|paste|copy|cut|' +
-  'touchstart|touchmove|touchend|touchcancel|scroll|resize|timeupdate|canplay|' +
-  'play|pause|volumechange|ratechange|progress|stalled|waiting|seeking|seeked|' +
-  'ended|emptied|abort|pageshow|pagehide|hashchange|popstate|beforeunload|' +
+  'focus|focusin|focusout|blur|change|submit|keydown|keyup|keypress|input|select|' +
+  'toggle|wheel|dblclick|contextmenu|auxclick|pointerdown|pointerup|pointerenter|' +
+  'pointerleave|pointermove|pointerover|pointerout|pointercancel|gotpointercapture|' +
+  'lostpointercapture|drag|dragstart|dragend|dragover|dragenter|dragleave|drop|' +
+  'paste|copy|cut|touchstart|touchmove|touchend|touchcancel|scroll|resize|' +
+  'timeupdate|loadedmetadata|durationchange|loadeddata|canplay|canplaythrough|' +
+  'play|pause|ratechange|progress|stalled|waiting|seeking|seeked|ended|emptied|' +
+  'abort|readystatechange|pageshow|pagehide|hashchange|popstate|beforeunload|' +
   'unload|online|offline|storage|message|visibilitychange|animationstart|' +
-  'animationend|animationiteration|transitionend'
-const DANGEROUS_HTML_RE = new RegExp(
-  `<script|<iframe|<object|<embed|<svg|<style|javascript\\s*:|` +
-    `(?:^|[\\s"'])(?:on(?:${EVENT_HANDLER_NAMES}))\\s*=`,
+  'animationend|animationiteration|animationcancel|transitionend|transitionrun|' +
+  'transitionstart|transitioncancel|mousewheel|beforeinput|pointerrawupdate'
+
+// A `<tag … on<handler>=…>` form — ANY element, ANY handler name. This is the
+// unambiguous executable XSS vector, so no curated handler list is needed here.
+const DANGEROUS_ANY_HANDLER_TAG_RE = /<\w+[^>]*\son[a-z][a-z0-9]*\s*=/i
+// The `on<known-handler>=` attribute WITHOUT a surrounding tag (token-boundary
+// "x onerror=…"). Bounded to the known list so "one =", "only =" are never
+// misflagged; the curated list above covers the common handlers.
+const DANGEROUS_STANDALONE_HANDLER_RE = new RegExp(
+  `(?:^|[\\s"'])(?:on(?:${EVENT_HANDLER_NAMES}))\\s*=`,
   'i',
 )
+// Embedded / executable elements, handler or not (opening or closing form).
+const DANGEROUS_ELEMENT_RE =
+  /<(?:\/)?(?:script|iframe|object|embed|svg|style|math|form|link|meta|base)\b/i
+const JAVASCRIPT_URI_RE = /javascript\s*:/i
+
+const DANGEROUS_RES = [
+  DANGEROUS_ELEMENT_RE,
+  DANGEROUS_ANY_HANDLER_TAG_RE,
+  DANGEROUS_STANDALONE_HANDLER_RE,
+  JAVASCRIPT_URI_RE,
+]
+
+// Decode common HTML character + numeric entities so obfuscated payloads
+// (`&#x73;`, `&lt;`, `&amp;`, `&#60;`, …) collapse to their literal form before
+// the dangerous-content checks run. Unknown/named non-entities are left intact.
+function htmlDecode(str) {
+  const named = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: ' ' }
+  return str
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#([0-9]+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/&([a-z][a-z0-9]+);/gi, (m, e) => named[e.toLowerCase()] ?? m)
+}
+
+// True when `value` is dangerous as stored plain-text content. Fail-closed:
+// any dangerous element, any `<tag on*=…>` form, a standalone known handler, or
+// a `javascript:` URI is rejected — after entity-decoding so obfuscation can't
+// bypass it.
+export function isDangerousContent(value) {
+  const decoded = htmlDecode(value)
+  for (const re of DANGEROUS_RES) {
+    if (re.test(decoded)) return true
+  }
+  return false
+}
 
 export function str(value, { max = STRING_MAX, required = false, trim = true, rejectHtml = true } = {}) {
   if (value === undefined || value === null) {
@@ -179,7 +235,7 @@ export function str(value, { max = STRING_MAX, required = false, trim = true, re
   if (v.length > max) return { error: { code: 'TOO_LONG', message: `Must be at most ${max} characters.` } }
   // Fail-closed: reject dangerous HTML/script/event-handler content in stored
   // text fields (XSS defense-in-depth, SEC-7.5 #409).
-  if (rejectHtml && DANGEROUS_HTML_RE.test(v)) {
+  if (rejectHtml && isDangerousContent(v)) {
     return { error: { code: 'HTML_REJECTED', message: 'Content is not allowed.' } }
   }
   return { value: v }
@@ -210,7 +266,7 @@ export function inEnum(value, allowed, { required = false } = {}) {
   return { value }
 }
 
-export function arrayOfStrings(value, { max = 100, itemMax = 1000, required = false } = {}) {
+export function arrayOfStrings(value, { max = 100, itemMax = 1000, required = false, rejectHtml = true } = {}) {
   if (value === undefined || value === null) {
     return required ? { error: { code: 'REQUIRED', message: 'This field is required.' } } : { value: undefined }
   }
@@ -219,6 +275,12 @@ export function arrayOfStrings(value, { max = 100, itemMax = 1000, required = fa
   for (const item of value) {
     if (typeof item !== 'string' || item.length > itemMax) {
       return { error: { code: 'TYPE_ERROR', message: 'Expected an array of short strings.' } }
+    }
+    // Fail-closed: every array entry (genre/style/etc.) is plain text, so it
+    // goes through the SAME dangerous-content guard as a scalar string — an
+    // XSS payload must not bypass via the array path (SEC-7.5 #409).
+    if (rejectHtml && isDangerousContent(item)) {
+      return { error: { code: 'HTML_REJECTED', message: 'Content is not allowed.' } }
     }
   }
   return { value }
