@@ -1,4 +1,4 @@
-// #162 / ADR-0015 Dec 4 — the trusted-device / offline-authorization record.
+// #162 / ADR-0019 Dec 4 — the trusted-device / offline-authorization record.
 //
 // Verifies the bounded offline-trust lifecycle: established only after a
 // successful ONLINE authentication, extended only on online revalidation,

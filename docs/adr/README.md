@@ -24,6 +24,7 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
 | 0016 | Passkeys and Sign in with Apple evaluation | Accepted — Deferred |
 | 0017 | Lookup resilience and provider fallbacks | Accepted |
 | 0018 | Persistent multi-team delivery model | Accepted |
+| 0019 | Platform foundation and offline-first architecture | Proposed |
 
 ## Important relationships
 
@@ -56,3 +57,5 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
 ## Numbering note
 
 The repository previously contained duplicate ADR-0003 and ADR-0004 filenames. The monetization decision is now ADR-0008 and the passkey evaluation is ADR-0016. The duplicate files were removed so every ADR number is unique.
+
+The offline-first platform ADR was renumbered from `0015` to `0019` to resolve a collision with the Accepted `0015` Architecture decision governance ADR (unique-number rule). The new/conflicting decision was renumbered per the governance rule.

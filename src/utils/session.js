@@ -46,7 +46,7 @@ export function getUserId() {
 //                                  badges-seen)
 //   runout.events[.enabled]        first-party opt-in analytics queue + flag
 //   runout.offlineTrust            the trusted-device/offline-authorization
-//                                  marker (#162, ADR-0015 Dec 4). It holds NO
+// marker (#162, ADR-0019 Dec 4). It holds NO
 //                                  credential (never the token/access code); it
 //                                  must still be cleared on sign-out/account
 //                                  switch so stale offline trust never survives

@@ -1,4 +1,4 @@
-// Trusted-device / offline-authorization record (M1, #162; ADR-0015 Dec 4;
+// Trusted-device / offline-authorization record (M1, #162; ADR-0019 Dec 4;
 // ADR-0016 trust rules).
 //
 // WHAT THIS IS
@@ -11,7 +11,7 @@
 //
 // The record is a LOCAL, NON-CREDENTIAL authorization marker. It deliberately:
 //   - NEVER contains the session token, the access code, the admin key, or any
-//     bearer/reusable secret (ADR-0015 Dec 4; the requirement that no raw
+//     bearer/reusable secret (ADR-0019 Dec 4; the requirement that no raw
 //     password / access code / token is stored holds — the token itself lives
 //     only in `localStorage.runout.session`, never in IndexedDB, and never in
 //     this record).

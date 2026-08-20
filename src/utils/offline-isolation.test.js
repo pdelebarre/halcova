@@ -123,7 +123,7 @@ describe('sign out as A, sign in as B — B never sees A\'s local data', () => {
 
   it('useAuth.login into a DIFFERENT account clears the previous account\'s local data', async () => {
     // A is signed in with local data present and is an explicitly-trusted
-    // device (#162/ADR-0015 Dec 4). me() rejects offline on mount so the
+    // device (#162/ADR-0019 Dec 4). me() rejects offline on mount so the
     // startup revalidation keeps A's cached session (never signs A out).
     seedUserAData()
     saveSession({ user: MEMBER_A, session: 'tok-a' })
