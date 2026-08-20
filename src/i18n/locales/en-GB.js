@@ -341,6 +341,18 @@ const enGB = {
   // §16b Offline status (M1 shell, #157)
   'offline.status': "You're offline — showing saved content",
   'offline.mirrorCopy': 'Showing your saved collection (offline copy) — synced {at}',
+  // M2 #159: offline sync-status states.
+  'offline.pending': '{n} change(s) saved on this device, waiting to sync',
+  'offline.queuedHint': "Changes you make offline are saved on this device and sync when you're back online.",
+  'offline.needsAttention': "Some changes couldn't sync — review them when you're back online.",
+  'offline.syncNow': 'Sync now',
+  'offline.synced': 'All changes synced',
+  // M2 #159: local-data management / reset (Settings).
+  'offline.localDataTitle': 'Offline data',
+  'offline.localDataHint': 'Your collection is saved on this device so you can browse and make changes offline.',
+  'offline.clearOfflineData': 'Clear offline data',
+  'offline.clearOfflineDataConfirm': 'Clear the offline copy from this device? Your online collection is not affected.',
+  'offline.clearOfflineDataDone': 'Offline data cleared',
 
   // §17 Free plan & demo — same copy as en for the baseline
   'plan.freeCounter': '{count} of {cap} items added',

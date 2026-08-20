@@ -338,6 +338,18 @@ const fr = {
 
   'offline.status': 'Hors ligne — contenu enregistré affiché',
   'offline.mirrorCopy': 'Affichage de votre collection enregistrée (copie hors ligne) — synchronisée le {at}',
+  // M2 #159 : états de synchronisation hors ligne.
+  'offline.pending': '{n} modification(s) enregistrée(s) sur cet appareil, en attente de synchronisation',
+  'offline.queuedHint': 'Les modifications effectuées hors ligne sont enregistrées sur cet appareil et synchronisées à la reconnexion.',
+  'offline.needsAttention': 'Certaines modifications n\'ont pas pu être synchronisées — vérifiez-les à la reconnexion.',
+  'offline.syncNow': 'Synchroniser maintenant',
+  'offline.synced': 'Toutes les modifications sont synchronisées',
+  // M2 #159 : gestion/réinitialisation des données locales (Réglages).
+  'offline.localDataTitle': 'Données hors ligne',
+  'offline.localDataHint': 'Votre collection est enregistrée sur cet appareil pour vous permettre de la parcourir et de la modifier hors ligne.',
+  'offline.clearOfflineData': 'Effacer les données hors ligne',
+  'offline.clearOfflineDataConfirm': 'Effacer la copie hors ligne de cet appareil ? Votre collection en ligne n\'est pas affectée.',
+  'offline.clearOfflineDataDone': 'Données hors ligne effacées',
 
   // §17 Plan gratuit & démo
   'plan.freeCounter': '{count} / {cap} articles ajoutés',

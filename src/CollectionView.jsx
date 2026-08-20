@@ -10,6 +10,7 @@ import AisleSheet from './components/AisleSheet'
 import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
 import PlayPanel from './components/PlayPanel'
+import SyncStatus from './components/SyncStatus'
 import { useCollection } from './hooks/useCollection'
 import { useLookup } from './hooks/useLookup'
 import { themeToCssVars, useTheme } from './theme'
@@ -1079,14 +1080,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       <main className="app-main">
         {status === 'loading' && <p className="status-line">{copy.loading}</p>}
 
-        {/* M2 #289: a clear "showing offline copy" state. Rendered whenever the
-            current items were hydrated from the IndexedDB mirror (offline or a
-            safe network failure) so the user knows they're browsing their
-            last-known collection, not live data. */}
-        {status === 'ready' && source === 'offline' && (
-          <div className="status-line status-offline-copy" role="status">
-            <p>{t('offline.mirrorCopy', { at: mirroredAt ? new Date(mirroredAt).toLocaleString() : '' })}</p>
-          </div>
+        {/* M2 #289/#159: offline + sync states. SyncStatus consolidates the
+            "showing offline copy" note (#289) with the pending / queued /
+            synced / conflict-or-error states (#159). It only renders when
+            there is something meaningful to communicate, and manual "Sync now"
+            re-pulls the live collection (the M2 reconnect sync hook). */}
+        {status === 'ready' && (
+          <SyncStatus
+            source={source}
+            mirroredAt={mirroredAt}
+            onSyncNow={refresh}
+          />
         )}
 
         {status === 'error' && (

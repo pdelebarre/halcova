@@ -1,0 +1,78 @@
+/* M2 Offline Sync Status strip (#159).
+   Compact, thumb-friendly status that appears only when there is something to
+   communicate (offline copy showing / queued / conflict / error / synced).
+   Safe-area aware for iPhone/iPad; wraps on narrow screens. */
+
+.sync-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 12px;
+  margin: 8px 0 4px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--color-surface-2, var(--vinyl-groove-2));
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--jacket-kraft);
+}
+
+.sync-status-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sync-status-line {
+  margin: 0;
+}
+
+/* Offline copy — matches the CollectionView offline-copy note tone. */
+.sync-status-offline-copy {
+  color: var(--jacket-kraft);
+}
+
+/* Pending (queued) — muted, informative. */
+.sync-status-pending {
+  color: var(--jacket-kraft);
+}
+
+/* Conflict / error — danger tone, safe generic message. */
+.sync-status-attention {
+  color: var(--color-danger-bright, var(--danger-bright));
+}
+
+/* Fully synced — calm confirmation. */
+.sync-status-synced {
+  color: var(--jacket-kraft);
+}
+
+/* Queued hint when offline — tells the user the action is saved locally. */
+.sync-status-queued-hint {
+  color: var(--jacket-kraft);
+}
+
+.sync-status-sync-now {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--color-surface-1, var(--surface));
+  color: var(--jacket-kraft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sync-status-sync-now:hover {
+  filter: brightness(1.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-status { animation: none; }
+}

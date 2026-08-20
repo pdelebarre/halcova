@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
+import 'fake-indexeddb/auto'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { LocaleProvider, setLocale, getLocale } from '../i18n'
 import SettingsModal from '../components/SettingsModal'
@@ -130,5 +131,54 @@ describe('SettingsModal — i18n', () => {
     expect(card).toBeInTheDocument()
     fireEvent.click(card)
     expect(onOpenFeedback).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('SettingsModal — offline-data management (#159)', () => {
+  it('does not render the offline-data section when no signed-in userId is provided', () => {
+    renderModal()
+    expect(screen.queryByText('Clear offline data')).toBeNull()
+    expect(screen.queryByText(/Offline data/i)).toBeNull()
+  })
+
+  it('renders the offline-data section for a signed-in user', () => {
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId="u1" />
+      </LocaleProvider>
+    )
+    // The section label and the action button are present.
+    expect(screen.getAllByText(/Offline data/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /Clear offline data/i })).toBeInTheDocument()
+  })
+
+  it('shows a confirmation before clearing, then reports done', async () => {
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId="u1" />
+      </LocaleProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
+    // Confirmation copy shown before the destructive action.
+    expect(screen.getByText(/Your online collection is not affected/i)).toBeInTheDocument()
+
+    // The destructive confirm button.
+    const confirm = screen.getAllByRole('button', { name: /Clear offline data/i }).at(-1)
+    fireEvent.click(confirm)
+
+    expect(await screen.findByText('Offline data cleared')).toBeInTheDocument()
+  })
+
+  it('can cancel the confirmation without clearing data', () => {
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId="u1" />
+      </LocaleProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Offline data cleared')).toBeNull()
   })
 })

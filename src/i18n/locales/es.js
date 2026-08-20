@@ -338,6 +338,18 @@ const es = {
 
   'offline.status': 'Sin conexión — mostrando contenido guardado',
   'offline.mirrorCopy': 'Mostrando su colección guardada (copia sin conexión) — sincronizada {at}',
+  // M2 #159: estados de sincronización sin conexión.
+  'offline.pending': '{n} cambio(s) guardado(s) en este dispositivo, pendiente(s) de sincronización',
+  'offline.queuedHint': 'Los cambios que haga sin conexión se guardan en este dispositivo y se sincronizan cuando vuelva a estar en línea.',
+  'offline.needsAttention': 'Algunos cambios no pudieron sincronizarse — revíselos cuando vuelva a estar en línea.',
+  'offline.syncNow': 'Sincronizar ahora',
+  'offline.synced': 'Todos los cambios sincronizados',
+  // M2 #159: gestión/restablecimiento de datos locales (Ajustes).
+  'offline.localDataTitle': 'Datos sin conexión',
+  'offline.localDataHint': 'Su colección se guarda en este dispositivo para poder consultarla y modificarla sin conexión.',
+  'offline.clearOfflineData': 'Borrar datos sin conexión',
+  'offline.clearOfflineDataConfirm': '¿Borrar la copia sin conexión de este dispositivo? Su colección en línea no se ve afectada.',
+  'offline.clearOfflineDataDone': 'Datos sin conexión borrados',
 
   // §17 Plan gratuito y demo
   'plan.freeCounter': '{count} de {cap} artículos añadidos',

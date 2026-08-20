@@ -457,6 +457,7 @@ export default function App() {
             setSettingsOpen(false)
             setFeedbackOpen({ initialType: 'suggestion' })
           }}
+          userId={user?.id}
         />
       )}
       {adminOpen && <AdminPanel onClose={() => setAdminOpen(false)} />}

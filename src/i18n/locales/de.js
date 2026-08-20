@@ -338,6 +338,18 @@ const de = {
 
   'offline.status': 'Offline — gespeicherte Inhalte werden angezeigt',
   'offline.mirrorCopy': 'Ihre gespeicherte Sammlung wird angezeigt (Offline-Kopie) — synchronisiert {at}',
+  // M2 #159: Offline-Synchronisierungsstatus.
+  'offline.pending': '{n} Änderung(en) auf diesem Gerät gespeichert, warten auf Synchronisierung',
+  'offline.queuedHint': 'Änderungen, die Sie offline vornehmen, werden auf diesem Gerät gespeichert und synchronisiert, sobald Sie wieder online sind.',
+  'offline.needsAttention': 'Einige Änderungen konnten nicht synchronisiert werden — prüfen Sie sie, sobald Sie wieder online sind.',
+  'offline.syncNow': 'Jetzt synchronisieren',
+  'offline.synced': 'Alle Änderungen synchronisiert',
+  // M2 #159: Verwaltung/Zurücksetzen lokaler Daten (Einstellungen).
+  'offline.localDataTitle': 'Offline-Daten',
+  'offline.localDataHint': 'Ihre Sammlung wird auf diesem Gerät gespeichert, damit Sie sie offline durchsuchen und bearbeiten können.',
+  'offline.clearOfflineData': 'Offline-Daten löschen',
+  'offline.clearOfflineDataConfirm': 'Offline-Kopie von diesem Gerät löschen? Ihre Online-Sammlung bleibt unverändert.',
+  'offline.clearOfflineDataDone': 'Offline-Daten gelöscht',
 
   // §17 Kostenloser Plan & Demo
   'plan.freeCounter': '{count} von {cap} Artikeln hinzugefügt',
