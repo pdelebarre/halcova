@@ -87,12 +87,19 @@ an implementer.
 
 Two layers of scanning:
 
-- **Advisory, non-blocking** (`codeql.yml`, `secret-scan.yml`, `sonarcloud.yml`)
+- **Advisory, non-blocking** (`secret-scan.yml`, `sonarcloud.yml`)
   surface findings without gating the launch branch.
 - **Blocking merge gate** (`security-ci.yml`, #213) **fails the check-run** on
   critical/high findings so it blocks merges via the required status checks.
-  It covers security unit tests, SAST (CodeQL security-extended), dependency
-  checks (`npm audit --audit-level=high`) and secret scanning (Gitleaks).
+  It covers security unit tests, dependency checks
+  (`npm audit --audit-level=high`) and secret scanning (Gitleaks).
+- **SAST (CodeQL)** is enforced **out of band** via GitHub **CodeQL default
+  setup**, which is enabled at the repo level. The advanced-config CodeQL
+  workflows (`codeql.yml` advisory and the former `sast` job in
+  `security-ci.yml`) were removed in #412 because default-setup rejects
+  advanced-config SARIF uploads. Default-setup code-scanning results surface
+  as code-scanning alerts and must be added as a branch-protection required
+  status check to gate merges.
 
 - **Dependency/SCA scanning (#208)** — Dependabot (`.github/dependabot.yml`)
   opens weekly update PRs for npm and GitHub Actions; an advisory
@@ -101,10 +108,13 @@ Two layers of scanning:
   - **Critical** — fix within **7 days**.
   - **High** — fix within **30 days**.
   - Moderate/low — next regular dependency update.
-- **SAST (#209)** — CodeQL (`.github/workflows/codeql.yml`) runs
-  `security-extended` on JavaScript/TypeScript for every PR and push to `main`
-  in advisory mode (`continue-on-error: true` on the analyze step). Findings
-  appear in the workflow log / code scanning results; they do not block merges.
+- **SAST (#209)** — enforced via GitHub **CodeQL default setup** (enabled at the
+  repo level by the owner). The advanced-config CodeQL workflow
+  (`.github/workflows/codeql.yml`) and the former `sast` job in
+  `security-ci.yml` were removed in #412 because default-setup rejects
+  advanced-config SARIF uploads. Default-setup runs `security-extended`
+  code scanning on every push/PR to `main`; findings surface as code-scanning
+  alerts and are gated via the default-setup required status check.
 - **Secret scanning (#210)** — an advisory Gitleaks scan
   (`.github/workflows/secret-scan.yml`, config in `.gitleaks.toml`) runs on
   every PR/push in report-only mode. Real-time secret scanning + push
@@ -117,9 +127,10 @@ Two layers of scanning:
    the repo in real time). Optionally enable **Dependabot alerts** and
    **Dependabot security updates** to complement the weekly PRs.
 2. In **Settings → Branches**, add the `security-ci.yml` job names
-   (`security-tests`, `dependency-audit`, `secret-scan`, `sast`) to the
-   branch-protection **required status checks** so the blocking gate actually
-   gates merges (this is what makes #213 effective).
+   (`security-tests`, `dependency-audit`, `secret-scan`) **and** the **CodeQL
+   default-setup** check to the branch-protection **required status checks** so
+   the blocking gate (incl. SAST via default-setup) actually gates merges (this
+   is what makes #213 effective).
 3. Follow-up for #208: commit a `package-lock.json` so the npm ecosystem
    (Dependabot + `npm audit`) resolves pinned versions.
 

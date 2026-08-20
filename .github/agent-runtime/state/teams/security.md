@@ -1,7 +1,7 @@
 TEAM: SECURITY
-CURRENT ISSUE: #342 (final sign-off) · #376 · #378
-STATUS: ACTIVE — M1 final security gate pending
-ACTIVE PR: —
-LAST GATE: Multi-tenant Security PASS · Security Auditor PENDING on #342
-BLOCKER: #342 owner-action repo settings (CodeQL, secret-scanning, required checks)
-NEXT: Security Auditor PASS #342 → Tester regression #376/#378
+CURRENT ISSUE: #412 CodeQL default-setup conflict — remove advanced-config SAST workflows
+STATUS: READY — codeql.yml advisory workflow deleted; sast job removed from security-ci.yml; comments/docs updated to point SAST gate at CodeQL default-setup code-scanning
+ACTIVE PR: (open) m1/security/412
+LAST GATE: pending independent Security Auditor verification (no self-approval)
+BLOCKER: —
+NEXT: PM review of #412 diff → human merge → confirm default-setup code-scanning required check in repo settings → sign-off #342
