@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useAuth } from './useAuth'
-import { saveSession } from '../utils/session'
+import { saveSession, getSessionToken } from '../utils/session'
 import { establishOfflineTrust, sessionFingerprint } from '../utils/offlineTrust'
 
 // Mock the auth API module so refresh() exercises the real session handling
@@ -109,6 +109,32 @@ describe('useAuth.refresh', () => {
     // The startup revalidation pulled the freshest plan into the session.
     expect(result.current.session.user.plan).toBe('lifetime')
     expect(result.current.session.session).toBe('tok-session-abc123')
+  })
+
+  it('does not resurrect the session when me() resolves 200 after logout (rotate-guard, SEC-5.2 #376)', async () => {
+    saveSession(SESSION)
+    let resolveMe
+    authApi.me.mockReturnValue(new Promise((resolve) => { resolveMe = resolve }))
+
+    const { result } = renderHook(() => useAuth())
+    // me() is in flight; the user signs out before it resolves. Model the real
+    // sign-out clearing the persisted session token (saveSession(null)), which
+    // is the precondition for the CWE-384-adjacent empty-token resurrection.
+    act(() => {
+      result.current.logout()
+      saveSession(null)
+    })
+    expect(result.current.session).toBeNull()
+    expect(getSessionToken()).toBe('')
+
+    // The stale in-flight me() now resolves 200 with a (cached-profile) user.
+    // The rotate-guard must discard it — it must NOT setSession({ user,
+    // session: '' }) and briefly remount the shell with the signed-out user's
+    // cached profile.
+    await act(async () => { resolveMe({ ...MEMBER, plan: 'premium' }) })
+
+    // Session stays null; no empty-token resurrection, no stale user profile.
+    expect(result.current.session).toBeNull()
   })
 
   it('signs the user out on logout', async () => {

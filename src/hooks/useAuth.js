@@ -6,7 +6,7 @@ import {
   offlineAccessAllowed,
   revalidateOfflineTrust,
   revokeOfflineTrust,
-  sessionFingerprint,
+  sessionFingerprintAsync,
 } from '../utils/offlineTrust'
 
 // Owns the signed-in session. Persists to localStorage (runout.session) so
@@ -28,17 +28,29 @@ export function useAuth() {
   // bounded offline trust for the (resolved, server-authenticated) user. If
   // me() resolves `null` (revoked / disabled / expired — 401/403), the trust
   // record is revoked and the session is cleared.
-  const applyMeUser = useCallback((user) => {
-    if (user) {
-      // Only extend trust that ALREADY exists for this user (an online
-      // revalidation reinforces an established grant; it never mints trust for
-      // an identity that wasn't authenticated through a full login first).
-      revalidateOfflineTrust(user, { sessionFp: sessionFingerprint(getSessionToken()) })
-      setSession({ user, session: getSessionToken() })
-    } else {
+  //
+  // SEC-5.2 (#376) rotate-guard (defense-in-depth): an in-flight `me()` success
+  // that resolves AFTER a sign-out / token rotation must not resurrect a stale
+  // session (previously `setSession({ user, session: '' })` briefly remounted
+  // the shell with the user's own cached profile). We capture the session token
+  // at entry, compute the SHA-256 session fingerprint from it, and only commit
+  // if the token is UNCHANGED — otherwise the result is discarded and the
+  // (already-cleared) session fails closed.
+  const applyMeUser = useCallback(async (user) => {
+    if (!user) {
       revokeOfflineTrust({ reason: 'session_invalid' })
       setSession(null)
+      return
     }
+    const tokenAtStart = getSessionToken()
+    if (!tokenAtStart) return
+    const sessionFp = await sessionFingerprintAsync(tokenAtStart)
+    if (getSessionToken() !== tokenAtStart) return
+    // Only extend trust that ALREADY exists for this user (an online
+    // revalidation reinforces an established grant; it never mints trust for
+    // an identity that wasn't authenticated through a full login first).
+    revalidateOfflineTrust(user, { sessionFp })
+    setSession({ user, session: tokenAtStart })
   }, [])
 
   useEffect(() => {
@@ -52,7 +64,7 @@ export function useAuth() {
       .then((user) => {
         if (!cancelled) applyMeUser(user)
       })
-      .catch(() => {
+      .catch(async () => {
         // Offline — keep the cached session ONLY if this device still holds a
         // live, bounded offline-trust grant for the cached user (fail-closed:
         // expired/absent trust means we do NOT render cached private state).
@@ -61,10 +73,12 @@ export function useAuth() {
         // this me() started. If the user logged in / re-established meanwhile
         // (token rotated), the in-flight offline result must not clobber the
         // fresh session.
-        if (!cancelled && getSessionToken() === tokenAtStart &&
-            !offlineAccessAllowed(getSession()?.user, { token: tokenAtStart })) {
-          revokeOfflineTrust({ reason: 'trust_expired' })
-          setSession(null)
+        if (cancelled || getSessionToken() !== tokenAtStart) return
+        if (!(await offlineAccessAllowed(getSession()?.user, { token: tokenAtStart }))) {
+          if (!cancelled) {
+            revokeOfflineTrust({ reason: 'trust_expired' })
+            setSession(null)
+          }
         }
       })
       .finally(() => {
@@ -85,7 +99,8 @@ export function useAuth() {
     }
     // The login exchange is a SUCCESSFUL ONLINE authentication — mint (or
     // refresh) the bounded offline trust for the newly authenticated user.
-    establishOfflineTrust(user, { sessionFp: sessionFingerprint(getSessionToken()) })
+    const sessionFp = await sessionFingerprintAsync(getSessionToken())
+    establishOfflineTrust(user, { sessionFp })
     setSession({ user, session: getSessionToken() })
     return user
   }, [])
@@ -99,7 +114,7 @@ export function useAuth() {
     } catch {
       // Offline / server error — keep the cached session only if a live trust
       // grant still exists; otherwise fail closed (S5, #53 + #162).
-      if (!offlineAccessAllowed(getSession()?.user, { token: getSessionToken() })) {
+      if (!(await offlineAccessAllowed(getSession()?.user, { token: getSessionToken() }))) {
         revokeOfflineTrust({ reason: 'trust_expired' })
         setSession(null)
       }
@@ -125,7 +140,7 @@ export function useAuth() {
   // Read-only: is this device currently trusted to keep the offline shell and
   // cached session for the signed-in user within the bounded window?
   const isOfflineTrusted = useCallback(
-    () => offlineAccessAllowed(getSession()?.user, { token: getSessionToken() }),
+    async () => offlineAccessAllowed(getSession()?.user, { token: getSessionToken() }),
     [],
   )
 

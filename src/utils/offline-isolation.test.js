@@ -197,7 +197,7 @@ describe('sign out as A, sign in as B — B never sees A\'s local data', () => {
     expect(trust?.userId).toBe('u2')
     // And A can no longer pass offlineAccessAllowed (its record is gone).
     const { offlineAccessAllowed } = await import('./offlineTrust')
-    expect(offlineAccessAllowed(MEMBER_A, { token: 'tok-a' })).toBe(false)
+    expect(await offlineAccessAllowed(MEMBER_A, { token: 'tok-a' })).toBe(false)
   })
 })
 
