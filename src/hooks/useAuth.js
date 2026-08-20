@@ -9,6 +9,7 @@ import {
   sessionFingerprintAsync,
 } from '../utils/offlineTrust'
 import { clearAllMirror } from '../utils/offlineMirror'
+import { clearAllOutbox } from '../utils/outbox'
 
 // Owns the signed-in session. Persists to localStorage (runout.session) so
 // the PWA remembers you between visits, and revalidates the code against the
@@ -128,6 +129,9 @@ export function useAuth() {
       // ADR-0019 Dec 5: clear the previous account's offline mirror so no
       // user's private collection data survives an account switch.
       clearAllMirror()
+      // M2 #292: clear the previous account's outbox so its queued mutations
+      // can never be pushed by (or surfaced to) the next account.
+      clearAllOutbox()
     }
     // The login exchange is a SUCCESSFUL ONLINE authentication — mint (or
     // refresh) the bounded offline trust for the newly authenticated user.
@@ -170,6 +174,9 @@ export function useAuth() {
     // ADR-0019 Dec 5: on sign-out, clear the offline mirror so the signed-out
     // account's private collection data does not remain on this device.
     clearAllMirror()
+    // M2 #292: clear the outbox so the signed-out account's queued mutations
+    // do not remain on this device.
+    clearAllOutbox()
   }, [])
 
   // SEC-1.4 (#179): revoke EVERY session for this user (all devices, current
@@ -182,6 +189,8 @@ export function useAuth() {
     clearLocalUserData()
     // ADR-0019 Dec 5: logout-all clears every user's local private data.
     clearAllMirror()
+    // M2 #292: logout-all clears every user's queued outbox mutations.
+    clearAllOutbox()
   }, [])
 
   // Read-only: is this device currently trusted to keep the offline shell and

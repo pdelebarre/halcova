@@ -76,6 +76,27 @@ async function handleBlobs(req, { user, collection, id, url }) {
       if (v.error) return badRequest(v.error)
       const body = v.item
 
+      // M2 #292 idempotent push (ADR-0019 Dec 7): the offline outbox sends a
+      // STABLE client operation id (`clientOpId`) so a retry / flaky reconnect
+      // can replay the SAME add without creating a duplicate. The key is read
+      // from the RAW body (it is NOT an item field — pickItemFields strips it,
+      // so it never reaches the stored item). If this op was already applied,
+      // return the existing item idempotently (201) — no second record, no
+      // duplicate. `clientOpId` is opaque to the server; scoping/ownership is
+      // still server-authoritative (the per-user store + resolved session).
+      const clientOpId = parsed.value?.clientOpId
+      const dedupe = (id) =>
+        store.setJSON(`dedupe:${clientOpId}`, id).catch(() => { /* best-effort */ })
+      if (clientOpId != null && clientOpId !== '') {
+        const existingId = await store.get(`dedupe:${clientOpId}`)
+        if (existingId) {
+          const existing = await store.get(`item:${existingId}`, { type: 'json' })
+          if (existing) {
+            return json(201, filterFor(user, 'item', existing, { own: true }))
+          }
+        }
+      }
+
       // Free-tier cap: enforced on ADDS only, server-side. Owner / unlimited
       // users bypass it (planLimitFor returns null). The cap now reads the
       // denormalized `count:owned` key (one blob read) instead of scanning
@@ -102,6 +123,7 @@ async function handleBlobs(req, { user, collection, id, url }) {
       const newId = randomUUID()
       const item = { ...picked, id: newId, dateAdded: picked.dateAdded || new Date().toISOString() }
       await store.setJSON(`item:${newId}`, item)
+      if (clientOpId != null && clientOpId !== '') await dedupe(newId)
       const ids = await readIndex(store)
       ids.unshift(newId)
       await writeIndex(store, ids)

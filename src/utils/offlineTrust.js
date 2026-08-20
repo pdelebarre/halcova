@@ -59,9 +59,15 @@ export const OFFLINE_TRUST_TTL_MS = 7 * 24 * 60 * 60 * 1000
 //                    outbox ships; the mirror READ scope is granted here because
 //                    #289's acceptance criteria (offline launch renders the
 //                    last-known collection) require offline mirror reads.
+//   - 'mutation'   : the offline OUTBOX WRITE capability (#292). Grants staging
+//                    a local mutation while offline (durable outbox record) so
+//                    it can be pushed idempotently on reconnect. Granted on the
+//                    same trusted-device record as the mirror; the push itself
+//                    is always re-authorized server-side (ADR-0019 Dec 7/8).
 export const OFFLINE_SCOPES = Object.freeze({
   SHELL: 'shell',
   COLLECTION: 'collection',
+  MUTATION: 'mutation',
 })
 
 const KEY = 'runout.offlineTrust'
@@ -181,9 +187,14 @@ export function establishOfflineTrust(user, { now = Date.now(), sessionFp = '' }
     establishedAt: new Date(now).toISOString(),
     lastVerifiedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + OFFLINE_TRUST_TTL_MS).toISOString(),
-    // Approved scopes: M1 'shell' + M2 'collection' mirror reads. M2 mutation
-    // scopes (#292) are added separately when the outbox ships.
-    scopes: [OFFLINE_SCOPES.SHELL, OFFLINE_SCOPES.COLLECTION],
+    // Approved scopes: M1 'shell' + M2 'collection' mirror reads (#289) + M2
+    // 'mutation' outbox writes (#292). The outbox push is still re-authorized
+    // server-side on reconnect — this local grant only covers durable staging.
+    scopes: [
+      OFFLINE_SCOPES.SHELL,
+      OFFLINE_SCOPES.COLLECTION,
+      OFFLINE_SCOPES.MUTATION,
+    ],
     // Non-secret binding to the current session (see sessionFingerprint).
     sessionFp,
   }

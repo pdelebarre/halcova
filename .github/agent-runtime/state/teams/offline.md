@@ -1,7 +1,7 @@
 TEAM: OFFLINE
-CURRENT ISSUE: #289 M2 Offline Collection Mirror (IndexedDB) — Tester-fail remediated
-STATUS: ACTIVE — Tester FAIL remediated on m2/offline/289: itemUuid.js fallback branches (getRandomValues, Math.random) now covered by tests; file 100% stmts/branch/funcs/lines (≥70 bar met). Awaiting Tester re-verify + Offline Architect + Security Auditor gates.
-ACTIVE PR: #420 (m2/offline/289)
-LAST GATE: Tester remediation local PASS — itemUuid.test.js 7 passed; src/utils suite 279 passed; itemUuid.js coverage 100/100/100/100; oxlint clean
-BLOCKER: none (outbox #292 + UX #159 serialized after #289 by design — not implemented here)
-NEXT: route PR #420 back to Tester for independent re-verification
+CURRENT ISSUE: #292 M2 Offline Capture Outbox, Offline Add & Reconnect Sync
+STATUS: ACTIVE — implemented on m2/offline/292: durable IndexedDB outbox (outbox.js), flush+reconcile (outboxSync.js), useCollection.add offline routing + minimal pending primitive, foreground-only useOutboxSync reconnect hook, outbox clear wired into useAuth sign-out/logout-all/account-switch, server idempotent add push via clientOpId (Blobs + Postgres). Affected suites pass (135 tests across outbox/useCollection/offlineMirror/itemUuid/offlineTrust + server collection). Working-tree collision with parallel #159 UX (SyncStatus/offlineOutbox/App.jsx/CollectionView.jsx) — those files are NOT part of this PR.
+ACTIVE PR: (pending open — m2/offline/292)
+LAST GATE: local PASS — outbox 14, outboxSync 4, useOutboxSync 3, useCollection-offline 11, useCollection 7, offlineMirror 14, itemUuid, offlineTrust, collection.test 58; oxlint clean on touched files
+BLOCKER: working-tree collision with parallel #159 UX writes in the same directory; PR contains ONLY #292 files. Independent Offline Architect + Security Auditor + Tester must verify (not self-approved).
+NEXT: open PR for m2/offline/292 with only the #292 file set
