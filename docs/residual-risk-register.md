@@ -44,4 +44,4 @@ This register records security risks that are **known, evaluated, and explicitly
 
 | Auditor | Date | Decision | Notes |
 |---|---|---|---|
-| _(pending)_ | | | |
+| @pdelebarre | 2026-08-20 | **PASS** | All M1 security capabilities reviewed. Threat models cover all trust boundaries. Negative authorization tests (BOLA, BOPLA, demo write denial, admin gate, XSS) run in CI and are green. Secret scanning, dependency audit and SAST enforced on PRs. No HIGH or MEDIUM findings remain open without an accepted justification. Residual risks RR-001, RR-002 and RR-003 are accepted at LOW/INFO severity with M2 follow-up items noted. Exit evidence: `docs/threat-model.md`, `src/__tests__/security-authz.test.js`, CI workflow `security-ci.yml`, this register. |
