@@ -10,8 +10,10 @@ import AisleSheet from './components/AisleSheet'
 import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
 import PlayPanel from './components/PlayPanel'
+import SyncStatus from './components/SyncStatus'
 import { useCollection } from './hooks/useCollection'
 import { useLookup } from './hooks/useLookup'
+import { useOutboxSync } from './hooks/useOutboxSync'
 import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { itemInBin } from './utils/browse'
@@ -69,7 +71,14 @@ const NEW_ARRIVALS_COUNT = 5
  * App.jsx renders one of these per tab.
  */
 export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
-  const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
+  const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem, flushOutbox, mutationSeq } = useCollection(catalog.storage)
+
+  // M2 #159/#292: mount the foreground reconnect-flush trigger so queued offline
+  // mutations auto-flush when the device comes back online / the tab is
+  // foregrounded (iOS-safe; no Background Sync assumption). onSynced refreshes
+  // the reconciled list. Manual "Sync now" still goes through useCollection's
+  // flushOutbox (push + reconcile + mutationSeq bump for the status strip).
+  useOutboxSync({ collection: catalog.storage, onSynced: () => refresh() })
 
   // T2 (issue #110): the active room's theme, provided by App.jsx. `useTheme()`
   // degrades to {} outside a provider, so a missing theme can never throw
@@ -595,6 +604,19 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     if (q) commitRecentSearch(q)
   }
 
+  // M2 #159: manual "Sync now" pushes the REAL #292 outbox (flush + reconcile)
+  // rather than re-pulling the live list — the user is explicitly asking to
+  // sync queued mutations, not to refresh. A failed flush surfaces the state
+  // via useOfflineSyncStatus (pending/error stay accurate); we never throw
+  // into the UI (no dark-screen risk).
+  async function handleSyncNow() {
+    try {
+      await flushOutbox()
+    } catch {
+      /* the status strip keeps showing the honest pending/error state */
+    }
+  }
+
   // The core "am I looking at a duplicate" step — every path into the app
   // (barcode auto-match, picking from multiple pressings/editions, text
   // search, manual entry) funnels through here before anything gets added.
@@ -1079,14 +1101,20 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       <main className="app-main">
         {status === 'loading' && <p className="status-line">{copy.loading}</p>}
 
-        {/* M2 #289: a clear "showing offline copy" state. Rendered whenever the
-            current items were hydrated from the IndexedDB mirror (offline or a
-            safe network failure) so the user knows they're browsing their
-            last-known collection, not live data. */}
-        {status === 'ready' && source === 'offline' && (
-          <div className="status-line status-offline-copy" role="status">
-            <p>{t('offline.mirrorCopy', { at: mirroredAt ? new Date(mirroredAt).toLocaleString() : '' })}</p>
-          </div>
+        {/* M2 #289/#159: offline + sync states. SyncStatus consolidates the
+            "showing offline copy" note (#289) with the pending / queued /
+            synced / conflict-or-error states (#159). It only renders when
+            there is something meaningful to communicate, and manual "Sync now"
+            flushes the REAL #292 outbox (push + reconcile), not a re-pull.
+            `syncId` bumps after each mutation so the strip re-reads the durable
+            outbox and reflects the real queue state (reachable states). */}
+        {status === 'ready' && (
+          <SyncStatus
+            source={source}
+            mirroredAt={mirroredAt}
+            syncId={mutationSeq}
+            onSyncNow={handleSyncNow}
+          />
         )}
 
         {status === 'error' && (

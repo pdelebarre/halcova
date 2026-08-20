@@ -338,6 +338,19 @@ const nl = {
 
   'offline.status': 'Offline — opgeslagen inhoud weergegeven',
   'offline.mirrorCopy': 'Uw opgeslagen collectie weergeven (offline kopie) — gesynchroniseerd {at}',
+  // M2 #159: offline synchronisatiestatus.
+  'offline.pending': '{n} wijziging(en) opgeslagen op dit apparaat, wachtend om te synchroniseren',
+  'offline.queuedHint': 'Wijzigingen die u offline maakt, worden op dit apparaat opgeslagen en gesynchroniseerd zodra u weer online bent.',
+  'offline.needsAttention': 'Sommige wijzigingen konden niet worden gesynchroniseerd — controleer ze wanneer u weer online bent.',
+  'offline.syncNow': 'Nu synchroniseren',
+  'offline.synced': 'Alle wijzigingen gesynchroniseerd',
+  // M2 #159: beheer/opruimen van lokale gegevens (Instellingen).
+  'offline.localDataTitle': 'Offline gegevens',
+  'offline.localDataHint': 'Uw collectie wordt op dit apparaat opgeslagen zodat u deze offline kunt bekijken en wijzigen.',
+  'offline.clearOfflineData': 'Offline gegevens wissen',
+  'offline.clearOfflineDataConfirm': 'De offline kopie van dit apparaat wissen? Uw online collectie blijft ongewijzigd.',
+  'offline.clearOfflineDataDone': 'Offline gegevens gewist',
+  'offline.clearOfflineDataFailed': 'Offline gegevens konden niet worden gewist. Probeer het opnieuw.',
 
   // §17 Gratis abonnement & demo
   'plan.freeCounter': '{count} van {cap} items toegevoegd',

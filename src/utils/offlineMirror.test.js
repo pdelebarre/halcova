@@ -246,6 +246,42 @@ describe('clear/isolate on sign-out & account switch (ADR-0019 Dec 5)', () => {
     await expect(clearMirrorForUser('nobody')).resolves.toBe(true)
     await expect(clearAllMirror()).resolves.toBe(true)
   })
+
+  // SECURITY (ADR-0019 Dec 5/12) fail-closed privacy reset: if the IndexedDB
+  // delete transaction fails while READS still succeed, clearMirrorForUser must
+  // report FALSE (not true) so the UI can never say "cleared" while private
+  // records survive on-device. This was a `catch { return true }` fail-open.
+  it('clearMirrorForUser FAILS CLOSED (false) when the delete transaction fails, leaving records durable', async () => {
+    trustUser(USER_A, TOKEN_A)
+    await saveMirror(USER_A.id, [KIND_OF_BLUE], { now: NOW })
+
+    // Force every delete in the clear transaction to throw inside the cursor's
+    // onsuccess handler. fake-indexeddb aborts the transaction on that throw,
+    // so tx.onabort fires and the clear must resolve false — while reads
+    // (readMirror) keep succeeding.
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('runout.offlineMirror', MIRROR_DB_VERSION)
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+    const storeProto = Object.getPrototypeOf(
+      db.transaction('mirror').objectStore('mirror'),
+    )
+    const origDelete = storeProto.delete
+    storeProto.delete = () => {
+      throw new DOMException('quota exceeded', 'QuotaExceededError')
+    }
+    try {
+      expect(await clearMirrorForUser(USER_A.id)).toBe(false)
+    } finally {
+      storeProto.delete = origDelete
+      db.close()
+    }
+
+    // Fail-closed: the mirror records are NOT silently wiped.
+    trustUser(USER_A, TOKEN_A)
+    expect(await readMirror(USER_A.id, { now: NOW + 1000, token: TOKEN_A })).not.toBeNull()
+  })
 })
 
 describe('no credentials in IndexedDB (ADR-0019 Dec 4)', () => {

@@ -357,8 +357,11 @@ export async function markFailed(
 
 /**
  * Clear ONE user's outbox (sign-out of a single account / account switch).
- * Leaves other users' queued mutations untouched. Resolves true when cleared
- * (or nothing to clear), false on any failure.
+ * Leaves other users' queued mutations untouched. FAIL-CLOSED: resolves true
+ * ONLY when the delete transaction commits (tx.oncomplete); any cursor error,
+ * transaction abort, quota or open failure rejects and this resolves FALSE so
+ * the caller can never report "cleared" while raw queued ops survive to
+ * auto-flush on reconnect (ADR-0019 Dec 5/12 privacy reset).
  */
 export async function clearOutboxForUser(userId) {
   const scope = outboxScope(userId)
@@ -368,13 +371,16 @@ export async function clearOutboxForUser(userId) {
     db = await openDb()
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_OPS, 'readwrite')
-      deleteScopeOps(tx, tx.objectStore(STORE_OPS), scope).then(() => resolve(true), reject)
+      const opsStore = tx.objectStore(STORE_OPS)
+      deleteScopeOps(tx, opsStore, scope).catch(reject)
+      // Resolve only on commit — not on cursor completion — so an abort that
+      // happens after the cursor pass still surfaces as a failure.
       tx.oncomplete = () => resolve(true)
       tx.onerror = () => reject(tx.error)
       tx.onabort = () => reject(new Error('clear transaction aborted'))
     })
   } catch {
-    return true
+    return false
   } finally {
     if (db) db.close()
   }

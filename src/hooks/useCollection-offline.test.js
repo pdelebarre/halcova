@@ -209,6 +209,28 @@ describe('useCollection offline add + reconnect flush (#292)', () => {
     expect(mirror.items.map((i) => i.title)).toContain('Miles Davis - In a Silent Way')
   })
 
+  it('bumps mutationSeq after a mutation so the SyncStatus strip re-reads the outbox (#159)', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([])
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.mutationSeq).toBe(0)
+
+    const originalOnLine = navigator.onLine
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+
+    await act(async () => {
+      await result.current.add({ title: 'Queued While Offline', year: 2020 })
+    })
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: originalOnLine })
+
+    // The mutation counter bumped, and the durable pending count reflects it —
+    // so the sync-status strip reflects the real queue state.
+    expect(result.current.mutationSeq).toBe(1)
+    expect(result.current.pendingCount).toBe(1)
+  })
+
   it('flushOutbox pushes the staged op idempotently and clears the pending state', async () => {
     seedSession()
     api.listItems.mockResolvedValue([])
@@ -249,6 +271,11 @@ describe('useCollection offline add + reconnect flush (#292)', () => {
     await waitFor(() => expect(result.current.pendingCount).toBe(0))
     // The item is now server-backed in the refreshed list.
     await waitFor(() => expect(result.current.items[0].id).toBe('srv-1'))
+    // A successful Sync-now bumps the flush seq so the SyncStatus strip
+    // (useOfflineSyncStatus, deps [online, syncId]) re-reads the now-empty
+    // outbox and reaches the "All changes synced" state instead of showing a
+    // stale "waiting to sync" (#159). The add already bumped it to 1.
+    await waitFor(() => expect(result.current.mutationSeq).toBe(2))
   })
 
   it('falls back to the outbox on a safe network failure while online', async () => {

@@ -338,6 +338,19 @@ const ptBR = {
 
   'offline.status': 'Offline — mostrando conteúdo salvo',
   'offline.mirrorCopy': 'Mostrando sua coleção salva (cópia offline) — sincronizada {at}',
+  // M2 #159: estados de sincronização offline.
+  'offline.pending': '{n} alteração(ões) salva(s) neste dispositivo, aguardando sincronização',
+  'offline.queuedHint': 'Alterações feitas offline são salvas neste dispositivo e sincronizadas quando você voltar a ficar online.',
+  'offline.needsAttention': 'Algumas alterações não puderam ser sincronizadas — revise-as quando voltar a ficar online.',
+  'offline.syncNow': 'Sincronizar agora',
+  'offline.synced': 'Todas as alterações sincronizadas',
+  // M2 #159: gerenciamento/redefinição de dados locais (Configurações).
+  'offline.localDataTitle': 'Dados offline',
+  'offline.localDataHint': 'Sua coleção é salva neste dispositivo para você navegar e fazer alterações offline.',
+  'offline.clearOfflineData': 'Limpar dados offline',
+  'offline.clearOfflineDataConfirm': 'Limpar a cópia offline deste dispositivo? Sua coleção online não é afetada.',
+  'offline.clearOfflineDataDone': 'Dados offline limpos',
+  'offline.clearOfflineDataFailed': 'Não foi possível limpar os dados offline. Tente novamente.',
 
   // §17 Plano gratuito e demo
   'plan.freeCounter': '{count} de {cap} itens adicionados',

@@ -411,6 +411,39 @@ describe('t()', () => {
     })
   })
 
+  describe('M2 #159 offline capability/UX keys', () => {
+    it('ships every new offline key in all 8 locales (no raw-key fallback)', () => {
+      const required = [
+        'offline.pending',
+        'offline.queuedHint',
+        'offline.needsAttention',
+        'offline.syncNow',
+        'offline.synced',
+        'offline.localDataTitle',
+        'offline.localDataHint',
+        'offline.clearOfflineData',
+        'offline.clearOfflineDataConfirm',
+        'offline.clearOfflineDataDone',
+        'offline.clearOfflineDataFailed',
+      ]
+      for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
+        setLocale(locale)
+        for (const key of required) {
+          // t() returns the key itself only when the key is missing everywhere.
+          expect(t(key)).not.toBe(key)
+        }
+      }
+    })
+
+    it('resolves the EN baseline strings with safe, non-secret wording', () => {
+      setLocale('en')
+      expect(t('offline.pending', { n: 2 })).toContain('2')
+      expect(t('offline.pending', { n: 2 })).not.toContain('{n}')
+      expect(t('offline.needsAttention')).not.toMatch(/token|secret|access code|Bearer/i)
+      expect(t('offline.queuedHint')).not.toMatch(/token|secret|access code|Bearer/i)
+    })
+  })
+
   describe('fallback behaviour', () => {
     it('falls back to en when key is missing in a non-en locale', () => {
       // 'common.copy' exists in en but let's test with a key that exists in en

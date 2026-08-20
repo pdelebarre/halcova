@@ -148,3 +148,28 @@
   color: var(--static-grey);
   font-size: 16px;
 }
+
+/* M2 #159: offline-data management / reset. */
+.settings-offline-data-hint {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--jacket-kraft-dim);
+  margin: 0 0 12px;
+}
+.settings-offline-data-done {
+  font-size: 13px;
+  color: var(--jacket-kraft);
+  margin: 0;
+  font-family: var(--font-mono);
+}
+.settings-offline-data-confirm p {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--jacket-kraft-dim);
+  margin: 0 0 12px;
+}
+.settings-offline-data-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}

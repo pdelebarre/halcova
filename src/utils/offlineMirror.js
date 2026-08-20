@@ -335,8 +335,11 @@ export async function findDuplicatesInMirror(
 
 /**
  * Clear the offline mirror for ONE user (sign-out of a single account /
- * account switch). Leaves other users' records untouched. Resolves true when
- * cleared (or nothing to clear), false on any failure.
+ * account switch). Leaves other users' records untouched. FAIL-CLOSED: resolves
+ * true ONLY when the delete transaction commits (tx.oncomplete); any cursor
+ * error, transaction abort, quota or open failure rejects and this resolves
+ * FALSE so the caller can never report "cleared" while private records survive
+ * on-device (ADR-0019 Dec 5 privacy reset).
  */
 export async function clearMirrorForUser(userId) {
   const scope = mirrorScope(userId)
@@ -351,12 +354,14 @@ export async function clearMirrorForUser(userId) {
       deleteScopeRecords(tx, mirrorStore, scope).then(() => {
         metaStore.delete(`cachedAt:${scope}`)
       }, reject)
+      // Resolve only on commit — not on cursor completion — so an abort that
+      // happens after the cursor pass still surfaces as a failure.
       tx.oncomplete = () => resolve(true)
       tx.onerror = () => reject(tx.error)
       tx.onabort = () => reject(new Error('clear transaction aborted'))
     })
   } catch {
-    return true
+    return false
   } finally {
     if (db) db.close()
   }

@@ -338,6 +338,19 @@ const it = {
 
   'offline.status': 'Offline — contenuti salvati in visualizzazione',
   'offline.mirrorCopy': 'Visualizzazione della collezione salvata (copia offline) — sincronizzata {at}',
+  // M2 #159: stati di sincronizzazione offline.
+  'offline.pending': '{n} modifica/e salvata/e su questo dispositivo, in attesa di sincronizzazione',
+  'offline.queuedHint': 'Le modifiche apportate offline vengono salvate su questo dispositivo e sincronizzate al ritorno online.',
+  'offline.needsAttention': 'Alcune modifiche non sono state sincronizzate — controllale quando torni online.',
+  'offline.syncNow': 'Sincronizza ora',
+  'offline.synced': 'Tutte le modifiche sincronizzate',
+  // M2 #159: gestione/reimpostazione dei dati locali (Impostazioni).
+  'offline.localDataTitle': 'Dati offline',
+  'offline.localDataHint': 'La tua collezione è salvata su questo dispositivo per poterla consultare e modificare offline.',
+  'offline.clearOfflineData': 'Cancella dati offline',
+  'offline.clearOfflineDataConfirm': 'Cancellare la copia offline da questo dispositivo? La tua collezione online non viene modificata.',
+  'offline.clearOfflineDataDone': 'Dati offline cancellati',
+  'offline.clearOfflineDataFailed': 'Non è stato possibile cancellare i dati offline. Riprova.',
 
   // §17 Piano gratuito e demo
   'plan.freeCounter': '{count} di {cap} articoli aggiunti',
