@@ -6,7 +6,7 @@ import {
   offlineAccessAllowed,
   revalidateOfflineTrust,
   revokeOfflineTrust,
-  sessionFingerprint,
+  sessionFingerprintAsync,
 } from '../utils/offlineTrust'
 
 // Owns the signed-in session. Persists to localStorage (runout.session) so
@@ -20,6 +20,19 @@ import {
 // token or access code; it has a bounded expiry and is extended ONLY on a
 // successful online revalidation (`me()` success). A stale or expired trust
 // record fails closed — the shell cannot extend offline access indefinitely.
+
+// SEC-5.2 (#376) session-generation counter (TOCTOU close). `authApi.logout()`
+// clears the persisted token only AFTER an awaited network call, so during that
+// window `getSessionToken()` still returns the OLD token. If an in-flight
+// `me()` resolves 200 in that window, a guard that only compares
+// `getSessionToken() !== tokenAtStart` would see old==old and resurrect a
+// signed-out cached profile. We therefore bump a monotonic generation counter
+// synchronously on logout / logout-all / account-switch, capture it when a
+// revalidation STARTS, and discard the resolve if the generation changed by the
+// time it commits — even when the persisted token is still present.
+let sessionGeneration = 0
+function bumpSessionGeneration() { sessionGeneration += 1 }
+
 export function useAuth() {
   const [session, setSession] = useState(() => getSession())
   const [ready, setReady] = useState(false)
@@ -28,21 +41,45 @@ export function useAuth() {
   // bounded offline trust for the (resolved, server-authenticated) user. If
   // me() resolves `null` (revoked / disabled / expired — 401/403), the trust
   // record is revoked and the session is cleared.
-  const applyMeUser = useCallback((user) => {
-    if (user) {
-      // Only extend trust that ALREADY exists for this user (an online
-      // revalidation reinforces an established grant; it never mints trust for
-      // an identity that wasn't authenticated through a full login first).
-      revalidateOfflineTrust(user, { sessionFp: sessionFingerprint(getSessionToken()) })
-      setSession({ user, session: getSessionToken() })
-    } else {
+  //
+  // SEC-5.2 (#376) rotate-guard (defense-in-depth): an in-flight `me()` success
+  // that resolves AFTER a sign-out / token rotation must not resurrect a stale
+  // session (previously `setSession({ user, session: '' })` briefly remounted
+  // the shell with the user's own cached profile). We capture the session
+  // generation and token at the START of the revalidation, compute the SHA-256
+  // session fingerprint from the token, and only commit if BOTH the token is
+  // unchanged AND the generation is unchanged. Otherwise the result is
+  // discarded and the (already-cleared) session fails closed.
+  //
+  // The generation check is what closes the logout TOCTOU: `authApi.logout()`
+  // clears the persisted token only after an awaited network call, so during
+  // that window `getSessionToken()` still returns the old token and a token-only
+  // guard (old==old) would pass. The generation is bumped synchronously on
+  // sign-out, so an in-flight `me()` that started before the sign-out always
+  // commits against a changed generation and is discarded.
+  const applyMeUser = useCallback(async (user, genAtStart, tokenAtStart) => {
+    if (!user) {
       revokeOfflineTrust({ reason: 'session_invalid' })
       setSession(null)
+      return
     }
+    // The session generation was captured when this revalidation STARTED. If
+    // it changed (a sign-out / switch happened while me() was in flight), the
+    // stale 200 must not resurrect the signed-out profile.
+    if (sessionGeneration !== genAtStart) return
+    if (!tokenAtStart) return
+    const sessionFp = await sessionFingerprintAsync(tokenAtStart)
+    if (getSessionToken() !== tokenAtStart || sessionGeneration !== genAtStart) return
+    // Only extend trust that ALREADY exists for this user (an online
+    // revalidation reinforces an established grant; it never mints trust for
+    // an identity that wasn't authenticated through a full login first).
+    revalidateOfflineTrust(user, { sessionFp })
+    setSession({ user, session: tokenAtStart })
   }, [])
 
   useEffect(() => {
     let cancelled = false
+    const genAtStart = sessionGeneration
     const tokenAtStart = getSessionToken()
     if (!getSession()) {
       setReady(true)
@@ -50,21 +87,23 @@ export function useAuth() {
     }
     authApi.me()
       .then((user) => {
-        if (!cancelled) applyMeUser(user)
+        if (!cancelled) applyMeUser(user, genAtStart, tokenAtStart)
       })
-      .catch(() => {
+      .catch(async () => {
         // Offline — keep the cached session ONLY if this device still holds a
         // live, bounded offline-trust grant for the cached user (fail-closed:
         // expired/absent trust means we do NOT render cached private state).
         //
-        // Guard: only fail closed when the session token is UNCHANGED since
-        // this me() started. If the user logged in / re-established meanwhile
-        // (token rotated), the in-flight offline result must not clobber the
-        // fresh session.
-        if (!cancelled && getSessionToken() === tokenAtStart &&
-            !offlineAccessAllowed(getSession()?.user, { token: tokenAtStart })) {
-          revokeOfflineTrust({ reason: 'trust_expired' })
-          setSession(null)
+        // Guard: only fail closed when the session token AND generation are
+        // UNCHANGED since this me() started. If the user logged in /
+        // re-established meanwhile (token rotated), the in-flight offline
+        // result must not clobber the fresh session.
+        if (cancelled || sessionGeneration !== genAtStart || getSessionToken() !== tokenAtStart) return
+        if (!(await offlineAccessAllowed(getSession()?.user, { token: tokenAtStart }))) {
+          if (!cancelled) {
+            revokeOfflineTrust({ reason: 'trust_expired' })
+            setSession(null)
+          }
         }
       })
       .finally(() => {
@@ -80,12 +119,16 @@ export function useAuth() {
     const previousId = getSession()?.user?.id
     const user = await authApi.login(code)
     if (previousId && previousId !== user.id) {
+      // Account switch: bump the generation so any in-flight revalidation from
+      // the PREVIOUS session cannot resurrect the old account's profile.
+      bumpSessionGeneration()
       clearLocalUserData() // also clears runout.offlineTrust (see session.js)
       revokeOfflineTrust({ reason: 'account_switch' })
     }
     // The login exchange is a SUCCESSFUL ONLINE authentication — mint (or
     // refresh) the bounded offline trust for the newly authenticated user.
-    establishOfflineTrust(user, { sessionFp: sessionFingerprint(getSessionToken()) })
+    const sessionFp = await sessionFingerprintAsync(getSessionToken())
+    establishOfflineTrust(user, { sessionFp })
     setSession({ user, session: getSessionToken() })
     return user
   }, [])
@@ -93,13 +136,16 @@ export function useAuth() {
   const requestAccess = useCallback((payload) => authApi.requestAccess(payload), [])
 
   const refresh = useCallback(async () => {
+    const genAtStart = sessionGeneration
+    const tokenAtStart = getSessionToken()
     try {
       const user = await authApi.me()
-      applyMeUser(user)
+      applyMeUser(user, genAtStart, tokenAtStart)
     } catch {
       // Offline / server error — keep the cached session only if a live trust
       // grant still exists; otherwise fail closed (S5, #53 + #162).
-      if (!offlineAccessAllowed(getSession()?.user, { token: getSessionToken() })) {
+      if (sessionGeneration !== genAtStart || getSessionToken() !== tokenAtStart) return
+      if (!(await offlineAccessAllowed(getSession()?.user, { token: tokenAtStart }))) {
         revokeOfflineTrust({ reason: 'trust_expired' })
         setSession(null)
       }
@@ -107,6 +153,12 @@ export function useAuth() {
   }, [applyMeUser])
 
   const logout = useCallback(() => {
+    // Synchronously invalidate the current session generation BEFORE/independent
+    // of the fire-and-forget network revoke, so an in-flight `me()` that started
+    // earlier cannot resurrect the signed-out session once it resolves 200 —
+    // even while the persisted token is still present (authApi.logout() clears
+    // it only after its awaited network call).
+    bumpSessionGeneration()
     authApi.logout()
     revokeOfflineTrust({ reason: 'sign_out' })
     setSession(null)
@@ -116,6 +168,7 @@ export function useAuth() {
   // SEC-1.4 (#179): revoke EVERY session for this user (all devices, current
   // one included) server-side, then clear the local session + trust.
   const logoutAll = useCallback(() => {
+    bumpSessionGeneration()
     authApi.logoutAll()
     revokeOfflineTrust({ reason: 'sign_out_all' })
     setSession(null)
@@ -125,7 +178,7 @@ export function useAuth() {
   // Read-only: is this device currently trusted to keep the offline shell and
   // cached session for the signed-in user within the bounded window?
   const isOfflineTrusted = useCallback(
-    () => offlineAccessAllowed(getSession()?.user, { token: getSessionToken() }),
+    async () => offlineAccessAllowed(getSession()?.user, { token: getSessionToken() }),
     [],
   )
 

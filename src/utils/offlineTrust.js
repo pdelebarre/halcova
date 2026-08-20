@@ -131,7 +131,14 @@ function writeRecord(record) {
 // not listed in the record all DENY offline access. When `token` is supplied it
 // must match the record's stored session fingerprint — a stale record from a
 // rotated session is never honored and (optionally) revoked.
-export function offlineAccessAllowed(
+//
+// Async because the session binding prefers the WebCrypto SHA-256 fingerprint
+// (see sessionFingerprintAsync). To stay consistent regardless of how the
+// record was bound (SHA-256 in a WebCrypto browser, or the FNV-1a sync/jsdom
+// fallback in non-WebCrypto environments), we match the stored fingerprint
+// against BOTH the sync FNV digest and the async SHA-256 digest. This is still
+// fail-closed: only the exact same token's fingerprint can validate the record.
+export async function offlineAccessAllowed(
   user,
   { now = Date.now(), scope = OFFLINE_SCOPES.SHELL, token = '' } = {},
 ) {
@@ -144,8 +151,13 @@ export function offlineAccessAllowed(
   if (Array.isArray(record.scopes) && !record.scopes.includes(scope)) return false
   // Optional session binding: if a token is provided, the record must be bound
   // to IT (or be an unbound legacy write). A rotated session never inherits
-  // stale offline trust.
-  if (token && record.sessionFp && record.sessionFp !== sessionFingerprint(token)) return false
+  // stale offline trust. See note above about matching both fingerprint schemes.
+  if (token && record.sessionFp) {
+    if (record.sessionFp !== sessionFingerprint(token)) {
+      const fpAsync = await sessionFingerprintAsync(token)
+      if (record.sessionFp !== fpAsync) return false
+    }
+  }
   return true
 }
 
