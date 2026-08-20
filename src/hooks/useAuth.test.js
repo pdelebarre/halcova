@@ -31,7 +31,7 @@ beforeEach(() => {
 describe('useAuth.refresh', () => {
   it('keeps the cached session when me() throws (offline)', async () => {
     saveSession(SESSION)
-    // #162 / ADR-0015 Dec 4: offline keep requires a device that was previously
+    // #162 / ADR-0019 Dec 4: offline keep requires a device that was previously
     // authenticated ONLINE and explicitly trusted. Model a trusted device by
     // establishing the bounded offline-trust grant for this session first.
     establishOfflineTrust(MEMBER, { sessionFp: sessionFingerprint(SESSION.session) })

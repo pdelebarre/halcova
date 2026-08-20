@@ -12,7 +12,7 @@ This document is the **PM-coordinated close-out checklist** for the #337/#342 fi
 
 | Capability | Evidence | Verification |
 |---|---|---|
-| Trusted-device / offline-auth model (ADR-0015 Dec 4, ADR-0016) | #162 → PR #374 (`a461e00`): `offlineTrust.js`, bounded expiry/revocation, fail-closed, no credentials in IndexedDB | Security Auditor PASS · Tester PASS |
+| Trusted-device / offline-auth model (ADR-0019 Dec 4, ADR-0016) | #162 → PR #374 (`a461e00`): `offlineTrust.js`, bounded expiry/revocation, fail-closed, no credentials in IndexedDB | Security Auditor PASS · Tester PASS |
 | Centralized object/property authorization (BOLA/BOPLA, IDOR) | #338 → PR #377 (`ebb161e`): `policy.js` predicate table, non-enumerating 403 FORBIDDEN, `filter.js` property allowlists | Security Auditor PASS · Tester PASS |
 | Privacy/visibility/data classification (data exposure) | #339 → PR #379 (`b6011e1`): `visibility.js` C1–C14 matrix, per-role DTO allowlists, `PRIVATE_ASSET_FIELDS`, retention doc | Security Auditor PASS · Tester PASS |
 | Rate limiting / abuse / cost controls (abuse & cost DoS) | #341 → PR #382 (`8b257b1`): `rate-limit.js` + `cost-ceiling.js` + rate-limit matrix + uniform 429 | Security Auditor PASS (GO) · Tester PASS |

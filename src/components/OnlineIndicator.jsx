@@ -5,7 +5,7 @@ import './OnlineIndicator.css'
 // ---------------------------------------------------------------------------
 // Online / offline status indicator (M1 shell, #157).
 //
-// The ADR-0015 Dec 4 principle requires the shell to fail gracefully across
+// The ADR-0019 Dec 4 principle requires the shell to fail gracefully across
 // network transitions — never a dark screen. The shell is fully precached, so
 // when the network drops the UI keeps rendering; this small pill surfaces the
 // network state so the user understands why live data (lookups, sync) is

@@ -14,7 +14,7 @@ import {
 // server on startup — a disabled/revoked account is signed out, while an
 // offline launch keeps a TRUSTED cached session so the shell still works.
 //
-// #162 / ADR-0015 Dec 4: offline access is limited to a device that was
+// #162 / ADR-0019 Dec 4: offline access is limited to a device that was
 // previously authenticated ONLINE and explicitly trusted (see
 // src/utils/offlineTrust.js). The trust record never contains the session
 // token or access code; it has a bounded expiry and is extended ONLY on a
