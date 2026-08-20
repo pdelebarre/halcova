@@ -147,20 +147,30 @@ async function handlePost(store, { user, kind, sourceId, body }) {
 }
 
 // DELETE — only the author, or the owner (admin key holder), may delete a
-// review. SEC-7.1 (#338) non-enumeration: a NON-admin caller gets a uniform 403
-// FORBIDDEN whether the review is someone else's OR doesn't exist — the server
-// never distinguishes "exists but isn't yours" from "doesn't exist" to a
-// non-owner. Only the admin (allowOverride) gets a genuine 404 for a truly
-// missing review (no enumeration risk for the owner, who may operate on any
-// object).
+// review. The AUTHORITATIVE ownership decision lives in the `review:delete`
+// policy gate (enforce -> ownsTarget), which performs a single getReview(id)
+// lookup against the session-derived principal (SEC-7.1 #338/#378) — so the
+// central policy layer is no longer a `() => true` no-op.
+//
+// The guard below is a DEFENSE-IN-DEPTH backstop: handleStore /
+// handlePostgres / handleBlobs are also exported and could theoretically be
+// invoked outside the policy layer (e.g. direct tests), so the store boundary
+// must fail closed and never delete another member's review even if reached
+// without the gate. SEC-7.1 non-enumeration: a NON-admin caller gets a uniform
+// 403 FORBIDDEN whether the review is someone else's OR doesn't exist — the
+// server never distinguishes "exists but isn't yours" from "doesn't exist" to
+// a non-owner. Only the admin (allowOverride, which skips ownsTarget) gets a
+// genuine 404 for a truly missing review (no enumeration risk for the owner,
+// who may operate on any object).
 async function handleDelete(store, { user, id }) {
   if (!id) return json(400, { error: 'Missing id', code: 'MISSING_ID' })
+  // Backstop: reject a non-admin caller who does not own the review. The policy
+  // gate normally decides this first (owner-or-admin); this guard makes the
+  // store layer fail closed even if it is invoked without the policy layer.
   if (user.role !== 'admin') {
     const review = await store.getReview(id)
     if (!review || review.authorId !== user.id) return forbidden()
   }
-  // Admin (owner) override: may delete any review. A genuinely missing review
-  // is a real 404 for the admin (who can operate on any object).
   const ok = await store.deleteReview(id)
   if (!ok) return json(404, { error: 'Not found' })
   return json(200, { ok: true })
@@ -316,10 +326,25 @@ export default async function reviewsHandler(req) {
       denyCode: 'DEMO_READONLY',
       denyMessage: 'The demo space is read-only. Sign in to write reviews.',
       // The review:delete ownership decision (owner-or-admin, non-enumerating)
-      // is made in handleDelete — the policy table declares the rule, and this
-      // closure lets the admin allowOverride apply at the right layer. The
-      // real target lookup happens once, inside handleDelete.
-      ...(action === 'review:delete' ? { ownsTarget: async () => true } : {}),
+      // lives HERE in the policy layer: ownsTarget performs the single
+      // getReview(id) lookup and compares the review's authorId to the
+      // session-derived principal. The admin allowOverride applies at the
+      // enforce layer (skips ownsTarget). Because the gate runs before
+      // handleDelete, ownership can never silently regress into a delete of
+      // another member's review if handleDelete's ordering/checks change.
+      ...(action === 'review:delete'
+        ? {
+            ownsTarget: async (u) => {
+              // No target id -> nothing to own-check; handleDelete answers
+              // with 400 MISSING_ID.
+              const id = new URL(req.url).searchParams.get('id')
+              if (!id) return true
+              const store = isPostgresConfigured() ? createReviewsRepo(db) : createReviewsBlobStore()
+              const review = await store.getReview(id)
+              return !!(review && review.authorId === u.id)
+            },
+          }
+        : {}),
     })
     if (error) return error
 

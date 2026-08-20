@@ -392,6 +392,25 @@ describe('DELETE — only the author (or the owner)', () => {
     expect((await res.json()).code).toBe('FORBIDDEN')
   })
 
+  it('regression (#378): the policy gate owns the check — deleteReview is never reached for a non-owner', async () => {
+    // A non-owner is blocked by the review:delete ownsTarget predicate, BEFORE
+    // the store's deleteReview runs. If the policy gate were ever regressed to
+    // a no-op (e.g. back to `() => true`), the store's delete would run and
+    // this test fails on the 403 and the delete spy both — ownership is
+    // enforced in the policy layer independent of handleDelete's ordering.
+    seedMember() // u1 = Ada is the caller
+    seedMember({ id: BOB_ID, name: 'Bob', code: CODE_BOB })
+    const id = '00000000-0000-0000-0000-000000000001'
+    seedBlobReviews([review({ id, authorId: BOB_ID, authorName: 'Bob', rating: 4 })])
+    const deleteSpy = vi.spyOn(stores['runout-reviews'], 'delete')
+    const res = await call('DELETE', `?kind=records&sourceId=${SOURCE_ID}&id=${id}`)
+    expect(res.status).toBe(403)
+    expect((await res.json()).code).toBe('FORBIDDEN')
+    expect(deleteSpy).not.toHaveBeenCalled()
+    // Untouched.
+    expect(stores['runout-reviews'].data.get(`release:records:${SOURCE_ID}`).reviews).toHaveLength(1)
+  })
+
   it('400s MISSING_ID without an id', async () => {
     seedMember()
     const res = await call('DELETE', `?kind=records&sourceId=${SOURCE_ID}`)

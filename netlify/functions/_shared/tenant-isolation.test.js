@@ -310,10 +310,14 @@ describe('#189 — IDOR / cross-tenant penetration', () => {
     // A writes a review.
     const created = await (await call(reviewsHandler, 'POST', '', { kind: RECORDS, sourceId: '222', rating: 5, body: 'A review' }, A_TOKEN)).json()
     const aReviewId = created.review.id
+    // Regression (#378): ownership is enforced by the review:delete policy gate,
+    // so the store's delete must never run for the cross-tenant (non-owner) caller.
+    const deleteSpy = vi.spyOn(stores['runout-reviews'], 'delete')
     // B tries to delete it.
     const res = await call(reviewsHandler, 'DELETE', `?id=${aReviewId}`, null, B_TOKEN)
     expect(res.status).toBe(403)
     expect((await res.json()).code).toBe('FORBIDDEN')
+    expect(deleteSpy).not.toHaveBeenCalled()
     // A's review still exists (A can GET it back as "mine").
     const list = await (await call(reviewsHandler, 'GET', `?kind=${RECORDS}&sourceId=222`, null, A_TOKEN)).json()
     expect(list.mine.id).toBe(aReviewId)
