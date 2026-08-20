@@ -47,6 +47,13 @@ function advisoryId(entry) {
 function main() {
   const raw = fs.readFileSync(0, 'utf8');
 
+  // npm's own exit code is forwarded by the workflow as argv[2] (see
+  // .github/workflows/security-ci.yml). It is an auxiliary signal: npm exits 1
+  // BOTH when it found vulnerabilities (allowlisted set should still PASS) AND
+  // when the audit itself errored. The authoritative fail-closed signal is the
+  // JSON report shape below, which distinguishes those two cases reliably.
+  const npmExit = process.argv[2] !== undefined ? Number(process.argv[2]) : NaN;
+
   let data;
   try {
     data = JSON.parse(raw);
@@ -59,7 +66,40 @@ function main() {
     process.exit(1);
   }
 
-  const vulns = (data && data.vulnerabilities) || {};
+  // FAIL-CLOSED on an error/incomplete audit. When `npm audit` itself errors
+  // (registry/network/DNS/auth failure) it emits valid JSON shaped like
+  // `{"message": ..., "error": {...}}` with NO `vulnerabilities` field and exits
+  // 1. Treating that as an empty vulnerability map would silently pass this
+  // BLOCKING gate while it scanned nothing — exactly the fail-open we must never
+  // allow. Any missing/inconsistent state fails closed.
+  const hasErrorShape =
+    data && (data.error !== undefined || data.message !== undefined);
+  const hasReportShape =
+    data &&
+    data.vulnerabilities !== undefined &&
+    data.metadata !== undefined &&
+    data.metadata.vulnerabilities !== undefined;
+  if (!data || !hasReportShape || hasErrorShape) {
+    console.error(
+      'dependency-audit FAIL: `npm audit --json` returned an error/incomplete ' +
+        'report — failing closed (the BLOCKING gate must not pass while scanning ' +
+        'nothing).'
+    );
+    if (Number.isInteger(npmExit) && npmExit !== 0) {
+      console.error(`npm audit exited non-zero (code ${npmExit}) — confirming the audit did not complete cleanly.`);
+    }
+    if (data && data.error) {
+      console.error(
+        `npm audit error: ${data.error.code || data.error.name || 'unknown'} — ` +
+          `${data.error.summary || data.error.message || '(no summary)'}`
+      );
+    } else if (data && data.message) {
+      console.error(`npm audit message: ${data.message}`);
+    }
+    process.exit(1);
+  }
+
+  const vulns = data.vulnerabilities || {};
   const unallowlisted = [];
 
   for (const [pkg, info] of Object.entries(vulns)) {

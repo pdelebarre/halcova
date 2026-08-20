@@ -89,10 +89,19 @@ jobs:
       - name: "npm audit (blocking on high/critical, with approved #386 allowlist)"
         run: |
           set -o pipefail
-          # Capture the full JSON report. npm's own exit code is ignored here;
-          # the allowlist gate below decides pass/fail on high/critical findings.
-          npm audit --json > /tmp/npm-audit.json || true
-          node scripts/security/dependency-audit-allowlist.js < /tmp/npm-audit.json
+          # Capture the full JSON report AND npm's own exit code. The allowlist
+          # gate decides pass/fail on high/critical findings, but npm's exit
+          # state is forwarded to the gate so an audit failure (registry/network/
+          # DNS/auth) cannot be masked. The gate FAILS CLOSED if the report is
+          # error-shaped/incomplete (npm's `{"message","error"}` shape has no
+          # `vulnerabilities`) — the BLOCKING gate must never pass while it
+          # scanned nothing. `|| true` is deliberately removed: npm's exit code
+          # is captured explicitly and the gate enforces the verdict.
+          set +e
+          npm audit --json > /tmp/npm-audit.json
+          npm_exit=$?
+          set -e
+          node scripts/security/dependency-audit-allowlist.js "$npm_exit" < /tmp/npm-audit.json
 
   secret-scan:
     name: Secret scan (Gitleaks)

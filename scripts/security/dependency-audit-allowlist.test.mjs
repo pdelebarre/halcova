@@ -49,6 +49,7 @@ const approved = {
     ipx: { severity: 'high', isDirect: false, via: ['sharp'] },
     sharp: leafVuln('sharp', 'high', 'https://github.com/advisories/GHSA-f88m-g3jw-g9cj'),
   },
+  metadata: { vulnerabilities: { total: 7, high: 7, critical: 0 } },
 };
 
 // (c) Un-allowlisted: a NEW high advisory (different GHSA) on a non-exempt package.
@@ -56,6 +57,7 @@ const newHigh = {
   vulnerabilities: {
     'some-new-pkg': leafVuln('some-new-pkg', 'high', 'https://github.com/advisories/GHSA-aaaa-bbbb-cccc'),
   },
+  metadata: { vulnerabilities: { total: 1, high: 1, critical: 0 } },
 };
 
 // (d) A new CVE on an already-exempt package family is NOT exempted (its GHSA
@@ -64,23 +66,51 @@ const newCveOnApprovedPkg = {
   vulnerabilities: {
     sharp: leafVuln('sharp', 'high', 'https://github.com/advisories/GHSA-zzzz-0000-9999'),
   },
+  metadata: { vulnerabilities: { total: 1, high: 1, critical: 0 } },
 };
 
-function runGate(inputJson) {
+// (e) FAIL-OPEN REGRESSION (#413): `npm audit` itself errored (registry/network/
+//     DNS/auth failure) and emitted npm's valid-JSON error shape — a top-level
+//     `message` + `error` and NO `vulnerabilities` field. The gate must FAIL
+//     CLOSED here, not treat the absent vulnerability map as "clean" and pass.
+const npmAuditErrorShape = {
+  message: 'Failed to fetch registry metadata',
+  error: {
+    code: 'EAI_AGAIN',
+    summary: 'getaddrinfo EAI_AGAIN registry.npmjs.org',
+    detail: 'DNS lookup failed for registry.npmjs.org',
+  },
+};
+
+// (f) FAIL-OPEN REGRESSION (#413): an incomplete report that is missing the
+//     `metadata` block (e.g. a truncated/partial audit stream). Not a clean
+//     report — fail closed rather than scan nothing and pass.
+const incompleteReport = {
+  vulnerabilities: {},
+  // no `metadata` — the gate must not treat this as a clean full report
+};
+
+function runGate(inputJson, npmExit) {
   try {
-    execFileSync('node', [gate], { input: JSON.stringify(inputJson), encoding: 'utf8' });
+    execFileSync('node', [gate, String(npmExit)], {
+      input: JSON.stringify(inputJson),
+      encoding: 'utf8',
+    });
     return 0;
   } catch (err) {
     return err.status;
   }
 }
 
-assert.strictEqual(runGate(clean), 0, 'clean report should pass');
-assert.strictEqual(runGate(approved), 0, 'approved #386 set should be exempt');
-assert.strictEqual(runGate(newHigh), 1, 'new un-allowlisted high should fail');
-assert.strictEqual(runGate(newCveOnApprovedPkg), 1, 'new CVE on exempt package should fail');
+assert.strictEqual(runGate(clean, 0), 0, 'clean report should pass');
+assert.strictEqual(runGate(approved, 1), 0, 'approved #386 set should be exempt (npm exit 1 = vulns found)');
+assert.strictEqual(runGate(newHigh, 1), 1, 'new un-allowlisted high should fail');
+assert.strictEqual(runGate(newCveOnApprovedPkg, 1), 1, 'new CVE on exempt package should fail');
+assert.strictEqual(runGate(npmAuditErrorShape, 1), 1, 'npm audit error shape (no vulnerabilities) should FAIL CLOSED (#413)');
+assert.strictEqual(runGate(incompleteReport, 1), 1, 'incomplete report (no metadata) should FAIL CLOSED (#413)');
 
 console.log(
   'dependency-audit-allowlist gate: FAIL-CLOSED confirmed ' +
-    '(clean=pass, approved#386=pass, new-high=fail, new-CVE=fail).'
+    '(clean=pass, approved#386=pass, new-high=fail, new-CVE=fail, ' +
+    'audit-error-shape=fail, incomplete-report=fail).'
 );
