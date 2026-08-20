@@ -1,7 +1,7 @@
 TEAM: PROVIDERS
-CURRENT ISSUE: #399 (lookup-queue test/functional gaps)
-STATUS: ACTIVE — P2 follow-up
-ACTIVE PR: —
-LAST GATE: Tester PASS T11 (2125 tests · 86.9% stmts)
-BLOCKER: #399 Blobs-lane deferred-enrichment merge untested
-NEXT: Tester #399 → PM
+CURRENT ISSUE: #317 (Metadata Provider Adapter Layer, epic #313)
+STATUS: IMPLEMENTED — awaiting independent gates (Security Auditor, Tester, Data Architect)
+ACTIVE PR: #426 (m3/providers/317)
+LAST GATE: Implementer — 31 contract tests + 251 affected-suite tests PASS; oxlint clean
+BLOCKER: None (deps #314/#165 merged; #315 registry names compatible)
+NEXT: Independent Security Auditor + Tester + Data Architect (provider-to-domain) → PM
