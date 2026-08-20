@@ -338,8 +338,66 @@ describe('RLS migration (db/rls/012_collection_types_rls.sql) — #315 registry'
 })
 
 // ---------------------------------------------------------------------------
+// FEAT-6.3 #316 — CanonicalItem write control (db/rls/013_canonical_item_rls
+// .sql). CanonicalItem is GLOBAL, READ-MOSTLY shared catalogue identity: SELECT
+// is open to authenticated callers; writes are restricted to SERVICE IDENTITY
+// only (ADR-0020 §4/§10). Enforced as (1) a SELECT-only policy (no write path)
+// and (2) app_rls SELECT-only grant — a tenant session / app runtime role can
+// never create/rewrite/delete a canonical row (no orphan/rewrite of user
+// references on merge, ADR-0020 §7).
+// ---------------------------------------------------------------------------
+describe('RLS migration (db/rls/013_canonical_item_rls.sql) — #316 canonical write control', () => {
+  const RLS_FILE_013 = path.join(
+    fileURLToPath(new URL('../../../db/rls/013_canonical_item_rls.sql', import.meta.url)),
+  )
+
+  it('enables RLS on canonical_items', async () => {
+    const sql = await readFile(RLS_FILE_013, 'utf8')
+    expect(sql).toContain('ALTER TABLE canonical_items ENABLE ROW LEVEL SECURITY')
+  })
+
+  it('creates a SELECT-ONLY policy — NO write policy (read-open, service-write-restricted)', async () => {
+    const sql = await readFile(RLS_FILE_013, 'utf8')
+    expect(sql).toMatch(/CREATE POLICY canonical_items_public_select ON canonical_items\s+FOR SELECT USING \(true\)/)
+    // Every CREATE POLICY in this file must be SELECT-only — no FOR ALL / WITH
+    // CHECK write path a tenant session could take.
+    const policyBlocks = sql.match(/CREATE POLICY[\s\S]*?;/g) || []
+    expect(policyBlocks.length).toBe(1)
+    for (const block of policyBlocks) {
+      expect(block).toMatch(/FOR SELECT/)
+      expect(block).not.toMatch(/FOR (ALL|INSERT|UPDATE|DELETE)/i)
+      expect(block).not.toMatch(/WITH CHECK/i)
+    }
+  })
+
+  it('grants app_rls SELECT-only (no DML path to the shared catalogue) — no orphan/rewrite', async () => {
+    const sql = await readFile(RLS_FILE_013, 'utf8')
+    expect(sql).toMatch(/GRANT SELECT ON canonical_items TO app_rls/)
+    // No DML grant: a buggy route / tenant session can read public catalogue
+    // metadata but cannot create/rewrite/delete a canonical row.
+    expect(sql).not.toMatch(/GRANT (INSERT|UPDATE|DELETE|ALL),?[^*]*ON canonical_items?/i)
+  })
+
+  it('FORCEs row-level security so even the table owner cannot bypass the read-only contract', async () => {
+    const sql = await readFile(RLS_FILE_013, 'utf8')
+    expect(sql).toMatch(/ALTER TABLE canonical_items FORCE ROW LEVEL SECURITY/)
+  })
+
+  it('exposes the ONLY write surface as a narrow SECURITY DEFINER service function', async () => {
+    const sql = await readFile(RLS_FILE_013, 'utf8')
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION canonical_upsert_service\(/)
+    expect(sql).toMatch(/LANGUAGE plpgsql SECURITY DEFINER/)
+    expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION canonical_upsert_service\(uuid, text, jsonb, text, jsonb, jsonb, text\) TO app_rls/)
+    // The service upsert must never rewrite an existing reference (idempotent
+    // return on an existing canonical) and must not take a client tenant id.
+    expect(sql).toMatch(/ON CONFLICT DO NOTHING/)
+    expect(sql).not.toMatch(/app\.tenant_id/)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // ARCH-6.1 #165 — isolation inventory + restore/retention evidence. Every
-// tenant-owned table in the inventory (§1 tenancy-and-rls.md) must have an RLS
+// tenant-owned table across the inventory (§4. tenancy-and-rls.md) must have an RLS
 // ENABLE across db/rls, and the backup/restore/retention + shared→dedicated
 // procedures must be documented.
 // ---------------------------------------------------------------------------
