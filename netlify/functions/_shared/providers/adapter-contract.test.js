@@ -424,3 +424,124 @@ describe('guardedFetch envelope path runs payload-guard (SEC HOLD #317)', () => 
     expect(r.outcome).toBe(OUTCOME.FAILED)
   })
 })
+
+// ---------------------------------------------------------------------------
+// 9. outcomeFor + the full async method surface (Tester FAIL #317)
+// ---------------------------------------------------------------------------
+// The Tester gate flagged FUNCTION coverage on adapter-contract.js: outcomeFor,
+// lookupByIdentifier, the detail/searchBarcode variants and the `.catch(() =>
+// toOutcome(FAILED))` fail-closed paths were uncovered. These are shipped
+// public contract surface on a security-relevant file, so each is pinned here.
+describe('outcomeFor maps a row set to a deterministic outcome', () => {
+  it('returns OK for a non-empty row set and NO_MATCH for empty/null', () => {
+    expect(discogsAdapter.outcomeFor([{ id: 1 }])).toBe(OUTCOME.OK)
+    expect(discogsAdapter.outcomeFor([])).toBe(OUTCOME.NO_MATCH)
+    expect(discogsAdapter.outcomeFor(null)).toBe(OUTCOME.NO_MATCH)
+  })
+})
+
+// The registered-adapter shape #316 uses (normalizer only, NO fetchEnvelope):
+// every async method runs through the direct `.then(handle).catch(FAILED)`
+// path. Pin success AND fail-closed (.catch) for each method.
+describe('registered-adapter async surface (no fetchEnvelope)', () => {
+  const mkDirect = (overrides = {}) => createProviderAdapter({
+    name: 'direct',
+    catalog: 'records',
+    allowedHosts: [],
+    normalizer: normalizeRecordsHit,
+    searchBarcode: async () => [{ id: 1, title: 'T', source: 'discogs' }],
+    searchText: async () => [{ id: 2, title: 'T2', source: 'discogs' }],
+    detail: async () => ({ id: 3, title: 'T3', source: 'discogs' }),
+    lookupByIdentifier: async () => [{ id: 4, title: 'T4', source: 'discogs' }],
+    ...overrides,
+  })
+
+  it('searchBarcode resolves OK on a healthy hit', async () => {
+    const r = await mkDirect().searchBarcode('123')
+    expect(r.outcome).toBe(OUTCOME.OK)
+    expect(r.hits[0].provider_ids.discogsId).toBe(1)
+  })
+
+  it('searchBarcode fails closed to FAILED when the provider rejects', async () => {
+    const a = mkDirect({ searchBarcode: async () => { throw new Error('down') } })
+    const r = await a.searchBarcode('123')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+
+  it('searchText fails closed to FAILED when the provider rejects', async () => {
+    const a = mkDirect({ searchText: async () => { throw new Error('down') } })
+    const r = await a.searchText('q')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+
+  it('detail resolves OK on a healthy single hit', async () => {
+    const r = await mkDirect().detail('3')
+    expect(r.outcome).toBe(OUTCOME.OK)
+    expect(r.hits[0].provider_ids.discogsId).toBe(3)
+  })
+
+  it('detail fails closed to FAILED when the provider rejects', async () => {
+    const a = mkDirect({ detail: async () => { throw new Error('down') } })
+    const r = await a.detail('3')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+
+  it('lookupByIdentifier resolves OK on a healthy hit', async () => {
+    const r = await mkDirect().lookupByIdentifier('mbid-x')
+    expect(r.outcome).toBe(OUTCOME.OK)
+    expect(r.hits[0].provider_ids.discogsId).toBe(4)
+  })
+
+  it('lookupByIdentifier fails closed to FAILED when the provider rejects', async () => {
+    const a = mkDirect({ lookupByIdentifier: async () => { throw new Error('down') } })
+    const r = await a.lookupByIdentifier('mbid-x')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+})
+
+// The fetchEnvelope variants (defense-in-depth) also carry the same
+// `.catch(() => toOutcome(FAILED))` fail-closed surface; pin success + reject.
+describe('fetchEnvelope async surface (defense-in-depth)', () => {
+  const mkEnv = (overrides = {}) => createProviderAdapter({
+    name: 'env',
+    catalog: 'records',
+    allowedHosts: [],
+    normalizer: normalizeRecordsHit,
+    fetchEnvelope: async () => ({ results: [{ id: 1, title: 'T', source: 'discogs' }] }),
+    envelopeKeys: ['results', 'results', 'results'],
+    searchBarcode: () => Promise.resolve(null),
+    searchText: () => Promise.resolve(null),
+    detail: () => Promise.resolve(null),
+    ...overrides,
+  })
+
+  it('searchBarcode via fetchEnvelope resolves OK', async () => {
+    const r = await mkEnv().searchBarcode('123')
+    expect(r.outcome).toBe(OUTCOME.OK)
+    expect(r.hits[0].provider_ids.discogsId).toBe(1)
+  })
+
+  it('searchBarcode via fetchEnvelope fails closed when fetchEnvelope rejects', async () => {
+    const a = mkEnv({ fetchEnvelope: async () => { throw new Error('down') } })
+    const r = await a.searchBarcode('123')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+
+  it('searchText via fetchEnvelope fails closed when fetchEnvelope rejects', async () => {
+    const a = mkEnv({ fetchEnvelope: async () => { throw new Error('down') } })
+    const r = await a.searchText('q')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+
+  it('detail via fetchEnvelope resolves OK', async () => {
+    const r = await mkEnv().detail('3')
+    expect(r.outcome).toBe(OUTCOME.OK)
+    expect(r.hits[0].provider_ids.discogsId).toBe(1)
+  })
+
+  it('detail via fetchEnvelope fails closed when fetchEnvelope rejects', async () => {
+    const a = mkEnv({ fetchEnvelope: async () => { throw new Error('down') } })
+    const r = await a.detail('3')
+    expect(r).toEqual({ outcome: OUTCOME.FAILED, hits: [] })
+  })
+})
