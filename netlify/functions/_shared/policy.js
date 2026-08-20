@@ -115,13 +115,13 @@ export function normalizeReject(response) {
 //
 //   enforce(req, 'collection:item:read')
 //   enforce(req, 'admin:*')
-//   enforce(req, 'review:delete', { ownsTarget: () => bool })   // target scope
+//   enforce(req, 'review:delete', { ownsTarget: (user) => bool })  // target scope
 //
 // Returns { user, session, token, principal } on success or
 // { error: <Response> } on failure. `principle`, `denyCode`, `denyMessage` may
 // override the rule's default deny response (e.g. DEMO_READONLY / FEATURE_OFF).
 export async function enforce(req, action, {
-  ownsTarget,             // async () => boolean, required when rule.owner==='target'
+  ownsTarget,             // async (user) => boolean, required when rule.owner==='target'
   requiresAdmin = false,  // force requires:'admin' (for admin:* fallthrough)
   denyCode,
   denyMessage,
@@ -147,8 +147,10 @@ export async function enforce(req, action, {
   }
 
   // owner 'target' — the caller must own the target object (admin override).
+  // The principal is passed to ownsTarget so the caller can compare the target's
+  // owner against the session-derived user (never a browser-supplied id/role).
   if (rule.owner === 'target' && !(rule.allowOverride || []).includes(user.role)) {
-    const owned = await ownsTarget()
+    const owned = await ownsTarget(user)
     if (!owned) return { error: forbidden() }
   }
 
