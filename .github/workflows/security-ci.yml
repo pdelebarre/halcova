@@ -102,6 +102,14 @@ jobs:
           npm_exit=$?
           set -e
           node scripts/security/dependency-audit-allowlist.js "$npm_exit" < /tmp/npm-audit.json
+      # BLOCKING regression gate (#413): the allowlist tests prove the gate is
+      # FAIL-CLOSED (clean=pass, approved#386=pass, new-high=fail, new-CVE=fail,
+      # audit-error-shape=fail, incomplete-report=fail). They run as a plain
+      # `node` invocation (the test's documented entrypoint) so no test-runner
+      # fragility is introduced for .mjs scripts, and a regression that makes
+      # the gate fail-open fails this job.
+      - name: Run dependency-audit allowlist regression tests (fail-closed, #413)
+        run: node scripts/security/dependency-audit-allowlist.test.mjs
 
   secret-scan:
     name: Secret scan (Gitleaks)
