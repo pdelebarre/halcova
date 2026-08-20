@@ -78,11 +78,21 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-      # BLOCKING: fails on any high/critical advisory (no continue-on-error).
+      # BLOCKING: fails on any high/critical advisory (no continue-on-error),
+      # EXCEPT the Security-Auditor-approved dev-only no-fix set (issue #386).
+      # Only the advisory sources in scripts/security/dependency-audit-allowlist.js
+      # are exempted (extract-zip GHSA-jmr9-qjv8-65gv and sharp/libvips
+      # GHSA-f88m-g3jw-g9cj); anything else — a new advisory, a new CVE on the
+      # same package, or a non-exempt package — fails the job (fail-closed).
       # Exceptions require a filed ticket + Security Auditor sign-off (see
-      # .github/ai/README.md).
-      - name: npm audit (blocking on high/critical)
-        run: npm audit --audit-level=high
+      # .github/ai/README.md, #213).
+      - name: "npm audit (blocking on high/critical, with approved #386 allowlist)"
+        run: |
+          set -o pipefail
+          # Capture the full JSON report. npm's own exit code is ignored here;
+          # the allowlist gate below decides pass/fail on high/critical findings.
+          npm audit --json > /tmp/npm-audit.json || true
+          node scripts/security/dependency-audit-allowlist.js < /tmp/npm-audit.json
 
   secret-scan:
     name: Secret scan (Gitleaks)
