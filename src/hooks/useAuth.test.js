@@ -111,30 +111,55 @@ describe('useAuth.refresh', () => {
     expect(result.current.session.session).toBe('tok-session-abc123')
   })
 
-  it('does not resurrect the session when me() resolves 200 after logout (rotate-guard, SEC-5.2 #376)', async () => {
+  it('does NOT resurrect the session when a stale me() 200 resolves while the persisted token is STILL present after logout (TOCTOU, SEC-5.2 #376)', async () => {
     saveSession(SESSION)
     let resolveMe
     authApi.me.mockReturnValue(new Promise((resolve) => { resolveMe = resolve }))
 
     const { result } = renderHook(() => useAuth())
-    // me() is in flight; the user signs out before it resolves. Model the real
-    // sign-out clearing the persisted session token (saveSession(null)), which
-    // is the precondition for the CWE-384-adjacent empty-token resurrection.
+    // me() is in flight. The user signs out. CRITICAL: we model the real
+    // TOCTOU race — the persisted token is STILL present because
+    // authApi.logout() clears it only AFTER an awaited network call, and here
+    // that network call has not completed. We must NOT call saveSession(null).
+    // (This is the race the previous happy-path test did not cover.)
     act(() => {
       result.current.logout()
-      saveSession(null)
     })
+    // The persisted token is still present; the token-only rotate-guard would
+    // see old==old and pass. The session generation changed on logout instead.
     expect(result.current.session).toBeNull()
-    expect(getSessionToken()).toBe('')
+    expect(getSessionToken()).toBe('tok-session-abc123')
 
-    // The stale in-flight me() now resolves 200 with a (cached-profile) user.
-    // The rotate-guard must discard it — it must NOT setSession({ user,
-    // session: '' }) and briefly remount the shell with the signed-out user's
-    // cached profile.
+    // The stale in-flight me() now resolves 200 with a (cached-profile) user
+    // while the persisted token is still present. The generation guard must
+    // discard it — it must NOT setSession and resurrect the signed-out profile.
     await act(async () => { resolveMe({ ...MEMBER, plan: 'premium' }) })
 
-    // Session stays null; no empty-token resurrection, no stale user profile.
+    // Session stays null; no resurrection, no stale user profile.
     expect(result.current.session).toBeNull()
+  })
+
+  it('does NOT let a stale me() 200 resurrect the previous account over the new session (account switch, SEC-5.2 #376)', async () => {
+    saveSession(SESSION)
+    let resolveMe
+    authApi.me.mockReturnValue(new Promise((resolve) => { resolveMe = resolve }))
+    authApi.login.mockResolvedValue({ id: 'u2', name: 'Grace', role: 'member', collections: {} })
+
+    const { result } = renderHook(() => useAuth())
+    // me() for the ORIGINAL (u1) session is in flight; meanwhile the user signs
+    // in to a DIFFERENT account (u2). The switch bumps the session generation,
+    // so the in-flight me() for the previous account must be discarded instead
+    // of clobbering the new account's session.
+    await act(async () => {
+      await result.current.login('code-b')
+    })
+
+    // Now the stale in-flight me() for u1 resolves 200 with u1's cached profile.
+    // The generation guard must discard it — the new u2 session stays put.
+    await act(async () => { resolveMe({ ...MEMBER, id: 'u1', name: 'Ada' }) })
+
+    expect(result.current.session.user.id).toBe('u2')
+    expect(result.current.session.user.name).toBe('Grace')
   })
 
   it('signs the user out on logout', async () => {
