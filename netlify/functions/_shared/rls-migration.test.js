@@ -277,6 +277,67 @@ describe('RLS migration (db/rls/011_binding_rls.sql) — #165 binding RLS', () =
 })
 
 // ---------------------------------------------------------------------------
+// FEAT-6.2 #315 — collection type registry RLS (db/rls/012_collection_types_
+// rls.sql). CollectionType is GLOBAL registry data: read-open to authenticated
+// callers (SELECT policy) and write-restricted (NO write policy + app_rls is
+// granted SELECT-only). A client can never supply or override a type/
+// capability/field definition (ADR-0020 §2 dec 6). Validated by CONTENT here
+// because pg-mem cannot parse RLS DDL.
+// ---------------------------------------------------------------------------
+describe('RLS migration (db/rls/012_collection_types_rls.sql) — #315 registry', () => {
+  const RLS_FILE_012 = path.join(
+    fileURLToPath(new URL('../../../db/rls/012_collection_types_rls.sql', import.meta.url)),
+  )
+
+  it('enables RLS on collection_types and collection_type_fields', async () => {
+    const sql = await readFile(RLS_FILE_012, 'utf8')
+    expect(sql).toContain('ALTER TABLE collection_types ENABLE ROW LEVEL SECURITY')
+    expect(sql).toContain('ALTER TABLE collection_type_fields ENABLE ROW LEVEL SECURITY')
+  })
+
+  it('creates SELECT-ONLY policies — NO write policy on the registry (read-open, write-restricted)', async () => {
+    const sql = await readFile(RLS_FILE_012, 'utf8')
+    // Public read for authenticated callers on both tables.
+    expect(sql).toMatch(/CREATE POLICY collection_types_public_select ON collection_types\s+FOR SELECT USING \(true\)/)
+    expect(sql).toMatch(/CREATE POLICY collection_type_fields_public_select ON collection_type_fields\s+FOR SELECT USING \(true\)/)
+    // Every CREATE POLICY in this file must be a SELECT-only policy — there is
+    // deliberately NO FOR ALL / FOR INSERT / FOR UPDATE / FOR DELETE / WITH
+    // CHECK write path a tenant session could take. (Scan policy DDL, not
+    // prose comments.)
+    const policyBlocks = sql.match(/CREATE POLICY[\s\S]*?;/g) || []
+    expect(policyBlocks.length).toBe(2)
+    for (const block of policyBlocks) {
+      expect(block).toMatch(/FOR SELECT/)
+      expect(block).not.toMatch(/FOR (ALL|INSERT|UPDATE|DELETE)/i)
+      expect(block).not.toMatch(/WITH CHECK/i)
+    }
+  })
+
+  it('grants app_rls SELECT-only (no DML path to the registry) — server-authoritative', async () => {
+    const sql = await readFile(RLS_FILE_012, 'utf8')
+    expect(sql).toMatch(/GRANT SELECT ON collection_types TO app_rls/)
+    expect(sql).toMatch(/GRANT SELECT ON collection_type_fields TO app_rls/)
+    // No DML grant: a compromised/buggy app route or a tenant session can read
+    // type metadata but can never redefine a type/field/capability/provider map.
+    expect(sql).not.toMatch(/GRANT (INSERT|UPDATE|DELETE|ALL),?.*ON collection_types?/i)
+    expect(sql).not.toMatch(/GRANT SELECT, INSERT, UPDATE, DELETE ON collection_types?/i)
+  })
+
+  it('FORCEs row-level security so even the table owner cannot bypass the read-only contract', async () => {
+    const sql = await readFile(RLS_FILE_012, 'utf8')
+    expect(sql).toMatch(/ALTER TABLE collection_types FORCE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/ALTER TABLE collection_type_fields FORCE ROW LEVEL SECURITY/)
+  })
+
+  it('policy predicate is read-open for every tenant (registry is global, not owner-scoped)', async () => {
+    const sql = await readFile(RLS_FILE_012, 'utf8')
+    // The registry is NOT tenant-scoped on owner_id — a bare USING(true) SELECT.
+    expect(sql).toMatch(/FOR SELECT USING \(true\)/)
+    expect(sql).not.toMatch(/current_setting\('app\.tenant_id'/)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // ARCH-6.1 #165 — isolation inventory + restore/retention evidence. Every
 // tenant-owned table in the inventory (§1 tenancy-and-rls.md) must have an RLS
 // ENABLE across db/rls, and the backup/restore/retention + shared→dedicated
