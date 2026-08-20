@@ -20,7 +20,7 @@ This document is the **PM-coordinated close-out checklist** for the #337/#342 fi
 | SSRF / external-provider boundaries | Pre-existing SEC-6 + #338 (`books.js`/`discogs.js` routing); allowlisted hosts, constrained cover proxy, bounded retries | Pre-existing controls + #338 negative tests |
 | XSS (web/input) | Pre-existing SEC-6 + shared `json()` security headers (CSP default-src 'none', nosniff), no reflection of untrusted values | Pre-existing controls; unchanged by M1 |
 | Secrets / PII-safe logging | `audit.js` redaction, `publicUser`/`SECRET_FIELDS`, secret-scan CI | Gitleaks CLEAR (#375) |
-| CI security gate | `security-ci.yml` (security-tests, dependency-audit, secret-scan, sast) | **#375 remediated** → PR #387 (`882df75`) |
+| CI security gate | `security-ci.yml` (security-tests, dependency-audit, secret-scan) + **CodeQL default-setup** for SAST | **#375 remediated** → PR #387 (`882df75`); advanced-config SAST removed in #412, SAST now via default-setup code-scanning |
 
 **Cumulative quality on main:** 153 files / **1924 tests**, coverage **87.37%** (all ≥70%), lint/build green. Every security PR behind independent Security Auditor + Tester blocking gates with negative tests.
 
@@ -60,10 +60,10 @@ This document is the **PM-coordinated close-out checklist** for the #337/#342 fi
 
 Done via GitHub / Netlify settings by the owner (not mergeable):
 
-1. **CodeQL default-setup conflict** (#375/#386): advanced-config `sast` SARIF upload is rejected because **default setup is enabled** at repo level. Action: either disable default setup (keep the blocking advanced `sast` job) OR keep default setup and drop the redundant blocking `sast` job. Confirm the active CodeQL is reporting to code-scanning.
+1. **CodeQL default-setup conflict** (#375/#386): **resolved in #412** — decision is to **keep default setup** and drop the redundant advanced-config SAST. The advisory `codeql.yml` workflow and the blocking `sast` job in `security-ci.yml` were removed; SAST is now enforced via **default-setup code-scanning results** (must be added as a required status check). Confirm the active CodeQL default-setup is reporting to code-scanning.
 2. **`github-advanced-security` required status check** (#375): references a workflow that has no matching job. Reconcile the branch-protection required-status-check config (add the real `security-ci` job names, or remove the stale check).
 3. **Enable secret-scanning + push protection + Dependabot alerts/security-updates** in **Settings → Code security and analysis** (per `.github/ai/README.md` "Owner actions").
-4. Add the `security-ci.yml` job names (`security-tests`, `dependency-audit`, `secret-scan`, `sast`) as **required status checks** in **Settings → Branches** so the blocking gate actually gates merges (the exceptions policy assumes this).
+4. Add the `security-ci.yml` job names (`security-tests`, `dependency-audit`, `secret-scan`) **and** the **CodeQL default-setup** check as **required status checks** in **Settings → Branches** so the blocking gate (incl. SAST via default-setup) actually gates merges (the exceptions policy assumes this).
 
 ## 5. #342 close checklist (for the Security Auditor)
 

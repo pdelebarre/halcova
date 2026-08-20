@@ -85,14 +85,13 @@ every `main` commit and PR #370:
   `security-ci.yml` `sast` blocking). GitHub rejects the advanced-config SARIF
   upload while default setup is on. The check-run list confirms default-setup
   jobs (`Analyze (actions)`, `Analyze (javascript-typescript)`) succeed.
-- **Disposition:** no repo-code fix can resolve the settings conflict.
-  **Owner action required:** choose ONE of
-  (a) disable **CodeQL default setup** in repo settings so the advanced-config
-  blocking `sast` job can upload SARIF, or
-  (b) keep default setup (it already runs CodeQL security scanning) and remove
-  / relax the redundant blocking `sast` job.
-  The blocking `sast` job should remain gated on actual high/critical findings
-  either way; this is a settings reconciliation, not a finding.
+- **Disposition:** resolved in **#412** — the decision is to **keep CodeQL
+  default setup** (option b) and remove the redundant advanced-config SAST
+  workflows. The advisory `codeql.yml` workflow and the blocking `sast` job in
+  `security-ci.yml` were removed so no advanced-config SARIF is uploaded.
+  SAST is now enforced by **default-setup code-scanning results**, which must
+  be added as a branch-protection required status check (see #412 and
+  `.github/ai/README.md`). This is a settings reconciliation, not a finding.
 
 ## 5. `github-advanced-security` — documented, owner action
 
@@ -117,7 +116,8 @@ every `main` commit and PR #370:
 
 1. **Security Auditor approval** of exceptions ticket **#386** (dependency
    HIGHs) and sign-off on the Gitleaks-clear scan (no real secret).
-2. **Owner action** for CodeQL default-setup conflict (#4) and
+2. **Owner action** for the CodeQL default-setup conflict (#4) — **resolved in
+   #412** (keep default setup, remove advanced-config SAST) and for
    `github-advanced-security` (#5).
 3. Re-run `security-ci.yml` on the branch to confirm the gate is green.
 4. PM-controlled merge to `main`.

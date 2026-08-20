@@ -17,7 +17,7 @@ M0 is the release gate for the existing Records/Books product. This document rec
 | Tests | `npm test` passed with 1,777 tests in the latest verified mainline validation; M0 instrumentation PRs add focused regression coverage. | PASS — fresh post-#362 Actions evidence still required for final release decision |
 | Coverage | 86.94% statements in the latest verified mainline validation, above the repository's 70% gate. | PASS |
 | Lint | `npm run lint` is a blocking step in `security-ci.yml` via merged PR #357. | PASS — gate configured; fresh post-#362 run still required |
-| Security CI | Blocking workflow includes security tests, dependency audit, secret scan and SAST; lint is also blocking. | PASS — configuration verified; fresh post-#362 run still required |
+| Security CI | Blocking workflow includes security tests, dependency audit and secret scan; SAST is enforced via CodeQL default-setup code-scanning (advanced-config SAST removed in #412); lint is also blocking. | PASS — configuration verified; fresh post-#362 run still required |
 
 PR #361 and PR #362 are merged. #361 implements first-add activation telemetry and #362 implements collection browse telemetry. Both preserve DEFAULT-OFF tracking and use the existing first-party queue; neither adds a third-party analytics SDK or telemetry backend.
 
@@ -75,7 +75,7 @@ No additional M0 product instrumentation work is currently required.
 ## Next actions
 
 1. Complete physical iOS validation and record evidence on #87.
-2. Confirm the complete blocking Security CI on the post-#362 mainline commit: tests, lint, build, dependency audit, secret scanning and SAST.
+2. Confirm the complete blocking Security CI on the post-#362 mainline commit: tests, lint, build, dependency audit, secret scanning and SAST (via CodeQL default-setup code-scanning).
 3. Re-run this evidence review.
 4. Make the explicit M0 PASS/HOLD decision.
 5. Do not start M1 as a release milestone until M0 is passed or an explicit product risk acceptance is recorded.
