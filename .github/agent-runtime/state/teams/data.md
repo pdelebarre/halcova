@@ -1,7 +1,7 @@
 TEAM: DATA
 CURRENT ISSUE: #316 — [FEAT-6.3] Migrate Books & Records to Generic Collections (ADR-0020 §11; epic #313)
 STATUS: IMPLEMENTED on m3/data/316 (branch m3/data/315 stacked) — migration SQL 012 (canonical_items + collection_items FK, pg-mem-safe, idempotent) + RLS 013 (CanonicalItem service-identity write control: SELECT-only policy, app_rls SELECT-only, FORCE RLS, SECURITY DEFINER canonical_upsert_service) + migration TOOL (collection-migration.js backfill/reconcile/rollback + scripts/migrate-collections.mjs) + tests (idempotency, reconciliation zero loss/dup/ownership change, reverse-mapping rollback). Postgres + Blobs paths untouched; legacy items + API contracts preserved until reconciliation PASS + retirement ADR.
-ACTIVE PR: m3/data/316 (created from #315) — PR pending
+ACTIVE PR: #428 (m3/data/316, stacked on #315)
 LAST GATE: DATA (self-run, NOT an approval) — collection-migration+db-migrate 8 passed, rls-migration+tenant-isolation+collection+collection-postgres+collection-outage 163 passed, registry+collection-types+providers 127 passed, repositories 151 passed. Independent Data Architect / Security Auditor / Multi-tenant Security / Tester / Release Validator gates PENDING (not waived).
 BLOCKER: #316 is stacked on #315 (registry) + #317 (provider adapter files present in the shared tree); #315/#317 must be merged before #316 can land on main.
 NEXT: PM coordinate independent gates on the #316 PR (Data Architect, Security Auditor, Multi-tenant Security, Tester, Release Validator — irreversible-adjacent migration).
