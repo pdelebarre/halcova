@@ -51,10 +51,17 @@
 // module constant (not env) so the client stays deterministic and testable.
 export const OFFLINE_TRUST_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
-// Capability scopes currently approved for M1. 'shell' = the offline app shell
-// may render with the cached session. Extend with M2 sync scopes later.
+// Capability scopes approved for M1/M2.
+//   - 'shell'      : the offline app shell may render with the cached session.
+//   - 'collection' : the offline collection mirror (#289) may be read/hydrated
+//                    for the signed-in user (the M2 offline mirror capability).
+//                    Sync/mutation scopes (#292) are added separately when the
+//                    outbox ships; the mirror READ scope is granted here because
+//                    #289's acceptance criteria (offline launch renders the
+//                    last-known collection) require offline mirror reads.
 export const OFFLINE_SCOPES = Object.freeze({
   SHELL: 'shell',
+  COLLECTION: 'collection',
 })
 
 const KEY = 'runout.offlineTrust'
@@ -174,8 +181,9 @@ export function establishOfflineTrust(user, { now = Date.now(), sessionFp = '' }
     establishedAt: new Date(now).toISOString(),
     lastVerifiedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + OFFLINE_TRUST_TTL_MS).toISOString(),
-    // The single approved M1 scope; M2 adds its collection scopes here.
-    scopes: [OFFLINE_SCOPES.SHELL],
+    // Approved scopes: M1 'shell' + M2 'collection' mirror reads. M2 mutation
+    // scopes (#292) are added separately when the outbox ships.
+    scopes: [OFFLINE_SCOPES.SHELL, OFFLINE_SCOPES.COLLECTION],
     // Non-secret binding to the current session (see sessionFingerprint).
     sessionFp,
   }

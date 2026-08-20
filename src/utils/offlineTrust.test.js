@@ -140,8 +140,10 @@ describe('offlineAccessAllowed — fail closed unless trusted within the window'
 
   it('denies a scope not granted on the record', async () => {
     establishOfflineTrust(USER, { now: NOW, sessionFp: fp() })
-    // M1 only grants 'shell'; anything else (e.g. an M2 sync scope) is denied.
-    expect(await offlineAccessAllowed(USER, { now: NOW + 1000, token: TOKEN, scope: 'collection' })).toBe(false)
+    // M1 grants 'shell' and M2 grants 'collection' (the offline mirror read
+    // scope, #289); anything else (e.g. a future sync/mutation scope) is denied
+    // until it is explicitly granted.
+    expect(await offlineAccessAllowed(USER, { now: NOW + 1000, token: TOKEN, scope: 'sync' })).toBe(false)
   })
 
   it('fails closed on a corrupted record', async () => {

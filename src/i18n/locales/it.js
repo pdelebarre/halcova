@@ -337,6 +337,7 @@ const it = {
   'update.reload': 'Reload',
 
   'offline.status': 'Offline — contenuti salvati in visualizzazione',
+  'offline.mirrorCopy': 'Visualizzazione della collezione salvata (copia offline) — sincronizzata {at}',
 
   // §17 Piano gratuito e demo
   'plan.freeCounter': '{count} di {cap} articoli aggiunti',

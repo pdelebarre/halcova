@@ -340,6 +340,7 @@ const enGB = {
 
   // §16b Offline status (M1 shell, #157)
   'offline.status': "You're offline — showing saved content",
+  'offline.mirrorCopy': 'Showing your saved collection (offline copy) — synced {at}',
 
   // §17 Free plan & demo — same copy as en for the baseline
   'plan.freeCounter': '{count} of {cap} items added',

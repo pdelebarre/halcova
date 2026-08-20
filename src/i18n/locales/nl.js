@@ -337,6 +337,7 @@ const nl = {
   'update.reload': 'Reload',
 
   'offline.status': 'Offline — opgeslagen inhoud weergegeven',
+  'offline.mirrorCopy': 'Uw opgeslagen collectie weergeven (offline kopie) — gesynchroniseerd {at}',
 
   // §17 Gratis abonnement & demo
   'plan.freeCounter': '{count} van {cap} items toegevoegd',

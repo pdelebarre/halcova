@@ -337,6 +337,7 @@ const es = {
   'update.reload': 'Reload',
 
   'offline.status': 'Sin conexión — mostrando contenido guardado',
+  'offline.mirrorCopy': 'Mostrando su colección guardada (copia sin conexión) — sincronizada {at}',
 
   // §17 Plan gratuito y demo
   'plan.freeCounter': '{count} de {cap} artículos añadidos',

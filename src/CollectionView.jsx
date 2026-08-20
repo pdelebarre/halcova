@@ -69,7 +69,7 @@ const NEW_ARRIVALS_COUNT = 5
  * App.jsx renders one of these per tab.
  */
 export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
-  const { items, status, error, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
+  const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
 
   // T2 (issue #110): the active room's theme, provided by App.jsx. `useTheme()`
   // degrades to {} outside a provider, so a missing theme can never throw
@@ -1078,6 +1078,16 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
 
       <main className="app-main">
         {status === 'loading' && <p className="status-line">{copy.loading}</p>}
+
+        {/* M2 #289: a clear "showing offline copy" state. Rendered whenever the
+            current items were hydrated from the IndexedDB mirror (offline or a
+            safe network failure) so the user knows they're browsing their
+            last-known collection, not live data. */}
+        {status === 'ready' && source === 'offline' && (
+          <div className="status-line status-offline-copy" role="status">
+            <p>{t('offline.mirrorCopy', { at: mirroredAt ? new Date(mirroredAt).toLocaleString() : '' })}</p>
+          </div>
+        )}
 
         {status === 'error' && (
           <div className="status-line status-error">

@@ -1,7 +1,7 @@
 TEAM: OFFLINE
-CURRENT ISSUE: ADR-0019 revision (renumber 0015->0019 + M2/M3 boundary + security clarifications) -> next #289/#292/#159
-STATUS: ACTIVE — ADR-0019 revision PR submitted; M2 gated on ADR-0019 confirmation + #337/#342
-ACTIVE PR: #419 (m2/offline/adr-0015-revision)
-LAST GATE: Tester PASS (M1 regression; PRs #373/#374) · ADR-0019 awaiting Offline + Data + Security re-review
-BLOCKER: M2 #289/#292/#159 gated by ADR-0019 confirmation (independent re-review) + M1 close-out
-NEXT: Offline + Data + Security re-review of ADR-0019 PR; do not merge self
+CURRENT ISSUE: #289 M2 Offline Collection Mirror (IndexedDB) — implemented
+STATUS: ACTIVE — #289 implemented on m2/offline/289; affected suites green (132 focused + 372 utils/hooks/i18n + 27 collection UI). Awaiting Offline Architect + Security Auditor + Tester independent gates.
+ACTIVE PR: m2/offline/289 (to be opened)
+LAST GATE: local PASS — mirror/uuid/trust/hydration/isolation/i18n/collection suites; build + oxlint clean
+BLOCKER: none (outbox #292 + UX #159 serialized after #289 by design — not implemented here)
+NEXT: push branch, open PR, route to Offline Architect + Security Auditor + Tester
