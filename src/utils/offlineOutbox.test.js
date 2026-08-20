@@ -7,7 +7,7 @@ import {
   OUTBOX_STATUS,
   OUTBOX_SCOPE,
 } from './offlineOutbox'
-import { stageAdd, clearAllOutbox } from './outbox'
+import { stageAdd, clearAllOutbox, markFailed } from './outbox'
 import {
   establishOfflineTrust,
   sessionFingerprint,
@@ -72,6 +72,26 @@ describe('offlineOutbox — read interface over the real #292 outbox (#159)', ()
     // The surfaced op is the minimal safe shape — no pendingItem, barcode,
     // ocrText, lastError, token, or secret is exposed to the UI.
     expect(ops[0]).toEqual({ opId: expect.any(String), status: 'pending', kind: 'add' })
+    expect(Object.keys(ops[0]).sort()).toEqual(['kind', 'opId', 'status'])
+  })
+
+  it('surfaces a real ERROR count after a failed push (markFailed -> error, #159/#292)', async () => {
+    seedTrustedSession()
+    const op = await stageAdd(USER.id, { item: ITEM, token: TOKEN })
+    expect(op).not.toBeNull()
+    // Simulate the sync engine failing to push this op (kept durable/retryable).
+    await markFailed(USER.id, op.opId, 'flaky reconnect', { token: TOKEN })
+
+    // The read interface maps the durable `failed` state to the ERROR attention
+    // status (not PENDING), against the REAL outbox — not a mocked op list.
+    const summary = await readOutboxSummary(USER.id)
+    expect(summary).toEqual({ pending: 0, conflict: 0, error: 1, synced: 0 })
+
+    const ops = await readOutboxOps(USER.id)
+    expect(ops).toHaveLength(1)
+    expect(ops[0].status).toBe(OUTBOX_STATUS.ERROR)
+    expect(ops[0].opId).toBe(op.opId)
+    // Still the safe shape — never a raw error/secret payload.
     expect(Object.keys(ops[0]).sort()).toEqual(['kind', 'opId', 'status'])
   })
 

@@ -449,6 +449,7 @@ const en = {
   'offline.clearOfflineData': 'Clear offline data',
   'offline.clearOfflineDataConfirm': 'Clear the offline copy from this device? Your online collection is not affected.',
   'offline.clearOfflineDataDone': 'Offline data cleared',
+  'offline.clearOfflineDataFailed': 'Offline data could not be cleared. Please try again.',
 
   // §17 Free plan & demo
   'plan.freeCounter': '{count} of {cap} items added',

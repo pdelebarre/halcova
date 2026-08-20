@@ -350,6 +350,7 @@ const es = {
   'offline.clearOfflineData': 'Borrar datos sin conexión',
   'offline.clearOfflineDataConfirm': '¿Borrar la copia sin conexión de este dispositivo? Su colección en línea no se ve afectada.',
   'offline.clearOfflineDataDone': 'Datos sin conexión borrados',
+  'offline.clearOfflineDataFailed': 'No se pudieron borrar los datos sin conexión. Inténtalo de nuevo.',
 
   // §17 Plan gratuito y demo
   'plan.freeCounter': '{count} de {cap} artículos añadidos',

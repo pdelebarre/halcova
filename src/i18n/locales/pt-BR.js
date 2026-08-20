@@ -350,6 +350,7 @@ const ptBR = {
   'offline.clearOfflineData': 'Limpar dados offline',
   'offline.clearOfflineDataConfirm': 'Limpar a cópia offline deste dispositivo? Sua coleção online não é afetada.',
   'offline.clearOfflineDataDone': 'Dados offline limpos',
+  'offline.clearOfflineDataFailed': 'Não foi possível limpar os dados offline. Tente novamente.',
 
   // §17 Plano gratuito e demo
   'plan.freeCounter': '{count} de {cap} itens adicionados',

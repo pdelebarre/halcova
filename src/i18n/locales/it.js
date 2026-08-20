@@ -350,6 +350,7 @@ const it = {
   'offline.clearOfflineData': 'Cancella dati offline',
   'offline.clearOfflineDataConfirm': 'Cancellare la copia offline da questo dispositivo? La tua collezione online non viene modificata.',
   'offline.clearOfflineDataDone': 'Dati offline cancellati',
+  'offline.clearOfflineDataFailed': 'Non è stato possibile cancellare i dati offline. Riprova.',
 
   // §17 Piano gratuito e demo
   'plan.freeCounter': '{count} di {cap} articoli aggiunti',

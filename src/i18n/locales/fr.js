@@ -350,6 +350,7 @@ const fr = {
   'offline.clearOfflineData': 'Effacer les données hors ligne',
   'offline.clearOfflineDataConfirm': 'Effacer la copie hors ligne de cet appareil ? Votre collection en ligne n\'est pas affectée.',
   'offline.clearOfflineDataDone': 'Données hors ligne effacées',
+  'offline.clearOfflineDataFailed': 'Impossible d\'effacer les données hors ligne. Veuillez réessayer.',
 
   // §17 Plan gratuit & démo
   'plan.freeCounter': '{count} / {cap} articles ajoutés',

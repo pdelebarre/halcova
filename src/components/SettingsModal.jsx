@@ -8,10 +8,12 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
   const { locale, setLocale } = useLocale()
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [clearDone, setClearDone] = useState(false)
+  const [clearFailed, setClearFailed] = useState(false)
   // Ergonomics (#159): manage focus so the keyboard/talkback user always knows
   // where the destructive-clear flow moved.
   const confirmButtonRef = useRef(null)
   const doneLineRef = useRef(null)
+  const clearErrorRef = useRef(null)
   // Ergonomics (#159): the trigger that opened the clear-confirmation, so a
   // Cancel restores focus to it rather than dropping to <body>.
   const clearTriggerRef = useRef(null)
@@ -20,11 +22,11 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
   // the trigger re-renders, so a synchronous focus in the onClick is too early.
   const wasConfirming = useRef(false)
   useEffect(() => {
-    if (wasConfirming.current && !confirmingClear && !clearDone) {
+    if (wasConfirming.current && !confirmingClear && !clearDone && !clearFailed) {
       clearTriggerRef.current?.focus()
     }
     wasConfirming.current = confirmingClear
-  }, [confirmingClear, clearDone])
+  }, [confirmingClear, clearDone, clearFailed])
 
   // On showing the confirmation, move focus to the confirm (destructive) button.
   useEffect(() => {
@@ -35,6 +37,11 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
   useEffect(() => {
     if (clearDone) doneLineRef.current?.focus()
   }, [clearDone])
+
+  // On a failed clear, move focus to the safe `role="alert"` error line.
+  useEffect(() => {
+    if (clearFailed) clearErrorRef.current?.focus()
+  }, [clearFailed])
 
   async function handleClearOfflineData() {
     if (!userId) return
@@ -47,9 +54,20 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
     // mirror/outbox is never touched. The offline trust record is left intact
     // by design here — clearing the offline copy is a privacy management action,
     // not a sign-out.
-    await Promise.all([clearMirrorForUser(userId), clearOutboxForUser(userId)])
+    //
+    // FAIL-CLOSED (Security): both clears are atomic for the reset outcome. If
+    // EITHER fails (delete/abort/quota/cursor error — the outbox or mirror could
+    // still be readable while a raw queued op survives to auto-flush on
+    // reconnect), we must NOT report "cleared". Surface a safe, generic error
+    // (ADR-0019 Dec 12: no secrets/raw content) and keep the clear trigger
+    // available for a retry.
+    const [mirrorOk, outboxOk] = await Promise.all([
+      clearMirrorForUser(userId),
+      clearOutboxForUser(userId),
+    ])
     setConfirmingClear(false)
-    setClearDone(true)
+    setClearDone(mirrorOk && outboxOk)
+    setClearFailed(!(mirrorOk && outboxOk))
   }
 
   return (
@@ -95,7 +113,29 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
               <p className="settings-section-label">{t('offline.localDataTitle')}</p>
               <div className="settings-card settings-help-books">
                 <p className="settings-offline-data-hint">{t('offline.localDataHint')}</p>
-                {clearDone ? (
+                {clearFailed ? (
+                  <>
+                    <p
+                      className="settings-offline-data-done"
+                      role="alert"
+                      ref={clearErrorRef}
+                      tabIndex={-1}
+                    >
+                      {t('offline.clearOfflineDataFailed')}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      ref={clearTriggerRef}
+                      onClick={() => {
+                        setClearFailed(false)
+                        setConfirmingClear(true)
+                      }}
+                    >
+                      {t('offline.clearOfflineData')}
+                    </button>
+                  </>
+                ) : clearDone ? (
                   <p
                     className="settings-offline-data-done"
                     role="status"

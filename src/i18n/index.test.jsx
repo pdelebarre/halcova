@@ -424,6 +424,7 @@ describe('t()', () => {
         'offline.clearOfflineData',
         'offline.clearOfflineDataConfirm',
         'offline.clearOfflineDataDone',
+        'offline.clearOfflineDataFailed',
       ]
       for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
         setLocale(locale)

@@ -350,6 +350,7 @@ const nl = {
   'offline.clearOfflineData': 'Offline gegevens wissen',
   'offline.clearOfflineDataConfirm': 'De offline kopie van dit apparaat wissen? Uw online collectie blijft ongewijzigd.',
   'offline.clearOfflineDataDone': 'Offline gegevens gewist',
+  'offline.clearOfflineDataFailed': 'Offline gegevens konden niet worden gewist. Probeer het opnieuw.',
 
   // §17 Gratis abonnement & demo
   'plan.freeCounter': '{count} van {cap} items toegevoegd',

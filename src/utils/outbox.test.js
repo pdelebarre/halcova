@@ -202,6 +202,44 @@ describe('clear/isolate on sign-out & account switch (ADR-0019 Dec 5)', () => {
     await expect(clearOutboxForUser('nobody')).resolves.toBe(true)
     await expect(clearAllOutbox()).resolves.toBe(true)
   })
+
+  // SECURITY (ADR-0019 Dec 5/12) fail-closed privacy reset: if the IndexedDB
+  // delete transaction fails (abort/quota/cursor error) while READS still
+  // succeed, clearOutboxForUser must report FALSE (not true) so the UI can never
+  // say "cleared" while the raw queued op (pendingItem/barcode/ocrText) survives
+  // to auto-flush on reconnect. This was a `catch { return true }` fail-open.
+  it('clearOutboxForUser FAILS CLOSED (false) when the delete transaction fails, leaving the op durable', async () => {
+    trustUser(USER_A, TOKEN_A)
+    await stageAdd(USER_A.id, { item: ITEM, now: NOW, token: TOKEN_A })
+
+    // Force every delete in the clear transaction to throw inside the cursor's
+    // onsuccess handler. fake-indexeddb aborts the transaction on that throw,
+    // so tx.onabort fires and the clear must resolve false — while reads
+    // (listPendingOps/countPendingOps) keep succeeding.
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('runout.outbox', OUTBOX_DB_VERSION)
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+    const storeProto = Object.getPrototypeOf(
+      db.transaction('ops').objectStore('ops'),
+    )
+    const origDelete = storeProto.delete
+    storeProto.delete = () => {
+      throw new DOMException('quota exceeded', 'QuotaExceededError')
+    }
+    try {
+      expect(await clearOutboxForUser(USER_A.id)).toBe(false)
+    } finally {
+      storeProto.delete = origDelete
+      db.close()
+    }
+
+    // Fail-closed: the raw op is NOT silently cleared — it stays durable and
+    // retryable (ADR-0016 rule 12), so nothing is reported as wiped.
+    trustUser(USER_A, TOKEN_A)
+    expect(await countPendingOps(USER_A.id, { now: NOW + 1000, token: TOKEN_A })).toBe(1)
+  })
 })
 
 describe('no credentials in the outbox (ADR-0019 Dec 4)', () => {
