@@ -58,17 +58,17 @@ export function createLookupQueueStore() {
       return id
     },
 
-    // Claim the next `limit` due rows for ONE tenant, oldest first.
+    // Claim the next `limit` due rows for ONE tenant, oldest-due first.
     async claimDue(userId, limit = 10) {
       const ids = await readIndex(store, userId)
       const capped = Math.max(1, Math.min(Number(limit) || 10, 100))
-      const claimed = []
-      for (const id of ids.slice(0, capped)) {
+      const due = []
+      for (const id of ids) {
         const row = await store.get(itemKey(id), { type: 'json' })
         if (!row || row?.status !== 'pending') continue
         const nextAt = new Date(row.nextAt).getTime()
         if (nextAt <= Date.now()) {
-          claimed.push({
+          due.push({
             id: row.id,
             kind: row.kind,
             payload: row.payload,
@@ -78,7 +78,12 @@ export function createLookupQueueStore() {
           })
         }
       }
-      return claimed
+      // Oldest-due first — matches the Postgres repo's `ORDER BY next_at ASC`.
+      // The index is pushed newest-first (enqueue uses unshift), so order rows
+      // by their due time rather than enqueue order to keep both backends
+      // consistent, then cap to the globally-oldest-due rows.
+      due.sort((a, b) => a.next_at.getTime() - b.next_at.getTime())
+      return due.slice(0, capped)
     },
 
     async markDone(userId, id) {
