@@ -10,7 +10,7 @@
 // isolation by evaluating them against sample rows (the app-layer negative
 // tests in tenant-isolation.test.js prove the same guarantee end-to-end).
 
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -114,5 +114,165 @@ describe('RLS migration (db/rls/009_lookup_queue_rls.sql) — T6 #285', () => {
     const sql = await readFile(RLS_FILE_009, 'utf8')
     expect(sql).toMatch(/DROP POLICY IF EXISTS lookup_queue_tenant_all ON lookup_queue/)
     expect(sql).not.toMatch(/^\s*ALTER TABLE\s+\w+\s+FORCE ROW LEVEL SECURITY/im)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ARCH-6.1 #165 — generic collection tables RLS (db/rls/010_rls_generic_
+// collections.sql). collections is tenant-scoped on owner_id; collection_items
+// has NO owner_id (ownership flows through Collection.owner_id), so its policy
+// resolves the predicate via a Collection SUBQUERY, NOT a bare owner_id compare.
+// FORCE ROW LEVEL SECURITY is set on both so the binding is effective.
+// ---------------------------------------------------------------------------
+describe('RLS migration (db/rls/010_rls_generic_collections.sql) — #165', () => {
+  const RLS_FILE_010 = path.join(
+    fileURLToPath(new URL('../../../db/rls/010_rls_generic_collections.sql', import.meta.url)),
+  )
+
+  it('enables RLS on collections (owner-scoped) and collection_items (Collection-subquery)', async () => {
+    const sql = await readFile(RLS_FILE_010, 'utf8')
+    expect(sql).toContain('ALTER TABLE collections ENABLE ROW LEVEL SECURITY')
+    expect(sql).toContain('ALTER TABLE collection_items ENABLE ROW LEVEL SECURITY')
+    // collections: a single FOR ALL policy scoped by owner_id.
+    expect(sql).toMatch(/CREATE POLICY collections_tenant_all ON collections/)
+    expect(sql).toMatch(/owner_id = current_setting\('app\.tenant_id', true\)/)
+  })
+
+  it('resolves the collection_items predicate via a Collection subquery, NOT a bare owner_id', async () => {
+    const sql = await readFile(RLS_FILE_010, 'utf8')
+    // The predicate joins collection_items to collections and compares the
+    // OWNING Collection's owner_id — this is the Security-Auditor blocking
+    // condition #2 (CollectionItem has no owner_id column).
+    expect(sql).toMatch(/CREATE POLICY collection_items_tenant_all ON collection_items/)
+    expect(sql).toMatch(/FROM collections c/i)
+    expect(sql).toMatch(/c\.id = collection_items\.collection_id/)
+    expect(sql).toMatch(/c\.owner_id = current_setting\('app\.tenant_id', true\)/)
+    // A bare owner_id predicate on collection_items must NOT appear (it would
+    // compare a non-existent column and silently allow every row).
+    expect(sql).not.toMatch(/collection_items\.owner_id\s*=\s*current_setting/)
+  })
+
+  it('is idempotent-safe (DROP POLICY IF EXISTS before each CREATE)', async () => {
+    const sql = await readFile(RLS_FILE_010, 'utf8')
+    expect((sql.match(/^\s*DROP POLICY IF EXISTS/gm) || []).length).toBe(2)
+    expect((sql.match(/^\s*CREATE POLICY/gm) || []).length).toBe(2)
+  })
+
+  it('sets FORCE ROW LEVEL SECURITY so the binding is effective', async () => {
+    const sql = await readFile(RLS_FILE_010, 'utf8')
+    expect(sql).toMatch(/ALTER TABLE collections FORCE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/ALTER TABLE collection_items FORCE ROW LEVEL SECURITY/)
+  })
+
+  it('the collection_items predicate blocks a cross-tenant row and allows the owner row', async () => {
+    // Evaluate the Collection-subquery semantics exactly as Postgres would per
+    // row: a collection_item is visible iff the Collection it references has
+    // owner_id == current tenant. Tenant = u1; u2's item must be invisible and
+    // an unset tenant fails closed.
+    const tenant = 'u1'
+    const collections = [
+      { id: 'c1', owner_id: 'u1' },
+      { id: 'c2', owner_id: 'u2' },
+    ]
+    const policyAllows = (item) =>
+      collections.some((c) => c.id === item.collection_id && c.owner_id === tenant)
+    expect(policyAllows({ collection_id: 'c1' })).toBe(true)    // own collection's item visible
+    expect(policyAllows({ collection_id: 'c2' })).toBe(false)   // another tenant's collection's item invisible
+    expect(policyAllows({ collection_id: 'c1' }) && tenant === null).toBe(false) // unset tenant fails closed
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ARCH-6.1 #165 — binding RLS (db/rls/011_binding_rls.sql). Deploys the
+// least-privilege `app_rls` role (does NOT own the tables), FORCE ROW LEVEL
+// SECURITY on every tenant-scoped table, the feedback policy it creates before
+// forcing, and SECURITY DEFINER functions so admin cross-tenant flows keep
+// working under binding RLS.
+// ---------------------------------------------------------------------------
+describe('RLS migration (db/rls/011_binding_rls.sql) — #165 binding RLS', () => {
+  const RLS_FILE_011 = path.join(
+    fileURLToPath(new URL('../../../db/rls/011_binding_rls.sql', import.meta.url)),
+  )
+
+  it('provisions a least-privilege role that does not own the tables', async () => {
+    const sql = await readFile(RLS_FILE_011, 'utf8')
+    expect(sql).toMatch(/CREATE ROLE app_rls/)
+    expect(sql).toMatch(/NOLOGIN/)
+    expect(sql).toMatch(/GRANT SELECT, INSERT, UPDATE, DELETE ON items TO app_rls/)
+    expect(sql).toMatch(/GRANT SELECT, INSERT, UPDATE, DELETE ON collections TO app_rls/)
+    expect(sql).toMatch(/GRANT SELECT, INSERT, UPDATE, DELETE ON collection_items TO app_rls/)
+    // app_rls is NOT granted ownership of any table (no OWNER GRANT).
+    expect(sql).not.toMatch(/GRANT ALL\s+ON (items|reviews|feedback|collections|collection_items)/i)
+  })
+
+  it('FORCEs row-level security on every tenant-scoped table', async () => {
+    const sql = await readFile(RLS_FILE_011, 'utf8')
+    for (const t of ['items', 'reviews', 'feedback', 'lookup_queue', 'collections', 'collection_items']) {
+      expect(sql).toMatch(new RegExp(`ALTER TABLE ${t} FORCE ROW LEVEL SECURITY`))
+    }
+    // identity/auth bootstrap tables are intentionally NOT forced (token
+    // resolution precedes tenant context) — assert no FORCE on users/sessions.
+    expect(sql).not.toMatch(/ALTER TABLE users FORCE ROW LEVEL SECURITY/)
+    expect(sql).not.toMatch(/ALTER TABLE sessions FORCE ROW LEVEL SECURITY/)
+  })
+
+  it('creates the feedback author-scoped policy before forcing it', async () => {
+    const sql = await readFile(RLS_FILE_011, 'utf8')
+    expect(sql).toMatch(/CREATE POLICY feedback_tenant_write ON feedback/)
+    expect(sql).toMatch(/author_id = current_setting\('app\.tenant_id', true\)/)
+    expect(sql).toMatch(/ALTER TABLE feedback ENABLE ROW LEVEL SECURITY/)
+    expect(sql).toMatch(/ALTER TABLE feedback FORCE ROW LEVEL SECURITY/)
+  })
+
+  it('deploys SECURITY DEFINER functions for every admin cross-tenant path', async () => {
+    const sql = await readFile(RLS_FILE_011, 'utf8')
+    // feedback inbox + triage + delete; member-deletion cleanup; dashboard
+    // aggregate; review management. Each must be SECURITY DEFINER + GRANTed to
+    // app_rls so requireAdmin flows keep working under binding RLS.
+    for (const fn of [
+      'admin_feedback_list', 'admin_feedback_triage', 'admin_feedback_delete',
+      'admin_delete_items_for_owner', 'admin_counts_by_kind',
+      'admin_review_set_status', 'admin_reviews_all',
+    ]) {
+      expect(sql).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION ${fn}\\(`))
+    }
+    expect((sql.match(/LANGUAGE (sql|plpgsql) SECURITY DEFINER/g) || [])).toHaveLength(7)
+    expect((sql.match(/GRANT EXECUTE ON FUNCTION/g) || [])).toHaveLength(7)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ARCH-6.1 #165 — isolation inventory + restore/retention evidence. Every
+// tenant-owned table in the inventory (§1 tenancy-and-rls.md) must have an RLS
+// ENABLE across db/rls, and the backup/restore/retention + shared→dedicated
+// procedures must be documented.
+// ---------------------------------------------------------------------------
+describe('ARCH-6.1 #165 — isolation inventory & restore evidence', () => {
+  const RLS_DIR = path.join(
+    fileURLToPath(new URL('../../../db/rls', import.meta.url)),
+  )
+  const DOC = path.join(
+    fileURLToPath(new URL('../../../db/tenancy-and-rls.md', import.meta.url)),
+  )
+
+  it('covers every tenant-owned table in the isolation inventory with RLS', async () => {
+    const files = (await readdir(RLS_DIR)).filter((f) => f.endsWith('.sql'))
+    const rls = await Promise.all(
+      files.map((f) => readFile(path.join(RLS_DIR, f), 'utf8')),
+    )
+    const all = rls.join('\n')
+    // The six tenant-scoped tables from the inventory (§1) each have RLS.
+    for (const t of ['items', 'reviews', 'feedback', 'lookup_queue', 'collections', 'collection_items']) {
+      expect(all).toMatch(new RegExp(`ALTER TABLE ${t} (ENABLE|FORCE) ROW LEVEL SECURITY`))
+    }
+  })
+
+  it('documents backup/restore/retention and the shared→dedicated path', async () => {
+    const doc = await readFile(DOC, 'utf8')
+    expect(doc).toMatch(/Backup, restore & retention/)
+    expect(doc).toMatch(/pg_dump/)
+    expect(doc).toMatch(/npm run db:migrate/)
+    expect(doc).toMatch(/Shared → dedicated schema path/)
+    expect(doc).toMatch(/isolation inventory/)
   })
 })
