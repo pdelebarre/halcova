@@ -3,10 +3,15 @@ import 'fake-indexeddb/auto'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { LocaleProvider, setLocale } from '../i18n'
 import SettingsModal from '../components/SettingsModal'
+import { clearAllOutbox, stageAdd, listPendingOps } from '../utils/outbox'
+import { clearAllMirror, saveMirror, readMirror } from '../utils/offlineMirror'
+import { establishOfflineTrust, sessionFingerprint } from '../utils/offlineTrust'
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear()
   setLocale('en')
+  await clearAllOutbox()
+  await clearAllMirror()
 })
 
 /**
@@ -180,6 +185,70 @@ describe('SettingsModal — offline-data management (#159)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByText('Offline data cleared')).toBeNull()
+  })
+
+  it('returns focus to the clear trigger when cancelling the confirmation (#159)', () => {
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId="u1" />
+      </LocaleProvider>
+    )
+
+    const trigger = screen.getByRole('button', { name: /Clear offline data/i })
+    fireEvent.click(trigger)
+    // Focus moved onto the destructive confirm button (existing behavior).
+    expect(document.activeElement).not.toBe(trigger)
+    // Cancelling restores focus to the (re-mounted) trigger — not <body>.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('button', { name: /Clear offline data/i })).toBe(document.activeElement)
+  })
+
+  // SECURITY (ADR-0019 Dec 5/12): "Clear offline data" must empty BOTH the
+  // offline mirror AND the durable #292 outbox for the signed-in user only —
+  // never another user's mirror/outbox, and never the server copy. Leaving raw
+  // queued mutations (pendingItem/barcode/ocrText) on-device would let them
+  // auto-flush to the server on reconnect after the user thought they were
+  // cleared.
+  it('clears the user outbox AND mirror, leaving another user untouched (#159)', async () => {
+    const U1 = { id: 'u1', name: 'One', role: 'member' }
+    const U2 = { id: 'u2', name: 'Two', role: 'member' }
+    const T1 = 'tok-1'
+    const T2 = 'tok-2'
+
+    // Stage + mirror data for user 1 (the one being cleared).
+    localStorage.setItem('runout.session', JSON.stringify({ user: U1, session: T1 }))
+    establishOfflineTrust(U1, { sessionFp: sessionFingerprint(T1) })
+    await stageAdd(U1.id, { item: { title: 'u1 queued', metadataPending: true }, token: T1 })
+    await saveMirror(U1.id, [{ id: 'm1', title: 'u1 mirror' }])
+
+    // Stage + mirror data for user 2 (must be untouched).
+    localStorage.setItem('runout.session', JSON.stringify({ user: U2, session: T2 }))
+    establishOfflineTrust(U2, { sessionFp: sessionFingerprint(T2) })
+    await stageAdd(U2.id, { item: { title: 'u2 queued', metadataPending: true }, token: T2 })
+    await saveMirror(U2.id, [{ id: 'm2', title: 'u2 mirror' }])
+
+    // Render the modal for user 1 and clear.
+    localStorage.setItem('runout.session', JSON.stringify({ user: U1, session: T1 }))
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId={U1.id} />
+      </LocaleProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
+    const confirm = screen.getAllByRole('button', { name: /Clear offline data/i }).at(-1)
+    fireEvent.click(confirm)
+    expect(await screen.findByText('Offline data cleared')).toBeInTheDocument()
+
+    // User 1's outbox is empty (no queued raw mutation remains to auto-flush).
+    expect(await listPendingOps(U1.id, { token: T1 })).toHaveLength(0)
+    // User 1's mirror is cleared.
+    expect(await readMirror(U1.id, { token: T1 })).toBeNull()
+
+    // User 2's outbox + mirror are untouched.
+    expect(await listPendingOps(U2.id, { token: T2 })).toHaveLength(1)
+    const m2 = await readMirror(U2.id, { token: T2 })
+    expect(m2.items.map((i) => i.id)).toEqual(['m2'])
   })
 
   it('moves focus to the destructive confirm button when confirming clear', () => {

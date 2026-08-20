@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { t, LOCALES, SUPPORTED_LOCALES, useLocale } from '../i18n'
 import { clearMirrorForUser } from '../utils/offlineMirror'
+import { clearOutboxForUser } from '../utils/outbox'
 import './SettingsModal.css'
 
 export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
@@ -11,6 +12,19 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
   // where the destructive-clear flow moved.
   const confirmButtonRef = useRef(null)
   const doneLineRef = useRef(null)
+  // Ergonomics (#159): the trigger that opened the clear-confirmation, so a
+  // Cancel restores focus to it rather than dropping to <body>.
+  const clearTriggerRef = useRef(null)
+  // Track the confirming transition so we can restore focus to the trigger on
+  // CANCEL (true→false with no clear done) — the ref is only populated after
+  // the trigger re-renders, so a synchronous focus in the onClick is too early.
+  const wasConfirming = useRef(false)
+  useEffect(() => {
+    if (wasConfirming.current && !confirmingClear && !clearDone) {
+      clearTriggerRef.current?.focus()
+    }
+    wasConfirming.current = confirmingClear
+  }, [confirmingClear, clearDone])
 
   // On showing the confirmation, move focus to the confirm (destructive) button.
   useEffect(() => {
@@ -26,9 +40,14 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
     if (!userId) return
     // Per ADR-0019 Dec 5 / security policy: clearing local data removes only the
     // signed-in user's offline records (never another user's, never the server
-    // copy). The offline trust record is left intact by design here — clearing
-    // the offline copy is a privacy management action, not a sign-out.
-    await clearMirrorForUser(userId)
+    // copy). This clears BOTH the offline mirror AND the durable #292 outbox so
+    // no queued raw offline mutation (pendingItem/barcode/ocrText) auto-flushes
+    // to the server on reconnect — a complete privacy reset (ADR-0019 Dec 12).
+    // Each clear is user-scoped (mirrorScope(userId)), so another account's
+    // mirror/outbox is never touched. The offline trust record is left intact
+    // by design here — clearing the offline copy is a privacy management action,
+    // not a sign-out.
+    await Promise.all([clearMirrorForUser(userId), clearOutboxForUser(userId)])
     setConfirmingClear(false)
     setClearDone(true)
   }
@@ -103,7 +122,7 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
                     </div>
                   </div>
                 ) : (
-                  <button type="button" className="btn btn-ghost" onClick={() => setConfirmingClear(true)}>
+                  <button type="button" className="btn btn-ghost" ref={clearTriggerRef} onClick={() => setConfirmingClear(true)}>
                     {t('offline.clearOfflineData')}
                   </button>
                 )}

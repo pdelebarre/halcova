@@ -202,6 +202,11 @@ export function useCollection(collection = 'records') {
       // Reconcile the in-memory list with the freshly-synced mirror (the pending
       // local: records are now re-keyed to server ids server-side).
       await refresh()
+      // Bump the flush seq so useOfflineSyncStatus (deps [online, syncId])
+      // re-reads the durable outbox after the push — otherwise the SyncStatus
+      // strip keeps showing the stale "N waiting to sync" and the "All changes
+      // synced" state is unreachable after a successful Sync-now drain (#159).
+      setMutationSeq((s) => s + 1)
       return result
     } catch (err) {
       setSyncState('error')

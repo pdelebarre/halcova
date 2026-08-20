@@ -271,6 +271,11 @@ describe('useCollection offline add + reconnect flush (#292)', () => {
     await waitFor(() => expect(result.current.pendingCount).toBe(0))
     // The item is now server-backed in the refreshed list.
     await waitFor(() => expect(result.current.items[0].id).toBe('srv-1'))
+    // A successful Sync-now bumps the flush seq so the SyncStatus strip
+    // (useOfflineSyncStatus, deps [online, syncId]) re-reads the now-empty
+    // outbox and reaches the "All changes synced" state instead of showing a
+    // stale "waiting to sync" (#159). The add already bumped it to 1.
+    await waitFor(() => expect(result.current.mutationSeq).toBe(2))
   })
 
   it('falls back to the outbox on a safe network failure while online', async () => {

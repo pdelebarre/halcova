@@ -13,6 +13,7 @@ import PlayPanel from './components/PlayPanel'
 import SyncStatus from './components/SyncStatus'
 import { useCollection } from './hooks/useCollection'
 import { useLookup } from './hooks/useLookup'
+import { useOutboxSync } from './hooks/useOutboxSync'
 import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { itemInBin } from './utils/browse'
@@ -71,6 +72,13 @@ const NEW_ARRIVALS_COUNT = 5
  */
 export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
   const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem, flushOutbox, mutationSeq } = useCollection(catalog.storage)
+
+  // M2 #159/#292: mount the foreground reconnect-flush trigger so queued offline
+  // mutations auto-flush when the device comes back online / the tab is
+  // foregrounded (iOS-safe; no Background Sync assumption). onSynced refreshes
+  // the reconciled list. Manual "Sync now" still goes through useCollection's
+  // flushOutbox (push + reconcile + mutationSeq bump for the status strip).
+  useOutboxSync({ collection: catalog.storage, onSynced: () => refresh() })
 
   // T2 (issue #110): the active room's theme, provided by App.jsx. `useTheme()`
   // degrades to {} outside a provider, so a missing theme can never throw
