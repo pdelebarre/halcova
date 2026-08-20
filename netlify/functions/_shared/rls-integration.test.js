@@ -294,10 +294,19 @@ describe.skipIf(!ready())('Binding RLS enforcement (real Postgres, ARCH-6.1 #165
   it('a tenant session cannot UPDATE/DELETE canonical_items (write-restriction fails closed)', async () => {
     // app_rls has no UPDATE/DELETE grant and canonical_items has no write policy —
     // a tenant session can never rewrite/remove a shared canonical row (ADR-0020 §7).
+    //
+    // Each rejected statement runs in its OWN transaction: a rejected UPDATE/DELETE
+    // aborts its explicit transaction, and any later statement in that same
+    // transaction would fail with "current transaction is aborted, commands ignored
+    // until end of transaction block" rather than the privilege error we assert on.
+    // Isolating each write gives a fresh, unambiguous rejection (same pattern as the
+    // admin-function negative cases above).
     await withTenantClient('u1', async (client) => {
       await expect(
         client.query(`UPDATE canonical_items SET source = 'pwned' WHERE id = $1`, [CID.caU1]),
       ).rejects.toThrow(/permission denied|row-level security|insufficient_privilege/i)
+    })
+    await withTenantClient('u1', async (client) => {
       await expect(
         client.query(`DELETE FROM canonical_items WHERE id = $1`, [CID.caU1]),
       ).rejects.toThrow(/permission denied|row-level security|insufficient_privilege/i)

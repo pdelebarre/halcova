@@ -44,6 +44,15 @@ END;
 $$;
 GRANT USAGE ON SCHEMA public TO canonical_service;
 
+-- canonical_service needs SELECT on the shared catalogue so its session can read
+-- back / verify canonical rows (e.g. the rls-integration positive-path check and
+-- any read of the public allowlist). It is granted SELECT-ONLY — never INSERT/
+-- UPDATE/DELETE — so the ONLY write surface remains the SECURITY DEFINER
+-- canonical_upsert_service (which runs as its owner and performs the sanitizer
+-- gate). Granting direct DML here would let the service role bypass the
+-- sanitizer, so it is deliberately withheld (least privilege, ADR-0020 §10).
+GRANT SELECT ON canonical_items TO canonical_service;
+
 -- --- canonical_items: read-open, write-restricted --------------------------
 ALTER TABLE canonical_items ENABLE ROW LEVEL SECURITY;
 
