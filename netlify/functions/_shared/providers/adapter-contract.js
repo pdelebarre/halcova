@@ -26,6 +26,8 @@
 //     contract normalizes the envelope they already emit, so lookup
 //     resilience is not regressed.
 //
+import { guardProviderRows } from './payload-guard'
+
 // Provider id keys per catalog (ADR-0020 §4 provider_ids). Keys are ADDITIVE:
 // a provider may set some subset; the map is preserved exactly as produced.
 export const PROVIDER_ID_KEYS = Object.freeze({
@@ -127,21 +129,26 @@ export function createProviderAdapter({
     throw new ProviderAdapterError('INVALID_ADAPTER', `unknown catalog: ${catalog}`)
   }
 
-  // Guard+normalize a single method result. `rows` is the raw hit array (or a
-  // single raw object for detail). Returns { outcome, hits }. Pure (sync) — the
-  // normalizer is pure, so this never needs to await.
+  // MANDATORY guard: every raw hit that reaches a normalizer is schema-checked,
+  // size-limited and host-allowlisted FIRST (guardProviderRows). This runs on
+  // the actual shipped path — normalizeMany / search / detail / lookup and the
+  // registered adapters all flow through here — so a hostile or degenerate
+  // payload fails closed to FAILED and never reaches normalization (ADR-0017
+  // §Security / ADR-0020 #317 control). The size cap is on the serialized rows
+  // BEFORE the normalizer truncates a canonical string.
   const handle = (rows) => {
     if (rows == null) return toOutcome(OUTCOME.NO_MATCH, [])
-    const list = Array.isArray(rows) ? rows : [rows]
+    const guarded = guardProviderRows(rows, { allowedHosts })
+    if (guarded.error) return toOutcome(OUTCOME.FAILED, [])
+    const list = guarded.value
     if (list.length === 0) return toOutcome(OUTCOME.NO_MATCH, [])
-    const hits = list.map(normalizer).filter(Boolean)
+    const hits = list.map((h) => normalizer(h, allowedHosts)).filter(Boolean)
     return toOutcome(hits.length ? OUTCOME.OK : OUTCOME.NO_MATCH, hits)
   }
 
   // Optional: when a fetchEnvelope + envelopeKeys are provided, run the
-  // payload-guard (schema-validated + size-limited) BEFORE normalization.
-  // Requires the payload-guard module; imported lazily to keep this module
-  // pure when a provider only offers direct rows.
+  // envelope-level payload-guard (schema-validated + size-limited) BEFORE the
+  // per-row guard in handle() (defense-in-depth).
   const guardedFetch = async (method, envelopeKey) => {
     const raw = await fetchEnvelope(method)
     const { guardProviderPayload } = await import('./payload-guard')
@@ -157,11 +164,16 @@ export function createProviderAdapter({
     catalog,
     allowedHosts: Object.freeze([...allowedHosts]),
     outcomeFor: (rows) => (rows && rows.length ? OUTCOME.OK : OUTCOME.NO_MATCH),
-    // Normalize ONE raw hit (pure). Returns a NormalizedHit or null. Exposed so
-    // a consumer can normalize a raw envelope hit it already holds (e.g. from
-    // the #281 proxy/fallback envelope) through the same contract.
-    normalize: (hit) => normalizer(hit) || null,
-    // Normalize MANY raw hits into { outcome, hits }.
+    // Normalize ONE raw hit (guarded, fail-closed to null). Returns a
+    // NormalizedHit or null. Exposed so a consumer can normalize a raw envelope
+    // hit it already holds (e.g. from the #281 proxy/fallback envelope) through
+    // the same guarded contract.
+    normalize: (hit) => {
+      const guarded = guardProviderRows(hit, { allowedHosts })
+      if (guarded.error) return null
+      return normalizer(guarded.value[0], allowedHosts) || null
+    },
+    // Normalize MANY raw hits into { outcome, hits } (guarded, fail-closed).
     normalizeMany: (rows) => handle(rows),
   }
 

@@ -115,6 +115,42 @@ export function guardProviderPayload(raw, {
   return { value: rows }
 }
 
+// Validate an already-parsed HIT ARRAY (or a single raw hit object) at the
+// normalization boundary — the path the registered adapters actually run
+// (normalizeMany / search / detail / lookup, ADR-0017 lookup boundary). This is
+// the mandatory per-row enforcement that runs BEFORE a normalizer sees the hit:
+//   * SIZE cap on the serialized rows (fail-closed, deterministic FAILED).
+//   * SCHEMA: every row must be a non-array object (a malformed row -> FAILED,
+//     never dropped-and-normalized).
+//   * HOST: any URL-bearing string in a row must reference an allowlisted host
+//     (SSRF posture, ADR-0017 §Security).
+// Returns { value: [rows] } or { error: { code, message } }.
+export function guardProviderRows(rows, {
+  allowedHosts = [],
+  maxBytes = DEFAULT_PROVIDER_BYTES,
+} = {}) {
+  if (rows == null) return { error: { code: PAYLOAD_ERROR.INVALID_JSON, message: 'Empty provider response.' } }
+
+  const list = Array.isArray(rows) ? rows : [rows]
+
+  // SIZE cap: bound the serialized rows before any normalization.
+  if (Buffer.byteLength(JSON.stringify(list), 'utf8') > maxBytes) {
+    return { error: { code: PAYLOAD_ERROR.TOO_LARGE, message: 'Provider response too large.' } }
+  }
+
+  // SCHEMA + HOST per row (fail-closed on the first violation).
+  for (const row of list) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      return { error: { code: PAYLOAD_ERROR.BAD_ENVELOPE, message: 'Provider hit is not an object.' } }
+    }
+    if (!hostCheck(row, allowedHosts)) {
+      return { error: { code: PAYLOAD_ERROR.BAD_HOST, message: 'Provider returned an off-allowlist URL.' } }
+    }
+  }
+
+  return { value: list }
+}
+
 // Reject a provider row/object that references a non-allowlisted URL anywhere
 // in its string leaf values (recursive, bounded by depth). Defense-in-depth for
 // the SSRF posture: a provider returning a cover/resource URL for a host that

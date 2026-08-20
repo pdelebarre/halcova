@@ -244,18 +244,23 @@ describe('deterministic outcome behaviour', () => {
     expect(r.hits[0].source).toBe('googleBooks')
   })
 
-  it('drops unnormalizable/pathological rows instead of leaking them', () => {
+  it('drops object rows with nothing usable instead of leaking them', () => {
     const r = discogsAdapter.normalizeMany([
       { id: 1, title: 'Good', source: 'discogs' },
       { title: '', source: 'discogs' }, // empty canonical, no id -> dropped
       { source: 'discogs' }, // no id, no canonical content -> dropped
-      'not-an-object',
-      null,
-      42,
     ])
     expect(r.outcome).toBe(OUTCOME.OK)
     expect(r.hits).toHaveLength(1)
     expect(r.hits[0].provider_ids.discogsId).toBe(1)
+  })
+
+  it('fails closed on a malformed (non-object) row instead of dropping it', () => {
+    for (const bad of ['not-an-object', null, 42]) {
+      const r = discogsAdapter.normalizeMany([{ id: 1, title: 'Good', source: 'discogs' }, bad])
+      expect(r.outcome).toBe(OUTCOME.FAILED)
+      expect(r.hits).toEqual([])
+    }
   })
 
   it('a failing async method resolves to FAILED (never throws to the caller)', async () => {
@@ -314,9 +319,108 @@ describe('provider DTOs never leak into domain entities', () => {
   })
 
   it('registered adapters all conform to the allowed-host SSRF posture', () => {
-    expect(PROVIDER_ALLOWED_HOSTS.discogs).toEqual(['api.discogs.com'])
+    // API hosts + real image/cover hosts so the guard does not false-FAIL on
+    // legitimate cover URLs (SEC HOLD #317).
+    expect(PROVIDER_ALLOWED_HOSTS.discogs).toEqual(['api.discogs.com', 'i.discogs.com'])
     expect(PROVIDER_ALLOWED_HOSTS.musicbrainz).toEqual(['musicbrainz.org', 'coverartarchive.org'])
-    expect(PROVIDER_ALLOWED_HOSTS.googleBooks).toEqual(['www.googleapis.com'])
+    expect(PROVIDER_ALLOWED_HOSTS.googleBooks).toEqual(['www.googleapis.com', 'books.google.com'])
     expect(PROVIDER_ALLOWED_HOSTS.openlibrary).toEqual(['openlibrary.org', 'covers.openlibrary.org'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 7. Mandatory guard on the SHIPPED adapter path (SEC HOLD #317)
+// ---------------------------------------------------------------------------
+// The registered adapters register a normalizer only (no fetchEnvelope). The
+// guard must therefore run inside the adapter boundary — normalizeMany /
+// normalize / search / detail — so schema+size+host enforcement happens on the
+// path #316 actually invokes, not on an unused fetchEnvelope.
+describe('mandatory guard on the registered-adapter path (SEC HOLD #317)', () => {
+  it('oversized payload FAILS closed on normalizeMany (2MiB cap, not ok)', () => {
+    const r = discogsAdapter.normalizeMany([
+      { id: 1, title: 'x'.repeat(3 * 1024 * 1024), source: 'discogs' },
+    ])
+    expect(r.outcome).toBe(OUTCOME.FAILED)
+    expect(r.hits).toEqual([])
+  })
+
+  it('off-allowlist cover host FAILS closed on normalizeMany (not ok)', () => {
+    const r = discogsAdapter.normalizeMany([
+      { id: 1, title: 'T', cover_image: 'https://evil.example.com/x.jpg', source: 'discogs' },
+    ])
+    expect(r.outcome).toBe(OUTCOME.FAILED)
+    expect(r.hits).toEqual([])
+  })
+
+  it('host allowlist is enforced in normalize media handling (not just https)', () => {
+    // Allowlisted image host passes the row guard and is emitted.
+    const ok = discogsAdapter.normalize({ id: 1, title: 'T', cover_image: 'https://i.discogs.com/cover.jpg', source: 'discogs' })
+    expect(ok.media.coverImage).toBe('https://i.discogs.com/cover.jpg')
+    // Off-allowlist host fails closed at the row guard -> whole hit is null.
+    const evil = discogsAdapter.normalize({ id: 1, title: 'T', cover_image: 'https://evil.example.com/x.jpg', source: 'discogs' })
+    expect(evil).toBeNull()
+    // Defense-in-depth: safeUrl also drops an off-allowlist cover even when a
+    // normalizer is called directly with an allowlist (hit kept, cover dropped).
+    const direct = normalizeRecordsHit(
+      { id: 1, title: 'T', cover_image: 'https://evil.example.com/x.jpg', source: 'discogs' },
+      ['api.discogs.com', 'i.discogs.com'],
+    )
+    expect(direct.media.coverImage).toBeUndefined()
+  })
+
+  it('rejects an object-valued provider id (scalar guard); keeps scalar ids', () => {
+    const hit = discogsAdapter.normalize({ id: { deep: 1 }, title: 'T', source: 'discogs' })
+    expect(hit.provider_ids.discogsId).toBeUndefined()
+    expect(hit.provider_ids).toEqual({})
+    const ok = discogsAdapter.normalize({ id: 123, title: 'T', source: 'discogs' })
+    expect(ok.provider_ids.discogsId).toBe(123)
+  })
+
+  it('malformed single-hit normalize fails closed to null', () => {
+    expect(discogsAdapter.normalize('not-an-object')).toBeNull()
+    expect(discogsAdapter.normalize(null)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 8. fetchEnvelope / guardedFetch path runs payload-guard (SEC HOLD #317)
+// ---------------------------------------------------------------------------
+describe('guardedFetch envelope path runs payload-guard (SEC HOLD #317)', () => {
+  // envelopeKeys index maps to searchBarcode(0)/searchText(1)/detail(2); this
+  // adapter only exercises searchText, so the envelope key sits at index 1.
+  const mk = (envelope) => createProviderAdapter({
+    name: 'testEnv',
+    catalog: 'books',
+    allowedHosts: ['www.googleapis.com', 'books.google.com'],
+    normalizer: normalizeBooksHit,
+    fetchEnvelope: async () => envelope,
+    envelopeKeys: [undefined, 'items'],
+    searchText: () => Promise.resolve(null),
+  })
+
+  it('a healthy envelope normalizes to OK', async () => {
+    const a = mk({ items: [{ id: 'v1', source: 'googleBooks', volumeInfo: { title: 'T' } }] })
+    const r = await a.searchText('q')
+    expect(r.outcome).toBe(OUTCOME.OK)
+    expect(r.hits[0].provider_ids.googleBooksId).toBe('v1')
+  })
+
+  it('an off-allowlist host in the envelope FAILS closed', async () => {
+    const a = mk({ items: [{ id: 'v1', source: 'googleBooks', volumeInfo: { imageLinks: { thumbnail: 'https://evil.example.com/x.jpg' } } }] })
+    const r = await a.searchText('q')
+    expect(r.outcome).toBe(OUTCOME.FAILED)
+    expect(r.hits).toEqual([])
+  })
+
+  it('an oversized envelope FAILS closed (size cap applied)', async () => {
+    const a = mk({ items: [{ id: 'v1', source: 'googleBooks', volumeInfo: { title: 'x'.repeat(3 * 1024 * 1024) } }] })
+    const r = await a.searchText('q')
+    expect(r.outcome).toBe(OUTCOME.FAILED)
+  })
+
+  it('a malformed envelope FAILS closed (missing key)', async () => {
+    const a = mk({ nope: [] })
+    const r = await a.searchText('q')
+    expect(r.outcome).toBe(OUTCOME.FAILED)
   })
 })

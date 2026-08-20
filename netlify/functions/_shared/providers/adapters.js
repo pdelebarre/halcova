@@ -16,6 +16,16 @@
 //
 // The allowed-host sets mirror each provider's SSRF posture so a normalized hit
 // can be checked against them (payload-guard).
+//
+// GUARD INVOCATION (SEC HOLD #317): the registered adapters register a
+// normalizer only (no fetchEnvelope). The schema+size+host guard is therefore
+// enforced MANDATORILY inside the adapter contract boundary (adapter-contract.js
+// handle()), so EVERY normalization entry — normalizeMany / normalize / the
+// async search*/detail/lookup methods — runs guardProviderRows BEFORE a raw hit
+// reaches a normalizer. When #316 wires these adapters into the collection
+// migration, it will resolve an adapter via getProviderAdapter(name) /
+// adaptersForCatalog(catalog) and call normalizeMany(rows) (or the async
+// methods); that call is the integration point at which the guard runs.
 
 import { createProviderAdapter } from './adapter-contract'
 import { normalizeRecordsHit, normalizeBooksHit } from './normalize'
@@ -23,10 +33,15 @@ import { normalizeRecordsHit, normalizeBooksHit } from './normalize'
 // Fixed, allowlisted host sets (asserted by each provider's contract test).
 // Cover hosts are URL-emitted by the proxy re-fetch; the connect hosts are the
 // API hosts only.
+// Allowlists include the API host AND the real provider image/cover hosts so the
+// host-allowlist guard does NOT false-FAIL on legitimate cover URLs the proxies
+// emit (e.g. i.discogs.com images, books.google.com thumbnails, coverartarchive
+// / covers.openlibrary.org artwork). SSRF posture: only these fixed hosts may
+// appear as resource/cover URLs in a normalized hit (ADR-0017 §Security).
 export const PROVIDER_ALLOWED_HOSTS = Object.freeze({
-  discogs: Object.freeze(['api.discogs.com']),
+  discogs: Object.freeze(['api.discogs.com', 'i.discogs.com']),
   musicbrainz: Object.freeze(['musicbrainz.org', 'coverartarchive.org']),
-  googleBooks: Object.freeze(['www.googleapis.com']),
+  googleBooks: Object.freeze(['www.googleapis.com', 'books.google.com']),
   openlibrary: Object.freeze(['openlibrary.org', 'covers.openlibrary.org']),
 })
 

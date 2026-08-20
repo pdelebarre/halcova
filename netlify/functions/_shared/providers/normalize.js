@@ -17,7 +17,7 @@
 // guarded with the dangerous-content check (XSS-safe rendering, SEC-7.5 #409 /
 // ADR-0020 #317 control) and length-capped, mirroring item-fields.js caps.
 
-import { isSafeCanonicalString } from './payload-guard'
+import { isSafeCanonicalString, isAllowedProviderUrl } from './payload-guard'
 
 // Cap constants aligned with the server item allowlist (item-fields.js) so a
 // normalized hit never exceeds what the domain can store.
@@ -62,11 +62,24 @@ function safeCanonicalArray(value, { max = NORMALIZE_CAPS.genreMax, itemMax = NO
 }
 
 // A safe https URL (cover/resource). Only https is emitted; any http/off-shape
-// value is dropped (the client proxies https covers only). The host allowlist
-// check already ran in payload-guard.
-function safeUrl(value, { max = NORMALIZE_CAPS.url } = {}) {
-  const s = safeCanonical(value, { max })
-  return /^https:\/\//.test(s) ? s : ''
+// value is dropped (the client proxies https covers only). The HOST ALLOWLIST
+// is enforced here as defense-in-depth (payload-guard also runs the allowlist
+// at the row boundary): a URL for an off-allowlist host is dropped so no
+// off-allowlist host can ever surface as media/resource. An empty allowlist
+// drops every URL (fail-closed); the registered adapters always pass their
+// fixed allowlist.
+function safeUrl(value, allowedHosts = []) {
+  const s = safeCanonical(value, { max: NORMALIZE_CAPS.url })
+  if (!/^https:\/\//.test(s)) return ''
+  if (!isAllowedProviderUrl(s, allowedHosts)) return ''
+  return s
+}
+
+// A provider id value must be a scalar (string | number). Reject object/array/
+// boolean id values so an object-shaped `id: { deep: 1 }` can never leak into
+// provider_ids (additive, preserved, but always scalar — ADR-0020 §4).
+function isScalarId(v) {
+  return (typeof v === 'string' || typeof v === 'number') && v !== ''
 }
 
 // Additive provider-id keys per catalog and the RAW field each maps from.
@@ -92,13 +105,13 @@ function pickProviderIds(hit, fields, extra = {}) {
   for (const [key, raw] of fields) {
     if (Object.hasOwn(ids, key)) continue // first raw source wins (primary id)
     const v = hit && Object.hasOwn(hit, raw) ? hit[raw] : null
-    // Preserve the id additively when present and scalar-ish; never invent one.
-    if (v !== undefined && v !== null && v !== '') ids[key] = v
+    // Preserve the id additively when present and scalar; never invent one.
+    if (v !== undefined && v !== null && isScalarId(v)) ids[key] = v
   }
   // Additive extras (e.g. isbn derived from the volume) never override a
   // direct hit field already picked.
   for (const [key, value] of Object.entries(extra)) {
-    if (!Object.hasOwn(ids, key) && value !== undefined && value !== null && value !== '') ids[key] = value
+    if (!Object.hasOwn(ids, key) && value !== undefined && value !== null && isScalarId(value)) ids[key] = value
   }
   return ids
 }
@@ -117,7 +130,7 @@ function baseHit(source, provider_ids) {
 // hit, which the fallback adapter already maps into the same shape carrying
 // `mbid` + `source:'musicbrainz'`).
 // ---------------------------------------------------------------------------
-export function normalizeRecordsHit(hit) {
+export function normalizeRecordsHit(hit, allowedHosts = []) {
   if (!hit || typeof hit !== 'object' || Array.isArray(hit)) return null
 
   const source = hit.source === 'musicbrainz' ? 'musicbrainz' : 'discogs'
@@ -145,9 +158,9 @@ export function normalizeRecordsHit(hit) {
   if (style.length) canonical.style = style
 
   const media = {}
-  const cover = safeUrl(hit.cover_image || hit.thumb)
+  const cover = safeUrl(hit.cover_image || hit.thumb, allowedHosts)
   if (cover) media.coverImage = cover
-  const resource = safeUrl(hit.resource_url)
+  const resource = safeUrl(hit.resource_url, allowedHosts)
   if (resource) media.resourceUrl = resource
 
   const hitNorm = baseHit(source, provider_ids)
@@ -165,7 +178,7 @@ export function normalizeRecordsHit(hit) {
 // which the fallback adapter maps into the same volume shape carrying
 // `openLibraryId` + `source:'openlibrary'`).
 // ---------------------------------------------------------------------------
-export function normalizeBooksHit(hit) {
+export function normalizeBooksHit(hit, allowedHosts = []) {
   if (!hit || typeof hit !== 'object' || Array.isArray(hit)) return null
 
   const source = hit.source === 'openlibrary' ? 'openlibrary' : 'googleBooks'
@@ -201,9 +214,9 @@ export function normalizeBooksHit(hit) {
   if (authors.length) canonical.authors = authors
 
   const media = {}
-  const cover = safeUrl(v.imageLinks?.thumbnail)
+  const cover = safeUrl(v.imageLinks?.thumbnail, allowedHosts)
   if (cover) media.coverImage = cover
-  const infoLink = safeUrl(hit.selfLink)
+  const infoLink = safeUrl(hit.selfLink, allowedHosts)
   if (infoLink) media.infoLink = infoLink
 
   const hitNorm = baseHit(source, provider_ids)
