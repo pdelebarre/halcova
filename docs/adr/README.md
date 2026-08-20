@@ -25,6 +25,7 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
 | 0017 | Lookup resilience and provider fallbacks | Accepted |
 | 0018 | Persistent multi-team delivery model | Accepted |
 | 0019 | Platform foundation and offline-first architecture | Proposed |
+| 0020 | Generic collection domain model | Proposed |
 
 ## Important relationships
 
@@ -41,6 +42,7 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
           +-- 0006 AI
           +-- 0007 Social
           +-- 0008 Monetization
+          +-- 0020 Generic collection domain model (operationalizes 0003)
 
 0009 Authentication
   |
