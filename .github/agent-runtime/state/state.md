@@ -1,6 +1,11 @@
 # PM Milestone State
 
 > Compact runtime state. The PM updates this after every milestone decision.
+> Portfolio: `ROADMAP.md` · milestones `M1.md`…`M4.md` · teams `teams/`.
+
+## Persistent teams
+- SECURITY `teams/security.md` · OFFLINE `teams/offline.md` · COLLECTOR `teams/collector.md`
+- DATA `teams/data.md` · PROVIDERS `teams/providers.md` · AI `teams/ai.md` · GROWTH `teams/growth.md`
 
 ## Current milestone
 - Milestone: M1 — Security, Reliability & Platform Foundation

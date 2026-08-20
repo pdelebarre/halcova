@@ -163,7 +163,11 @@ Each specialist returns evidence, findings, residual risks and explicit PASS / F
 
 The PM may advance M0 → M1 → M2 → M3 → M4 → M5 → M6 only when the current milestone's #355 exit criteria and mandatory gates are satisfied.
 
-Future milestones are planning horizons, not authorization to start early. The PM re-grooms the next milestone using evidence from the completed milestone.
+Future milestones are planning horizons, not authorization to start early —
+except where ADR-0018 multi-milestone parallelism explicitly permits an
+unblocked downstream workstream (dependencies satisfied, architecture gates
+permit it, file ownership clear). The PM re-grooms the next milestone using
+evidence from the completed one.
 
 ## 9. Agent Runtime v2 — operational layer
 
@@ -193,3 +197,36 @@ Rules of the runtime layer:
 
 The runtime layer does **not** change separation of duties, blocking gates, PM
 accountability or the escalation model defined above.
+
+## 10. Persistent team layer (ADR-0018)
+
+Work is executed through **persistent teams** between the PM and individual
+specialists. This layer does not change the authority hierarchy, blocking
+gates, separation of duties, or PM accountability defined above.
+
+| Team | Scope |
+|---|---|
+| SECURITY | auth, authorization, tenant isolation, privacy, security controls/gates |
+| OFFLINE | PWA, offline shell, local-first persistence, offline auth/UX, outbox, reconnect, sync |
+| COLLECTOR | scanner, capture, identify, confirm, add, browse, search/filter, mobile collector UX |
+| DATA | generic collection model, data architecture, repositories, migrations, PostgreSQL/tenancy, provider adapters, scalability |
+| PROVIDERS | OpenLibrary, MusicBrainz, Discogs, fallback, retry, resilience, OCR fallback, external integration hardening |
+| AI | AI abstraction/runtime/tools/enrichment/duplicates/intelligence/assistant (DORMANT until READY) |
+| GROWTH | social, discovery, marketplace, expansion, feedback/product intelligence (DORMANT until READY) |
+
+Rules:
+
+- A team is persistent across issues and milestones; the PM assigns the next
+  READY issue to the existing team.
+- A team implements only in-scope issues; out-of-scope → `OUT OF SCOPE` → PM.
+- Teams do not coordinate directly; communication is via GitHub issue/PR, ADR,
+  compact state and the PM.
+- One issue = one branch = one PR (`mN/<team>/<issue>`); human merge authority.
+- Specialists inside a team remain dormant until their trigger applies.
+- Team checkpoints: `.github/agent-runtime/state/teams/<team>.md`; master
+  portfolio: `.github/agent-runtime/state/ROADMAP.md` + `M1.md`…`M4.md`.
+- Milestones may overlap when dependencies, architecture gates and file
+  ownership permit; never implement blocked downstream work merely for
+  parallelism.
+
+Canonical team model: `docs/adr/0018-persistent-multi-team-delivery.md`.

@@ -16,10 +16,17 @@ governance documents above only when compiling a DAG, advancing a milestone, or
 when the kernel is insufficient. The runtime layer:
 
 - `.github/agent-runtime/kernel.md` — authority, gates, budgets, escalation (load first).
-- `.github/agent-runtime/routing.md` — deterministic routing + dormant-agent rules.
+- `.github/agent-runtime/routing.md` — deterministic routing + dormant-agent rules + team scope.
 - `.github/agent-runtime/handoff.md` — compressed handoff + evidence-cache rules.
 - `.github/agent-runtime/validation.md` — incremental validation ladder.
 - `.github/agent-runtime/state/state.md` — PM milestone state (template in `state/template.md`).
+- `.github/agent-runtime/state/ROADMAP.md` + `state/M1.md`…`state/M4.md` — master portfolio state.
+- `.github/agent-runtime/state/teams/<team>.md` — persistent team checkpoints.
+
+Work runs through **persistent teams** (SECURITY, OFFLINE, COLLECTOR, DATA,
+PROVIDERS, AI, GROWTH) under the single PM orchestrator — see
+`docs/adr/0018-persistent-multi-team-delivery.md`. One issue = one branch = one
+PR (`mN/<team>/<issue>`); human retains merge authority.
 
 ## Authority rules
 

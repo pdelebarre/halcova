@@ -2,14 +2,18 @@
 
 > Compact runtime state. The PM updates this after every milestone decision.
 > Keep it concise — do not paste agent transcripts.
+> Portfolio: `ROADMAP.md` · teams: `teams/<team>.md`.
 
 ## Current milestone
 - Milestone:
 - Epic:
 - Roadmap gate (#355):
 
+## Teams
+- (team → checkpoint file → status) —
+
 ## Active workstreams
-- [ ] (owner, branch, PR, scope) —
+- [ ] (team, owner, branch, PR, scope) —
 
 ## Completed work
 - (ticket → PR) —
