@@ -68,6 +68,14 @@ export const POLICY = {
   'collection:item:update': { owner: 'self', deny: ['demo'] },
   'collection:item:delete': { owner: 'self', deny: ['demo'] },
 
+  // --- collection type registry (FEAT-6.2 #315) -----------------------------
+  // READ-ONLY metadata for any authenticated caller. The registry is
+  // server-authoritative (ADR-0020 §2 dec 6): the client can READ type
+  // definitions (labels/icons/capabilities) but can never supply or override
+  // one — there is no write action here and the function never accepts a type
+  // definition in the request body.
+  'collection:type:read': {},
+
   // --- lending (targeted at an item the caller must own) --------------------
   // The owner/admin CAN lend their own items (they have real collections).
   // Demo is read-only (also caught by the feature gate) — claimed here too.
