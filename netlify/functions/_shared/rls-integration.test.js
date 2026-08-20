@@ -93,58 +93,91 @@ describe.skipIf(!ready())('Binding RLS enforcement (real Postgres, ARCH-6.1 #165
     await Promise.allSettled([superPool?.end(), appRlsPool?.end()])
   })
 
+  // Real-Postgres semantics: each pooled statement is its own implicit
+  // transaction, so a bare pool.query()'d set_config is discarded immediately
+  // and the pool does not guarantee the same connection for the next statement.
+  // To keep the tenant context (current_setting('app.tenant_id', true)) alive
+  // across the assertions we must run them inside an EXPLICIT transaction on a
+  // SINGLE checked-out client: BEGIN -> set_config(..., is_local=true) ->
+  // fn() -> COMMIT (ROLLBACK on failure). This mirrors the app's real
+  // `withTenantTransaction` semantics (netlify/functions/_shared/tenant-rls.js).
+  async function withTenantClient(tenantId, fn) {
+    const client = await appRlsPool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query('SELECT set_config($1, $2, true)', ['app.tenant_id', tenantId])
+      const result = await fn(client)
+      await client.query('COMMIT')
+      return result
+    } catch (err) {
+      try { await client.query('ROLLBACK') } catch { /* connection may be dead */ }
+      throw err
+    } finally {
+      client.release()
+    }
+  }
+
   it('app_rls cross-tenant SELECT returns 0 rows and UPDATE/INSERT are rejected (fail closed)', async () => {
-    // app_rls session scoped to tenant u1.
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
+    await withTenantClient('u1', async (client) => {
+      // (1) Cross-tenant SELECT: u1's session sees only u1's rows, never u2's.
+      const { rows } = await client.query('SELECT owner_id FROM items ORDER BY owner_id')
+      expect(rows.map((r) => r.owner_id)).toEqual(['u1', 'u1'])
 
-    // (1) Cross-tenant SELECT: u1's session sees only u1's rows, never u2's.
-    const { rows } = await appRlsPool.query('SELECT owner_id FROM items ORDER BY owner_id')
-    expect(rows.map((r) => r.owner_id)).toEqual(['u1', 'u1'])
+      // (2) Cross-tenant UPDATE targets a row the tenant cannot see -> 0 rows changed.
+      const upd = await client.query(`UPDATE items SET title = 'pwned' WHERE owner_id = 'u2'`)
+      expect(upd.rowCount).toBe(0)
 
-    // (2) Cross-tenant UPDATE targets a row the tenant cannot see -> 0 rows changed.
-    const upd = await appRlsPool.query(`UPDATE items SET title = 'pwned' WHERE owner_id = 'u2'`)
-    expect(upd.rowCount).toBe(0)
-
-    // (3) Cross-tenant INSERT is rejected by the RLS WITH CHECK (owner_id != tenant).
-    await expect(
-      appRlsPool.query(
-        `INSERT INTO items (id, owner_id, kind, data)
-         VALUES ('00000000-0000-0000-0000-000000000099', 'u2', 'records', '{}'::jsonb)`,
-      ),
-    ).rejects.toThrow()
+      // (3) Cross-tenant INSERT is rejected by the RLS WITH CHECK (owner_id != tenant).
+      await expect(
+        client.query(
+          `INSERT INTO items (id, owner_id, kind, data)
+           VALUES ('00000000-0000-0000-0000-000000000099', 'u2', 'records', '{}'::jsonb)`,
+        ),
+      ).rejects.toThrow()
+    })
   })
 
   it('a NON-ADMIN app_rls session CANNOT invoke admin functions, even after forging app.admin_session (HOLD 3)', async () => {
     // app_rls scoped to u1. It forges the OLD forgeable GUC marker...
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.admin_session', '1'])
-
-    // ...but the marker is IGNORED: admin authority is DERIVED from the resolved
-    // session token, so only the caller's own MEMBER token is available, whose
-    // role resolves to non-admin -> fail closed (HOLD 3, #165).
+    //
+    // Each admin invocation runs in its OWN transaction: a rejected call aborts
+    // its transaction, and any later statement in that same transaction would
+    // fail with "current transaction is aborted" rather than the privilege
+    // error we assert on. Isolating each call gives a fresh, unambiguous
+    // `insufficient_privilege` rejection.
     const memberHash = sha256(MEMBER_TOKEN)
-    await expect(
-      appRlsPool.query('SELECT admin_counts_by_kind($1)', [memberHash]),
-    ).rejects.toThrow(/insufficient_privilege/i)
-    await expect(
-      appRlsPool.query(`SELECT admin_delete_items_for_owner($1, 'u1')`, [memberHash]),
-    ).rejects.toThrow(/insufficient_privilege/i)
+    await withTenantClient('u1', async (client) => {
+      await client.query('SELECT set_config($1, $2, true)', ['app.admin_session', '1'])
+      // ...but the marker is IGNORED: admin authority is DERIVED from the
+      // resolved session token, so only the caller's own MEMBER token is
+      // available, whose role resolves to non-admin -> fail closed (HOLD 3).
+      await expect(
+        client.query('SELECT admin_counts_by_kind($1)', [memberHash]),
+      ).rejects.toThrow(/insufficient_privilege/i)
+    })
+    await withTenantClient('u1', async (client) => {
+      await client.query('SELECT set_config($1, $2, true)', ['app.admin_session', '1'])
+      await expect(
+        client.query(`SELECT admin_delete_items_for_owner($1, 'u1')`, [memberHash]),
+      ).rejects.toThrow(/insufficient_privilege/i)
+    })
   })
 
   it('the same admin functions DO work once a real ADMIN session token is presented', async () => {
     // requireAdmin resolved a REAL admin session (role='admin', user_id='owner'),
     // so the app passes that session token's sha256 hash.
-    await appRlsPool.query('SELECT set_config($1, $2, true)', ['app.tenant_id', 'u1'])
-    const adminHash = sha256(ADMIN_TOKEN)
+    await withTenantClient('u1', async (client) => {
+      const adminHash = sha256(ADMIN_TOKEN)
 
-    // admin_counts_by_kind is cross-tenant: it sees BOTH u1's and u2's items.
-    const { rows } = await appRlsPool.query('SELECT kind, count FROM admin_counts_by_kind($1)', [adminHash])
-    const byKind = Object.fromEntries(rows.map((r) => [r.kind, Number(r.count)]))
-    expect(byKind).toEqual({ records: 2, books: 1 })
+      // admin_counts_by_kind is cross-tenant: it sees BOTH u1's and u2's items.
+      const { rows } = await client.query('SELECT kind, count FROM admin_counts_by_kind($1)', [adminHash])
+      const byKind = Object.fromEntries(rows.map((r) => [r.kind, Number(r.count)]))
+      expect(byKind).toEqual({ records: 2, books: 1 })
 
-    // admin_delete_items_for_owner is cross-tenant: removes u2's row entirely.
-    const deleted = await appRlsPool.query(`SELECT admin_delete_items_for_owner($1, 'u2') AS n`, [adminHash])
-    expect(Number(deleted.rows[0].n)).toBe(1)
+      // admin_delete_items_for_owner is cross-tenant: removes u2's row entirely.
+      const deleted = await client.query(`SELECT admin_delete_items_for_owner($1, 'u2') AS n`, [adminHash])
+      expect(Number(deleted.rows[0].n)).toBe(1)
+    })
     const remaining = await superPool.query('SELECT count(*)::int AS c FROM items')
     expect(remaining.rows[0].c).toBe(2) // only u1's two rows remain
   })
