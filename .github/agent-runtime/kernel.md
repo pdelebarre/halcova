@@ -11,6 +11,33 @@ full governance documents only when needed (see "Expand when needed").
 - PM does not implement application code.
 - PM cannot convert a mandatory specialist FAIL into PASS.
 
+## 1.1 Persistent teams (ADR-0018)
+
+Work runs through **persistent teams**, not one-off agents per issue:
+
+- The PM assigns the next READY issue to the existing team; do not recreate the
+  team or its session for every issue.
+- Team scope is fixed; an issue outside the team's scope returns `OUT OF SCOPE`
+  and control returns to the PM.
+- Teams do not coordinate directly; they communicate via GitHub issue/PR, ADR,
+  compact state and the PM.
+- GitHub is the handoff bus: issue → branch → PR → review → merge → dependency
+  → next issue.
+- Specialists inside a team stay dormant until a deterministic trigger applies
+  (`routing.md`).
+- Team checkpoints live in `state/teams/<team>.md`; portfolio state in
+  `state/ROADMAP.md` and `state/M1.md`…`state/M4.md`.
+
+Team roster and scopes: `docs/adr/0018-persistent-multi-team-delivery.md`.
+
+## 1.2 PM commands
+
+`Initialize` — inspect repo/GitHub and build portfolio state. `Go` — execute
+maximum safe parallel work. `Status` — concise portfolio status. `Run M1`…
+`Run M4` — activate milestone-ready teams. `Pause <team>` / `Resume <team>`.
+`Review <PR>` — coordinate required gates. `Finish <milestone>` — milestone
+completion validation.
+
 ## 2. Responsibility rules
 
 - One accountable role per capability; specialist authority is independent.
@@ -38,7 +65,13 @@ responsible implementer or design authority.
 
 - One GitHub issue → one implementation branch → one focused PR.
 - Never work directly on `main` for feature/bug implementation.
-- Do not merge your own PR; integration is controlled by the PM.
+- Branch naming: `mN/<team>/<issue>` (e.g. `m1/security/376`,
+  `m1/providers/399`). Never use `m1-development`, `development` or a shared
+  agent branch.
+- Two teams never modify the same branch; if two teams need the same critical
+  file, serialize and record the conflict in PM state.
+- Do not merge your own PR; integration and merge authority stay with the PM /
+  human.
 
 ## 5. Minimum sufficient context
 
@@ -81,12 +114,21 @@ responsible implementer or design authority.
 Budgets are operational guidance, **not** a license to skip a gate or fabricate
 evidence. Start with minimum context and expand only when evidence requires it.
 
+## 9. Multi-milestone parallelism
+
+Milestones are not a strictly serial queue. Multiple milestones may run active
+teams when dependencies are satisfied, architecture gates permit it, file
+ownership does not conflict, and work does not prematurely consume a blocked
+dependency. Never implement blocked downstream functionality merely to increase
+parallelism.
+
 ## Expand when needed
 
 Load these only when the kernel is insufficient for the task:
 
 - `docs/agents/responsibility-matrix.md` — canonical authority model.
 - `docs/adr/0014-agent-orchestration-and-governance.md` — rationale.
+- `docs/adr/0018-persistent-multi-team-delivery.md` — persistent team model.
 - `.github/skills/agentic-workflow/SKILL.md` — execution protocol.
 - `.github/copilot-instructions.md` — project conventions.
 - GitHub #355 — milestone roadmap and exit criteria.

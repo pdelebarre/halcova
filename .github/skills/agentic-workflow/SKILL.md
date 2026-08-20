@@ -113,6 +113,30 @@ The PM may resolve scope, sequencing and trade-off conflicts, but **may not decl
 
 A specialist must provide evidence for PASS. Documentation-only assertions are insufficient for security and quality gates.
 
+## Persistent team layer (ADR-0018)
+
+Between the PM and individual specialists, work runs through **persistent
+teams** that keep their domain context across issues and milestones.
+
+```text
+USER → MASTER PM → persistent specialist teams → GitHub issues/PRs → MASTER PM → human merge/decision
+```
+
+Teams: SECURITY · OFFLINE · COLLECTOR · DATA · PROVIDERS · AI (dormant) ·
+GROWTH (dormant). Full scopes: `docs/adr/0018-persistent-multi-team-delivery.md`.
+
+Team rules:
+
+- The PM assigns the next READY issue to the existing team; never recreate a
+  team per issue.
+- A team implements only in-scope issues; out-of-scope → `OUT OF SCOPE` → PM.
+- Teams do not coordinate directly; communication is via GitHub issue/PR, ADR,
+  compact state and the PM (GitHub is the handoff bus).
+- One issue = one branch = one PR (`mN/<team>/<issue>`); human merge authority.
+- Specialists inside a team stay dormant until their trigger applies.
+- Team checkpoints: `.github/agent-runtime/state/teams/<team>.md`; portfolio:
+  `.github/agent-runtime/state/ROADMAP.md` + `M1.md`…`M4.md`.
+
 ## Adaptive Agent Graph Protocol
 
 The PM MUST build a **minimal safe DAG** for every ticket or workstream before assigning agents. The graph is adaptive: agents are added because deterministic ticket characteristics trigger their responsibility or because a dependency requires them.
@@ -230,8 +254,9 @@ Use the canonical compressed handoff contract in
 
 ```text
 STATUS: PASS | FAIL | HOLD | NOT VERIFIED
+ISSUE:
+PR:
 DECISION:
-CHANGED:
 EVIDENCE:
 RISKS:
 NEXT:
@@ -311,7 +336,14 @@ Independent work may occupy these states concurrently. The PM must avoid unneces
 
 **Milestones remain sequential:** `M0 → M1 → M2 → M3 → M4 → M5 → M6`
 
-Work inside a milestone may be highly parallel. Do not start a later milestone merely because independent work remains in the current milestone. Strategic progression remains gate-driven.
+Work inside a milestone may be highly parallel. Do not start a later milestone
+merely because independent work remains in the current milestone. Strategic
+progression remains gate-driven.
+
+Exception (ADR-0018): a later milestone may run an explicitly unblocked
+workstream when dependencies are satisfied, architecture gates permit it and
+file ownership does not conflict — never by consuming a blocked dependency
+merely to increase parallelism.
 
 ## Canonical execution graph
 

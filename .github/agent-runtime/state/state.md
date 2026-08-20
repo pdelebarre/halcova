@@ -1,6 +1,11 @@
 # PM Milestone State
 
 > Compact runtime state. The PM updates this after every milestone decision.
+> Portfolio: `ROADMAP.md` · milestones `M1.md`…`M4.md` · teams `teams/`.
+
+## Persistent teams
+- SECURITY `teams/security.md` · OFFLINE `teams/offline.md` · COLLECTOR `teams/collector.md`
+- DATA `teams/data.md` · PROVIDERS `teams/providers.md` · AI `teams/ai.md` · GROWTH `teams/growth.md`
 
 ## Current milestone
 - Milestone: M1 — Security, Reliability & Platform Foundation
@@ -8,23 +13,28 @@
 - Roadmap gate (#355): M0 complete; M1 in progress
 
 ## Active workstreams
-- [ ] Agent Runtime v2 (agent/skill orchestration runtime) — this change
+- [ ] M1 final gate — see `state/M1.md` (implementation merged; #342 Security Auditor sign-off + follow-up disposition pending)
+- [ ] P2 follow-ups launched: #376 (`m1/security/376`), #378 (`m1/security/378`), #399 (`m1/provider/399`)
 
 ## Completed work
 - M0 release evidence (`docs/release/m0-release-evidence.md`, PR #362)
-- M1 provider/enrichment tasks: #283, #285, #290, #291 (recent [M1] commits)
+- Agent Runtime v2 merged (PR #401)
+- M1 implementation merged: security #338–#341, offline #157/#162, lookup #283–#293, performance #364–#366
 
 ## Blocked work
-- —
+- #342 — BLOCKED_OWNER_ACTION (repo settings: CodeQL default-setup, secret-scanning, required checks)
 
 ## Active PRs
-- —
+- — (none open)
 
 ## Last gate results
-- M0 release evidence: PASS (see `docs/release/m0-release-evidence.md`)
+- T11 regression: PASS (2125 tests) · coverage 86.9% stmts / 89.8% lines
+- Security Auditor (#342): PENDING final sign-off (R1–R3 closed)
 
 ## Unresolved risks
 - AI provider surface deferred by design until M1 security foundation passes (#303/#304)
+- #386 dev-only dependency HIGHs (accepted exception, no production path)
 
 ## Next actions
-- Merge Agent Runtime v2; then route agent-system consistency check to Agent Developer
+- P2 follow-ups: implement → Security Auditor re-review → Tester regression → Release Validator
+- Human owner-action settings → Security Auditor #342 PASS → Release Validator → PM declares M1

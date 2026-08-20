@@ -41,6 +41,35 @@ clarification needed.
 The PM may add agents for risk or dependencies but may not omit a mandatory
 specialist triggered by the ticket. Record ambiguous omissions.
 
+## Persistent team routing (ADR-0018)
+
+The PM routes every ticket to exactly **one persistent team** (its scope
+owner), then activates only the triggered specialists inside that team. See
+`docs/adr/0018-persistent-multi-team-delivery.md` for full scopes.
+
+| Team | Owns triggers | State |
+|---|---|---|
+| SECURITY | auth, authorization, tenant isolation, privacy, security controls/gates | active |
+| OFFLINE | PWA, offline shell, local-first persistence, offline auth/UX, outbox, reconnect, sync | active |
+| COLLECTOR | scanner, capture, identify, confirm, add, browse, search/filter, mobile collector UX | active |
+| DATA | generic collection model, data architecture, repositories, migrations, PostgreSQL/tenancy, provider adapters, scalability | active |
+| PROVIDERS | OpenLibrary, MusicBrainz, Discogs, provider fallback, retry, resilience, OCR fallback, external integration hardening | active |
+| AI | AI provider abstraction, AI runtime, tool contracts, metadata enrichment, duplicate detection, collection intelligence, assistant | DORMANT |
+| GROWTH | social, discovery, marketplace, collection expansion, feedback/product intelligence | DORMANT |
+
+A DORMANT team is not assigned work until its GitHub dependencies are READY.
+The PM assigns the next READY issue to the existing team — never recreate the
+team per issue.
+
+### Team scope boundary
+
+- A team may implement only issues within its scope.
+- An issue outside a team's scope → report `OUT OF SCOPE` and return control to
+  the PM. A team must not implement out-of-scope work or expand its own
+  roadmap.
+- Teams do not coordinate with each other directly; cross-team communication
+  goes through GitHub issue/PR, ADR, compact state and the PM.
+
 ## Dormant-agent rules
 
 Do **not** activate a specialist when its trigger does not apply:
@@ -68,6 +97,12 @@ Do **not** activate a specialist when its trigger does not apply:
 authorization, user data, payments, storage, caching, external APIs, databases,
 AI providers), the Security Auditor gate applies regardless of the dormant-agent
 rules above.
+
+**Dormant within a team.** An active team does not activate every specialist.
+Activate only the specialists whose trigger applies to the current issue (e.g.
+Sync Engineer only for outbox/conflict work; Data Architect only for
+schema/migration work; Ergonomics Reviewer only for user-facing interaction
+changes).
 
 ## Minimal graph examples
 

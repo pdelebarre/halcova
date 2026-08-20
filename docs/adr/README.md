@@ -23,6 +23,7 @@ ADRs are the authoritative record of durable architecture decisions. See ADR-001
 | 0015 | Architecture decision governance | Accepted |
 | 0016 | Passkeys and Sign in with Apple evaluation | Accepted — Deferred |
 | 0017 | Lookup resilience and provider fallbacks | Accepted |
+| 0018 | Persistent multi-team delivery model | Accepted |
 
 ## Important relationships
 
