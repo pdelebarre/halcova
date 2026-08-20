@@ -435,6 +435,8 @@ const en = {
 
   // §16b Offline status (M1 shell, #157)
   'offline.status': "You're offline — showing saved content",
+  // M2 #289: the collection was hydrated from the local offline mirror.
+  'offline.mirrorCopy': 'Showing your saved collection (offline copy) — synced {at}',
 
   // §17 Free plan & demo
   'plan.freeCounter': '{count} of {cap} items added',

@@ -8,6 +8,7 @@ import {
   revokeOfflineTrust,
   sessionFingerprintAsync,
 } from '../utils/offlineTrust'
+import { clearAllMirror } from '../utils/offlineMirror'
 
 // Owns the signed-in session. Persists to localStorage (runout.session) so
 // the PWA remembers you between visits, and revalidates the code against the
@@ -124,6 +125,9 @@ export function useAuth() {
       bumpSessionGeneration()
       clearLocalUserData() // also clears runout.offlineTrust (see session.js)
       revokeOfflineTrust({ reason: 'account_switch' })
+      // ADR-0019 Dec 5: clear the previous account's offline mirror so no
+      // user's private collection data survives an account switch.
+      clearAllMirror()
     }
     // The login exchange is a SUCCESSFUL ONLINE authentication — mint (or
     // refresh) the bounded offline trust for the newly authenticated user.
@@ -163,6 +167,9 @@ export function useAuth() {
     revokeOfflineTrust({ reason: 'sign_out' })
     setSession(null)
     clearLocalUserData()
+    // ADR-0019 Dec 5: on sign-out, clear the offline mirror so the signed-out
+    // account's private collection data does not remain on this device.
+    clearAllMirror()
   }, [])
 
   // SEC-1.4 (#179): revoke EVERY session for this user (all devices, current
@@ -173,6 +180,8 @@ export function useAuth() {
     revokeOfflineTrust({ reason: 'sign_out_all' })
     setSession(null)
     clearLocalUserData()
+    // ADR-0019 Dec 5: logout-all clears every user's local private data.
+    clearAllMirror()
   }, [])
 
   // Read-only: is this device currently trusted to keep the offline shell and

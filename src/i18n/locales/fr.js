@@ -337,6 +337,7 @@ const fr = {
   'update.reload': 'Reload',
 
   'offline.status': 'Hors ligne — contenu enregistré affiché',
+  'offline.mirrorCopy': 'Affichage de votre collection enregistrée (copie hors ligne) — synchronisée le {at}',
 
   // §17 Plan gratuit & démo
   'plan.freeCounter': '{count} / {cap} articles ajoutés',

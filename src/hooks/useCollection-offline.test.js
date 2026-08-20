@@ -1,0 +1,175 @@
+// M2 #289 — useCollection offline-mirror hydration.
+//
+// Verifies the mirror hydration contract:
+//   - a SUCCESSFUL live fetch returns live data (source 'live') and writes it
+//     back to the mirror (so the next offline launch has the last-known list);
+//   - a SAFE network failure (offline / 5xx / network) with a live offline-trust
+//     grant hydrates from the mirror (source 'offline') and surfaces a
+//     "showing offline copy" state with the cachedAt stamp;
+//   - a confirmed AUTH failure (401/403) NEVER falls back to the mirror (fail
+//     closed — a revoked session must not render cached private data).
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import 'fake-indexeddb/auto'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { useCollection } from './useCollection'
+import { saveMirror } from '../utils/offlineMirror'
+import {
+  establishOfflineTrust,
+  sessionFingerprint,
+} from '../utils/offlineTrust'
+
+vi.mock('../api/collection', () => ({
+  listItems: vi.fn(),
+  addItem: vi.fn(),
+  updateItem: vi.fn(),
+  deleteItem: vi.fn(),
+}))
+vi.mock('../api/lending', () => ({ lend: vi.fn(), returnItem: vi.fn() }))
+import * as api from '../api/collection'
+
+import { clearAllMirror } from '../utils/offlineMirror'
+
+const USER = { id: 'u1', name: 'Ada', role: 'member' }
+const TOKEN = 'tok-a'
+const KIND_OF_BLUE = {
+  id: 'r1',
+  serverId: 'r1',
+  title: 'Miles Davis - Kind of Blue',
+  year: 1959,
+  formatType: 'LP',
+}
+const IN_A_SILENT_WAY = {
+  id: 'r2',
+  serverId: 'r2',
+  title: 'Miles Davis - In a Silent Way',
+  year: 1969,
+  formatType: 'LP',
+}
+
+beforeEach(async () => {
+  localStorage.clear()
+  vi.clearAllMocks()
+  await clearAllMirror()
+})
+
+// Seed a signed-in session + a live M2 'collection'-scope trust grant.
+function seedSession() {
+  localStorage.setItem(
+    'runout.session',
+    JSON.stringify({ user: USER, session: TOKEN }),
+  )
+  establishOfflineTrust(USER, { sessionFp: sessionFingerprint(TOKEN) })
+}
+
+describe('useCollection offline-mirror hydration (#289)', () => {
+  it('a live fetch succeeds with source "live" and writes the list to the mirror', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([KIND_OF_BLUE])
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    expect(result.current.source).toBe('live')
+    expect(result.current.items).toEqual([KIND_OF_BLUE])
+    // The fresh list was written to the mirror for offline reuse.
+    const mirror = await readMirrorForUser()
+    expect(mirror.items).toHaveLength(1)
+  })
+
+  it('hydrates from the mirror (source "offline") on a safe network failure when offline-trusted', async () => {
+    seedSession()
+    // A trusted offline device has the last-known list cached locally.
+    await saveMirror(USER.id, [KIND_OF_BLUE, IN_A_SILENT_WAY], {
+      now: Date.UTC(2026, 0, 1, 12, 0, 0),
+    })
+    // The live request fails with a network error (safe to hydrate).
+    api.listItems.mockRejectedValue(new Error('Failed to fetch'))
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    expect(result.current.source).toBe('offline')
+    expect(result.current.items.map((i) => i.title)).toEqual([
+      'Miles Davis - Kind of Blue',
+      'Miles Davis - In a Silent Way',
+    ])
+    expect(result.current.mirroredAt).toBe(
+      new Date(Date.UTC(2026, 0, 1, 12, 0, 0)).toISOString(),
+    )
+  })
+
+  it('hydrates from the mirror on a server error (5xx) — a safe failure', async () => {
+    seedSession()
+    await saveMirror(USER.id, [KIND_OF_BLUE], { now: Date.now() })
+    const err = new Error('Server Error')
+    err.status = 500
+    api.listItems.mockRejectedValue(err)
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.source).toBe('offline')
+    expect(result.current.items.map((i) => i.id)).toEqual(['r1'])
+  })
+
+  it('NEVER hydrates on a confirmed auth failure (401) — fails closed', async () => {
+    seedSession()
+    await saveMirror(USER.id, [KIND_OF_BLUE], { now: Date.now() })
+    const err = new Error('Unauthorized')
+    err.status = 401
+    api.listItems.mockRejectedValue(err)
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('error'))
+    // The mirror data is NOT surfaced for a revoked session.
+    expect(result.current.items).toEqual([])
+    expect(result.current.source).toBeNull()
+  })
+
+  it('falls back to error (not an empty mirror) when offline-trust is missing', async () => {
+    // Signed in, but NO offline-trust grant → readMirror fails closed.
+    localStorage.setItem(
+      'runout.session',
+      JSON.stringify({ user: USER, session: TOKEN }),
+    )
+    await saveMirror(USER.id, [KIND_OF_BLUE], { now: Date.now() })
+    api.listItems.mockRejectedValue(new Error('Failed to fetch'))
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('error'))
+    expect(result.current.items).toEqual([])
+    expect(result.current.source).toBeNull()
+  })
+
+  it('surfaces the error (not a silent empty view) when offline and no mirror exists', async () => {
+    seedSession()
+    api.listItems.mockRejectedValue(new Error('Failed to fetch'))
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('error'))
+    expect(result.current.items).toEqual([])
+    expect(result.current.error).toBe('Failed to fetch')
+  })
+
+  it('a successful refresh() writes fresh data to the mirror for the next offline launch', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([KIND_OF_BLUE])
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    // Simulate the server-side list changing, then refresh.
+    api.listItems.mockResolvedValue([IN_A_SILENT_WAY])
+    await act(async () => {
+      await result.current.refresh()
+    })
+
+    const mirror = await readMirrorForUser()
+    expect(mirror.items.map((i) => i.id)).toEqual(['r2'])
+    expect(result.current.source).toBe('live')
+  })
+})
+
+// Read the mirror back for the seeded user using its own gated API.
+async function readMirrorForUser() {
+  const { readMirror } = await import('../utils/offlineMirror')
+  return readMirror(USER.id, { token: TOKEN })
+}

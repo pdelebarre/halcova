@@ -337,6 +337,7 @@ const ptBR = {
   'update.reload': 'Reload',
 
   'offline.status': 'Offline — mostrando conteúdo salvo',
+  'offline.mirrorCopy': 'Mostrando sua coleção salva (cópia offline) — sincronizada {at}',
 
   // §17 Plano gratuito e demo
   'plan.freeCounter': '{count} de {cap} itens adicionados',
