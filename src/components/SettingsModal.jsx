@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { t, LOCALES, SUPPORTED_LOCALES, useLocale } from '../i18n'
 import { clearMirrorForUser } from '../utils/offlineMirror'
 import './SettingsModal.css'
@@ -7,6 +7,20 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
   const { locale, setLocale } = useLocale()
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [clearDone, setClearDone] = useState(false)
+  // Ergonomics (#159): manage focus so the keyboard/talkback user always knows
+  // where the destructive-clear flow moved.
+  const confirmButtonRef = useRef(null)
+  const doneLineRef = useRef(null)
+
+  // On showing the confirmation, move focus to the confirm (destructive) button.
+  useEffect(() => {
+    if (confirmingClear) confirmButtonRef.current?.focus()
+  }, [confirmingClear])
+
+  // On completion, move focus to the `role="status"` done line.
+  useEffect(() => {
+    if (clearDone) doneLineRef.current?.focus()
+  }, [clearDone])
 
   async function handleClearOfflineData() {
     if (!userId) return
@@ -63,12 +77,24 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
               <div className="settings-card settings-help-books">
                 <p className="settings-offline-data-hint">{t('offline.localDataHint')}</p>
                 {clearDone ? (
-                  <p className="settings-offline-data-done" role="status">{t('offline.clearOfflineDataDone')}</p>
+                  <p
+                    className="settings-offline-data-done"
+                    role="status"
+                    ref={doneLineRef}
+                    tabIndex={-1}
+                  >
+                    {t('offline.clearOfflineDataDone')}
+                  </p>
                 ) : confirmingClear ? (
                   <div className="settings-offline-data-confirm">
                     <p>{t('offline.clearOfflineDataConfirm')}</p>
                     <div className="settings-offline-data-actions">
-                      <button type="button" className="btn btn-danger" onClick={handleClearOfflineData}>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        ref={confirmButtonRef}
+                        onClick={handleClearOfflineData}
+                      >
                         {t('offline.clearOfflineData')}
                       </button>
                       <button type="button" className="btn btn-ghost" onClick={() => setConfirmingClear(false)}>

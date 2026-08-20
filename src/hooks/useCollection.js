@@ -62,6 +62,9 @@ export function useCollection(collection = 'records') {
   const [pendingCount, setPendingCount] = useState(0)
   // Minimal sync-state primitive for "is this synchronized?": idle|syncing|error.
   const [syncState, setSyncState] = useState('idle')
+  // M2 #159: bumped after every successful mutation (add/update/remove) so the
+  // SyncStatus strip re-reads the real outbox and reflects fresh queue state.
+  const [mutationSeq, setMutationSeq] = useState(0)
 
   // Refresh the durable pending-count from the outbox (gated by offline trust).
   const refreshPendingCount = useCallback(async () => {
@@ -165,18 +168,23 @@ export function useCollection(collection = 'records') {
     // foreground-only model). A user/collection is required for a durable op.
     if (!isOnline()) {
       if (!userId) throw new Error('Sign in to add items.')
-      return stageOfflineAdd(userId, token, item, collection)
+      const staged = await stageOfflineAdd(userId, token, item, collection)
+      setMutationSeq((s) => s + 1)
+      return staged
     }
     // Online: attempt the live add. On a SAFE failure (offline/5xx/network) fall
     // back to the offline outbox so the capture is never lost (ADR-0016 rule 12).
     try {
       const saved = await api.addItem(item, collection)
       setItems((prev) => [saved, ...prev])
+      setMutationSeq((s) => s + 1)
       return saved
     } catch (err) {
       if (!isSafeToMirror(err)) throw err // auth failure: fail closed, no staging
       if (!userId) throw err
-      return stageOfflineAdd(userId, token, item, collection)
+      const staged = await stageOfflineAdd(userId, token, item, collection)
+      setMutationSeq((s) => s + 1)
+      return staged
     }
   }, [collection, stageOfflineAdd])
 
@@ -206,6 +214,7 @@ export function useCollection(collection = 'records') {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)))
     try {
       await api.updateItem(id, patch, collection)
+      setMutationSeq((s) => s + 1)
     } catch (err) {
       setItems(prevItems)
       throw err
@@ -217,6 +226,7 @@ export function useCollection(collection = 'records') {
     setItems((prev) => prev.filter((it) => it.id !== id))
     try {
       await api.deleteItem(id, collection)
+      setMutationSeq((s) => s + 1)
     } catch (err) {
       setItems(prevItems)
       throw err
@@ -279,5 +289,5 @@ export function useCollection(collection = 'records') {
     }
   }, [items, collection])
 
-  return { items, status, error, source, mirroredAt, refresh, add, update, remove, lend, returnItem, pendingCount, syncState, flushOutbox }
+  return { items, status, error, source, mirroredAt, refresh, add, update, remove, lend, returnItem, pendingCount, syncState, flushOutbox, mutationSeq }
 }

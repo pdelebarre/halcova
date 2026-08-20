@@ -70,7 +70,7 @@ const NEW_ARRIVALS_COUNT = 5
  * App.jsx renders one of these per tab.
  */
 export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
-  const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem } = useCollection(catalog.storage)
+  const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem, flushOutbox, mutationSeq } = useCollection(catalog.storage)
 
   // T2 (issue #110): the active room's theme, provided by App.jsx. `useTheme()`
   // degrades to {} outside a provider, so a missing theme can never throw
@@ -596,6 +596,19 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     if (q) commitRecentSearch(q)
   }
 
+  // M2 #159: manual "Sync now" pushes the REAL #292 outbox (flush + reconcile)
+  // rather than re-pulling the live list — the user is explicitly asking to
+  // sync queued mutations, not to refresh. A failed flush surfaces the state
+  // via useOfflineSyncStatus (pending/error stay accurate); we never throw
+  // into the UI (no dark-screen risk).
+  async function handleSyncNow() {
+    try {
+      await flushOutbox()
+    } catch {
+      /* the status strip keeps showing the honest pending/error state */
+    }
+  }
+
   // The core "am I looking at a duplicate" step — every path into the app
   // (barcode auto-match, picking from multiple pressings/editions, text
   // search, manual entry) funnels through here before anything gets added.
@@ -1084,12 +1097,15 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
             "showing offline copy" note (#289) with the pending / queued /
             synced / conflict-or-error states (#159). It only renders when
             there is something meaningful to communicate, and manual "Sync now"
-            re-pulls the live collection (the M2 reconnect sync hook). */}
+            flushes the REAL #292 outbox (push + reconcile), not a re-pull.
+            `syncId` bumps after each mutation so the strip re-reads the durable
+            outbox and reflects the real queue state (reachable states). */}
         {status === 'ready' && (
           <SyncStatus
             source={source}
             mirroredAt={mirroredAt}
-            onSyncNow={refresh}
+            syncId={mutationSeq}
+            onSyncNow={handleSyncNow}
           />
         )}
 

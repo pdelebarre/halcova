@@ -59,6 +59,7 @@
 .sync-status-sync-now {
   flex-shrink: 0;
   align-self: center;
+  min-height: 44px; /* ≥44px touch target (Ergonomics) */
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--line);

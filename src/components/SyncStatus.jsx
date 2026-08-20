@@ -54,6 +54,15 @@ export default function SyncStatus({
           </p>
         )}
 
+        {/* M2 #159: "All changes synced" — surfaced after a successful Sync-now
+            / queue drain (online, nothing pending, nothing needing attention).
+            Only shown inside the already-rendered strip (never always-on). */}
+        {online && !needsAttention && pendingCount === 0 && (
+          <p className="sync-status-line sync-status-synced">
+            {t('offline.synced')}
+          </p>
+        )}
+
         {pendingCount > 0 && (
           <p className="sync-status-line sync-status-pending">
             {t('offline.pending', { n: pendingCount })}

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { LocaleProvider, setLocale, getLocale } from '../i18n'
+import { LocaleProvider, setLocale } from '../i18n'
 import SettingsModal from '../components/SettingsModal'
 
 beforeEach(() => {
@@ -180,5 +180,34 @@ describe('SettingsModal — offline-data management (#159)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByText('Offline data cleared')).toBeNull()
+  })
+
+  it('moves focus to the destructive confirm button when confirming clear', () => {
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId="u1" />
+      </LocaleProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
+    const confirm = screen.getAllByRole('button', { name: /Clear offline data/i }).at(-1)
+    expect(confirm).toBe(document.activeElement)
+  })
+
+  it('moves focus to the status line after clearing completes', async () => {
+    render(
+      <LocaleProvider>
+        <SettingsModal onClose={vi.fn()} userId="u1" />
+      </LocaleProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear offline data/i }))
+    const confirm = screen.getAllByRole('button', { name: /Clear offline data/i }).at(-1)
+    fireEvent.click(confirm)
+
+    const done = await screen.findByText('Offline data cleared')
+    // The done line is a live-region status announcement and receives focus.
+    expect(done).toHaveAttribute('role', 'status')
+    expect(done).toBe(document.activeElement)
   })
 })

@@ -45,12 +45,20 @@ Every capability falls into exactly one of these five states:
 
 ### M2 mutation policy (ADR-0019 Decision 8 — minimal conflict matrix)
 
+> **Wired reality (#292 merged):** M2 queues the **add** mutation through the
+> durable outbox (the only `OUTBOX_KIND.ADD`). Edit/delete push and the
+> conflict matrix are **M3** (#160/#161) — until then the app surfaces a clear
+> "couldn't sync" attention state rather than speculatively queuing them. The
+> pending/error counts the UI renders read the real #292 outbox (`outbox.js` →
+> `offlineOutbox.js`); a flushed/empty queue renders the "All changes synced"
+> state.
+
 | Mutation | M2 policy |
 | --- | --- |
-| Item add | Queued as new record; idempotent by operation ID |
-| Item edit (non-conflict-sensitive fields, e.g. notes) | Pushed last-write-wins on those fields; conflicts surfaced, never dropped |
-| Item edit (authoritative/enrichment fields) | Not silently overwritten; server re-authorizes and merges |
-| Item delete | Durable outbox op + server authorization; rejected deletes surfaced |
+| Item add | Queued as new record; idempotent by operation ID (staged + pushed on reconnect) |
+| Item edit (non-conflict-sensitive fields, e.g. notes) | **M3** (#160) — pushed last-write-wins; conflicts surfaced, never dropped |
+| Item edit (authoritative/enrichment fields) | **M3** — not silently overwritten; server re-authorizes and merges |
+| Item delete | **M3** (#161) — durable outbox op + server authorization; rejected deletes surfaced |
 
 Anything **outside** this matrix is surfaced to the user (fail-closed) — never
 pushed speculatively and never dropped silently.
@@ -92,7 +100,8 @@ requirements). The UI must make these states visible:
    offline, tell them it's saved on this device and will sync when they're
    back online — never leave them wondering whether it "took".
 2. **Manual sync control where appropriate.** Provide a "Sync now" control so
-   the user isn't stuck waiting for the automatic reconnect.
+   the user isn't stuck waiting for the automatic reconnect. In the running app
+   "Sync now" pushes the real #292 outbox (`flushOutbox`), not a re-pull.
 3. **Safe sync error details.** Show a *generic, human* explanation of why a
    sync failed. **Never** surface tokens, access codes, bearer credentials, raw
    private collection contents, or internal error strings.
@@ -101,6 +110,13 @@ requirements). The UI must make these states visible:
    Settings, per the approved security policy.
 5. **No silent fallback.** A failed online action must never silently create an
    untracked local mutation (see fail-closed invariant in §1).
+
+> **Reachable states (#159 + #292):** the pending / queued / error ("couldn't
+> sync") and "All changes synced" states read the real durable outbox, so they
+> are reachable in the running app — an offline add shows "saved on this device,
+> waiting to sync", a failed push shows the safe attention state, and a drained
+> queue shows "All changes synced". `conflict` remains M3 (no M2 conflict
+> matrix), so its count is 0 until #160/#161 land.
 
 ---
 

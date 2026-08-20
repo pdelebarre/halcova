@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import 'fake-indexeddb/auto'
 import {
   readOutboxOps,
   readOutboxSummary,
@@ -6,20 +7,42 @@ import {
   OUTBOX_STATUS,
   OUTBOX_SCOPE,
 } from './offlineOutbox'
+import { stageAdd, clearAllOutbox } from './outbox'
+import {
+  establishOfflineTrust,
+  sessionFingerprint,
+} from './offlineTrust'
 
-// M2 #159 — the defined outbox read interface.
+// M2 #159 — the outbox read interface, wired to the REAL #292 durable outbox.
 //
-// Before #292's durable outbox store exists, the read interface must FAIL
-// CLOSED: `readOutboxOps` resolves to an empty queue (never a fabricated or
-// silently-untracked mutation) and `readOutboxSummary` yields all-zero counts.
-// The interface also must refuse a client-chosen/empty scope (server-resolved
-// userId only) so it can never enumerate another user's queue.
+// The UI reads pending/error counts from the actual IndexedDB outbox (not a
+// fail-closed empty stub): staging an offline add makes the summary report a
+// real `pending: 1`, and a read op NEVER carries a raw payload (only the safe
+// { opId, status, kind } shape — ADR-0019 Dec 12). It still FAILS CLOSED for a
+// missing/empty scope or a missing/expired mutation trust grant (zeros, never
+// a throw, never another user's queue).
 
-describe('offlineOutbox — defined read interface (#159)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+const USER = { id: 'u1', name: 'Ada', role: 'member' }
+const TOKEN = 'tok-a'
+const ITEM = { title: 'Kind of Blue', year: 1959 }
 
+beforeEach(async () => {
+  localStorage.clear()
+  vi.clearAllMocks()
+  await clearAllOutbox()
+})
+
+// Seed a signed-in session + a live M2 'mutation'-scope offline-trust grant so
+// the outbox reads/writes are permitted (fail-closed otherwise).
+function seedTrustedSession() {
+  localStorage.setItem(
+    'runout.session',
+    JSON.stringify({ user: USER, session: TOKEN }),
+  )
+  establishOfflineTrust(USER, { sessionFp: sessionFingerprint(TOKEN) })
+}
+
+describe('offlineOutbox — read interface over the real #292 outbox (#159)', () => {
   it('exposes the operation-status enum and collection scope contract', () => {
     expect(OUTBOX_STATUS).toEqual({
       PENDING: 'pending',
@@ -30,26 +53,46 @@ describe('offlineOutbox — defined read interface (#159)', () => {
     expect(OUTBOX_SCOPE).toBe('collection')
   })
 
-  it('readOutboxOps resolves to an empty queue before #292 (fail closed)', async () => {
-    const ops = await readOutboxOps('u1')
-    expect(ops).toEqual([])
+  it('reads a real pending count from the durable outbox after staging an add', async () => {
+    seedTrustedSession()
+    const op = await stageAdd(USER.id, { item: ITEM, token: TOKEN })
+    expect(op).not.toBeNull()
+
+    const summary = await readOutboxSummary(USER.id)
+    expect(summary).toEqual({ pending: 1, conflict: 0, error: 0, synced: 0 })
   })
 
-  it('readOutboxSummary resolves to all-zero counts before #292 (fail closed)', async () => {
-    const summary = await readOutboxSummary('u1')
+  it('surfaces only the safe { opId, status, kind } shape — never a raw payload', async () => {
+    seedTrustedSession()
+    const op = await stageAdd(USER.id, { item: ITEM, barcode: '123', token: TOKEN })
+    expect(op).not.toBeNull()
+
+    const ops = await readOutboxOps(USER.id)
+    expect(ops).toHaveLength(1)
+    // The surfaced op is the minimal safe shape — no pendingItem, barcode,
+    // ocrText, lastError, token, or secret is exposed to the UI.
+    expect(ops[0]).toEqual({ opId: expect.any(String), status: 'pending', kind: 'add' })
+    expect(Object.keys(ops[0]).sort()).toEqual(['kind', 'opId', 'status'])
+  })
+
+  it('fails closed (zeros) when no session user / no trust grant', async () => {
+    // No trust grant seeded at all.
+    expect(await readOutboxSummary('')).toEqual({ pending: 0, conflict: 0, error: 0, synced: 0 })
+    expect(await readOutboxOps(null)).toEqual([])
+    expect(await readOutboxOps()).toEqual([])
+  })
+
+  it('fails closed for a user without a live mutation-trust grant', async () => {
+    // Signed in, but NO offline-trust grant → listPendingOps fails closed.
+    localStorage.setItem(
+      'runout.session',
+      JSON.stringify({ user: USER, session: TOKEN }),
+    )
+    const summary = await readOutboxSummary(USER.id)
     expect(summary).toEqual({ pending: 0, conflict: 0, error: 0, synced: 0 })
   })
 
-  it('refuses to read when the userId is missing/not a string (fail closed)', async () => {
-    expect(await readOutboxOps('')).toEqual([])
-    expect(await readOutboxOps(null)).toEqual([])
-    expect(await readOutboxOps()).toEqual([])
-    expect(await readOutboxSummary('')).toEqual({ pending: 0, conflict: 0, error: 0, synced: 0 })
-  })
-
   it('summarizes counts from a mocked op list without exposing raw payloads', () => {
-    // Simulate what #292's durable store will return. The UI only ever sees
-    // counts + a safe status label — never a raw exception or private content.
     const summary = summarizeOps([
       { opId: 'op-1', status: OUTBOX_STATUS.PENDING, kind: 'add' },
       { opId: 'op-2', status: OUTBOX_STATUS.CONFLICT, kind: 'edit' },

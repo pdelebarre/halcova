@@ -1,30 +1,31 @@
-// M2 Offline Mutation Outbox — defined read interface (#159; ADR-0019 Dec 7/8).
+// M2 Offline Mutation Outbox — read interface (#159; ADR-0019 Dec 7/8/12).
 //
-// #159 ships the offline UX STATES for queued/synced/conflict operations and a
-// DEFINED READ INTERFACE that the M2 outbox (#292, runs in parallel on a
-// separate branch) will implement against IndexedDB. #159 does NOT depend on
-// #292 being merged: before the outbox store exists, this module fails CLOSED
-// by reporting an empty queue, so the UI renders "all changes synced" / "no
-// pending changes" — never a fabricated or silently-untracked mutation.
+// #159 ships the offline UX STATES for queued/synced/error operations and a
+// read interface over the M2 durable outbox (#292, merged into main as
+// src/utils/outbox.js + outboxSync.js). This module is the READ adapter that
+// the UI consumes: it reads the REAL #292 outbox (listPendingOps) and reduces
+// it to the minimal safe shape `{ opId, status, kind }` that SyncStatus /
+// useOfflineSyncStatus render.
 //
-// The interface deliberately mirrors #292's contract (operation IDs, status
-// enum, idempotency) so that when #292 lands it can implement `readOutboxOps`
-// against the same durable outbox without changing #159's consumers:
+// SECURITY (ADR-0019 Dec 12 — mandatory): the op records surfaced here carry
+// ONLY a safe status label + a non-secret kind. A surfaced op NEVER carries a
+// raw pendingItem, barcode, ocrText, lastError, token or access code — the
+// #292 durable records are mapped down to `{ opId, status, kind }` before they
+// leave this module, so the UI can never render a raw payload or secret.
 //
-//   - Every offline mutation has a deterministic operation ID (itemUuid.js).
-//   - Ops are tracked as: pending (queued, not yet pushed) / conflict / error
-//     (failed) / synced (acknowledged).
-//   - Reading the outbox never writes; writes go through #292's enqueue path.
-//
-// SECURITY (ADR-0019 Dec 12): the op records surfaced here carry only a safe,
-// non-secret `kind` label for display. A returned op NEVER carries raw
-// credentials, access codes, tokens, or raw private collection contents in any
-// field the UI renders. Sync errors are surfaced as generic safe messages by
-// the UI, not by echoing raw exception text.
+// FAIL-CLOSED: any missing scope, missing/expired offline trust, or IndexedDB
+// failure resolves to an empty queue (all-zero counts) rather than a throw —
+// the UI never renders a fabricated or silently-untracked mutation, and never
+// dark-screens.
 
+import { getSessionToken } from './session'
+import { listPendingOps } from './outbox'
 import { mirrorScope } from './offlineMirror'
 
-// Operation lifecycle statuses. #292 writes these; #159 reads them.
+// Operation lifecycle statuses the UI understands. #292 writes `pending` /
+// `failed` / `flushed`; this adapter maps failed -> ERROR (the "couldn't sync"
+// attention state) and pending -> PENDING. CONFLICT is M3 (#160/#161) — M2
+// only queues adds, so conflict counts stay 0 until a conflict matrix lands.
 export const OUTBOX_STATUS = Object.freeze({
   PENDING: 'pending',
   CONFLICT: 'conflict',
@@ -36,24 +37,25 @@ export const OUTBOX_STATUS = Object.freeze({
 export const OUTBOX_SCOPE = 'collection'
 
 /**
- * Read the outbox operations for a user's scope.
+ * Read the outbox operations for a user's scope, reduced to the SAFE UI shape.
  *
  * @param {string} userId  Server-resolved session user id (never client-chosen).
  * @param {object} [opts]
- * @returns {Promise<Array>} A list of tracked operations, each of the shape
- *   `{ opId, status, kind }`. Before #292's durable outbox store exists, this
- *   resolves to `[]` (fail closed — an empty queue, never a silent mutation).
+ * @returns {Promise<Array>} A list of `{ opId, status, kind }` records. Reads
+ *   the real #292 durable outbox (listPendingOps) and strips every raw payload
+ *   before returning — never a raw item/barcode/ocrText/error/token.
  */
 export async function readOutboxOps(userId, { scope = OUTBOX_SCOPE } = {}) {
-  // `scope` is part of the defined #292 contract (the outbox is scoped per
-  // user+capability). Before #292's durable store exists we read nothing, but
-  // the parameter is reserved so the signature matches the upcoming contract.
   void scope
   const scopeKey = mirrorScope(userId)
   if (!scopeKey) return []
-  // TODO(#292): read the durable outbox store for this scope. Until then the
-  // queue is empty by design so the UI never shows a fabricated pending state.
-  return []
+  const ops = await listPendingOps(userId, { token: getSessionToken() })
+  return ops.map((op) => ({
+    opId: op.opId,
+    status:
+      op.state === 'failed' ? OUTBOX_STATUS.ERROR : OUTBOX_STATUS.PENDING,
+    kind: op.kind || 'add',
+  }))
 }
 
 /**
@@ -72,8 +74,8 @@ export function summarizeOps(ops = []) {
 }
 
 /**
- * Summarize the outbox into counts the UI can render. Fails closed: a missing
- * or empty outbox yields all-zero counts (never null, never throws).
+ * Summarize the outbox into counts the UI can render. Fails closed: a missing,
+ * empty or untrusted outbox yields all-zero counts (never null, never throws).
  *
  * @param {string} userId  Server-resolved session user id.
  * @returns {Promise<{pending:number, conflict:number, error:number, synced:number}>}

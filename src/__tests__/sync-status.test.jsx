@@ -58,6 +58,22 @@ describe('SyncStatus — offline sync states (#159)', () => {
     expect(await screen.findByText(/offline copy/i)).toBeInTheDocument()
   })
 
+  it('surfaces "All changes synced" after a successful queue drain (online, nothing pending)', async () => {
+    seedSession()
+    readOutboxSummary.mockResolvedValue({ pending: 0, conflict: 0, error: 0, synced: 0 })
+    renderStatus({ source: 'offline', onSyncNow: vi.fn() })
+    expect(await screen.findByText(/all changes synced/i)).toBeInTheDocument()
+  })
+
+  it('does NOT claim "all changes synced" while offline with nothing pending', async () => {
+    seedSession()
+    setOnLine(false)
+    readOutboxSummary.mockResolvedValue({ pending: 0, conflict: 0, error: 0, synced: 0 })
+    renderStatus({ source: 'offline', onSyncNow: vi.fn() })
+    expect(await screen.findByText(/offline copy/i)).toBeInTheDocument()
+    expect(screen.queryByText(/all changes synced/i)).toBeNull()
+  })
+
   it('shows a queued "pending" state with a count when operations are waiting', async () => {
     seedSession()
     readOutboxSummary.mockResolvedValue({ pending: 3, conflict: 0, error: 0, synced: 0 })

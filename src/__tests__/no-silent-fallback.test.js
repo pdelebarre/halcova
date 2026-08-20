@@ -3,16 +3,20 @@ import 'fake-indexeddb/auto'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useCollection } from '../hooks/useCollection'
 import { saveMirror, clearAllMirror } from '../utils/offlineMirror'
+import { clearAllOutbox, listPendingOps } from '../utils/outbox'
 import {
   establishOfflineTrust,
   sessionFingerprint,
 } from '../utils/offlineTrust'
 
-// M2 #159 — fail-closed invariant: a failed ONLINE mutation must NEVER
-// silently become an untracked local mutation (ADR-0016 rule 12, ADR-0019
-// Dec 8). A rejected add/update/remove re-throws and leaves the in-memory
-// items + the IndexedDB mirror exactly as they were — the UI never renders a
-// phantom local state, and nothing is queued silently behind the user's back.
+// M2 #159 + #292 — fail-closed invariant: a failed ONLINE mutation must NEVER
+// silently become an UNTRACKED local mutation (ADR-0016 rule 12, ADR-0019
+// Dec 8). Since #292, a SAFE online failure (offline/5xx/network) STAGES the
+// add as a TRACKED outbox op with an explicit pending state ("saved on this
+// device, waiting to sync") — tracked, never silent, never dropped. A confirmed
+// AUTH failure (401/403) re-throws and writes NOTHING (fail closed — a revoked
+// session never stages offline). Update/delete are M3 and never stage: a failed
+// online update/delete re-throws and reverts (no silent local edit/removal).
 
 vi.mock('../api/collection', () => ({
   listItems: vi.fn(),
@@ -36,6 +40,7 @@ beforeEach(async () => {
   localStorage.clear()
   vi.clearAllMocks()
   await clearAllMirror()
+  await clearAllOutbox()
 })
 
 function seedSession() {
@@ -51,8 +56,8 @@ async function readMirror() {
   return readMirror(USER.id, { token: TOKEN })
 }
 
-describe('useCollection — no silent fallback from a failed online mutation (#159)', () => {
-  it('a failed online ADD re-throws and does not write an untracked local item', async () => {
+describe('useCollection — no silent fallback from a failed online mutation (#159/#292)', () => {
+  it('a SAFE online ADD failure stages a TRACKED op (not silent, not dropped)', async () => {
     seedSession()
     api.listItems.mockResolvedValue([])
     api.addItem.mockRejectedValue(new Error('Failed to fetch'))
@@ -61,20 +66,46 @@ describe('useCollection — no silent fallback from a failed online mutation (#1
     const { result } = renderHook(() => useCollection('records'))
     await waitFor(() => expect(result.current.status).toBe('ready'))
 
+    let staged
+    await act(async () => {
+      staged = await result.current.add({ title: 'New', year: 2020 })
+    })
+
+    // The capture is not lost: it is staged as an explicit TRACKED pending add.
+    expect(staged.metadataPending).toBe(true)
+    expect(result.current.items[0].title).toBe('New')
+    expect(result.current.pendingCount).toBe(1)
+    // A durable outbox op exists (the mutation is tracked, never silent).
+    const ops = await listPendingOps(USER.id, { token: TOKEN })
+    expect(ops).toHaveLength(1)
+    expect(ops[0].pendingItem.metadataPending).toBe(true)
+    // The mirror holds the pending item so it survives reload.
+    const mirror = await readMirror()
+    expect(mirror.items.map((i) => i.title)).toContain('New')
+  })
+
+  it('an AUTH online ADD failure (401) re-throws and stages NOTHING (fail closed)', async () => {
+    seedSession()
+    api.listItems.mockResolvedValue([])
+    const err = new Error('Unauthorized')
+    err.status = 401
+    api.addItem.mockRejectedValue(err)
+
+    const { result } = renderHook(() => useCollection('records'))
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
     let thrown = null
     await act(async () => {
       try {
-        await result.current.add({ title: 'New' })
+        await result.current.add({ title: 'Nope', year: 2000 })
       } catch (e) { thrown = e }
     })
 
-    // The online failure is surfaced (thrown), never swallowed into a local add.
-    expect(thrown?.message).toBe('Failed to fetch')
+    // A revoked session never stages offline — the mutation re-throws.
+    expect(thrown?.message).toBe('Unauthorized')
     expect(result.current.items).toEqual([])
-
-    // The mirror was NOT mutated silently.
-    const mirror = await readMirror()
-    expect(mirror.items).toEqual([])
+    expect(result.current.pendingCount).toBe(0)
+    expect(await listPendingOps(USER.id, { token: TOKEN })).toEqual([])
   })
 
   it('a failed online UPDATE re-throws and reverts to the previous state (no silent local edit)', async () => {
