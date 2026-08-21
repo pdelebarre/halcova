@@ -11,14 +11,14 @@
 //   * The client can never write/override a definition (read-only by contract).
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import handler from './collection-types'
-import { createMemDb } from './_shared/repositories/test-helpers'
+import handler from '../collection-types'
+import { createMemDb } from './repositories/test-helpers'
 
 // Postgres is "configured"; getPool() returns a pg-mem-backed `db` ({ query,
 // connect }), so the REAL createCollectionTypeRepository builds against it —
 // the full server-authoritative path runs with no live DB.
 const { dbRef } = vi.hoisted(() => ({ dbRef: { current: null } }))
-vi.mock('./_shared/postgres', () => ({
+vi.mock('./postgres', () => ({
   isPostgresConfigured: () => true,
   getPool: () => dbRef.current,
 }))
@@ -26,7 +26,7 @@ vi.mock('./_shared/postgres', () => ({
 // The registry is read-open to any authenticated caller. Bypass the real
 // session-resolution (covered elsewhere) so we can exercise the function's
 // registry logic against the real pg-mem repository.
-vi.mock('./_shared/policy', () => ({
+vi.mock('./policy', () => ({
   enforce: async () => ({ user: { id: 'u1', role: 'member' }, error: null }),
 }))
 
