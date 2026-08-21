@@ -21,6 +21,7 @@ import { lookupFetch } from './_shared/lookup-fetch'
 import { readCooldownMs, recordProviderDown, PROVIDER_STATE_STORE } from './_shared/provider-state'
 import { openlibrary } from './_shared/providers/openlibrary'
 import { json, safeError } from './_shared/security'
+import { isJsonContentType } from './_shared/providers/payload-guard'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 
 const GOOGLE_BASE = 'https://www.googleapis.com/books/v1'
@@ -213,6 +214,12 @@ async function lookup(lookupSpec, ttlMs, identity) {
   }
 
   // SEC-3.2 (#195): cap the provider body before parsing/caching.
+  // SEC-6.3 (#217): reject a non-JSON content-type fail-closed (a hostile
+  // upstream must not smuggle an HTML/image body past the JSON boundary).
+  const contentType = res.headers?.get?.('content-type')
+  if (!isJsonContentType(contentType)) {
+    return { error: json(502, { error: 'Provider response is not JSON.', code: 'HTTP_ERROR' }) }
+  }
   const raw = await res.text()
   if (Buffer.byteLength(raw, 'utf8') > MAX_PROXY_BYTES) {
     return { error: json(502, { error: 'Provider response too large.', code: 'HTTP_ERROR' }) }

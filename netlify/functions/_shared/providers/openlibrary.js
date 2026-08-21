@@ -42,6 +42,7 @@
 //     bounded by the existing books rate limiter).
 
 import { lookupFetch } from '../lookup-fetch'
+import { isJsonContentType } from './payload-guard'
 
 const OL_BASE = 'https://openlibrary.org'
 const OL_COVER_HOST = 'covers.openlibrary.org'
@@ -270,6 +271,10 @@ async function olFetch(path, params = {}) {
     throw new Error('OpenLibrary redirect not allowed.')
   }
   if (!res.ok) throw new Error('OpenLibrary request failed.')
+  // SEC-6.3 #217: reject a non-JSON content-type fail-closed.
+  if (!isJsonContentType(res.headers?.get?.('content-type'))) {
+    throw new Error('OpenLibrary response is not JSON.')
+  }
   const raw = await res.text()
   if (Buffer.byteLength(raw, 'utf8') > MAX_PROVIDER_BYTES) {
     throw new Error('OpenLibrary response too large.')
