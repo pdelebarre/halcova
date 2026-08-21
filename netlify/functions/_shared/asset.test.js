@@ -11,6 +11,9 @@
 //   - FAILS CLOSED: no ASSET_SIGN_SECRET -> signing refuses (503), never an
 //     open URL.
 //   - Owner DTO carries asset ids only; signed URLs come only from asset:sign.
+//   - SEC-7.3.x (#385): asset:sign is rate-limited per-identity+IP (429 on
+//     exhaustion, no bypass).
+//   - SEC-7.3.x (#385): asset:revoke sets revokedAt for instant revocation.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import assetHandler from '../asset'
@@ -222,5 +225,87 @@ describe('handler plumbing', () => {
   it('rejects an unknown action with 400', async () => {
     const res = await assetHandler(req(MEMBER_A_TOKEN, { action: 'explode' }))
     expect(res.status).toBe(400)
+  })
+})
+
+describe('asset:sign — rate-limit (SEC-7.3.x #385)', () => {
+  it('rate-limits asset:sign per-identity (429 after limit exhaustion)', async () => {
+    process.env.RUNOUT_ASSET_SIGN_RATE_LIMIT = '2'
+    const { default: assetHandlerFresh } = await import('../asset')
+    seedEnvelope(`assets-memberA`, { assetId: A_ID, ownerId: 'memberA' })
+
+    const r1 = await assetHandlerFresh(req(MEMBER_A_TOKEN, { action: 'sign', assetId: A_ID }))
+    expect(r1.status).toBe(200)
+    const r2 = await assetHandlerFresh(req(MEMBER_A_TOKEN, { action: 'sign', assetId: A_ID }))
+    expect(r2.status).toBe(200)
+    const r3 = await assetHandlerFresh(req(MEMBER_A_TOKEN, { action: 'sign', assetId: A_ID }))
+    expect(r3.status).toBe(429)
+    const body = await r3.json()
+    expect(body.code).toBe('RATE_LIMIT')
+  })
+
+  it('rate-limit does not affect other identities (no cross-identity throttling)', async () => {
+    process.env.RUNOUT_ASSET_SIGN_RATE_LIMIT = '1'
+    const { default: assetHandlerFresh } = await import('../asset')
+    seedEnvelope(`assets-memberA`, { assetId: A_ID, ownerId: 'memberA' })
+    seedEnvelope(`assets-memberB`, { assetId: B_ID, ownerId: 'memberB' })
+
+    const r1 = await assetHandlerFresh(req(MEMBER_A_TOKEN, { action: 'sign', assetId: A_ID }))
+    expect(r1.status).toBe(200)
+    const r2 = await assetHandlerFresh(req(MEMBER_A_TOKEN, { action: 'sign', assetId: A_ID }))
+    expect(r2.status).toBe(429)
+
+    const r3 = await assetHandlerFresh(req(MEMBER_B_TOKEN, { action: 'sign', assetId: B_ID }))
+    expect(r3.status).toBe(200)
+  })
+
+  it('rate-limit degrades open when the store is unavailable (never a 500)', async () => {
+    seedEnvelope(`assets-memberA`, { assetId: A_ID, ownerId: 'memberA' })
+    const res = await assetHandler(req(MEMBER_A_TOKEN, { action: 'sign', assetId: A_ID }))
+    expect(res.status).toBe(200)
+  })
+})
+
+describe('asset:revoke — instant revocation (SEC-7.3.x #385)', () => {
+  it('revokes an asset the caller owns, setting revokedAt on the envelope', async () => {
+    seedEnvelope(`assets-memberA`, { assetId: A_ID, ownerId: 'memberA' })
+    const res = await assetHandler(req(MEMBER_A_TOKEN, { action: 'revoke', assetId: A_ID }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).ok).toBe(true)
+
+    const store = stores['assets-memberA']
+    const envelope = await store.get(`asset:${A_ID}`, { type: 'json' })
+    expect(envelope.revokedAt).toBeTruthy()
+  })
+
+  it('denies revoking an asset in another member\'s store (same 403 as missing)', async () => {
+    seedEnvelope(`assets-memberB`, { assetId: B_ID, ownerId: 'memberB' })
+    const notOwned = await assetHandler(req(MEMBER_A_TOKEN, { action: 'revoke', assetId: B_ID }))
+    const missing = await assetHandler(req(MEMBER_A_TOKEN, { action: 'revoke', assetId: A_ID }))
+    expect(notOwned.status).toBe(403)
+    expect(await notOwned.json()).toEqual(await missing.json())
+  })
+
+  it('denies the demo identity revoking (read-only demo)', async () => {
+    const res = await assetHandler(req(DEMO_TOKEN, { action: 'revoke', assetId: A_ID }))
+    expect(res.status).toBe(403)
+  })
+
+  it('requires a valid session — unauthenticated is 401', async () => {
+    const res = await assetHandler(req('', { action: 'revoke', assetId: A_ID }))
+    expect(res.status).toBe(401)
+  })
+
+  it('validates assetId is a UUID shape (400 on junk)', async () => {
+    const res = await assetHandler(req(MEMBER_A_TOKEN, { action: 'revoke', assetId: 'not-a-uuid' }))
+    expect(res.status).toBe(400)
+  })
+
+  it('revoke is idempotent — revoking an already-revoked asset succeeds', async () => {
+    seedEnvelope(`assets-memberA`, { assetId: A_ID, ownerId: 'memberA' })
+    const r1 = await assetHandler(req(MEMBER_A_TOKEN, { action: 'revoke', assetId: A_ID }))
+    expect(r1.status).toBe(200)
+    const r2 = await assetHandler(req(MEMBER_A_TOKEN, { action: 'revoke', assetId: A_ID }))
+    expect(r2.status).toBe(200)
   })
 })

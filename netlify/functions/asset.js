@@ -8,10 +8,12 @@
 //   sign   { action: 'sign', assetId }   -> 200 { url, expiresAt, mimeType }
 //   list                                  -> 200 { assets: [{ assetId, mimeType, size, createdAt }] }
 //   delete { action: 'delete', assetId }  -> 200 { ok: true }
+//   revoke { action: 'revoke', assetId }  -> 200 { ok: true }
 //
 // Security properties (SEC-7.3, #340):
 //   - Every action routes through enforce() (policy.js): asset:sign /
-//     asset:delete deny the read-only demo identity; asset:list is owner-self.
+//     asset:delete / asset:revoke deny the read-only demo identity;
+//     asset:list is owner-self.
 //   - The asset store is resolved from the SESSION user.id (asset-store.js
 //     namespaces `assets-<userId>`), never a client-supplied owner id.
 //   - Non-enumeration (SEC-7.1): signing an asset that is missing OR whose
@@ -23,14 +25,26 @@
 //     that ever appears in DTOs.
 //   - FAILS CLOSED (CWE-287/346): if ASSET_SIGN_SECRET is not configured, sign
 //     refuses with 503 — never a default-open URL.
-//   - Session revocation does NOT retroactively revoke an already-issued
-//     10-minute URL — an accepted, bounded trade-off (the token is single-
-//     object read-only and short-lived). Documented in docs/secure-asset-access.md.
+//   - SEC-7.3.x (#385): asset:sign is rate-limited per-identity+IP (30/min
+//     default). The serving layer (serve.js) checks per-asset revokedAt for
+//     instant revocation — a revoked asset's already-issued signed URLs are
+//     rejected regardless of their TTL.
 
 import { getAssetStore } from './_shared/asset-store'
 import { isAssetSignConfigured, issueAssetToken } from './_shared/asset-sign'
 import { enforce, forbidden } from './_shared/policy'
 import { json, readJsonBody, safeError } from './_shared/security'
+import { getStore } from '@netlify/blobs'
+import { rateLimitGuard, rateLimitIdentity } from './_shared/rate-limit'
+import { anomalyScope } from './_shared/anomaly'
+
+const RATE_LIMITS_STORE = 'runout-rate-limits'
+// Per-identity + IP rate limit for asset:sign (SEC-7.3.x, #385). Default 30
+// signed-URL mints per minute — generous for normal use, stops a runaway client
+// from churning signed URLs. Evaluated at runtime so tests can change the env.
+function assetSignRateLimit() {
+  return Number(process.env.RUNOUT_ASSET_SIGN_RATE_LIMIT) || 30
+}
 
 // Asset blob keys are prefixed so they never collide with index/metadata keys
 // in the same per-user store.
@@ -45,10 +59,10 @@ async function readBody(req) {
 
 function validateAction(body) {
   const { action, assetId } = body
-  if (action !== 'sign' && action !== 'list' && action !== 'delete') {
+  if (action !== 'sign' && action !== 'list' && action !== 'delete' && action !== 'revoke') {
     return json(400, { error: 'Unknown action.' })
   }
-  if (action === 'sign' || action === 'delete') {
+  if (action === 'sign' || action === 'delete' || action === 'revoke') {
     if (typeof assetId !== 'string' || !assetId.trim()) return json(400, { error: 'Missing assetId.' })
     // Asset ids are UUIDs assigned server-side; reject anything that isn't one
     // (tight shape, no injection into blob keys).
@@ -77,6 +91,7 @@ export default async function asset(req) {
       case 'sign': return await signAction(req, body)
       case 'list': return await listAction(req)
       case 'delete': return await deleteAction(req, body)
+      case 'revoke': return await revokeAction(req, body)
       default: return json(400, { error: 'Unknown action.' })
     }
   } catch (err) {
@@ -85,13 +100,30 @@ export default async function asset(req) {
   }
 }
 
-// asset:sign — demo denied, owner-self. The store namespace is derived from the
-// SESSION user.id only; a foreign owner/tenant/asset id can never address
-// another namespace.
+// asset:sign — demo denied, owner-self. Rate-limited per-identity+IP
+// (SEC-7.3.x, #385). The store namespace is derived from the SESSION user.id
+// only; a foreign owner/tenant/asset id can never address another namespace.
 async function signAction(req, body) {
   const auth = await enforce(req, 'asset:sign')
   if (auth.error) return auth.error
   const user = auth.user
+
+  // SEC-7.3.x (#385): rate-limit asset:sign per-identity+IP. The demo identity
+  // keys on client IP so one demo visitor can't throttle every other demo
+  // visitor. Skipped when there's no identity to key on.
+  const identity = rateLimitIdentity(user, req)
+  if (identity) {
+    const burstScope = user.role === 'demo' ? anomalyScope('rlx:asset:sign', identity) : undefined
+    const rl = await rateLimitGuard({
+      store: getStore(RATE_LIMITS_STORE),
+      scope: 'asset:sign',
+      limit: assetSignRateLimit(),
+      identity,
+      anomalyStore: getStore(RATE_LIMITS_STORE),
+      burstScope,
+    })
+    if (rl) return rl
+  }
 
   const found = await lookupOwn(user.id, body.assetId)
   if (!found) return assetNotFound()
@@ -120,6 +152,20 @@ async function deleteAction(req, body) {
   const existing = await lookupOwn(user.id, body.assetId)
   if (!existing || existing.ownerId !== user.id) return assetNotFound()
   await deleteOwn(user.id, body.assetId)
+  return json(200, { ok: true })
+}
+
+// asset:revoke — instant revocation (SEC-7.3.x, #385). Sets revokedAt on the
+// envelope so the serving layer (serve.js) rejects already-issued signed URLs.
+// Owner-self only; non-owner is the same non-enumerating FORBIDDEN as missing.
+// Demo is denied (read-only).
+async function revokeAction(req, body) {
+  const auth = await enforce(req, 'asset:revoke')
+  if (auth.error) return auth.error
+  const user = auth.user
+  const existing = await lookupOwn(user.id, body.assetId)
+  if (!existing || existing.ownerId !== user.id) return assetNotFound()
+  await revokeOwn(user.id, body.assetId)
   return json(200, { ok: true })
 }
 
@@ -153,6 +199,17 @@ async function listOwn(userId) {
   return assets
 }
 
+// Set revokedAt on the envelope so the serving layer rejects already-issued
+// signed URLs. The envelope is read, updated with the current timestamp, and
+// re-saved. Idempotent: revoking an already-revoked asset is a no-op success.
+async function revokeOwn(userId, assetId) {
+  const store = getAssetStore(userId)
+  const envelope = await store.get(`${ASSET_KEY_PREFIX}${assetId}`, { type: 'json' })
+  if (!envelope) return // already gone — nothing to revoke
+  envelope.revokedAt = new Date().toISOString()
+  await store.setJSON(`${ASSET_KEY_PREFIX}${assetId}`, envelope)
+}
+
 async function deleteOwn(userId, assetId) {
   const store = getAssetStore(userId)
   await store.delete(`${ASSET_KEY_PREFIX}${assetId}`)
@@ -172,8 +229,8 @@ async function mintSignedUrl(user, envelope) {
   })
   // Asset IDs (not raw signed URLs) are the only thing ever in DTOs; the
   // signed URL token is returned exactly once, on demand, from this dedicated
-  // action. The future serving/object-store layer validates it with
-  // verifyAssetToken() (single-object read-only, bounded TTL).
+  // action. The serving layer (serve.js) validates it with verifyAssetToken()
+  // (single-object read-only, bounded TTL) and checks per-asset revokedAt.
   return json(200, {
     url: signed,
     expiresAt,
