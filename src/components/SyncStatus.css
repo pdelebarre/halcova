@@ -77,3 +77,30 @@
 @media (prefers-reduced-motion: reduce) {
   .sync-status { animation: none; }
 }
+
+/* M3 #161: conflict resolution entry point */
+
+.sync-status-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-status-conflict-btn {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-danger-bright, #ef4444);
+  background: var(--color-danger-bg, rgba(239, 68, 68, 0.08));
+  color: var(--color-danger-bright, #ef4444);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: filter 0.15s;
+}
+
+.sync-status-conflict-btn:hover {
+  filter: brightness(1.1);
+}

@@ -36,9 +36,12 @@ import {
   saveItems,
   deleteItem as localDeleteItem,
   clearTombstone,
+  getItem,
   getTombstones,
   SYNC_STATUS,
 } from '../repositories/localDatabase'
+import { checkConflict, ConflictError, determineEntityType } from './conflictResolver'
+import { saveConflict } from './conflictStore'
 
 const SYNC_FN_BASE = '/.netlify/functions/sync'
 
@@ -138,12 +141,16 @@ export function persistMetrics(userId, metrics) {
 /**
  * Push pending outbox operations to the server sync endpoint.
  *
+ * Sends the base version (serverVersion) with each mutation for OCC.
+ * Handles 'conflict' status from the server by persisting a conflict
+ * record locally.
+ *
  * @param {object} opts
  * @param {string} opts.userId
  * @param {string} opts.token
  * @param {string} [opts.collection='records']
  * @param {number} [opts.now=Date.now()]
- * @returns {Promise<{attempted:number, pushed:number, failed:number, failedOps:Array<{opId:string,message:string}>, latencyMs:number}>}
+ * @returns {Promise<{attempted:number, pushed:number, failed:number, conflicted:number, failedOps:Array<{opId:string,message:string}>, latencyMs:number}>}
  */
 export async function pushPendingOps({
   userId,
@@ -153,21 +160,33 @@ export async function pushPendingOps({
 } = {}) {
   const start = performance.now()
   const ops = await listPendingOps(userId, { now, token })
-  const result = { attempted: 0, pushed: 0, failed: 0, failedOps: [], latencyMs: 0 }
+  const result = { attempted: 0, pushed: 0, failed: 0, conflicted: 0, failedOps: [], latencyMs: 0 }
 
   if (ops.length === 0) {
     result.latencyMs = Math.round(performance.now() - start)
     return result
   }
 
-  // Build the batch payload
-  const operations = ops.map((op) => ({
-    opId: op.opId,
-    kind: op.kind,
-    collection: op.collection || collection,
-    item: op.pendingItem || undefined,
-    itemId: op.serverId || undefined,
-    patch: op.patch || undefined,
+  // Build the batch payload, including base version for OCC
+  const operations = await Promise.all(ops.map(async (op) => {
+    let baseVersion = 0
+    // Look up the local record to get the server version
+    if (op.serverId || op.pendingItem?.uuid) {
+      const uuid = op.pendingItem?.uuid || `server:${op.serverId}`
+      const localRecord = await getItem(userId, uuid)
+      if (localRecord) {
+        baseVersion = localRecord.serverVersion || 0
+      }
+    }
+    return {
+      opId: op.opId,
+      kind: op.kind,
+      collection: op.collection || collection,
+      item: op.pendingItem || undefined,
+      itemId: op.serverId || undefined,
+      patch: op.patch || undefined,
+      baseVersion,
+    }
   }))
 
   try {
@@ -203,11 +222,36 @@ export async function pushPendingOps({
         if (r.item?.id) {
           await saveItem(userId, r.item, {
             now,
-            serverVersion: 1,
+            serverVersion: r.item.serverVersion || r.serverVersion || 1,
             syncStatus: SYNC_STATUS.SYNCED,
           })
         }
         result.pushed += 1
+      } else if (r.status === 'conflict') {
+        // Conflict detected — persist locally and mark op as failed
+        result.conflicted = (result.conflicted || 0) + 1
+        result.failed += 1
+        result.failedOps.push({ opId: r.opId, message: r.error || 'Conflict' })
+
+        await markFailed(userId, r.opId, r.error || 'Conflict detected', { now, token })
+
+        // Build and persist a conflict record
+        const op = ops.find((o) => o.opId === r.opId)
+        if (op && r.serverItem) {
+          const conflict = checkConflict({
+            uuid: op.pendingItem?.uuid || `server:${op.serverId}`,
+            localItem: op.pendingItem || {},
+            serverItem: r.serverItem,
+            serverVersion: r.serverVersion || 0,
+            localVersion: r.localVersion || 0,
+            baseVersion: r.expectedVersion || 0,
+            scope: `user:${userId}`,
+            entityType: determineEntityType(op.pendingItem || r.serverItem),
+          })
+          if (conflict) {
+            await saveConflict(userId, conflict)
+          }
+        }
       } else {
         await markFailed(userId, r.opId, r.error || 'Rejected by server', { now, token })
         result.failed += 1
@@ -349,7 +393,7 @@ export async function syncCycle({
   }
 
   // --- Push phase with retry ---
-  let pushResult = { attempted: 0, pushed: 0, failed: 0, failedOps: [], latencyMs: 0 }
+  let pushResult = { attempted: 0, pushed: 0, failed: 0, conflicted: 0, failedOps: [], latencyMs: 0 }
   let retries = 0
 
   while (retries <= maxRetries) {
@@ -371,7 +415,10 @@ export async function syncCycle({
   result.pullResult = pullResult
 
   // --- Determine overall status ---
-  if (pushResult.failed > 0) {
+  const hasConflicts = pushResult.conflicted > 0
+  if (hasConflicts) {
+    result.status = 'conflict'
+  } else if (pushResult.failed > 0) {
     result.status = 'partial'
   } else if (pushResult.pushed > 0 || pullResult.pulled > 0 || pullResult.deleted > 0) {
     result.status = 'synced'
@@ -386,6 +433,7 @@ export async function syncCycle({
     pushAttempted: pushResult.attempted,
     pushPushed: pushResult.pushed,
     pushFailed: pushResult.failed,
+    pushConflicted: pushResult.conflicted,
     pullPulled: pullResult.pulled,
     pullDeleted: pullResult.deleted,
     latencyMs: result.totalLatencyMs,
@@ -424,12 +472,14 @@ export function defaultMetrics() {
  */
 export function updateMetrics(userId, event) {
   const existing = readPersistedMetrics(userId) || defaultMetrics()
+  const conflictCount = existing.conflictCount + (event.pushConflicted || 0)
   const updated = {
     ...existing,
     totalPushed: existing.totalPushed + (event.pushPushed || 0),
     totalFailed: existing.totalFailed + (event.pushFailed || 0),
     totalPulled: existing.totalPulled + (event.pullPulled || 0),
     totalDeleted: existing.totalDeleted + (event.pullDeleted || 0),
+    conflictCount,
     lastSyncAt: new Date(event.now || Date.now()).toISOString(),
     lastStatus: event.status || existing.lastStatus,
     lastLatencyMs: event.latencyMs || 0,
@@ -454,7 +504,7 @@ export function getSyncMetrics(userId) {
 function createEmptyResult(status) {
   return {
     status,
-    pushResult: { attempted: 0, pushed: 0, failed: 0, failedOps: [], latencyMs: 0 },
+    pushResult: { attempted: 0, pushed: 0, failed: 0, conflicted: 0, failedOps: [], latencyMs: 0 },
     pullResult: { pulled: 0, deleted: 0, cursor: null, hasMore: false, latencyMs: 0 },
     totalLatencyMs: 0,
     metrics: null,

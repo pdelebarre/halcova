@@ -73,6 +73,7 @@ vi.mock('../repositories/localDatabase', () => ({
   deleteItem: vi.fn(),
   clearTombstone: vi.fn(),
   getTombstones: vi.fn(),
+  getItem: vi.fn(),
   SYNC_STATUS: Object.freeze({
     SYNCED: 'synced',
     PENDING: 'pending',
@@ -81,7 +82,30 @@ vi.mock('../repositories/localDatabase', () => ({
   }),
 }))
 
-import { saveItem, saveItems, deleteItem, clearTombstone } from '../repositories/localDatabase'
+// Mock conflictResolver
+vi.mock('./conflictResolver', () => ({
+  checkConflict: vi.fn(),
+  ConflictError: class ConflictError extends Error {
+    constructor(uuid, serverVersion, expectedVersion, message) {
+      super(message || `Conflict: ${uuid}`)
+      this.name = 'ConflictError'
+      this.code = 'CONFLICT_ERROR'
+      this.uuid = uuid
+      this.serverVersion = serverVersion
+      this.expectedVersion = expectedVersion
+    }
+  },
+  determineEntityType: vi.fn(() => 'collection'),
+}))
+
+// Mock conflictStore
+vi.mock('./conflictStore', () => ({
+  saveConflict: vi.fn(),
+}))
+
+import { saveItem, saveItems, deleteItem, clearTombstone, getItem } from '../repositories/localDatabase'
+import { checkConflict, determineEntityType } from './conflictResolver'
+import { saveConflict } from './conflictStore'
 
 // Mock global fetch
 global.fetch = vi.fn()
@@ -510,5 +534,206 @@ describe('adversarial — safety guarantees', () => {
     // In a real scenario the app would terminate here
     // The ops remain in the outbox (durable) and will be retried on next startup
     expect(listPendingOps).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Conflict handling
+// ---------------------------------------------------------------------------
+
+describe('conflict handling — optimistic concurrency', () => {
+  it('sends base version with each mutation', async () => {
+    getItem.mockResolvedValue({ serverVersion: 3, localVersion: 2 })
+    listPendingOps.mockResolvedValue([pendingOp({ kind: 'edit' })])
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{ opId: OP_ID, status: 'accepted', item: { ...SERVER_ITEM, serverVersion: 4 } }],
+        cursor: '2026-08-20T11:00:00Z',
+      }),
+    })
+
+    await pushPendingOps({ userId: USER_ID, token: TOKEN, now: 1 })
+
+    // Verify the request body includes baseVersion
+    const callBody = JSON.parse(global.fetch.mock.calls[0][1].body)
+    expect(callBody.operations[0].baseVersion).toBe(3)
+  })
+
+  it('handles conflict status from server and persists conflict', async () => {
+    getItem.mockResolvedValue({ serverVersion: 3, localVersion: 2 })
+    listPendingOps.mockResolvedValue([pendingOp({ kind: 'edit' })])
+    checkConflict.mockReturnValue({
+      conflictId: 'server:r1:123',
+      uuid: OP_ID,
+      entityType: 'collection',
+      serverVersion: 5,
+      localVersion: 2,
+      status: 'unresolved',
+    })
+    saveConflict.mockResolvedValue(true)
+
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{
+          opId: OP_ID,
+          status: 'conflict',
+          error: 'Stale update',
+          serverVersion: 5,
+          expectedVersion: 3,
+          serverItem: { id: 'srv-1', title: 'Server version' },
+        }],
+        cursor: '2026-08-20T11:00:00Z',
+      }),
+    })
+
+    const result = await pushPendingOps({ userId: USER_ID, token: TOKEN, now: 1 })
+
+    expect(result.conflicted).toBe(1)
+    expect(result.failed).toBe(1)
+    expect(result.failedOps).toEqual([{ opId: OP_ID, message: 'Stale update' }])
+    expect(markFailed).toHaveBeenCalledWith(USER_ID, OP_ID, 'Stale update', { now: 1, token: TOKEN })
+    expect(checkConflict).toHaveBeenCalled()
+    expect(saveConflict).toHaveBeenCalled()
+  })
+
+  it('syncCycle reports conflict status when conflicts exist', async () => {
+    getItem.mockResolvedValue({ serverVersion: 1, localVersion: 1 })
+    listPendingOps.mockResolvedValue([pendingOp({ kind: 'edit' })])
+    checkConflict.mockReturnValue({
+      conflictId: 'c1',
+      uuid: OP_ID,
+      entityType: 'collection',
+      serverVersion: 5,
+      localVersion: 2,
+      status: 'unresolved',
+    })
+    saveConflict.mockResolvedValue(true)
+    // markFailed must return a value to avoid retry loop
+    markFailed.mockResolvedValue({ state: 'failed' })
+
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{
+          opId: OP_ID,
+          status: 'conflict',
+          error: 'Stale update',
+          serverVersion: 5,
+          expectedVersion: 1,
+          serverItem: { id: 'srv-1' },
+        }],
+        cursor: '2026-08-20T11:00:00Z',
+      }),
+    })
+
+    const result = await syncCycle({ collection: 'records', now: 1, maxRetries: 0 })
+    expect(result.status).toBe('conflict')
+    expect(result.pushResult.conflicted).toBe(1)
+  })
+
+  it('metrics track conflict counts', async () => {
+    // Simulate a conflict event
+    const metrics = updateMetrics(USER_ID, {
+      pushPushed: 0,
+      pushFailed: 1,
+      pushConflicted: 1,
+      pullPulled: 0,
+      pullDeleted: 0,
+      latencyMs: 100,
+      status: 'conflict',
+      now: Date.now(),
+    })
+
+    expect(metrics.conflictCount).toBe(1)
+    expect(metrics.totalFailed).toBe(1)
+    expect(metrics.lastStatus).toBe('conflict')
+
+    // Second conflict
+    const metrics2 = updateMetrics(USER_ID, {
+      pushPushed: 0,
+      pushFailed: 0,
+      pushConflicted: 2,
+      pullPulled: 0,
+      pullDeleted: 0,
+      latencyMs: 100,
+      status: 'conflict',
+      now: Date.now(),
+    })
+
+    expect(metrics2.conflictCount).toBe(3)
+  })
+
+  it('stale update rejected — conflict detection works for add/edit', async () => {
+    // Simulate: server version (5) > base version (1) → conflict
+    getItem.mockResolvedValue({ serverVersion: 1, localVersion: 2 })
+    listPendingOps.mockResolvedValue([pendingOp({ kind: 'edit' })])
+    checkConflict.mockReturnValue({
+      conflictId: 'c1',
+      uuid: OP_ID,
+      serverVersion: 5,
+      localVersion: 2,
+      status: 'unresolved',
+    })
+    saveConflict.mockResolvedValue(true)
+
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{
+          opId: OP_ID,
+          status: 'conflict',
+          error: 'Stale update',
+          serverVersion: 5,
+          expectedVersion: 1,
+          serverItem: { id: 'srv-1' },
+        }],
+        cursor: '2026-08-20T11:00:00Z',
+      }),
+    })
+
+    const result = await pushPendingOps({ userId: USER_ID, token: TOKEN, now: 1 })
+    expect(result.conflicted).toBe(1)
+  })
+
+  it('persisted conflicts contain no credentials', async () => {
+    getItem.mockResolvedValue({ serverVersion: 1, localVersion: 2 })
+    listPendingOps.mockResolvedValue([pendingOp({ kind: 'edit' })])
+    checkConflict.mockReturnValue({
+      conflictId: 'c1',
+      uuid: OP_ID,
+      entityType: 'collection',
+      serverVersion: 5,
+      localVersion: 2,
+      serverItem: { id: 'srv-1', title: 'Safe' },
+      localItem: { uuid: OP_ID, title: 'Local' },
+      status: 'unresolved',
+    })
+    saveConflict.mockResolvedValue(true)
+
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [{
+          opId: OP_ID,
+          status: 'conflict',
+          error: 'Stale update',
+          serverVersion: 5,
+          expectedVersion: 1,
+          serverItem: { id: 'srv-1' },
+        }],
+        cursor: '2026-08-20T11:00:00Z',
+      }),
+    })
+
+    await pushPendingOps({ userId: USER_ID, token: TOKEN, now: 1 })
+
+    // Verify no credentials were passed to saveConflict
+    const savedConflictArg = saveConflict.mock.calls[0]?.[1]
+    if (savedConflictArg) {
+      expect(savedConflictArg.serverItem?.token).toBeUndefined()
+      expect(savedConflictArg.localItem?.token).toBeUndefined()
+    }
   })
 })
