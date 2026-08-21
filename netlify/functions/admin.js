@@ -232,7 +232,7 @@ async function handleUpdateUser(body) {
 //     any read-through writes that landed in Blobs while Postgres was down —
 //     parity with deleteUserCollections' dual-clean.
 // Idempotent in both backends (a member with no reviews is a no-op).
-async function deleteMemberReviews(userId) {
+export async function deleteMemberReviews(userId) {
   if (!isPostgresConfigured()) {
     await createReviewsBlobStore().deleteByAuthor(userId)
     return
@@ -258,7 +258,7 @@ async function deleteMemberReviews(userId) {
 //     the ordering in handleDeleteUser). A best-effort Blobs sweep then catches
 //     any read-through writes that landed in Blobs while Postgres was down.
 // Idempotent in both backends (a member with no feedback is a no-op).
-async function deleteMemberFeedback(userId) {
+export async function deleteMemberFeedback(userId) {
   if (!isPostgresConfigured()) {
     await createFeedbackBlobStore().deleteByAuthor(userId)
     return

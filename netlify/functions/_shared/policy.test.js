@@ -36,6 +36,7 @@ describe('POLICY predicate table (SEC-7.1)', () => {
     // auth identity
     expect(POLICY['auth:logout']).toEqual({ owner: 'self' })
     expect(POLICY['auth:logoutAll']).toEqual({ owner: 'self' })
+    expect(POLICY['auth:deleteAccount']).toEqual({ owner: 'self', deny: ['demo'] })
     // admin + seed
     expect(POLICY['admin:*']).toEqual({ requires: 'admin' })
     expect(POLICY['seed-demo:seed']).toEqual({ requires: 'admin' })

@@ -57,6 +57,7 @@ export const POLICY = {
   'auth:me': {},
   'auth:logout': { owner: 'self' },
   'auth:logoutAll': { owner: 'self' },
+  'auth:deleteAccount': { owner: 'self', deny: ['demo'] },
 
   // --- admin (/admin, /seed-demo) ------------------------------------------
   'admin:*': { requires: 'admin' },
