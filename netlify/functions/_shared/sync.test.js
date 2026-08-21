@@ -18,70 +18,70 @@ vi.mock('@netlify/blobs', () => ({
 import { getStore } from '@netlify/blobs'
 
 // Mock shared modules
-vi.mock('./_shared/security', () => ({
+vi.mock('./security', () => ({
   json: vi.fn((status, body, headers) => ({ status, body, headers })),
   readJsonBody: vi.fn(),
   safeError: vi.fn((err) => ({ status: 500, body: { error: 'Internal error', code: 'INTERNAL' } })),
 }))
 
-vi.mock('./_shared/session-auth', () => ({
+vi.mock('./session-auth', () => ({
   resolveSession: vi.fn(),
 }))
 
-vi.mock('./_shared/policy', () => ({
+vi.mock('./policy', () => ({
   enforce: vi.fn(),
   forbidden: vi.fn(() => ({ status: 403, body: { error: 'Not authorized.', code: 'FORBIDDEN' } })),
 }))
 
-vi.mock('./_shared/collection-store', () => ({
+vi.mock('./collection-store', () => ({
   COLLECTIONS: { records: true, books: true },
   readIndex: vi.fn(),
   writeIndex: vi.fn(),
 }))
 
-vi.mock('./_shared/users', () => ({
+vi.mock('./users', () => ({
   storeNameFor: vi.fn((id) => `user:${id}`),
 }))
 
-vi.mock('./_shared/item-fields', () => ({
+vi.mock('./item-fields', () => ({
   pickItemFields: vi.fn((item) => item),
   validateItem: vi.fn(() => ({ error: null, item: {} })),
 }))
 
-vi.mock('./_shared/plans', () => ({
+vi.mock('./plans', () => ({
   planLimitFor: vi.fn(() => null),
 }))
 
-vi.mock('./_shared/counts', () => ({
+vi.mock('./counts', () => ({
   ensureOwnedCount: vi.fn(() => 0),
   adjustOwnedCount: vi.fn(),
 }))
 
-vi.mock('./_shared/list-cache', () => ({
+vi.mock('./list-cache', () => ({
   invalidateListCache: vi.fn(),
 }))
 
-vi.mock('./_shared/filter', () => ({
+vi.mock('./filter', () => ({
   filterFor: vi.fn((user, type, item) => item),
 }))
 
-vi.mock('./_shared/postgres', () => ({
+vi.mock('./postgres', () => ({
   isPostgresConfigured: vi.fn(() => false),
 }))
 
-vi.mock('./_shared/repository', () => ({
+vi.mock('./repository', () => ({
   getRepository: vi.fn(),
 }))
 
-import { json, readJsonBody } from './_shared/security'
-import { resolveSession } from './_shared/session-auth'
-import { COLLECTIONS, readIndex, writeIndex } from './_shared/collection-store'
-import { storeNameFor } from './_shared/users'
-import { pickItemFields, validateItem } from './_shared/item-fields'
-import { planLimitFor } from './_shared/plans'
-import { ensureOwnedCount, adjustOwnedCount } from './_shared/counts'
-import { invalidateListCache } from './_shared/list-cache'
-import { filterFor } from './_shared/filter'
+import { json, readJsonBody } from './security'
+import { resolveSession } from './session-auth'
+import { COLLECTIONS, readIndex, writeIndex } from './collection-store'
+import { storeNameFor } from './users'
+import { pickItemFields, validateItem } from './item-fields'
+import { planLimitFor } from './plans'
+import { ensureOwnedCount, adjustOwnedCount } from './counts'
+import { invalidateListCache } from './list-cache'
+import { filterFor } from './filter'
 
 const USER = {
   id: 'u1',
@@ -133,7 +133,7 @@ describe('sync push endpoint', () => {
     readIndex.mockResolvedValue([])
     writeIndex.mockResolvedValue(undefined)
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +159,7 @@ describe('sync push endpoint', () => {
       },
     })
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,7 +183,7 @@ describe('sync push endpoint', () => {
       },
     })
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -202,7 +202,7 @@ describe('sync push endpoint', () => {
       },
     })
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -220,7 +220,7 @@ describe('sync push endpoint', () => {
       },
     })
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -251,7 +251,7 @@ describe('sync push endpoint', () => {
     })
     readIndex.mockResolvedValue([])
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -285,7 +285,7 @@ describe('sync pull endpoint', () => {
     }())
     mockStore.setJSON.mockResolvedValue(undefined)
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/pull', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -310,7 +310,7 @@ describe('sync pull endpoint', () => {
       // No entries
     }())
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/pull', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -330,7 +330,7 @@ describe('sync pull endpoint', () => {
       },
     })
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/pull', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -349,7 +349,7 @@ describe('sync security', () => {
   it('requires authentication', async () => {
     resolveSession.mockResolvedValue({ error: { status: 401, body: { error: 'Not signed in.' } } })
 
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -360,7 +360,7 @@ describe('sync security', () => {
   })
 
   it('rejects unsupported methods', async () => {
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/push', {
       method: 'GET',
     })
@@ -370,7 +370,7 @@ describe('sync security', () => {
   })
 
   it('rejects unknown paths', async () => {
-    const handler = await import('./sync')
+    const handler = await import('../sync')
     const req = new Request('http://localhost/.netlify/functions/sync/unknown', {
       method: 'POST',
     })
