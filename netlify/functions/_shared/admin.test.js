@@ -1057,3 +1057,153 @@ describe('dashboard-counts fallback — redacted logging (ADMIN-EPIC-1, #264, CW
     }
   })
 })
+
+// (ADMIN-3.2, #304) — secure AI provider-profile administration over the admin
+// HTTP surface. requireAdmin gates every AI action (member/demo/forged -> 403/
+// 401); the facade is the real one (not mocked), so create persists a secret
+// encrypted-at-rest and never returns it. A deterministic server-side key is
+// set so encrypt/decrypt work hermetically.
+describe('admin AI provider profiles (#304)', () => {
+  beforeEach(() => {
+    process.env.RUNOUT_AI_SECRET_KEY = 'test-admin-secret-key-0000'
+    // Clear the AI config store between tests.
+    delete stores['runout-ai-config']
+  })
+
+  const AI_BODY = {
+    action: 'aiCreate',
+    name: 'OpenAI Primary',
+    providerType: 'openai',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    apiKey: 'sk-http-secret-9999',
+  }
+
+  it('GET ?providers=1 is requireAdmin-gated', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    const member = await sessionTokenFor({ userId: 'u1', role: 'member' })
+    expect((await getWith(member, '?providers=1')).status).toBe(403)
+    expect((await getWith(await demoSessionToken(), '?providers=1')).status).toBe(403)
+    expect((await getWith('forged-token', '?providers=1')).status).toBe(401)
+  })
+
+  it('POST aiCreate is requireAdmin-gated', async () => {
+    usersMock.getUser.mockResolvedValue(MEMBER)
+    const member = await sessionTokenFor({ userId: 'u1', role: 'member' })
+    const res = await handler({
+      ...req('POST', AI_BODY),
+      headers: { get: (k) => (String(k).toLowerCase() === 'authorization' ? `Bearer ${member}` : null) },
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('creates a profile with the secret stored encrypted and never returned', async () => {
+    const res = await post(AI_BODY)
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.profile.secretSet).toBe(true)
+    expect(body.profile.secretCiphertext).toBeUndefined()
+    expect(JSON.stringify(body)).not.toContain('sk-http-secret-9999')
+
+    // The Blobs store holds only the ciphertext, never the plaintext.
+    const stored = stores['runout-ai-config'].data.get('profiles')
+    expect(JSON.stringify(stored)).not.toContain('sk-http-secret-9999')
+
+    // GET ?providers=1 returns the masked profile, never the secret.
+    const listRes = await handler(req('GET', undefined, '?providers=1'))
+    expect(listRes.status).toBe(200)
+    const list = await listRes.json()
+    expect(list.providers.length).toBe(1)
+    expect(JSON.stringify(list)).not.toContain('sk-http-secret-9999')
+    expect(list.providers[0].secretSet).toBe(true)
+  })
+
+  it('rejects an unsafe endpoint over the HTTP surface (never persisted)', async () => {
+    const res = await post({ ...AI_BODY, baseUrl: 'http://api.openai.com/v1' })
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.code).toBe('INSECURE_ENDPOINT')
+  })
+
+  it('aiDelete removes the profile (admin-gated)', async () => {
+    const created = await (await post(AI_BODY)).json()
+    const del = await post({ action: 'aiDelete', profileId: created.profile.id })
+    expect(del.status).toBe(200)
+    const list = await (await handler(req('GET', undefined, '?providers=1'))).json()
+    expect(list.providers.length).toBe(0)
+  })
+
+  it('aiTest runs a connection test and reports failure without leaking the secret', async () => {
+    const created = await (await post(AI_BODY)).json()
+    const originalFetch = global.fetch
+    // A deterministic 401 so the real facade's health check fails offline.
+    global.fetch = vi.fn(async () => ({ ok: false, status: 401 }))
+    try {
+      const res = await post({ action: 'aiTest', profileId: created.profile.id })
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.code).toBe('PROVIDER_AUTH')
+      expect(JSON.stringify(body)).not.toContain('sk-http-secret-9999')
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
+
+  it('aiActivate requires a passing connection test (fails offline, never activates)', async () => {
+    const created = await (await post(AI_BODY)).json()
+    const originalFetch = global.fetch
+    global.fetch = vi.fn(async () => ({ ok: false, status: 401 }))
+    try {
+      const res = await post({ action: 'aiActivate', profileId: created.profile.id })
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body.code).toBe('TEST_REQUIRED')
+      const list = await (await handler(req('GET', undefined, '?providers=1'))).json()
+      expect(list.providers[0].active).toBe(false)
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
+
+  it('aiActivate succeeds and is atomic when the connection test passes', async () => {
+    const created = await (await post(AI_BODY)).json()
+    const originalFetch = global.fetch
+    global.fetch = vi.fn(async () => ({ ok: true, status: 200, text: async () => '{}' }))
+    try {
+      const res = await post({ action: 'aiActivate', profileId: created.profile.id })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.profile.active).toBe(true)
+      expect(JSON.stringify(body)).not.toContain('sk-http-secret-9999')
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
+
+  it('aiUpdate/aiDelete/aiTest/aiActivate reject a missing profileId (400)', async () => {
+    for (const action of ['aiUpdate', 'aiDelete', 'aiTest', 'aiActivate']) {
+      const res = await post({ action })
+      expect(res.status, action).toBe(400)
+      const body = await res.json()
+      expect(body.code, action).toBe('MISSING_ID')
+    }
+  })
+
+  it('aiUpdate/aiDelete return 404 and aiTest/aiActivate return 400 for an unknown profileId', async () => {
+    const unknown = '00000000-0000-0000-0000-000000000099'
+    // aiUpdate/aiDelete surface NOT_FOUND as 404.
+    for (const action of ['aiUpdate', 'aiDelete']) {
+      const res = await post({ action, profileId: unknown })
+      expect(res.status, action).toBe(404)
+      const body = await res.json()
+      expect(body.code, action).toBe('NOT_FOUND')
+    }
+    // aiTest/aiActivate surface NOT_FOUND as 400 (their error contract).
+    for (const action of ['aiTest', 'aiActivate']) {
+      const res = await post({ action, profileId: unknown })
+      expect(res.status, action).toBe(400)
+      const body = await res.json()
+      expect(body.code, action).toBe('NOT_FOUND')
+    }
+  })
+})

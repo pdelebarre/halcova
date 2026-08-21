@@ -18,7 +18,7 @@
 - M4/M5/M6 — NOT started (AI-differentiation / social / commerce; distinct from what was mislabeled).
 
 ## Active workstreams (READY to dispatch)
-- [ ] M1 #303/#304 AI provider abstraction + secure LLM config — AI team awakens (deps #337 done)
+- [ ] M1 #303 AI provider abstraction — MERGED (PR #430) · #304 secure LLM config — IMPLEMENTED (branch m1/ai/304, awaiting independent gates)
 - [ ] M1 #217 SSRF regression suite — SECURITY
 - [ ] M3 #160/#161 sync — gated on accept ADR-0019 first
 - [ ] M2 #319 core (#320/#321/#322) — COLLECTOR + UX

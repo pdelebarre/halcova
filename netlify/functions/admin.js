@@ -28,6 +28,14 @@ import { emailHash, logAudit } from './_shared/audit'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
 import { getDashboardCounts } from './_shared/dashboard-counts'
 import {
+  activateProviderProfile,
+  createProviderProfile,
+  deleteProviderProfile,
+  listProviderProfiles,
+  testProviderProfile,
+  updateProviderProfile,
+} from './_shared/ai/ai-admin'
+import {
   deleteUserCollections,
   getRequest,
   getUser,
@@ -317,6 +325,57 @@ async function handleDeleteReview(body) {
   return json(200, { ok: true })
 }
 
+// (ADMIN-3.2, #304) — secure LLM provider-profile administration. All six are
+// admin-only (the default export's requireAdmin gate rejects a member/demo
+// session before any handler runs) and POST-rate-limited like every other
+// admin write. Each action delegates to the ai-admin facade, which owns the
+// security invariants: secrets are stored encrypted and NEVER returned
+// (masked only), base_url is SSRF-validated before it is written, activation
+// is atomic and only after a passing connection test, and audit events never
+// carry the secret.
+async function handleAiList() {
+  const profiles = await listProviderProfiles()
+  return json(200, { providers: profiles })
+}
+
+async function handleAiCreate(body) {
+  const result = await createProviderProfile(body)
+  if (result.error) return json(400, { error: result.error.message, code: result.error.code })
+  return json(201, result)
+}
+
+async function handleAiUpdate(body) {
+  const v = validateId(body.profileId, 'profileId')
+  if (v.error) return badRequest(v.error)
+  const result = await updateProviderProfile(v.value, body)
+  if (result.error) return json(404, { error: result.error.message, code: result.error.code })
+  return json(200, result)
+}
+
+async function handleAiDelete(body) {
+  const v = validateId(body.profileId, 'profileId')
+  if (v.error) return badRequest(v.error)
+  const result = await deleteProviderProfile(v.value)
+  if (result.error) return json(404, { error: result.error.message, code: result.error.code })
+  return json(200, result)
+}
+
+async function handleAiTest(body) {
+  const v = validateId(body.profileId, 'profileId')
+  if (v.error) return badRequest(v.error)
+  const result = await testProviderProfile(v.value)
+  if (result.error) return json(400, { error: result.error.message, code: result.error.code })
+  return json(200, result)
+}
+
+async function handleAiActivate(body) {
+  const v = validateId(body.profileId, 'profileId')
+  if (v.error) return badRequest(v.error)
+  const result = await activateProviderProfile(v.value)
+  if (result.error) return json(400, { error: result.error.message, code: result.error.code })
+  return json(200, result)
+}
+
 // Validate the ids shared across admin actions (SEC-3.1, #194): requestId,
 // userId and reviewId must be short, non-empty strings. Reused by each handler
 // so the shape checks live in one place instead of being re-derived. The
@@ -445,6 +504,13 @@ export default async (req) => {
       if (wantDashboard) {
         body.counts = await getDashboardCounts({ requests, users })
       }
+      // (ADMIN-3.2, #304) — AI provider-profile listing. Opt-in via
+      // ?providers=1. requireAdmin already gated this GET; profiles are
+      // returned with the secret MASKED (tail only) and never the ciphertext
+      // or plaintext (the ai-admin facade strips them).
+      if (url.searchParams.get('providers') === '1') {
+        body.providers = await listProviderProfiles()
+      }
       return json(200, body)
     }
 
@@ -464,6 +530,12 @@ export default async (req) => {
         case 'hideReview': return handleHideReview(body)
         case 'showReview': return handleShowReview(body)
         case 'deleteReview': return handleDeleteReview(body)
+        // (ADMIN-3.2, #304) — AI provider-profile administration.
+        case 'aiCreate': return await handleAiCreate(body)
+        case 'aiUpdate': return await handleAiUpdate(body)
+        case 'aiDelete': return await handleAiDelete(body)
+        case 'aiTest': return await handleAiTest(body)
+        case 'aiActivate': return await handleAiActivate(body)
         default: return json(400, { error: 'Unknown action.' })
       }
     }

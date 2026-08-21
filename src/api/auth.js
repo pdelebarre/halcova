@@ -167,3 +167,31 @@ export async function adminDeleteUser({ userId }) {
 export async function adminRotate({ userId }) {
   return postJson(ADMIN_URL, { action: 'rotate', userId }, getSessionToken())
 }
+
+// ---- Admin AI settings (ADMIN-3.2, #304) ----
+// Secure LLM provider-profile administration. Secrets are never returned by
+// the backend — the list carries only a `secretMasked` tail + `secretSet`
+// boolean, so the client can show "a secret is set" without ever receiving it.
+export async function adminAiList() {
+  return getJson(`${ADMIN_URL}?providers=1`, getSessionToken())
+}
+
+export async function adminAiCreate({ name, providerType, baseUrl, model, capabilities, apiKey }) {
+  return postJson(ADMIN_URL, { action: 'aiCreate', name, providerType, baseUrl, model, capabilities, apiKey }, getSessionToken())
+}
+
+export async function adminAiUpdate({ profileId, name, providerType, baseUrl, model, capabilities, apiKey, fallbackProviderId }) {
+  return postJson(ADMIN_URL, { action: 'aiUpdate', profileId, name, providerType, baseUrl, model, capabilities, apiKey, fallbackProviderId }, getSessionToken())
+}
+
+export async function adminAiDelete({ profileId }) {
+  return postJson(ADMIN_URL, { action: 'aiDelete', profileId }, getSessionToken())
+}
+
+export async function adminAiTest({ profileId }) {
+  return postJson(ADMIN_URL, { action: 'aiTest', profileId }, getSessionToken())
+}
+
+export async function adminAiActivate({ profileId }) {
+  return postJson(ADMIN_URL, { action: 'aiActivate', profileId }, getSessionToken())
+}

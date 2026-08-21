@@ -307,6 +307,56 @@ describe('OpenAI — SSRF control', () => {
     const [, init] = global.fetch.mock.calls[0]
     expect(init.redirect).toBe('manual')
   })
+
+  it('rejects a base-URL host off the explicit allowlist before fetching (complete)', async () => {
+    const provider = makeProvider({ baseUrl: 'https://api.other.com/v1', allowedHosts: ['api.example.com'] })
+    global.fetch.mockResolvedValue(response(200, chatPayload('{"category":"x","confidence":0.5}')))
+    await expect(provider.complete({ user: 'hi', schema: CLASSIFY_SCHEMA }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.ENDPOINT_NOT_ALLOWED })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('allows a base-URL host on the explicit allowlist (exact or subdomain)', async () => {
+    const provider = makeProvider({ allowedHosts: ['api.example.com'] })
+    global.fetch.mockResolvedValue(response(200, chatPayload('{"category":"x","confidence":0.5}')))
+    const result = await provider.complete({ user: 'hi', schema: CLASSIFY_SCHEMA })
+    expect(result.content.category).toBe('x')
+  })
+
+  it('rejects an off-allowlist host on health before fetching', async () => {
+    const provider = makeProvider({ baseUrl: 'https://api.other.com/v1', allowedHosts: ['api.example.com'] })
+    global.fetch.mockResolvedValue(response(200, '{}'))
+    await expect(provider.health()).rejects.toMatchObject({ code: ProviderErrorCode.ENDPOINT_NOT_ALLOWED })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('enforces the environment allowlist when no explicit list is given', async () => {
+    const prev = process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST
+    process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST = 'api.example.com'
+    try {
+      const provider = makeProvider({ baseUrl: 'https://api.other.com/v1' }) // off-allowlist
+      global.fetch.mockResolvedValue(response(200, chatPayload('{"category":"x","confidence":0.5}')))
+      await expect(provider.complete({ user: 'hi', schema: CLASSIFY_SCHEMA }))
+        .rejects.toMatchObject({ code: ProviderErrorCode.ENDPOINT_NOT_ALLOWED })
+      expect(global.fetch).not.toHaveBeenCalled()
+    } finally {
+      if (prev === undefined) delete process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST
+      else process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST = prev
+    }
+  })
+
+  it('allows any host when no allowlist is configured (default)', async () => {
+    const prev = process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST
+    delete process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST
+    try {
+      const provider = makeProvider()
+      global.fetch.mockResolvedValue(response(200, chatPayload('{"category":"x","confidence":0.5}')))
+      const result = await provider.complete({ user: 'hi', schema: CLASSIFY_SCHEMA })
+      expect(result.content.category).toBe('x')
+    } finally {
+      if (prev !== undefined) process.env.RUNOUT_AI_ENDPOINT_ALLOWLIST = prev
+    }
+  })
 })
 
 describe('OpenAI — health', () => {
