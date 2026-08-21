@@ -41,6 +41,18 @@ export const PAYLOAD_ERROR = Object.freeze({
 // ALLOWED_HOSTS; when none is provided we accept no URL-bearing fields.
 const HTTP_URL_RE = /^https?:\/\/[^/]+\//
 
+// SEC-6.3 #217 — content-type bound for a provider response. A hostile or
+// degenerate upstream must not smuggle a non-JSON body (e.g. an HTML error page
+// or an image) past the JSON-parsing boundary. Fail-closed: a PRESENT
+// content-type that is not JSON (application/json or a +json suffix) is
+// rejected. An ABSENT content-type is allowed — the body is still JSON-parsed
+// and schema/size-guarded, so a non-JSON body fails closed at parse time.
+export function isJsonContentType(contentType) {
+  const ct = String(contentType || '').toLowerCase().split(';')[0].trim()
+  if (!ct) return true // absent -> the JSON.parse boundary still validates
+  return ct === 'application/json' || ct.endsWith('+json')
+}
+
 function hostOf(url) {
   const m = HTTP_URL_RE.exec(String(url || ''))
   if (!m) return null

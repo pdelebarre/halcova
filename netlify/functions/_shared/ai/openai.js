@@ -17,6 +17,7 @@
 import { ProviderError, ProviderErrorCode, boundedOptions, mergeOptions } from './provider'
 import { validateSchema } from './schema'
 import { endpointAllowlistFromEnv } from './ai-endpoint'
+import { isJsonContentType } from '../providers/payload-guard'
 
 // Default OpenAI-compatible chat completions path.
 const CHAT_COMPLETIONS_PATH = '/chat/completions'
@@ -193,6 +194,11 @@ export class OpenAIProvider {
       opts,
     })
 
+    // SEC-6.3 #217: reject a non-JSON content-type fail-closed (a hostile
+    // upstream must not smuggle an HTML/image body past the JSON boundary).
+    if (!isJsonContentType(res.headers?.get?.('content-type'))) {
+      throw new ProviderError(ProviderErrorCode.INVALID_OUTPUT, 'Provider returned a non-JSON content type.')
+    }
     const text = await readBoundedText(res, opts.maxResponseBytes)
     let payload
     try {

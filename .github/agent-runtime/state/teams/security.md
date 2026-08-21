@@ -1,7 +1,7 @@
 TEAM: SECURITY
-CURRENT ISSUE: #412 CodeQL default-setup conflict — remove advanced-config SAST workflows
-STATUS: READY — codeql.yml advisory workflow deleted; sast job removed from security-ci.yml; comments/docs updated to point SAST gate at CodeQL default-setup code-scanning
-ACTIVE PR: (open) m1/security/412
-LAST GATE: pending independent Security Auditor verification (no self-approval)
+CURRENT ISSUE: #217 SSRF Regression Suite for External API Proxies (SEC-6.3)
+STATUS: READY — dedicated _shared/ssrf-regression.test.js (22 tests) + content-type bounds enforced fail-closed on every JSON proxy (discogs/books/musicbrainz/openlibrary/ai-openai) via shared isJsonContentType; negative content-type tests added to each proxy suite; 1370 netlify/functions tests pass; changed-file coverage >= 70%
+ACTIVE PR: (open) m1/security/217
+LAST GATE: pending independent Security Auditor + Tester verification (no self-approval)
 BLOCKER: —
-NEXT: PM review of #412 diff → human merge → confirm default-setup code-scanning required check in repo settings → sign-off #342
+NEXT: PM review of #217 diff → independent Security Auditor + Tester gates → human merge

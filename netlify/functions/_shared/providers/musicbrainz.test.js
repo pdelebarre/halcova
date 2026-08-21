@@ -192,6 +192,18 @@ describe('SSRF posture', () => {
     const out = await searchBarcode('07464405491')
     expect(out).toEqual({ results: [] })
   })
+
+  it('rejects a non-JSON content-type fail-closed (SEC-6.3 #217)', async () => {
+    // A hostile upstream returns an HTML body with a non-JSON content-type —
+    // the adapter must reject it (-> empty envelope), never parse it as JSON.
+    lookupFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'text/html' },
+      text: async () => '<html>not json</html>',
+    })
+    expect(await searchBarcode('07464405491')).toEqual({ results: [] })
+  })
 })
 
 describe('throttle (tokenless ~1 req/s gate)', () => {

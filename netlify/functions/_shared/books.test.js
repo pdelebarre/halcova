@@ -121,6 +121,32 @@ describe('SEC-3.2 (#195) — proxy-level provider body cap (books.js)', () => {
     expect(hosts[1]).toBe('openlibrary.org')
     expect(Object.keys(stores['books-cache']?.data || {})).toEqual([])
   })
+
+  it('rejects a non-JSON content-type fail-closed (SEC-6.3 #217)', async () => {
+    // A hostile Google upstream returns an HTML body with a non-JSON
+    // content-type — the proxy must reject it (never parse/cache it) and the
+    // fallback chain fires. The OpenLibrary fallback returns valid JSON and
+    // wins, proving the primary's bad body was never cached.
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'text/html' },
+        text: async () => '<html>not json</html>',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ 'ISBN:9780452284234': { details: { title: 'T' } } }),
+      })
+    const res = await booksHandler(req('/.netlify/functions/books?action=searchBarcode&isbn=9780452284234'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    // The fallback won — the primary's non-JSON body was rejected, not cached.
+    expect(body.source).toBe('openlibrary')
+    expect(Object.keys(stores['books-cache']?.data || {})).toEqual([])
+  })
 })
 
 describe('cover action — public SSRF surface (via the books handler)', () => {

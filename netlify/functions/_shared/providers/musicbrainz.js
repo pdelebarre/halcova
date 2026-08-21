@@ -46,6 +46,7 @@
 //     lookup path is bounded by the existing Discogs rate limiter).
 
 import { lookupFetch } from '../lookup-fetch'
+import { isJsonContentType } from './payload-guard'
 
 const MB_BASE = 'https://musicbrainz.org/ws/2'
 const CAA_BASE = 'https://coverartarchive.org'
@@ -186,6 +187,10 @@ async function mbFetch(path, params) {
     throw new Error('MusicBrainz redirect not allowed.')
   }
   if (!res.ok) throw new Error('MusicBrainz request failed.')
+  // SEC-6.3 #217: reject a non-JSON content-type fail-closed.
+  if (!isJsonContentType(res.headers?.get?.('content-type'))) {
+    throw new Error('MusicBrainz response is not JSON.')
+  }
   const raw = await res.text()
   if (Buffer.byteLength(raw, 'utf8') > MAX_PROVIDER_BYTES) {
     throw new Error('MusicBrainz response too large.')
