@@ -37,6 +37,7 @@ ACTIVE PR:
 LAST GATE:
 BLOCKER:
 NEXT:
+LESSONS: [RETRO-x.y, RETRO-x.z — last 2-3 RETRO tickets relevant to this team]
 ```
 
 ## Evidence cache

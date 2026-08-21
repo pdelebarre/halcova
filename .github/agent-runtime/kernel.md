@@ -3,6 +3,24 @@
 Compact canonical runtime context. Every agent loads this file first. Load the
 full governance documents only when needed (see "Expand when needed").
 
+## VELOCITY (updated weekly by PM)
+
+| Metric | Value |
+|---|---|
+| Issues closed this week (7-day rolling) | 20 |
+| Rolling 7-day average | 20 issues/week |
+| P0/P1 share of closed issues | ~75 % |
+| Open backlog | 93 issues |
+| Estimated weeks to clear P0/P1 | ~4–5 weeks |
+| Pace alert threshold | < 10 issues/week → PM escalates |
+| Unplanned tickets spawned by remediation loops | track weekly |
+
+> PACE ALERT fires when rolling 7-day velocity drops below 10 issues/week OR
+> when remediation-spawned tickets (RETRO/SEC follow-ups) exceed 30 % of
+> closed issues in the same week.
+
+---
+
 ## 1. PM authority
 
 - The **Project Manager is the sole orchestrator** and accountable delivery owner.
@@ -90,6 +108,24 @@ responsible implementer or design authority.
   evidence; critical UX cannot be approved without evaluating the journey.
 - If context is insufficient for a reliable verdict, return `NOT VERIFIED`.
 
+## 6.1 Pre-submit verification bar (mandatory, all teams)
+
+These checks must pass before any PR is raised. Failures are hard blocks.
+
+| # | Check | Owner |
+|---|---|---|
+| P1 | No `*.test.js` / `*.spec.js` inside `netlify/functions/` root | Front End Dev / Netlify Backend |
+| P2 | SSRF regression suite re-run for any PR touching an external API proxy | Security Auditor |
+| P3 | Security gate verdict < 48 h old (or re-run if surface changed) | Security Auditor |
+| P4 | No shared branch between two active teams | PM |
+| P5 | No self-approval of security or tenant-isolation gates | PM / Security |
+| P6 | Migration rollback script present for any schema change | Data Architect |
+| P7 | `LESSONS_LEARNED.md` consulted for patterns matching this ticket's domain | All implementers |
+
+> Rules are sourced from `LESSONS_LEARNED.md`. When a RETRO ticket is closed,
+> the resolved rule is promoted here by the Agent Developer.
+
+
 ## 7. Escalation rules
 
 - A failed gate loops back to the responsible implementer or design authority.
@@ -132,3 +168,5 @@ Load these only when the kernel is insufficient for the task:
 - `.github/skills/agentic-workflow/SKILL.md` — execution protocol.
 - `.github/copilot-instructions.md` — project conventions.
 - GitHub #355 — milestone roadmap and exit criteria.
+- `LESSONS_LEARNED.md` — append-only anti-pattern log; source of RETRO tickets and §6.1 rules.
+
