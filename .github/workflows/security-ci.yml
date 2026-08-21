@@ -46,6 +46,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/security-ci.yml'
+    paths-ignore:
+      - 'src/**/*.test.ts'
+      - 'src/**/*.test.tsx'
+      - 'src/**/*.spec.ts'
+      - 'src/**/*.spec.tsx'
+      - 'src/**/__tests__/**'
+      - 'src/**/test/**'
+      - 'src/**/tests/**'
   push:
     branches: [main]
     paths:
@@ -54,6 +62,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/security-ci.yml'
+    paths-ignore:
+      - 'src/**/*.test.ts'
+      - 'src/**/*.test.tsx'
+      - 'src/**/*.spec.ts'
+      - 'src/**/*.spec.tsx'
+      - 'src/**/__tests__/**'
+      - 'src/**/test/**'
+      - 'src/**/tests/**'
 
 permissions:
   contents: read

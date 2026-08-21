@@ -9,6 +9,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'sonar-project.properties'
+    paths-ignore:
+      - 'src/**/*.test.ts'
+      - 'src/**/*.test.tsx'
+      - 'src/**/*.spec.ts'
+      - 'src/**/*.spec.tsx'
+      - 'src/**/__tests__/**'
+      - 'src/**/test/**'
+      - 'src/**/tests/**'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
@@ -16,6 +24,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'sonar-project.properties'
+    paths-ignore:
+      - 'src/**/*.test.ts'
+      - 'src/**/*.test.tsx'
+      - 'src/**/*.spec.ts'
+      - 'src/**/*.spec.tsx'
+      - 'src/**/__tests__/**'
+      - 'src/**/test/**'
+      - 'src/**/tests/**'
 
 jobs:
   sonarcloud:
