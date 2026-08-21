@@ -34,6 +34,7 @@ import { resolveSession } from './session-auth'
 import { createSession, getSessionByToken } from './sessions'
 import { getUser, listRequests, listUsers, saveUser } from './users'
 import { RATE_LIMIT_WINDOW_MS, windowIndex } from './rate-limit'
+import { demoSessionToken } from './session-test-helpers'
 
 const { stores, createStore } = vi.hoisted(() => {
   const stores = {}
@@ -582,5 +583,142 @@ describe('SEC-3.5 (#198) — CSRF-immune token-based sessions', () => {
     })
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)
+  })
+})
+
+// ---- Self-serve account deletion (SEC-7.2.x #381) --------------------------
+//
+// A member can delete their OWN account via the auth endpoint. The cascade is
+// the same as admin handleDeleteUser: reviews, feedback, collection stores,
+// user record, sessions. Gated by re-authentication (access code confirmation).
+// Demo is denied. Cross-user deletion is non-enumerating (403).
+
+const MEMBER_FIXTURE = {
+  id: 'u-delete-me',
+  name: 'Delete Me',
+  email: 'delete@example.com',
+  code: 'RU-DEL1-ETE2-ETE3',
+  collections: { records: true, books: true },
+  features: {},
+  plan: 'free',
+  role: 'member',
+  status: 'active',
+  createdAt: '2026-08-01T09:00:00.000Z',
+}
+
+describe('deleteAccount — self-serve account deletion (SEC-7.2.x)', () => {
+  beforeEach(async () => {
+    await saveUser(MEMBER_FIXTURE)
+  })
+
+  it('deletes the member\'s own account with a valid re-auth code — cascade runs', async () => {
+    const { token } = await createSession({ userId: MEMBER_FIXTURE.id, role: 'member' })
+
+    const { status, body } = await call(
+      { action: 'deleteAccount', code: MEMBER_FIXTURE.code },
+      { token },
+    )
+    expect(status).toBe(200)
+    expect(body.ok).toBe(true)
+
+    // The user record is gone.
+    expect(await getUser(MEMBER_FIXTURE.id)).toBeNull()
+    // The session is gone (deleted with the account).
+    expect(await getSessionByToken(token)).toBeNull()
+  })
+
+  it('rejects a wrong access code with 403 REAUTH_FAILED — account is NOT deleted', async () => {
+    const { token } = await createSession({ userId: MEMBER_FIXTURE.id, role: 'member' })
+
+    const { status, body } = await call(
+      { action: 'deleteAccount', code: 'RU-WRONG-WRONG-WRONG' },
+      { token },
+    )
+    expect(status).toBe(403)
+    expect(body.code).toBe('REAUTH_FAILED')
+
+    // The user record is still there.
+    expect(await getUser(MEMBER_FIXTURE.id)).toMatchObject({ id: MEMBER_FIXTURE.id })
+  })
+
+  it('rejects a missing access code with 400 REAUTH_REQUIRED', async () => {
+    const { token } = await createSession({ userId: MEMBER_FIXTURE.id, role: 'member' })
+
+    const { status, body } = await call({ action: 'deleteAccount' }, { token })
+    expect(status).toBe(400)
+    expect(body.code).toBe('REAUTH_REQUIRED')
+
+    // The user record is still there.
+    expect(await getUser(MEMBER_FIXTURE.id)).toMatchObject({ id: MEMBER_FIXTURE.id })
+  })
+
+  it('denies the demo identity (403 FORBIDDEN) — demo is a constant, read-only identity', async () => {
+    const token = await demoSessionToken()
+
+    const { status, body } = await call(
+      { action: 'deleteAccount', code: 'RU-DEMO-DEMO-DEMO' },
+      { token },
+    )
+    expect(status).toBe(403)
+    expect(body.code).toBe('FORBIDDEN')
+  })
+
+  it('denies a member trying to delete another member\'s account (non-enumerating 403)', async () => {
+    // Attacker: u-attacker has a valid session but tries to delete u-victim.
+    const attacker = { id: 'u-attacker', name: 'Attacker', email: 'attacker@example.com', code: 'RU-ATTK-ATTK-ATTK', collections: { records: true, books: true }, features: {}, plan: 'free', role: 'member', status: 'active', createdAt: '2026-08-01T09:00:00.000Z' }
+    const victim = { ...MEMBER_FIXTURE, id: 'u-victim', email: 'victim@example.com', code: 'RU-VICT-IM00-IM00' }
+    await saveUser(attacker)
+    await saveUser(victim)
+    const { token } = await createSession({ userId: attacker.id, role: 'member' })
+
+    // The attacker sends victim's code — but the session resolves to the
+    // attacker, so the code lookup returns the victim (different user id).
+    const { status, body } = await call(
+      { action: 'deleteAccount', code: victim.code },
+      { token },
+    )
+    // Non-enumerating: same 403 REAUTH_FAILED whether the code is wrong or
+    // belongs to a different user.
+    expect(status).toBe(403)
+    expect(body.code).toBe('REAUTH_FAILED')
+
+    // Both users still exist.
+    expect(await getUser(attacker.id)).toMatchObject({ id: attacker.id })
+    expect(await getUser(victim.id)).toMatchObject({ id: victim.id })
+  })
+
+  it('denies an unauthenticated request with 401', async () => {
+    const { status, body } = await call(
+      { action: 'deleteAccount', code: MEMBER_FIXTURE.code },
+      { token: '' },
+    )
+    expect(status).toBe(401)
+    expect(body.code).toBe('NOT_SIGNED_IN')
+  })
+
+  it('denies a forged bearer with 401', async () => {
+    const { status, body } = await call(
+      { action: 'deleteAccount', code: MEMBER_FIXTURE.code },
+      { token: 'forged-token' },
+    )
+    expect(status).toBe(401)
+    // A forged token is not found in the session store — resolveSession
+    // returns 401 NOT_SIGNED_IN (the stable unauthenticated shape).
+    expect(body.code).toBe('NOT_SIGNED_IN')
+  })
+
+  it('is idempotent — a second call on a deleted user returns 401 (sessions are gone)', async () => {
+    const { token } = await createSession({ userId: MEMBER_FIXTURE.id, role: 'member' })
+
+    // First call: succeeds.
+    const first = await call({ action: 'deleteAccount', code: MEMBER_FIXTURE.code }, { token })
+    expect(first.status).toBe(200)
+
+    // Second call: the session was deleted, so the request is unauthenticated.
+    const second = await call({ action: 'deleteAccount', code: MEMBER_FIXTURE.code }, { token })
+    expect(second.status).toBe(401)
+    // The session is gone — resolveSession returns 401 NOT_SIGNED_IN (the
+    // session record was deleted, so getSessionByToken returns null).
+    expect(second.body.code).toBe('NOT_SIGNED_IN')
   })
 })

@@ -16,17 +16,20 @@ import { clientIp, rateLimitGuard } from './_shared/rate-limit'
 import { consumeMagicLink, isMagicLinkConfigured, issueMagicLink, magicLinkSecret, verifyMagicLinkToken } from './_shared/magic-link'
 import { isDevEmailMode, isMailConfigured, sendMagicLink } from './_shared/mailer'
 import { enforce } from './_shared/policy'
-import { createSession, revokeAllForUser, revokeSession } from './_shared/sessions'
+import { createSession, deleteAllForUser, revokeAllForUser, revokeSession } from './_shared/sessions'
 import {
   findPendingRequestByEmail,
   findUserByCode,
   findUserByEmail,
   saveRequest,
   saveUser,
+  deleteUserCollections,
+  removeUserRecord,
 } from './_shared/users'
 import { json, readJsonBody, safeError } from './_shared/security'
-import { logAudit } from './_shared/audit'
+import { logAudit, emailHash } from './_shared/audit'
 import { anomalyScope, recordAnomaly } from './_shared/anomaly'
+import { deleteMemberReviews, deleteMemberFeedback } from './admin'
 
 // NOTE — CSRF (SEC-3.5, #198): sessions are NOT cookie-based. SEC-EPIC-1
 // (#176) uses a Bearer session token held in localStorage and sent as an
@@ -308,6 +311,70 @@ async function handleLogoutAll(req) {
   return json(200, { ok: true })
 }
 
+// Self-serve account deletion (right-to-erasure, SEC-7.2.x #381). A member
+// deletes their OWN account — the same cascade as admin handleDeleteUser
+// (reviews, feedback, collection stores, Postgres items, user record, all live
+// sessions), gated by re-authentication (the member must supply their access
+// code as a confirmation step). Demo identity is denied (constant, read-only).
+// The owner account cannot be deleted here (admin.js handleDeleteUser also
+// rejects OWNER_ID).
+//
+// Security properties:
+//   - owner: 'self' — the session resolves to the requesting user; a member
+//     can never delete another member's account (non-enumerating 403).
+//   - Re-auth gate: the access code in the body must match the resolved user.
+//     A stolen session token alone cannot destroy the account.
+//   - Demo is denied by the policy layer (deny: ['demo']).
+//   - The cascade is idempotent (a second call on a deleted user resolves to
+//     a 401 because the sessions are gone).
+//   - Audit event carries emailHash (no PII).
+async function handleDeleteAccount(body, req) {
+  // SEC-7.1 (#338): the identity action is routed through the shared policy
+  // layer (`auth:deleteAccount`, principal scoped to the session's own user).
+  const resolved = await enforce(req, 'auth:deleteAccount')
+  if (resolved.error) return resolved.error
+
+  const user = resolved.user
+
+  // The owner account cannot be deleted through the self-serve path (the admin
+  // handleDeleteUser also rejects OWNER_ID). This is a defense-in-depth check
+  // on top of the policy layer — the owner's session role is 'admin', and
+  // auth:deleteAccount does not require 'admin', so the owner would never reach
+  // here via the auth endpoint. But guard it anyway.
+  if (user.id === OWNER_ID) {
+    return json(403, { error: 'Not authorized.', code: 'FORBIDDEN' })
+  }
+
+  // Re-auth gate (SEC-7.2.x): the member must supply their access code as a
+  // confirmation step. This prevents an account-takeover from silently
+  // destroying another member's account and prevents accidental mass deletion.
+  const code = String(body.code || '').trim()
+  if (!code) {
+    return json(400, { error: 'Re-authentication required. Provide your access code.', code: 'REAUTH_REQUIRED' })
+  }
+
+  // Verify the code against the resolved user. We look up the user by code
+  // and check that the returned user id matches the session user id — this
+  // is non-enumerating (a wrong code gets the same 403 as a wrong user).
+  const codeUser = await findUserByCode(code.toUpperCase())
+  if (!codeUser || codeUser.id !== user.id) {
+    logAudit('auth.delete_account_failed', { reason: 'reauth_failed', userId: user.id, emailHash: emailHash(user.email) })
+    return json(403, { error: 'Re-authentication failed. Check your access code and try again.', code: 'REAUTH_FAILED' })
+  }
+
+  // Run the same cascade as admin handleDeleteUser: reviews, feedback,
+  // collection stores, user record, then sessions. The cascade is idempotent
+  // — a second call on a deleted user resolves to a 401 (sessions are gone).
+  await deleteMemberReviews(user.id)
+  await deleteMemberFeedback(user.id)
+  await deleteUserCollections(user.id)
+  await removeUserRecord(user.id)
+  await deleteAllForUser(user.id)
+
+  logAudit('user.self_delete', { userId: user.id, emailHash: emailHash(user.email) })
+  return json(200, { ok: true })
+}
+
 // ---- Self-serve signup via email magic link (ADR-0003, S1) ----------------
 //
 // No admin in the loop: the visitor proves they own the email by clicking the
@@ -499,6 +566,7 @@ export default async (req) => {
       if (body.action === 'verifyMagicLink') return handleVerifyMagicLink(body, req)
       if (body.action === 'logout') return handleLogout(req)
       if (body.action === 'logoutAll') return handleLogoutAll(req)
+      if (body.action === 'deleteAccount') return handleDeleteAccount(body, req)
       return json(400, { error: 'Unknown action.' })
     }
 

@@ -57,6 +57,7 @@ export const POLICY = {
   'auth:me': {},
   'auth:logout': { owner: 'self' },
   'auth:logoutAll': { owner: 'self' },
+  'auth:deleteAccount': { owner: 'self', deny: ['demo'] },
 
   // --- admin (/admin, /seed-demo) ------------------------------------------
   'admin:*': { requires: 'admin' },
@@ -100,6 +101,13 @@ export const POLICY = {
 
   // --- lookups (any authenticated caller; demo stays ungated) ----------------
   'lookup:read': {},
+
+  // --- data export (GDPR portability, SEC-7.2.x #380) -------------------------
+  // Owner-scoped to the principal's own data only. Demo is excluded (read-only,
+  // no personal data to export). The export action is a one-time signed download
+  // — there is no target-object lookup, so `owner: 'self'` gates the entire
+  // operation.
+  'export:mine': { owner: 'self', deny: ['demo'] },
 
   // --- payment / billing (kept custom; normalized shape) ---------------------
   'payment:checkout': { preAuth: true },
