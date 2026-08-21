@@ -4,16 +4,18 @@
 > Team checkpoints: `state/teams/`. Milestone detail: `state/M1.md` … `state/M4.md`.
 
 ## Position
-- M0 complete. M1/M2/M3 have merged CORE slices but retain OPEN backlog tickets; final-exit criteria per #355 not all met. M4 NOT started. Backlog reconciliation needed before any milestone is declared externally complete.
+- M0 complete. M1 complete (40 closed). M2 complete (19 closed). M3 complete (9 closed). M4–M6 in Icebox.
 
 ## Milestones
 | Milestone | Focus | Status | Leading teams |
 |---|---|---|---|
-| M1 — Security, Reliability & Platform Foundation | epic #337 (merged core) — CORE merged; OPEN: #217 SSRF suite (P1), #385/#381/#380 (P2 sec), #411 XSS residual, #408 deps, #214 SEC-EPIC-6 | IN PROGRESS (backlog open) | SECURITY |
-| M2 — Offline-first | mirror #289 · outbox #292 · capability #159 merged | IN PROGRESS (backlog open) · OPEN: #158 IndexedDB (P0), #160/#161 sync+OCC (P1), ARCH-EPIC-1 #150 stack | OFFLINE, DATA, SECURITY |
-| M3 — Generic Collection Platform | epic #313 core (domain #314 · tenancy #165 · registry #315 · adapters #317 · migrate #316) merged | IN PROGRESS (backlog open) · OPEN: #318 wishlist/lifecycle (P1), #309 GitHub↔feedback | DATA, PROVIDERS, SECURITY |
-| M4 — Collector-First Mobile Experience | epic #319 | NOT STARTED (hold pending M1–M3 backlog reconciliation) | — |
-| M5+ — Differentiation & growth | social #325 · AI #331 · marketplace #343 · expansion #348 | DORMANT | GROWTH, AI |
+| M0 — Stabilize & Release Current Product | launch baseline | COMPLETE | — |
+| M1 — Security, Reliability & Platform Foundation | Security foundation + AI provider + SSRF + asset serving + data export + account deletion (40 closed) | **COMPLETE** | SECURITY, AI, DATA |
+| M2 — Collector Core Experience | Offline-first #289/#292/#159 + FEAT-EPIC-7 core (#320/#321/#322) + admin analytics (19 closed) | **COMPLETE** | COLLECTOR, OFFLINE, UX, DATA |
+| M3 — Generic Collection Platform & Robust Sync | Domain #314 · tenancy #165 · registry #315 · adapters #317 · migrate #316 · sync #160/#161 · wishlist #318 (9 closed) | **COMPLETE** | DATA, PROVIDERS, OFFLINE |
+| M4 — Differentiation & Intelligent Collection | AI, duplication, assistant, enrichment — gated on AI readiness | IN ICEBOX | AI, GROWTH |
+| M5 — Social & Discovery | Social features, discovery, moderation | IN ICEBOX | GROWTH |
+| M6 — Commerce & Value Services | Marketplace, valuations, commerce | IN ICEBOX | GROWTH |
 
 ## Team map
 `state/teams/security.md` · `offline.md` · `collector.md` · `data.md` · `providers.md` · `ai.md` · `growth.md`

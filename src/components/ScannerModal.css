@@ -174,11 +174,6 @@
   padding: 8px 12px;
   border-radius: 8px;
   pointer-events: auto;
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .scanner-manual {
@@ -189,11 +184,6 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   padding: 10px;
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

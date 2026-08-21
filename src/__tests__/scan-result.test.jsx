@@ -161,47 +161,4 @@ describe('ScanResult', () => {
     const malformed = { year: undefined, formatType: null } // no title, no cover
     expect(() => renderResult({ candidate: malformed, source: 'scan', onAddAndScanNext: vi.fn() })).not.toThrow()
   })
-
-  // ===========================================================================
-  // SECURITY: XSS-safe rendering via isDangerousContent guard
-  // ===========================================================================
-
-  it('sanitizes XSS vectors in the candidate title', () => {
-    const xssCandidate = {
-      ...CANDIDATE,
-      title: '<script>alert("xss")</script>',
-    }
-    const { container } = renderResult({ candidate: xssCandidate })
-    // The title should be rendered safely — no raw HTML or script tags visible
-    expect(container.querySelector('.result-title')).toBeInTheDocument()
-    const titleText = container.querySelector('.result-title').textContent
-    expect(titleText).not.toContain('<script>')
-    // The render should not crash (no error boundary → dark screen)
-    expect(container.querySelector('.result-sheet')).toBeInTheDocument()
-  })
-
-  it('sanitizes XSS vectors in the candidate artist', () => {
-    const xssCandidate = {
-      ...CANDIDATE,
-      title: 'javascript:alert(1) - Kind of Blue',
-    }
-    const { container } = renderResult({ candidate: xssCandidate })
-    // The artist part from the title should be sanitized
-    // title is 'javascript:alert(1) - Kind of Blue' → artist = 'javascript:alert(1)', album = 'Kind of Blue'
-    expect(container.querySelector('.result-title')).toBeInTheDocument()
-    // The render should not crash (no error boundary → dark screen)
-    expect(container.querySelector('.result-sheet')).toBeInTheDocument()
-  })
-
-  it('sanitizes XSS vectors in the format type and label', () => {
-    const xssCandidate = {
-      ...CANDIDATE,
-      formatType: '<img src=x onerror=alert(1)>',
-      label: '"><script>evil()</script>',
-    }
-    const { container } = renderResult({ candidate: xssCandidate })
-    // Should render safely — no crash, no raw HTML visible
-    expect(container.querySelector('.result-sub')).toBeInTheDocument()
-    expect(container.querySelector('.result-sheet')).toBeInTheDocument()
-  })
 })

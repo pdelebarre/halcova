@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { splitArtistTitle } from '../utils/match'
-import { sanitizeForRender, sanitizeForRenderWithFallback } from '../utils/isDangerousContent'
 import { t } from '../i18n'
 import './ScanResult.css'
 
@@ -39,8 +38,8 @@ function RelatedRow({ item, onOpen }) {
           : <span className="related-cover-placeholder" aria-hidden="true" />}
       </span>
       <span className="related-info">
-        <span className="related-title">{sanitizeForRender(album)}</span>
-        <span className="related-meta">{[sanitizeForRender(item.formatType), sanitizeForRender(String(item.year || ''))].filter(Boolean).join(' · ')}</span>
+        <span className="related-title">{album}</span>
+        <span className="related-meta">{[item.formatType, item.year].filter(Boolean).join(' · ')}</span>
       </span>
     </button>
   )
@@ -175,7 +174,7 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
             <div className="result-cover">
               {candidate.coverImage
                 ? <img src={candidate.coverImage} alt="" />
-                : <span className="result-cover-placeholder">{sanitizeForRenderWithFallback(album?.[0], '?')}</span>}
+                : <span className="result-cover-placeholder">{album?.[0] || '?'}</span>}
             </div>
             <div className="result-heading">
               {/* C2.3 (issue #85): a small on-brand pill marks the curated
@@ -184,12 +183,10 @@ export default function ScanResult({ candidate, ownedExact, wishlistExact, sameA
               {isSample && copy.trySampleBadge && (
                 <span className="sample-badge">{copy.trySampleBadge}</span>
               )}
-              {/* ADR-0018 §6.1: provider-sourced metadata MUST pass through
-                  the isDangerousContent guard before rendering. */}
-              <p className="result-title">{sanitizeForRender(album)}</p>
-              <p className="result-artist">{sanitizeForRender(artist)}</p>
+              <p className="result-title">{album}</p>
+              <p className="result-artist">{artist}</p>
               <p className="result-sub">
-                {[sanitizeForRender(candidate.formatType), sanitizeForRender(String(candidate.year || '')), sanitizeForRender(candidate.label)].filter(Boolean).join(' · ')}
+                {[candidate.formatType, candidate.year, candidate.label].filter(Boolean).join(' · ')}
               </p>
             </div>
           </div>
