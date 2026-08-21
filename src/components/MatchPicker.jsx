@@ -1,4 +1,5 @@
 import { t } from '../i18n'
+import { sanitizeForRender, sanitizeForRenderWithFallback } from '../utils/isDangerousContent'
 import './MatchPicker.css'
 
 export default function MatchPicker({
@@ -48,11 +49,11 @@ export default function MatchPicker({
                       : <span className="match-cover-placeholder" aria-hidden="true" />}
                   </span>
                   <span className="match-info">
-                    <span className="match-title">{m.title}</span>
+                    <span className="match-title">{sanitizeForRender(m.title)}</span>
                     <span className="match-meta">
-                      {[m.formatType, m.year, m.label].filter(Boolean).join(' · ')}
+                      {[sanitizeForRender(m.formatType), sanitizeForRender(String(m.year || '')), sanitizeForRender(m.label)].filter(Boolean).join(' · ')}
                     </span>
-                    {m.catno && <span className="match-catno">{m.catno}</span>}
+                    {m.catno && <span className="match-catno">{sanitizeForRender(m.catno)}</span>}
                   </span>
                 </button>
               </li>

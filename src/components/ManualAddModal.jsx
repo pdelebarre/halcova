@@ -3,6 +3,7 @@ import * as discogs from '../api/discogs'
 import { useLookup } from '../hooks/useLookup'
 import { t } from '../i18n'
 import { sanitizeItemForCreate } from '../utils/sanitizeItem'
+import { sanitizeForRender } from '../utils/isDangerousContent'
 import MatchPicker from './MatchPicker'
 import './ManualAddModal.css'
 
