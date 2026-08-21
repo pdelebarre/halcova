@@ -22,7 +22,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { t } from '../i18n'
-import { useConflicts, RESOLUTION } from '../hooks/useConflicts'
+import { useConflicts } from '../hooks/useConflicts'
+import { RESOLUTION } from '../utils/conflictResolver'
 import './ConflictResolutionModal.css'
 
 /**
