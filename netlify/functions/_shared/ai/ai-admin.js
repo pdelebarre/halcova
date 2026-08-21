@@ -22,7 +22,7 @@ import { isPostgresConfigured, db } from '../postgres'
 import { createAiConfigRepo } from './ai-config-repo'
 import { createAiConfigBlobStore } from './ai-config-blob'
 import { encryptSecret, decryptSecret, maskSecret } from './ai-secrets'
-import { validateAiEndpoint } from './ai-endpoint'
+import { validateAiEndpoint, endpointAllowlistFromEnv } from './ai-endpoint'
 import { OpenAIProvider } from './openai'
 import { logAudit } from '../audit'
 
@@ -223,6 +223,7 @@ function buildProvider(profile, secret) {
       apiKey: secret,
       model: profile.model,
       capabilities: profile.capabilities,
+      allowedHosts: endpointAllowlistFromEnv(),
     })
   }
   return null

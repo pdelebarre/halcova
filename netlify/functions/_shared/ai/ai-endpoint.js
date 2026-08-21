@@ -35,27 +35,6 @@ function isIpv4Literal(host) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
 }
 
-// Reject RFC1918 private, loopback, link-local, CGNAT, reserved, and special-
-// purpose v4 ranges. A non-matching dotted quad is not a valid v4 literal and
-// is handled by the hostname check (fails there).
-function isReservedIpv4(host) {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
-  if (!m) return false
-  const [a, b, c, d] = m.slice(1).map(Number)
-  if (a > 255 || b > 255 || c > 255 || d > 255) return false
-  if (a === 0 || a === 10 || a === 127) return true
-  if (a === 100 && b >= 64 && b <= 127) return true // CGNAT 100.64/10
-  if (a === 169 && b === 254) return true // link-local
-  if (a === 172 && b >= 16 && b <= 31) return true // 172.16/12
-  if (a === 192 && b === 168) return true // 192.168/16
-  if (a === 198 && b === 18) return true // benchmarking 198.18/15
-  if (a === 192 && b === 0 && c === 0) return true // 192.0.0/24 special purpose
-  if (a === 192 && b === 0 && c === 2) return true // 192.0.2/24 TEST-NET-1
-  if (a === 198 && b === 51 && c === 100) return true // TEST-NET-2
-  if (a === 203 && b === 0 && c === 113) return true // TEST-NET-3
-  return false
-}
-
 function isReservedIpv6(host) {
   if (host === '::' || host === '::1') return true
   if (host === '::ffff:127.0.0.1') return true
@@ -78,6 +57,16 @@ function allowlistMatches(host, allowlist) {
   return allowlist.some((h) => h === host || host.endsWith(`.${h}`))
 }
 
+// Parse the host allowlist from the environment (comma-separated host suffixes,
+// lowercased, trimmed, empties dropped). Shared by the config-time gate and the
+// OpenAIProvider's fetch-time defense-in-depth check.
+export function endpointAllowlistFromEnv(env = process.env) {
+  return String(env[AI_ENDPOINT_ALLOWLIST_ENV] || '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean)
+}
+
 // Validate a base URL for the AI provider. Returns
 //   { value: <normalizedUrl> } on success, or
 //   { error: { code, message } } fail-closed.
@@ -90,16 +79,13 @@ export function validateAiEndpoint(raw, env = process.env) {
   if (!host) {
     return { error: { code: 'INSECURE_ENDPOINT', message: 'Only HTTPS endpoints are allowed.' } }
   }
-  if (isIpv4Literal(host) || isReservedIpv4(host) || isReservedIpv6(host) || isReservedHostname(host)) {
+  if (isIpv4Literal(host) || isReservedIpv6(host) || isReservedHostname(host)) {
     return { error: { code: 'UNSAFE_ENDPOINT', message: 'That endpoint host is not allowed.' } }
   }
   if (!HOSTNAME_RE.test(host)) {
     return { error: { code: 'UNSAFE_ENDPOINT', message: 'That endpoint host is not a valid public hostname.' } }
   }
-  const allowlist = String(env[AI_ENDPOINT_ALLOWLIST_ENV] || '')
-    .split(',')
-    .map((h) => h.trim().toLowerCase())
-    .filter(Boolean)
+  const allowlist = endpointAllowlistFromEnv(env)
   if (!allowlistMatches(host, allowlist)) {
     return { error: { code: 'ENDPOINT_NOT_ALLOWED', message: 'That endpoint host is not allowlisted.' } }
   }

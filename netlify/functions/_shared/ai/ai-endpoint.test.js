@@ -2,7 +2,7 @@
 // Unit tests for the SSRF-safe AI endpoint validation (ADMIN-3.2, #304).
 
 import { describe, expect, it } from 'vitest'
-import { validateAiEndpoint, AI_ENDPOINT_ALLOWLIST_ENV } from './ai-endpoint'
+import { validateAiEndpoint, endpointAllowlistFromEnv, AI_ENDPOINT_ALLOWLIST_ENV } from './ai-endpoint'
 
 describe('validateAiEndpoint (#304 SSRF gate)', () => {
   it('accepts a public HTTPS endpoint', () => {
@@ -67,5 +67,12 @@ describe('validateAiEndpoint (#304 SSRF gate)', () => {
 
   it('no allowlist env means any public host is allowed', () => {
     expect(validateAiEndpoint('https://anything.else.io/v1', {}).value).toBeTruthy()
+  })
+
+  it('endpointAllowlistFromEnv parses comma-separated host suffixes', () => {
+    expect(endpointAllowlistFromEnv({ [AI_ENDPOINT_ALLOWLIST_ENV]: 'api.example.com, sub.other.io ' }))
+      .toEqual(['api.example.com', 'sub.other.io'])
+    expect(endpointAllowlistFromEnv({ [AI_ENDPOINT_ALLOWLIST_ENV]: '  ' })).toEqual([])
+    expect(endpointAllowlistFromEnv({})).toEqual([])
   })
 })

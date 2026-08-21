@@ -146,4 +146,91 @@ describe('auth API', () => {
     expect(init.headers.Authorization).toBe(`Bearer ${ADMIN_TOKEN}`)
     expect(JSON.parse(init.body)).toEqual({ action: 'rotate', userId: 'u1' })
   })
+
+  // (ADMIN-3.2, #304) — the admin AI provider-profile client. Each call sends
+  // the owner admin session as Bearer; the list is a GET with ?providers=1 and
+  // the mutations are POST actions. Secrets are never sent back to the client.
+  it('adminAiList requests the provider list with the admin session', async () => {
+    saveSession({ user: { id: 'owner', role: 'admin' }, session: ADMIN_TOKEN })
+    global.fetch.mockResolvedValue(res(200, { providers: [] }))
+    const data = await auth.adminAiList()
+    expect(data).toEqual({ providers: [] })
+    const [url, init] = global.fetch.mock.calls[0]
+    expect(url).toContain('/.netlify/functions/admin?providers=1')
+    expect(init.headers.Authorization).toBe(`Bearer ${ADMIN_TOKEN}`)
+  })
+
+  it('adminAiCreate posts the profile fields and apiKey as an aiCreate action', async () => {
+    saveSession({ user: { id: 'owner', role: 'admin' }, session: ADMIN_TOKEN })
+    global.fetch.mockResolvedValue(res(201, { profile: { id: 'p1' } }))
+    await auth.adminAiCreate({
+      name: 'OpenAI Primary',
+      providerType: 'openai',
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      capabilities: ['classify'],
+      apiKey: 'sk-secret',
+    })
+    const [, init] = global.fetch.mock.calls[0]
+    expect(JSON.parse(init.body)).toEqual({
+      action: 'aiCreate',
+      name: 'OpenAI Primary',
+      providerType: 'openai',
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      capabilities: ['classify'],
+      apiKey: 'sk-secret',
+    })
+  })
+
+  it('adminAiUpdate posts an aiUpdate action with the profileId', async () => {
+    saveSession({ user: { id: 'owner', role: 'admin' }, session: ADMIN_TOKEN })
+    global.fetch.mockResolvedValue(res(200, { profile: { id: 'p1' } }))
+    await auth.adminAiUpdate({ profileId: 'p1', name: 'Renamed' })
+    const [, init] = global.fetch.mock.calls[0]
+    expect(JSON.parse(init.body)).toEqual({ action: 'aiUpdate', profileId: 'p1', name: 'Renamed' })
+  })
+
+  it('adminAiDelete/adminAiTest/adminAiActivate post their actions with the profileId', async () => {
+    saveSession({ user: { id: 'owner', role: 'admin' }, session: ADMIN_TOKEN })
+    global.fetch.mockResolvedValue(res(200, { ok: true }))
+    await auth.adminAiDelete({ profileId: 'p1' })
+    await auth.adminAiTest({ profileId: 'p1' })
+    await auth.adminAiActivate({ profileId: 'p1' })
+    const bodies = global.fetch.mock.calls.map(([, init]) => JSON.parse(init.body))
+    expect(bodies).toEqual([
+      { action: 'aiDelete', profileId: 'p1' },
+      { action: 'aiTest', profileId: 'p1' },
+      { action: 'aiActivate', profileId: 'p1' },
+    ])
+  })
+
+  it('adminReject/adminUpdateUser/adminDeleteUser/adminCounts send their admin actions', async () => {
+    saveSession({ user: { id: 'owner', role: 'admin' }, session: ADMIN_TOKEN })
+    global.fetch.mockResolvedValue(res(200, { ok: true }))
+    await auth.adminReject({ requestId: 'req-1' })
+    await auth.adminUpdateUser({ userId: 'u1', status: 'disabled' })
+    await auth.adminDeleteUser({ userId: 'u1' })
+    await auth.adminCounts()
+    const bodies = global.fetch.mock.calls.slice(0, 3).map(([, init]) => JSON.parse(init.body))
+    expect(bodies).toEqual([
+      { action: 'reject', requestId: 'req-1' },
+      { action: 'updateUser', userId: 'u1', status: 'disabled' },
+      { action: 'deleteUser', userId: 'u1' },
+    ])
+    // adminCounts is a GET with ?counts=1.
+    const [url] = global.fetch.mock.calls[3]
+    expect(url).toContain('?counts=1')
+  })
+
+  it('requestMagicLink and verifyMagicLink hit the auth endpoint', async () => {
+    global.fetch.mockResolvedValue(res(200, { ok: true, user: MEMBER, session: MEMBER_TOKEN }))
+    await auth.requestMagicLink({ email: 'ada@example.com' })
+    await auth.verifyMagicLink({ token: 'magic-token' })
+    const bodies = global.fetch.mock.calls.map(([, init]) => JSON.parse(init.body))
+    expect(bodies).toEqual([
+      { action: 'requestMagicLink', email: 'ada@example.com' },
+      { action: 'verifyMagicLink', token: 'magic-token' },
+    ])
+  })
 })

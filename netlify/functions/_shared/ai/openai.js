@@ -16,10 +16,17 @@
 
 import { ProviderError, ProviderErrorCode, boundedOptions, mergeOptions } from './provider'
 import { validateSchema } from './schema'
+import { endpointAllowlistFromEnv } from './ai-endpoint'
 
 // Default OpenAI-compatible chat completions path.
 const CHAT_COMPLETIONS_PATH = '/chat/completions'
 const MODELS_PATH = '/models'
+
+// Match a host against an allowlist of host suffixes (exact or subdomain).
+function hostAllowed(host, allowlist) {
+  if (!allowlist || allowlist.length === 0) return true
+  return allowlist.some((h) => h === host || host.endsWith(`.${h}`))
+}
 
 // Retry only 429 and 5xx. A 4xx is a caller/credential bug, never transient.
 function isRetryableStatus(status) {
@@ -96,7 +103,7 @@ function parseAndValidate(content, schema) {
 }
 
 export class OpenAIProvider {
-  constructor({ baseUrl, apiKey, model, capabilities = [], options = {} }) {
+  constructor({ baseUrl, apiKey, model, capabilities = [], options = {}, allowedHosts } = {}) {
     if (!baseUrl || typeof baseUrl !== 'string') {
       throw new ProviderError(ProviderErrorCode.BAD_REQUEST, 'OpenAIProvider requires a baseUrl.')
     }
@@ -109,6 +116,30 @@ export class OpenAIProvider {
     this.model = model
     this.capabilities = new Set(capabilities)
     this.options = { ...boundedOptions(options) }
+    // Host allowlist (SSRF control, ADR-0006). When provided it is enforced
+    // before every fetch; when omitted it defaults to the environment allowlist
+    // (RUNOUT_AI_ENDPOINT_ALLOWLIST) so a provider constructed without an
+    // explicit list still refuses off-allowlist hosts in a locked-down deploy.
+    this.allowedHosts = Array.isArray(allowedHosts)
+      ? allowedHosts.map((h) => String(h).toLowerCase()).filter(Boolean)
+      : endpointAllowlistFromEnv()
+  }
+
+  // Fail-closed SSRF gate: the base-URL host must be on the allowlist before
+  // the adapter ever fetches it. Throws ENDPOINT_NOT_ALLOWED otherwise.
+  #assertHostAllowed() {
+    let host
+    try {
+      host = new URL(this.baseUrl).hostname.toLowerCase()
+    } catch {
+      throw new ProviderError(ProviderErrorCode.ENDPOINT_NOT_ALLOWED, 'Provider base URL is invalid.')
+    }
+    if (!hostAllowed(host, this.allowedHosts)) {
+      throw new ProviderError(
+        ProviderErrorCode.ENDPOINT_NOT_ALLOWED,
+        'Provider base-URL host is not allowlisted.',
+      )
+    }
   }
 
   modelMetadata() {
@@ -135,6 +166,7 @@ export class OpenAIProvider {
     if (!schema || typeof schema !== 'object') {
       throw new ProviderError(ProviderErrorCode.BAD_REQUEST, 'An output schema is required.')
     }
+    this.#assertHostAllowed()
     const opts = mergeOptions(this.options, options)
 
     const messages = []
@@ -186,6 +218,7 @@ export class OpenAIProvider {
   // Health check against the provider's models endpoint. Returns
   // { ok: true, latencyMs } or throws ProviderError.
   async health() {
+    this.#assertHostAllowed()
     const started = Date.now()
     const url = `${this.baseUrl}${MODELS_PATH}`
     const res = await this.#fetchWithRetry(url, {

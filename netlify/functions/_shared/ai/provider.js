@@ -41,6 +41,9 @@ export const ProviderErrorCode = Object.freeze({
   BAD_REQUEST: 'PROVIDER_BAD_REQUEST',
   // The provider does not support the requested capability/model.
   UNSUPPORTED: 'PROVIDER_UNSUPPORTED',
+  // The configured base-URL host is not on the provider's host allowlist
+  // (SSRF control, ADR-0006). Fail-closed before any fetch.
+  ENDPOINT_NOT_ALLOWED: 'PROVIDER_ENDPOINT_NOT_ALLOWED',
 })
 
 export class ProviderError extends Error {
