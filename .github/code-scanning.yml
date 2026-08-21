@@ -1,0 +1,17 @@
+# CodeQL default-setup path filter
+# Skips code scanning on documentation, config, and markup files
+# so only real source code triggers analysis.
+paths-ignore:
+  - '**/*.md'
+  - '**/*.mdx'
+  - '**/*.yml'
+  - '**/*.yaml'
+  - '**/*.toml'
+  - '**/*.json'
+  - '**/*.env*'
+  - '**/*.config.js'
+  - '**/*.config.ts'
+  - '.github/**'
+  - 'docs/**'
+  - 'public/**'
+  - 'dist/**'
