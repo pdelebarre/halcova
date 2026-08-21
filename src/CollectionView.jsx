@@ -123,6 +123,24 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // enough: it only drives the momentum toast, resets on reload, and avoids
   // double-increment under StrictMode.
   const addedTodayRef = useRef(0)
+  // Privacy-preserving telemetry: time-to-add measurement for the scan →
+  // identify → confirm → add flow. Only emitted when tracking is opted-in, and
+  // carries only safe aggregate dimensions (kind, source, online/offline) —
+  // never identifying metadata (title, artist, barcode).
+  const scanStartRef = useRef(null)
+  const telemetryStart = useCallback(() => { scanStartRef.current = performance.now() }, [])
+  const telemetryEnd = useCallback((source, kind) => {
+    const elapsed = scanStartRef.current ? performance.now() - scanStartRef.current : null
+    scanStartRef.current = null
+    if (elapsed !== null) {
+      track('time_to_add', {
+        source,
+        kind,
+        online: navigator.onLine !== false,
+        elapsedMs: Math.round(elapsed),
+      })
+    }
+  }, [])
 
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -801,6 +819,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
     const source = scanCandidate?.source === 'scan' ? 'scan' : 'manual'
     try {
       await add({ ...payload, notes: '' })
+      // Privacy-preserving time-to-add telemetry: records how long the scan →
+      // confirm → add flow took, carrying only safe aggregate dimensions (never
+      // identifying metadata). Only emitted when tracking is opted-in.
+      telemetryEnd(source, catalog.kind)
       // G-2 funnel join key (Phase 0 §4): every owned add emits
       // gamif_item_added with its kind and source (scan vs manual). track()
       // is default-off — harmless today, joinable later.
@@ -933,6 +955,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   function openCoverScan() {
     setCoverState({ busy: false, error: '' })
     setModal('cover')
+    telemetryStart()
   }
 
   function fabAction(m) {
@@ -941,6 +964,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
       openCoverScan()
       return
     }
+    if (m === 'scan') telemetryStart()
     setModal(m)
   }
 
