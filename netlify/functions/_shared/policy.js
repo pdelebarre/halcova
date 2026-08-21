@@ -57,6 +57,7 @@ export const POLICY = {
   'auth:me': {},
   'auth:logout': { owner: 'self' },
   'auth:logoutAll': { owner: 'self' },
+  'auth:deleteAccount': { owner: 'self', deny: ['demo'] },
 
   // --- admin (/admin, /seed-demo) ------------------------------------------
   'admin:*': { requires: 'admin' },
@@ -83,10 +84,11 @@ export const POLICY = {
   'lending:item:return': { owner: 'self', deny: ['demo'] },
 
   // --- private assets (SEC-7.3 #340; per-user store, owner is 'self') --------
-  // Demo is read-only: it has no private assets, and can never sign/delete.
+  // Demo is read-only: it has no private assets, and can never sign/delete/revoke.
   'asset:list': { owner: 'self' },
   'asset:sign': { owner: 'self', deny: ['demo'] },
   'asset:delete': { owner: 'self', deny: ['demo'] },
+  'asset:revoke': { owner: 'self', deny: ['demo'] },
 
   // --- reviews (shared; DELETE is owner-or-admin) ---------------------------
   'review:read': {},
@@ -99,6 +101,13 @@ export const POLICY = {
 
   // --- lookups (any authenticated caller; demo stays ungated) ----------------
   'lookup:read': {},
+
+  // --- data export (GDPR portability, SEC-7.2.x #380) -------------------------
+  // Owner-scoped to the principal's own data only. Demo is excluded (read-only,
+  // no personal data to export). The export action is a one-time signed download
+  // — there is no target-object lookup, so `owner: 'self'` gates the entire
+  // operation.
+  'export:mine': { owner: 'self', deny: ['demo'] },
 
   // --- payment / billing (kept custom; normalized shape) ---------------------
   'payment:checkout': { preAuth: true },
