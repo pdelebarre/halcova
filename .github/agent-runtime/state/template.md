@@ -3,6 +3,9 @@
 > Compact runtime state. The PM updates this after every milestone decision.
 > Keep it concise — do not paste agent transcripts.
 > Portfolio: `ROADMAP.md` · teams: `teams/<team>.md`.
+> Pre-submit bar: each implementation must self-verify per `kernel.md` §6.1
+> (adversarial negatives · real-env execution · full-file coverage ≥70% ·
+> no `.test.*` in deployable dirs · downstream-consumer check) before a gate.
 
 ## Current milestone
 - Milestone:

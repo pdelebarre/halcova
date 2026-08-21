@@ -90,6 +90,35 @@ responsible implementer or design authority.
   evidence; critical UX cannot be approved without evaluating the journey.
 - If context is insufficient for a reliable verdict, return `NOT VERIFIED`.
 
+## 6.1 Pre-submit verification bar (standing, per issue)
+
+An implementation is ready for an independent gate only after the implementer
+**self-verifies the way the reviewer would**. This is the standing bar on every
+submit — it is what makes gates pass on the first pass instead of looping:
+
+- **Adversarial negatives** for the change, not just happy path: entity-obfuscated
+  XSS / script, forced failure (IDB abort/quota, audit error, provider error),
+  off-allowlist host, oversized/malformed payload, cross-tenant / cross-user
+  access, rotated/expired/invalid session.
+- **Real-environment execution** where available (e.g. the real-Postgres
+  `db:test:rls` suite, not content-matching RLS files; a real build/deploy-path
+  check for anything in the Netlify functions dir).
+- **Coverage on ALL changed files — including new modules and their async surface** —
+  meeting the ≥70% bar on every metric (stmts/branch/funcs/lines) before submit,
+  not after a gate flags it.
+- **No `.test.js` / `.test.*` file inside a deployable directory** (Netlify
+  functions, etc.) that would be bundled as a function; test files live under
+  `_shared/` per the established pattern.
+- **Downstream-consumer check**: if the change feeds another surface (migration →
+  adapter, registry → provider, outbox → UX), confirm the consumer contract still
+  holds and the whole defect class is covered, not just the reported instance.
+
+When a gate returns less than `PASS`, the fix pass **sweeps the defect class in
+one pass** (sibling paths with the same failure mode, real-env execution, and
+full-file coverage) so the loop stops after one remediation rather than several.
+The fix-pass sweep is a *self-verification* step: it does **not** substitute for
+the independent gate re-verification, which must still pass after remediation.
+
 ## 7. Escalation rules
 
 - A failed gate loops back to the responsible implementer or design authority.
