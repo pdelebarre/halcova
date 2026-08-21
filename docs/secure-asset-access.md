@@ -26,11 +26,11 @@ before bytes exist.
 | T1 | **BOLA / IDOR** — a member addresses another member's asset id | Per-user store namespace (`assets-<userId>`) derived from the session; `asset:sign`/`asset:delete` owner-self + non-enumerating 403 | — |
 | T2 | **Cross-tenant addressing** — forged client owner/tenant/asset id | Store/principal always from the session user.id; `ownerId === user.id` defense-in-depth on the envelope | — |
 | T3 | **Signed-URL forgery / replay** | Stateless HMAC `ASSET_SIGN_SECRET` (fail-closed, CWE-287/346); constant-time compare (CWE-347); scope-bound to `{assetId, tenantId, action, expiresAt}` | — |
-| T4 | **Signed-URL longevity** | Bounded TTL (10-min default, 15-min hard cap); expires at/after bound | Per-object revocation on demand is explicitly **not** retroactive (see §4) |
+| T4 | **Signed-URL longevity** | Bounded TTL (10-min default, 15-min hard cap); expires at/after bound; **instant per-asset revocation (revokedAt, #385)** | — |
 | T5 | **Oversized / wrong-type upload** | — (no upload endpoint) | Server-side size cap (`RUNOUT_ASSET_MAX_BYTES`, 5 MiB) + content-type allowlist + magic-byte/sha256 integrity |
 | T6 | **Malware / it's-a-hideout** | — | AV scanning, image re-encode / EXIF strip, moderation pipeline (deferred to file-heavy feature) |
 | T7 | **Client-cached private bytes** | Signed URLs are returned on demand only; the PWA SW has **no** runtime rule for asset URLs (ADR-0016 rule 10 — confirmed no-op today) | — |
-| T8 | **Abuse / quota** (per-identity+IP) | — | Register `asset:sign`/`asset:upload` quotas in the #337 abuse table (see §6) |
+| T8 | **Abuse / quota** (per-identity+IP) | **Wired (#385):** `asset:sign` rate-limit (30/min), `asset:serve` rate-limit (30/min) | `asset:upload` total-storage quota |
 
 Threat-model posture: the security boundary is **"authorize-before-signed-
 access"** — a signed URL is minted only *after* the caller is authorized to the
@@ -107,6 +107,7 @@ All actions are POST, `Authorization: Bearer <sessionToken>`:
 | `sign` `{ action:'sign', assetId }` | `asset:sign` (owner-self, deny demo) | resolve store from SESSION user.id → look up `asset:<uuid>` in **my** store → missing **or** `ownerId !== user.id` → uniform `403 FORBIDDEN` → 200 `{ url, expiresAt, mimeType }` |
 | `list` | `asset:list` (owner-self) | 200 `{ assets: [{ assetId, mimeType, size, createdAt }] }` — caller's own only |
 | `delete` | `asset:delete` (owner-self, deny demo) | delete **only** from my store; non-owner → same `403 FORBIDDEN` |
+| `revoke` `{ action:'revoke', assetId }` | `asset:revoke` (owner-self, deny demo) | set `revokedAt` on the envelope → serving layer rejects already-issued signed URLs (#385) |
 
 - **Non-enumeration (SEC-7.1):** "asset doesn't exist" and "asset exists but
   isn't yours" return the **same** `403 FORBIDDEN`, so a client can't enumerate.
@@ -117,20 +118,23 @@ All actions are POST, `Authorization: Bearer <sessionToken>`:
 
 ---
 
-## 4. Signed-read revocation nuance (documented — accepted control)
+## 4. Signed-read revocation (implemented — SEC-7.3.x #385)
 
-**Session revocation does NOT retroactively revoke an already-issued 10-minute
-signed URL.** This is an accepted trade-off:
+**Instant revocation is now implemented.** The serving layer (`serve.js`) checks
+per-asset `revokedAt` on the envelope before streaming bytes. A revoked asset
+returns `403 ASSET_UNAVAILABLE` — the same body as a missing asset (non-enumerating).
 
-- The URL is single-object, read-only, and bounded to ≤15 minutes.
-- Revolving the *session* stops *new* URL issuance immediately (the principal
-  no longer resolves), but a URL already handed out keeps its bounded window
-  (the serving layer needs no session to validate the HMAC — that is the point
-  of stateless signing).
-- **Mitigations in force:** bounded TTL, single-object read-only scope,
-  fail-closed secret. If a future feature needs instant revocation, the serving
-  layer can add a per-asset "revokedAt" check or rotate `ASSET_SIGN_SECRET`
-  (invalidates all outstanding URLs) — both deferred.
+Revocation is triggered via the `asset:revoke` action (`asset.js`), which sets
+`revokedAt` on the envelope. This invalidates all already-issued signed URLs for
+that asset, regardless of their remaining TTL.
+
+Additionally, rotating `ASSET_SIGN_SECRET` invalidates ALL outstanding signed
+URLs across all assets (a global kill switch).
+
+**Accepted trade-off (pre-#385):** Session revocation does NOT retroactively
+revoke an already-issued 10-minute signed URL. This was the pre-#340 accepted
+control. With #385, per-asset revocation is instant, and secret rotation is a
+global kill switch.
 
 ---
 
@@ -147,26 +151,31 @@ The **file-heavy feature** will implement, and this contract binds it:
 4. **Pipeline:** AV scanning, image re-encode / EXIF strip, moderation —
    deferred to the file-heavy feature; the blob seam already accepts raw bytes
    so this stays a pure add-on.
-5. **Serving layer:** the function that returns the bytes validates the signed
-   URL with `verifyAssetToken()` (scope + expiry) before streaming — the
-   readiness `asset:sign` returns the token so that layer has a single verifier.
+5. **Serving layer (implemented #385):** `serve.js` validates the signed URL
+   with `verifyAssetToken()` (scope + expiry), checks instant revocation
+   (`revokedAt`), and streams the asset bytes with security headers.
 
-> **IMPORTANT — do not implement §5 in #340.** It is recorded as the contract
-> for the next ticket. The only code landed here is the reversible readiness
-> seam (§2–§3) + policy/tests.
+> **IMPORTANT — this is now implemented in #385.** The serving layer is the
+> consumption side of the signed-URL contract, verifying the HMAC, checking
+> per-asset revocation, and applying rate limits before streaming bytes.
 
 ---
 
 ## 6. Abuse / quota registration (#337 abuse table)
 
-Per-identity + IP quotas for the asset surface are recorded here for the #337
-abuse table and will be **wired when the upload endpoint exists**:
+Per-identity + IP quotas for the asset surface are registered here:
 
-- `asset:sign` — per identity (user id) + IP: bound minting so a runaway client
-  can't churn signed URLs. Rate limit bucket under `runout-rate-limits`.
+- `asset:sign` — **wired (#385)** per identity (user id) + IP: 30 signed-URL
+  mints per minute default (`RUNOUT_ASSET_SIGN_RATE_LIMIT`), 429 on exhaustion.
+  Rate limit bucket under `runout-rate-limits`. The demo identity keys on
+  client IP so one demo visitor can't throttle every other demo visitor.
+- `asset:serve` — **wired (#385)** per identity (from signed token's tenantId)
+  + IP: 30 requests per minute default (`RUNOUT_ASSET_SERVE_RATE_LIMIT`),
+  429 on exhaustion.
 - `asset:upload` — per identity + IP with a **total-storage quota** (bytes +
   count) when the upload feature ships; delete frees quota.
-- `asset:list` / `asset:delete` — low, per-user; list is owner-scoped read.
+- `asset:list` / `asset:delete` / `asset:revoke` — low, per-user; list is
+  owner-scoped read.
 
 ---
 
@@ -189,23 +198,30 @@ private assets) must **not** be stored in generic service-worker HTTP caches.
   seam (`assetStoreName`, `getAssetStore`, `list/get/set/delete`).
 - `netlify/functions/_shared/asset-sign.js` — stateless HMAC signed-URL helper
   (fail-closed, bounded TTL, scope binding, CWE-347 canonical check).
-- `netlify/functions/asset.js` — `sign` / `list` / `delete` endpoint.
-- `_shared/policy.js` — `asset:list` / `asset:sign` / `asset:delete` actions.
+- `netlify/functions/asset.js` — `sign` / `list` / `delete` / `revoke` endpoint.
+- `netlify/functions/serve.js` — asset serving layer: verifies signed URLs,
+  checks instant revocation, streams bytes with security headers.
+- `_shared/policy.js` — `asset:list` / `asset:sign` / `asset:delete` / `asset:revoke` actions.
 - `_shared/visibility.js` + `_shared/filter.js` — `PRIVATE_ASSET_FIELDS`
   (`assets/receipts/attachments/photoRefs`) hardening; explicit non-owner
   strip guard.
-- Negative tests: `asset-sign.test.js`, `asset.test.js`, `policy.test.js`
-  (BOLA, cross-tenant, expiry/scope, fail-closed, demo deny, private-ref leak).
+- **SEC-7.3.x (#385):** `asset:sign` rate-limit per-identity+IP
+  (`rateLimitGuard`, 30/min default, 429 on exhaustion).
+- **SEC-7.3.x (#385):** Instant revocation via `asset:revoke` action + serving
+  layer `revokedAt` check.
+- **SEC-7.3.x (#385):** Serving layer (`serve.js`) with signed URL verification,
+  token expiry/validity checks, per-asset revocation, rate-limit, method guard,
+  fail-closed, and non-enumeration.
+- Negative tests: `asset-sign.test.js`, `asset.test.js`, `serve.test.js`,
+  `policy.test.js` (BOLA, cross-tenant, expiry/scope, fail-closed, demo deny,
+  private-ref leak, rate-limit, revocation, serving layer).
 - This design doc.
 
 ### Deferred (documented contract only — next ticket)
 - Upload endpoint + server-side size/type enforcement + magic-byte/sha256
   integrity.
 - AV / re-encode / EXIF-strip / moderation pipeline.
-- Signed-read revocation (instant per-asset revoke / secret rotation).
-- `asset:sign`/`asset:upload` quota wiring + member asset-store cleanup on
-  user delete.
-- The serving layer that validates the token and streams bytes.
+- `asset:upload` quota wiring + member asset-store cleanup on user delete.
 
 ---
 
@@ -215,8 +231,13 @@ private assets) must **not** be stored in generic service-worker HTTP caches.
 - [x] Policy actions added + negative tests green.
 - [x] BOLA / cross-tenant / expiry / scope / fail-closed / demo / DTO-leak
       negatives pass.
-- [x] `npm run lint`, `npm test`, `npm run build`, coverage (see the #340
-      branch commit for exact numbers).
-- [ ] Security Auditor review (blocking).
-- [ ] API Contract Reviewer review.
+- [x] `asset:sign` rate-limit per-identity+IP (SEC-7.3.x #385) — 429 on
+      exhaustion, no bypass, cross-identity isolation.
+- [x] Serving layer (`serve.js`) verifies signed URLs end-to-end — valid token
+      returns bytes, expired/tampered/revoked tokens rejected.
+- [x] Instant revocation (`asset:revoke` + `revokedAt` check) — revoked asset
+      URL returns 403 ASSET_UNAVAILABLE, non-enumerating with missing.
+- [x] `npm run lint`, `npm test`, `npm run build`, coverage ≥70% (all changed
+      files).
+- [ ] Security Auditor re-review (blocking — pre-file-feature gate).
 - [ ] Tester sign-off.
