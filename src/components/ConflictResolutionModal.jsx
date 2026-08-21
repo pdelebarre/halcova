@@ -15,12 +15,12 @@
 //
 // ERGONOMICS
 //   - Thumb-friendly layout (min 44px touch targets, safe-area aware).
-//   - Screen-reader accessible (role="dialog", aria-modal, focus trap).
+//   - Screen-reader accessible (role="dialog", aria-modal, aria-describedby, focus trap).
 //   - Warns before closing with unresolved conflicts.
 //   - Shows conflict count: "Conflict 1 of 3".
-//   - Resolved conflicts show a confirmation state.
+//   - Resolved conflicts show a confirmation state with resolution type.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { t } from '../i18n'
 import { useConflicts, RESOLUTION } from '../hooks/useConflicts'
 import './ConflictResolutionModal.css'
@@ -42,18 +42,91 @@ export default function ConflictResolutionModal({
   const [currentIndex, setCurrentIndex] = useState(0)
   const [resolving, setResolving] = useState(null) // conflictId being resolved
   const [resolvedIds, setResolvedIds] = useState(new Set())
+  const [resolvedTypes, setResolvedTypes] = useState({}) // conflictId -> resolution type string
   const [mergedFields, setMergedFields] = useState({})
+  const [warnedBeforeClose, setWarnedBeforeClose] = useState(false)
+  const dialogRef = useRef(null)
+  const descriptionId = 'conflict-dialog-desc'
 
   const currentConflict = conflicts[currentIndex] || null
   const totalUnresolved = conflicts.length
 
+  // MAJOR 4: Auto-focus on modal open — focus the first focusable element
+  useEffect(() => {
+    if (!open) return
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const firstFocusable = dialog.querySelector(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )
+    if (firstFocusable) {
+      firstFocusable.focus()
+    } else {
+      dialog.focus()
+    }
+  }, [open])
+
+  // MAJOR 3: Focus trap — keep tab focus within the modal while open
+  useEffect(() => {
+    if (!open) return
+
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const focusableSelector =
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Tab') return
+
+      const focusableElements = dialog.querySelectorAll(focusableSelector)
+      if (focusableElements.length === 0) {
+        e.preventDefault()
+        return
+      }
+
+      const firstFocusable = focusableElements[0]
+      const lastFocusable = focusableElements[focusableElements.length - 1]
+
+      if (e.shiftKey) {
+        // Shift+Tab: if focus is on first element, wrap to last
+        if (document.activeElement === firstFocusable) {
+          e.preventDefault()
+          lastFocusable.focus()
+        }
+      } else {
+        // Tab: if focus is on last element, wrap to first
+        if (document.activeElement === lastFocusable) {
+          e.preventDefault()
+          firstFocusable.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [open])
+
   // Reset index when conflicts change
-  const handleClose = useCallback(() => {
+  const resetState = useCallback(() => {
     setCurrentIndex(0)
     setResolvedIds(new Set())
+    setResolvedTypes({})
     setMergedFields({})
+    setWarnedBeforeClose(false)
+  }, [])
+
+  // MAJOR 5: Warn before close when unresolved conflicts exist
+  const handleClose = useCallback(() => {
+    const hasUnresolved = conflicts.length > 0 && resolvedIds.size < conflicts.length
+    if (hasUnresolved && !warnedBeforeClose) {
+      setWarnedBeforeClose(true)
+      // Use a brief state toggle to show the warning message in the UI
+      return
+    }
+    resetState()
     onClose()
-  }, [onClose])
+  }, [conflicts.length, resolvedIds.size, warnedBeforeClose, resetState, onClose])
 
   const handleResolve = useCallback(async (conflictId, resolution) => {
     if (!conflictId) return
@@ -66,9 +139,31 @@ export default function ConflictResolutionModal({
     const ok = await resolveConflict(conflictId, resolution, mergedItem)
     if (ok) {
       setResolvedIds((prev) => new Set([...prev, conflictId]))
+      // MINOR 10: Store the resolution type for the banner
+      const resolutionLabels = {
+        [RESOLUTION.USE_SERVER]: t('conflict.server'),
+        [RESOLUTION.USE_LOCAL]: t('conflict.local'),
+        [RESOLUTION.MERGE]: t('conflict.merge'),
+      }
+      setResolvedTypes((prev) => ({
+        ...prev,
+        [conflictId]: resolutionLabels[resolution] || resolution,
+      }))
+
+      // MINOR 6: Auto-advance after resolution — brief delay then next or close
+      setTimeout(() => {
+        setResolving(null)
+        if (currentIndex < conflicts.length - 1) {
+          setCurrentIndex((i) => i + 1)
+        } else {
+          // All resolved — leave on last conflict showing resolved banner
+          setResolving(null)
+        }
+      }, 800)
+    } else {
+      setResolving(null)
     }
-    setResolving(null)
-  }, [resolveConflict, mergedFields])
+  }, [resolveConflict, mergedFields, currentIndex, conflicts.length])
 
   const handleMergeField = useCallback((field, value) => {
     setMergedFields((prev) => ({
@@ -96,6 +191,9 @@ export default function ConflictResolutionModal({
 
   const hasUnresolved = totalUnresolved > 0
   const isResolved = currentConflict && resolvedIds.has(currentConflict.conflictId)
+  const resolutionType = currentConflict ? resolvedTypes[currentConflict.conflictId] : null
+  const isLastConflict = currentIndex >= totalUnresolved - 1
+  const shouldWarn = warnedBeforeClose && hasUnresolved && resolvedIds.size < totalUnresolved
 
   // Diff server vs local fields
   const serverItem = currentConflict?.serverItem || {}
@@ -117,11 +215,20 @@ export default function ConflictResolutionModal({
     >
       <div
         className="conflict-modal"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={t('conflict.title')}
+        aria-describedby={descriptionId}
         onClick={(e) => e.stopPropagation()}
+        // Make the dialog itself focusable for the focus trap
+        tabIndex={-1}
       >
+        {/* Hidden description for screen readers (MAJOR 9) */}
+        <div id={descriptionId} className="visually-hidden">
+          {t('conflict.dialogDescription', { count: totalUnresolved })}
+        </div>
+
         {/* Header */}
         <div className="conflict-modal-header">
           <h2 className="conflict-modal-title">
@@ -141,6 +248,27 @@ export default function ConflictResolutionModal({
             ✕
           </button>
         </div>
+
+        {/* MAJOR 5: Warn before close banner */}
+        {shouldWarn && (
+          <div className="conflict-modal-warn-banner" role="alert">
+            {t('conflict.warnBeforeClose', { remaining: totalUnresolved - resolvedIds.size })}
+            <button
+              type="button"
+              className="conflict-modal-warn-confirm"
+              onClick={() => { resetState(); onClose() }}
+            >
+              {t('conflict.warnConfirmClose')}
+            </button>
+            <button
+              type="button"
+              className="conflict-modal-warn-dismiss"
+              onClick={() => setWarnedBeforeClose(false)}
+            >
+              {t('conflict.warnCancel')}
+            </button>
+          </div>
+        )}
 
         {/* Content */}
         <div className="conflict-modal-body">
@@ -176,10 +304,12 @@ export default function ConflictResolutionModal({
                 </p>
               </div>
 
-              {/* Resolution status */}
+              {/* Resolution status — MINOR 10: include resolution type */}
               {isResolved && (
                 <div className="conflict-modal-resolved-banner">
-                  {t('conflict.resolved')}
+                  {resolutionType
+                    ? t('conflict.resolvedWith', { type: resolutionType })
+                    : t('conflict.resolved')}
                 </div>
               )}
 
@@ -187,6 +317,9 @@ export default function ConflictResolutionModal({
               {!isResolved && (
                 <div className="conflict-modal-diff">
                   <div className="conflict-modal-diff-header">
+                    <span className="conflict-modal-diff-label-field">
+                      {t('conflict.field')}
+                    </span>
                     <span className="conflict-modal-diff-label-server">
                       {t('conflict.server')}
                     </span>
@@ -232,6 +365,10 @@ export default function ConflictResolutionModal({
                       onClick={() => handleResolve(currentConflict.conflictId, RESOLUTION.USE_SERVER)}
                       disabled={resolving === currentConflict.conflictId}
                     >
+                      {/* MINOR 7: loading spinner */}
+                      {resolving === currentConflict.conflictId ? (
+                        <span className="conflict-modal-spinner" aria-hidden="true" />
+                      ) : null}
                       {t('conflict.useServer')}
                     </button>
 
@@ -241,6 +378,9 @@ export default function ConflictResolutionModal({
                       onClick={() => handleResolve(currentConflict.conflictId, RESOLUTION.USE_LOCAL)}
                       disabled={resolving === currentConflict.conflictId}
                     >
+                      {resolving === currentConflict.conflictId ? (
+                        <span className="conflict-modal-spinner" aria-hidden="true" />
+                      ) : null}
                       {t('conflict.useLocal')}
                     </button>
 
@@ -251,6 +391,9 @@ export default function ConflictResolutionModal({
                         onClick={() => handleResolve(currentConflict.conflictId, RESOLUTION.MERGE, mergedFields[currentConflict.conflictId])}
                         disabled={resolving === currentConflict.conflictId}
                       >
+                        {resolving === currentConflict.conflictId ? (
+                          <span className="conflict-modal-spinner" aria-hidden="true" />
+                        ) : null}
                         {t('conflict.merge')}
                       </button>
                     )}
@@ -267,6 +410,7 @@ export default function ConflictResolutionModal({
                   {currentConflict.policy.mergeableFields.map((field) => {
                     const sVal = serverItem[field]
                     const lVal = localItem[field]
+                    const currentMergedValue = mergedFields[currentConflict.conflictId]?.[field]
                     return (
                       <div key={field} className="conflict-modal-merge-field-row">
                         <span className="conflict-modal-merge-field-name">{field}</span>
@@ -274,7 +418,8 @@ export default function ConflictResolutionModal({
                           <input
                             type="radio"
                             name={`merge-${currentConflict.conflictId}-${field}`}
-                            checked={!mergedFields[currentConflict.conflictId]?.[field] && mergedFields[currentConflict.conflictId]?.[field] !== lVal}
+                            // CRITICAL 2: fixed checked expression — server radio checked when value === sVal
+                            checked={currentMergedValue === sVal}
                             onChange={() => handleMergeField(field, sVal)}
                           />
                           <span>{t('conflict.server')}: {String(sVal ?? '—')}</span>
@@ -283,7 +428,7 @@ export default function ConflictResolutionModal({
                           <input
                             type="radio"
                             name={`merge-${currentConflict.conflictId}-${field}`}
-                            checked={mergedFields[currentConflict.conflictId]?.[field] === lVal}
+                            checked={currentMergedValue === lVal}
                             onChange={() => handleMergeField(field, lVal)}
                           />
                           <span>{t('conflict.local')}: {String(lVal ?? '—')}</span>

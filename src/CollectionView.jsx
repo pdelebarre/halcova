@@ -11,9 +11,11 @@ import CollectionStats from './components/CollectionStats'
 import WishlistSheet from './components/WishlistSheet'
 import PlayPanel from './components/PlayPanel'
 import SyncStatus from './components/SyncStatus'
+import ConflictResolutionModal from './components/ConflictResolutionModal'
 import { useCollection } from './hooks/useCollection'
 import { useLookup } from './hooks/useLookup'
 import { useOutboxSync } from './hooks/useOutboxSync'
+import { useConflicts } from './hooks/useConflicts'
 import { themeToCssVars, useTheme } from './theme'
 import { findRelated, splitArtistTitle, searchItems, didYouMean } from './utils/match'
 import { itemInBin } from './utils/browse'
@@ -192,6 +194,10 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   // and the Wishlist sheet (§ Fix — unowned wants).
   const [wishlistOpen, setWishlistOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
+  // M3 #161: conflict resolution modal
+  const [conflictModalOpen, setConflictModalOpen] = useState(false)
+  const [conflictRefreshId, setConflictRefreshId] = useState(0)
+  const { conflicts: unresolvedConflicts, metrics: conflictMetrics } = useConflicts({ refreshId: conflictRefreshId })
   // Gamification (Phase 1 § Play): the "Play" entry point is gated by the
   // member's `features.games` entitlement (admin-granted) — the modal only
   // mounts when the entitlement is on (passed as `gamificationEnabled` from
@@ -1109,11 +1115,35 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
             `syncId` bumps after each mutation so the strip re-reads the durable
             outbox and reflects the real queue state (reachable states). */}
         {status === 'ready' && (
-          <SyncStatus
-            source={source}
-            mirroredAt={mirroredAt}
-            syncId={mutationSeq}
-            onSyncNow={handleSyncNow}
+          <div className="sync-status-area">
+            <SyncStatus
+              source={source}
+              mirroredAt={mirroredAt}
+              syncId={mutationSeq}
+              onSyncNow={handleSyncNow}
+            />
+
+            {/* M3 #161: conflict resolution entry point — shown when conflicts exist */}
+            {unresolvedConflicts.length > 0 && (
+              <button
+                type="button"
+                className="sync-status-conflict-btn"
+                onClick={() => setConflictModalOpen(true)}
+              >
+                {t('conflict.reviewBtn', { n: unresolvedConflicts.length })}
+              </button>
+            )}
+          </div>
+        )}
+
+        {status === 'ready' && (
+          <ConflictResolutionModal
+            open={conflictModalOpen}
+            onClose={() => {
+              setConflictModalOpen(false)
+              setConflictRefreshId((id) => id + 1)
+            }}
+            refreshId={conflictRefreshId}
           />
         )}
 

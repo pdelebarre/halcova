@@ -882,8 +882,10 @@ const en = {
   'conflict.none': 'No unresolved conflicts.',
   'conflict.resolvedCount': 'Resolved {n} of {total} conflicts.',
   'conflict.resolved': '✓ Resolved',
+  'conflict.resolvedWith': '✓ Resolved — kept {type}',
   'conflict.server': 'Server',
   'conflict.local': 'Local',
+  'conflict.field': 'Field',
   'conflict.noDifferences': 'No field differences to show.',
   'conflict.versionInfo': 'Server version {server} · Local version {local}',
   'conflict.chooseResolution': 'Choose which version to keep:',
@@ -895,6 +897,11 @@ const en = {
   'conflict.entityType.lending': 'Lending status',
   'conflict.entityType.review': 'Review',
   'conflict.entityType.payment': 'Payment',
+  'conflict.dialogDescription': 'Conflict resolution dialog. {count} unresolved conflict(s) remaining.',
+  'conflict.warnBeforeClose': 'You have {remaining} unresolved conflict(s). Closing will discard your progress.',
+  'conflict.warnConfirmClose': 'Close anyway',
+  'conflict.warnCancel': 'Keep reviewing',
+  'conflict.reviewBtn': 'Review {n} conflict(s)',
 }
 
 export default en
