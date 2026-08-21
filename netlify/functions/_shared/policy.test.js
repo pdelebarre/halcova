@@ -36,6 +36,7 @@ describe('POLICY predicate table (SEC-7.1)', () => {
     // auth identity
     expect(POLICY['auth:logout']).toEqual({ owner: 'self' })
     expect(POLICY['auth:logoutAll']).toEqual({ owner: 'self' })
+    expect(POLICY['auth:deleteAccount']).toEqual({ owner: 'self', deny: ['demo'] })
     // admin + seed
     expect(POLICY['admin:*']).toEqual({ requires: 'admin' })
     expect(POLICY['seed-demo:seed']).toEqual({ requires: 'admin' })
@@ -57,6 +58,9 @@ describe('POLICY predicate table (SEC-7.1)', () => {
     // feedback + lookups
     expect(POLICY['feedback:moderate'].requires).toBe('admin')
     expect(POLICY['lookup:read'].owner).toBeUndefined()
+    // data export (SEC-7.2.x #380)
+    expect(POLICY['export:mine'].owner).toBe('self')
+    expect(POLICY['export:mine'].deny).toContain('demo')
   })
 
   it('enforces requires:admin for admin actions', async () => {
