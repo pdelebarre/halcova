@@ -76,11 +76,11 @@ The assistant (#333) is a conversational interface that helps users manage their
 | Tool | Category | Input | Output | Data accessed |
 | --- | --- | --- | --- | --- |
 | `search_items` | Read | `{ query: string, collectionType?: string, limit?: int (1-20) }` | `{ results: [{ id, title, subtitle?, coverUrl?, collectionType, status }] }` | Public canonical metadata + owned status only. Never private notes, lending state, or audit data. |
-| `get_item_detail` | Read | `{ itemId: uuid }` | `{ id, title, subtitle?, description?, coverUrl?, providerIds?, canonicalAttributes?, ownedAttributes? (allowlisted only), status }` | Canonical metadata + allowlisted owned attributes (title, notes — never lending history, grading, or audit fields). |
+| `get_item_detail` | Read | `{ itemId: uuid }` | `{ id, title, subtitle?, description?, coverUrl?, providerIds?, canonicalAttributes?, ownedAttributes? (allowlisted only — never private notes, grading, lending or audit fields), status }` | Canonical metadata + allowlisted owned attributes (title only — **never** user private notes, grading, lending history, or audit fields per §2.2). |
 | `get_collection_summary` | Read | `{ collectionType?: string }` | `{ totalItems, identifiedCount, draftCount, byStatus: { ... } }` | Aggregated counts only. Never individual item data. |
 | `get_duplicate_suggestions` | Read | `{ collectionType?: string, limit?: int (1-20) }` | `{ suggestions: [{ itemId, duplicateOfId, title, score, reason }] }` | Duplicate candidate pairs with similarity scores. Never private notes. |
 | `get_completion_suggestions` | Read | `{ collectionType?: string, limit?: int (1-20) }` | `{ suggestions: [{ itemId, title, missingFields: string[], suggestedValues: object }] }` | Items with missing canonical fields and AI-suggested completions. |
-| `propose_mutation` | Mutation draft | `{ action: string, entityType: string, entityId?: uuid, changes: object }` | `{ draftId: uuid, action, entityType, entityId?, changes, requiresConfirmation: boolean }` | The draft is validated but not executed. Returns a draft id for confirmation. |
+| `propose_mutation` | Mutation draft | `{ action: enum("update","delete","add"), entityType: enum("collection_item","collection","review","lending"), entityId?: uuid, changes: object }`；`changes` keys validated against the entity type's field schema (ADR-0020 §6: `collection_type_fields`) per capability contract. Unknown actions or invalid entity types are rejected fail-closed. | `{ draftId: uuid, action, entityType, entityId?, changes, requiresConfirmation: boolean }` | The draft is validated but not executed. Returns a draft id for confirmation. Actions limited to `update`, `delete`, `add`; entity types limited to `collection_item`, `collection`, `review`, `lending`. `changes` keys must match the entity's registered field schema (`collection_type_fields`, ADR-0020 §6). |
 
 #### 2.2 Metadata Completion Tool
 
@@ -118,7 +118,7 @@ The image recognition capability identifies items from user-submitted images (co
 
 | Tool | Category | Input | Output | Data accessed |
 | --- | --- | --- | --- | --- |
-| `identify_from_image` | Read | `{ imageUrl: string (signed, temporary), hints?: { collectionType?: string } }` | `{ candidates: [{ title, confidence, providerId?, source }] }` | The image URL (signed, time-bounded) and public reference data only. |
+| `identify_from_image` | Read | `{ imageUrl: string (signed, temporary), hints?: { collectionType?: string } }` | `{ candidates: [{ title, confidence, providerId?, source }] }` | The image URL (signed, time-bounded) is minted server-side from user upload (POST upload → server saves to Blobs → returns `asset:sign` signed URL with short TTL). Client never directly exposes raw blob storage URLs. Public reference data only. |
 
 **Security constraints:**
 - Image URLs are server-signed, time-bounded (5 min TTL), and scoped to the authenticated user.
@@ -153,7 +153,7 @@ User: [JSON-serialized capability input — only the fields declared in inputSch
 #### 3.3 Sensitive content exclusion
 
 - Items flagged with sensitive metadata (e.g., user-classified private notes) are excluded from AI context unless the capability explicitly requires them and the user has consented.
-- The AI runtime checks a `aiExclude` flag (or equivalent) on collection items before including them in batch operations (completion, dedup, insights).
+- The AI runtime checks an `aiExclude` flag (stored as `CollectionItem.flags.aiExclude`, ADR-0020 §5) on collection items before including them in batch operations (completion, dedup, insights). Items flagged with `aiExclude: true` are always excluded from AI context. The frontend exposes a toggle to enable this flag on individual items.
 
 ### 4. Authorization model
 
@@ -212,6 +212,7 @@ Every AI tool invocation is subject to cost controls enforced by the AI runtime.
 - Quotas are configurable by admin via the #304 admin API.
 - When a quota is exceeded, the AI endpoint returns `RATE_LIMITED` (same error code as provider rate limits).
 - Quota counters are stored server-side (Netlify Blobs or Postgres) and are never client-authoritative.
+- Future plan-tier-aware quotas may be differentiated by subscription tier per ADR-0008; the quota infrastructure must support per-tier defaults without architecture change.
 
 #### 5.3 Cost tracking
 
