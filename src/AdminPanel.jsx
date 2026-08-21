@@ -120,7 +120,7 @@ export default function AdminPanel({ onClose }) {
 
   // Feedback inbox (epic #74, T6 #75). Loaded on mount so the Feedback tab's
   // unread badge (open items) is correct before the owner ever clicks it.
-  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'dashboard'
+  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'dashboard' | 'ai'
   const [allItems, setAllItems] = useState([]) // full newest-first inbox (badge source)
   const [fbLoading, setFbLoading] = useState(true)
   const [fbError, setFbError] = useState('')
@@ -139,6 +139,19 @@ export default function AdminPanel({ onClose }) {
   const [dashLoading, setDashLoading] = useState(true)
   const [dashError, setDashError] = useState('')
   const [fetchedAt, setFetchedAt] = useState('')
+
+  // Admin AI settings (ADMIN-3.2, #304): secure LLM provider-profile
+  // management. Loaded on mount so the tab is ready when the owner clicks it.
+  // The backend never returns secrets — only `secretSet` + a masked tail — so
+  // the client stores only display data, never a credential.
+  const [aiProfiles, setAiProfiles] = useState([])
+  const [aiLoading, setAiLoading] = useState(true)
+  const [aiError, setAiError] = useState('')
+  const [aiBusy, setAiBusy] = useState(null) // profileId with an op in flight
+  const [aiMsg, setAiMsg] = useState('')
+  const [aiDraftOpen, setAiDraftOpen] = useState(false)
+  const [aiEditing, setAiEditing] = useState(null) // profile being edited (or null = new)
+  const [aiDraft, setAiDraft] = useState({ name: '', providerType: 'openai', baseUrl: '', model: '', apiKey: '', capabilities: '' })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -195,6 +208,116 @@ export default function AdminPanel({ onClose }) {
   }, [])
 
   useEffect(() => { loadDashboard() }, [loadDashboard])
+
+  // Load the AI provider profiles (ADMIN-3.2, #304). Every failure degrades to
+  // an in-tab error state with retry — never an uncaught throw.
+  const loadAi = useCallback(async () => {
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const res = await authApi.adminAiList()
+      setAiProfiles(Array.isArray(res?.providers) ? res.providers : [])
+    } catch (err) {
+      setAiProfiles([])
+      setAiError(err?.message || '')
+    } finally {
+      setAiLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadAi() }, [loadAi])
+
+  // The active profile's secret is never sent back to the client, so opening
+  // the edit form for an existing profile leaves the apiKey blank — a blank
+  // apiKey on save means "keep the stored secret unchanged".
+  const openAiDraft = (profile) => {
+    setAiEditing(profile || null)
+    setAiDraft({
+      name: profile?.name || '',
+      providerType: profile?.providerType || 'openai',
+      baseUrl: profile?.baseUrl || '',
+      model: profile?.model || '',
+      apiKey: '',
+      capabilities: Array.isArray(profile?.capabilities) ? profile.capabilities.join(', ') : '',
+    })
+    setAiDraftOpen(true)
+    setAiMsg('')
+  }
+
+  const closeAiDraft = () => {
+    setAiDraftOpen(false)
+    setAiEditing(null)
+  }
+
+  const saveAiProfile = async () => {
+    setAiMsg('')
+    setAiBusy('__form__')
+    try {
+      const capabilities = aiDraft.capabilities.split(',').map((s) => s.trim()).filter(Boolean)
+      const payload = {
+        name: aiDraft.name,
+        providerType: aiDraft.providerType,
+        baseUrl: aiDraft.baseUrl,
+        model: aiDraft.model,
+        capabilities,
+        ...(aiDraft.apiKey ? { apiKey: aiDraft.apiKey } : {}),
+      }
+      if (aiEditing) {
+        await authApi.adminAiUpdate({ profileId: aiEditing.id, ...payload })
+      } else {
+        await authApi.adminAiCreate(payload)
+      }
+      await loadAi()
+      closeAiDraft()
+      setAiMsg(aiEditing ? t('admin.ai.saved') : t('admin.ai.created'))
+    } catch (err) {
+      setAiMsg(err?.message || '')
+    } finally {
+      setAiBusy(null)
+    }
+  }
+
+  const testAiProfile = async (profileId) => {
+    setAiMsg('')
+    setAiBusy(profileId)
+    try {
+      await authApi.adminAiTest({ profileId })
+      setAiMsg(t('admin.ai.testOk'))
+      await loadAi()
+    } catch (err) {
+      setAiMsg(err?.message || t('admin.ai.testFail'))
+    } finally {
+      setAiBusy(null)
+    }
+  }
+
+  const activateAiProfile = async (profileId) => {
+    setAiMsg('')
+    setAiBusy(profileId)
+    try {
+      await authApi.adminAiActivate({ profileId })
+      setAiMsg(t('admin.ai.activated'))
+      await loadAi()
+    } catch (err) {
+      setAiMsg(err?.message || t('admin.ai.activateFail'))
+    } finally {
+      setAiBusy(null)
+    }
+  }
+
+  const deleteAiProfile = async (profileId) => {
+    setAiMsg('')
+    setAiBusy(profileId)
+    try {
+      await authApi.adminAiDelete({ profileId })
+      setAiMsg(t('admin.ai.deleted'))
+      await loadAi()
+    } catch (err) {
+      setAiMsg(err?.message || '')
+    } finally {
+      setAiBusy(null)
+    }
+  }
 
   const unread = allItems.filter((i) => i?.status === 'open').length
   const visibleItems = allItems.filter((i) =>
@@ -495,6 +618,15 @@ export default function AdminPanel({ onClose }) {
           >
             {t('admin.tab.dashboard')}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'ai'}
+            className={`admin-tab${tab === 'ai' ? ' active' : ''}`}
+            onClick={() => setTab('ai')}
+          >
+            {t('admin.tab.ai')}
+          </button>
         </div>
 
         <div className="admin-scroll">
@@ -768,6 +900,160 @@ export default function AdminPanel({ onClose }) {
                     <p className="admin-dash-updated">{t('admin.dashboard.updated', { time: fmtDateTime(fetchedAt) })}</p>
                   )}
                 </>
+              )}
+            </section>
+          ) : tab === 'ai' ? (
+            <section>
+              {/* Admin AI settings (ADMIN-3.2, #304) — secure LLM provider-profile
+                  management. Secrets are never returned by the backend (only
+                  secretSet + a masked tail), so this UI can show "a secret is set"
+                  without ever receiving the credential. */}
+              <h3 className="admin-h3">{t('admin.ai.title')}</h3>
+              <p className="admin-sub">{t('admin.ai.subtitle')}</p>
+
+              {aiMsg && <p className="sheet-status" role="status">{aiMsg}</p>}
+              {aiError && (
+                <p className="sheet-error" role="alert">
+                  {aiError}
+                  <button type="button" className="btn btn-ghost btn-sm admin-fb-retry" onClick={loadAi}>
+                    {t('admin.dashboard.retry')}
+                  </button>
+                </p>
+              )}
+
+              <div className="admin-row-actions admin-ai-actions">
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => openAiDraft(null)}>
+                  {t('admin.ai.add')}
+                </button>
+              </div>
+
+              {aiLoading ? (
+                <p className="sheet-status">{t('common.loading')}</p>
+              ) : aiProfiles.length === 0 && !aiError ? (
+                <p className="sheet-empty">{t('admin.ai.empty')}</p>
+              ) : (
+                <ul className="admin-list">
+                  {aiProfiles.map((p) => (
+                    <li key={p.id} className="admin-row">
+                      <div className="admin-row-main">
+                        <span className="admin-name">
+                          {p.name || t('admin.ai.unnamed')}
+                          {p.active ? <span className="admin-badge">{t('admin.ai.active')}</span> : null}
+                        </span>
+                        <span className="admin-sub">
+                          {p.providerType} · {p.model} · {p.baseUrl}
+                        </span>
+                        <span className="admin-sub">
+                          {p.secretSet ? t('admin.ai.secretSet') : t('admin.ai.secretMissing')}
+                          {p.lastTestOk ? ` · ${t('admin.ai.lastTestOk')}` : ''}
+                        </span>
+                      </div>
+                      <div className="admin-row-actions">
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => testAiProfile(p.id)}
+                          disabled={aiBusy === p.id}
+                        >
+                          {t('admin.ai.test')}
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => activateAiProfile(p.id)}
+                          disabled={aiBusy === p.id || p.active}
+                        >
+                          {t('admin.ai.activate')}
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => openAiDraft(p)}>
+                          {t('admin.ai.edit')}
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => deleteAiProfile(p.id)}>
+                          {t('admin.delete')}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {aiDraftOpen && (
+                <section className="admin-approve">
+                  <h3 className="admin-h3">
+                    {aiEditing ? t('admin.ai.editTitle') : t('admin.ai.newTitle')}
+                  </h3>
+                  <div className="admin-field">
+                    <label htmlFor="ai-name">{t('admin.ai.name')}</label>
+                    <input
+                      id="ai-name"
+                      type="text"
+                      value={aiDraft.name}
+                      onChange={(e) => setAiDraft((d) => ({ ...d, name: e.target.value }))}
+                      maxLength={80}
+                    />
+                  </div>
+                  <div className="admin-field">
+                    <label htmlFor="ai-provider">{t('admin.ai.providerType')}</label>
+                    <select
+                      id="ai-provider"
+                      value={aiDraft.providerType}
+                      onChange={(e) => setAiDraft((d) => ({ ...d, providerType: e.target.value }))}
+                    >
+                      <option value="openai">OpenAI-compatible</option>
+                    </select>
+                  </div>
+                  <div className="admin-field">
+                    <label htmlFor="ai-baseurl">{t('admin.ai.baseUrl')}</label>
+                    <input
+                      id="ai-baseurl"
+                      type="url"
+                      value={aiDraft.baseUrl}
+                      onChange={(e) => setAiDraft((d) => ({ ...d, baseUrl: e.target.value }))}
+                      placeholder="https://api.openai.com/v1"
+                    />
+                  </div>
+                  <div className="admin-field">
+                    <label htmlFor="ai-model">{t('admin.ai.model')}</label>
+                    <input
+                      id="ai-model"
+                      type="text"
+                      value={aiDraft.model}
+                      onChange={(e) => setAiDraft((d) => ({ ...d, model: e.target.value }))}
+                    />
+                  </div>
+                  <div className="admin-field">
+                    <label htmlFor="ai-cap">{t('admin.ai.capabilities')}</label>
+                    <input
+                      id="ai-cap"
+                      type="text"
+                      value={aiDraft.capabilities}
+                      onChange={(e) => setAiDraft((d) => ({ ...d, capabilities: e.target.value }))}
+                      placeholder="classify, deduplicate, prioritize"
+                    />
+                  </div>
+                  <div className="admin-field">
+                    <label htmlFor="ai-key">{t('admin.ai.apiKey')}</label>
+                    <input
+                      id="ai-key"
+                      type="password"
+                      autoComplete="off"
+                      value={aiDraft.apiKey}
+                      onChange={(e) => setAiDraft((d) => ({ ...d, apiKey: e.target.value }))}
+                      placeholder={aiEditing ? t('admin.ai.keyPlaceholder') : ''}
+                    />
+                    <p className="admin-sub">{t('admin.ai.keyHint')}</p>
+                  </div>
+                  <div className="admin-row-actions">
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={saveAiProfile}
+                      disabled={aiBusy === '__form__'}
+                    >
+                      {t('common.save')}
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={closeAiDraft}>
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </section>
               )}
             </section>
           ) : (

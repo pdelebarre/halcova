@@ -511,3 +511,29 @@
 .admin-badge.menu-badge {
   margin-left: auto;
 }
+
+/* Admin AI settings (ADMIN-3.2, #304) — provider-profile form fields. */
+.admin-ai-actions {
+  margin: 0 0 12px;
+}
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+.admin-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--jacket-kraft-dim);
+}
+.admin-field input,
+.admin-field select {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--ink);
+  font-size: 13px;
+}
