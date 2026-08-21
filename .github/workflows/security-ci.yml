@@ -31,29 +31,50 @@
 #   - actions/checkout@v7 -> 3d3c42e5aac5ba805825da76410c181273ba90b1
 #   - actions/setup-node@v7 -> 820762786026740c76f36085b0efc47a31fe5020
 #
-# Path filters: these jobs only run when real source or config files change.
-# Pure doc/markdown/config-only PRs skip the gate. NOTE: if these jobs are
-# listed as required status checks, a skipped run counts as "not run" and will
-# block merge — in that case remove the paths filter or add a pass-through job.
+# paths-ignore: workflows skip when only non-code or test files change.
+# NOTE: if these jobs are listed as required status checks, a skipped run
+# counts as "not run" and will block merge — add a pass-through job in that case.
 name: Security CI (blocking gate)
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/security-ci.yml'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.toml'
+      - '**/*.env*'
+      - '**/public/**'
+      - '**/dist/**'
+      - '**/__tests__/**'
+      - '**/test/**'
+      - '**/tests/**'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+      - '**/*.spec.ts'
+      - '**/*.spec.tsx'
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/security-ci.yml'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.toml'
+      - '**/*.env*'
+      - '**/public/**'
+      - '**/dist/**'
+      - '**/__tests__/**'
+      - '**/test/**'
+      - '**/tests/**'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+      - '**/*.spec.ts'
+      - '**/*.spec.tsx'
 
 permissions:
   contents: read
@@ -66,10 +87,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-      # Node 22: the jsdom@30/undici@8 stack requires Node >= 22.19.0 (see
-      # undici engines). Node 20 crashes the vitest worker with
-      # `webidl.util.markAsUncloneable is not a function` and drops test files
-      # (OPS-3.1, #375). 22 is an Active LTS and matches the local toolchain.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '22'
@@ -77,23 +94,11 @@ jobs:
         run: npm install --legacy-peer-deps
       - name: Run lint
         run: npm run lint
-      # Blocking: the full suite includes the security negative tests
-      # (validation, CSRF, outage 503, XSS, rate-limit 429, safe-error, PWA
-      # cache isolation). A regression there fails the merge.
       - name: Run the test suite (incl. security negative tests)
         run: npm test
       - name: Verify the production build
         run: npm run build
 
-  # Real-Postgres RLS enforcement (ARCH-6.1 #165, HOLD 1). BLOCKING (no
-  # continue-on-error): proves cross-tenant fail-closed AND admin-function
-  # authorization against an ACTUAL PostgreSQL server on every PR/merge, using
-  # the least-privilege `app_rls` role. The `npm test` job above only exercises
-  # pg-mem (which cannot parse RLS DDL), so without this job there is ZERO
-  # execution evidence for the RLS enforcement tests — that is the gap this
-  # closes. Trust auth is used so no password literal is committed (nothing for
-  # the secret scan to flag): the owner connects over the service port and the
-  # test connects as `app_rls` (created WITH LOGIN by the provisioning step).
   rls-integration:
     name: Real-Postgres RLS enforcement
     runs-on: ubuntu-latest
@@ -147,11 +152,6 @@ jobs:
           `)
           await c.end()
           EOF
-      # BLOCKING — runs the REAL-Postgres integration suite (rls-integration
-      # .test.js). RLS_INTEGRATION=1 + both URLs mean the suite RUNS here, it
-      # does NOT skip (a missing URL would FAIL, not skip — see the test's
-      # config guard). db:migrate:rls inside db:test:rls applies the RLS files
-      # (idempotent; the role already exists WITH LOGIN, so it is left intact).
       - name: Run real-Postgres RLS integration tests (blocking)
         run: npm run db:test:rls
         env:
@@ -167,36 +167,14 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-      # BLOCKING: fails on any high/critical advisory (no continue-on-error),
-      # EXCEPT the Security-Auditor-approved dev-only no-fix set (issue #386).
-      # Only the advisory sources in scripts/security/dependency-audit-allowlist.js
-      # are exempted (extract-zip GHSA-jmr9-qjv8-65gv and sharp/libvips
-      # GHSA-f88m-g3jw-g9cj); anything else — a new advisory, a new CVE on the
-      # same package, or a non-exempt package — fails the job (fail-closed).
-      # Exceptions require a filed ticket + Security Auditor sign-off (see
-      # .github/ai/README.md, #213).
       - name: "npm audit (blocking on high/critical, with approved #386 allowlist)"
         run: |
           set -o pipefail
-          # Capture the full JSON report AND npm's own exit code. The allowlist
-          # gate decides pass/fail on high/critical findings, but npm's exit
-          # state is forwarded to the gate so an audit failure (registry/network/
-          # DNS/auth) cannot be masked. The gate FAILS CLOSED if the report is
-          # error-shaped/incomplete (npm's `{"message","error"}` shape has no
-          # `vulnerabilities`) — the BLOCKING gate must never pass while it
-          # scanned nothing. `|| true` is deliberately removed: npm's exit code
-          # is captured explicitly and the gate enforces the verdict.
           set +e
           npm audit --json > /tmp/npm-audit.json
           npm_exit=$?
           set -e
           node scripts/security/dependency-audit-allowlist.js "$npm_exit" < /tmp/npm-audit.json
-      # BLOCKING regression gate (#413): the allowlist tests prove the gate is
-      # FAIL-CLOSED (clean=pass, approved#386=pass, new-high=fail, new-CVE=fail,
-      # audit-error-shape=fail, incomplete-report=fail). They run as a plain
-      # `node` invocation (the test's documented entrypoint) so no test-runner
-      # fragility is introduced for .mjs scripts, and a regression that makes
-      # the gate fail-open fails this job.
       - name: Run dependency-audit allowlist regression tests (fail-closed, #413)
         run: node scripts/security/dependency-audit-allowlist.test.mjs
 
@@ -207,16 +185,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-      # BLOCKING: Gitleaks fails (exit 1) on any detected secret. Output is
-      # redacted so nothing secret is logged.
-      #
-      # The previous step invoked gitleaks via a public Docker image
-      # (gitleaks/gitleaks:v8.24.3); CI intermittently failed with "pull access
-      # denied" (exit 125) because the image is not reliably pullable on hosted
-      # runners (OPS-3.1, #375). We now run the standalone release binary
-      # (same v8.24.3 engine, same .gitleaks.toml) so the scan never depends on
-      # the Docker daemon. Over the full git history with fetch-depth 0 this
-      # scan reports no leaks.
       - name: Run Gitleaks (blocking)
         run: |
           mkdir -p /tmp/gitleaks

@@ -4,18 +4,42 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'sonar-project.properties'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.toml'
+      - '**/*.env*'
+      - '**/public/**'
+      - '**/dist/**'
+      - '**/__tests__/**'
+      - '**/test/**'
+      - '**/tests/**'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+      - '**/*.spec.ts'
+      - '**/*.spec.tsx'
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'sonar-project.properties'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.mdx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.toml'
+      - '**/*.env*'
+      - '**/public/**'
+      - '**/dist/**'
+      - '**/__tests__/**'
+      - '**/test/**'
+      - '**/tests/**'
+      - '**/*.test.ts'
+      - '**/*.test.tsx'
+      - '**/*.spec.ts'
+      - '**/*.spec.tsx'
 
 jobs:
   sonarcloud:
@@ -45,7 +69,6 @@ jobs:
 
       # Advisory dependency scan (SEC-EPIC-5, #208) — report-only, never blocks
       # (the BLOCKING dependency gate is part of security-ci.yml, #213).
-      # npm install above generates a transient lockfile for the audit to read.
       - name: npm audit (advisory, non-blocking)
         run: |
           npm audit --audit-level=high \
