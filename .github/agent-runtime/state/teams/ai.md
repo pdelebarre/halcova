@@ -1,7 +1,8 @@
 TEAM: AI
-CURRENT ISSUE: #304 — [ADMIN-3.2] Secure LLM configuration storage + Admin AI settings
-STATUS: ACTIVE — implementation complete, awaiting independent gates (Security Auditor + Data Architect + Tester)
-ACTIVE PR: none yet — branch m1/ai/304 (committed + working tree)
-LAST GATE: self-verify — full suite 2605 pass (10 skipped); global coverage gate passes (stmts 88.3%, branches 80.4%, funcs 86.5%, lines 91.4%); ALL changed files ≥70% on stmts/branches/funcs (admin.js, ai-admin, ai-config-repo, ai-config-blob, ai-endpoint, ai-secrets, openai, provider, AdminPanel.jsx, api/auth.js); build + lint clean
-BLOCKER: none — #303 merged (PR #430); #304 includes the mandatory base-URL HOST ALLOWLIST on the OpenAI provider (ADR-0006 / #303 Security Auditor MEDIUM) + secrets encrypted at rest (RUNOUT_AI_SECRET_KEY), admin-only API, atomic test-before-activate, audit without secrets
-NEXT: PM route #304 to Security Auditor + Data Architect + Tester for independent verification; then Release Validator before cutover
+CURRENT ISSUE: #332 — [FEAT-9.1] Define AI Collection Tool Contracts & Data-Minimization Policy (M4 design gate)
+STATUS: ACTIVE — ADR-0021 written on branch m4/ai/332, awaiting independent specialist review (AI Architect + Security Auditor + Whole Stack Architect)
+ACTIVE PR: none yet — branch m4/ai/332 (committed, not pushed)
+LAST GATE: self-verify — design document only (no implementation code); consistent with ADR-0006, ADR-0013, ADR-0010, ADR-0014, ADR-0019, ADR-0020, #303, #304, #409, #317
+BLOCKER: none — all dependencies (#303, #304, #409, #317) merged; ADR-0020 is Proposed but this ADR builds on its domain model concepts without requiring its acceptance
+NEXT: PM route ADR-0021 for independent review by AI Architect + Security Auditor + Whole Stack Architect; then route P1 tickets (#333, #334, #306, #307, #308, #310, #309) for implementation
+LESSONS: none yet — first AI team M4 issue
