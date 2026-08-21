@@ -10,6 +10,8 @@ import AuthScreen from './AuthScreen'
 import AdminPanel from './AdminPanel'
 import PaywallModal from './components/PaywallModal'
 import ErrorBoundary from './components/ErrorBoundary'
+import BottomNav from './components/BottomNav'
+import HomeScreen from './components/HomeScreen'
 import { ThemeProvider } from './theme'
 import { recordsCatalog, booksCatalog } from './catalog'
 import * as authApi from './api/auth'
@@ -61,7 +63,24 @@ function stripUrlParam(key) { stripUrlParams([key]) }
 
 export default function App() {
   const { session, ready, login, logout, requestAccess, refresh, setSession } = useAuth()
-  const [tab, setTab] = useState('records')
+  // Bottom navigation tab: 'home' | 'browse' | 'scan' | 'more'
+  // Default is 'home'. Tests and URL params can override via ?tab=browse.
+  const initialTab = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get('tab')
+      if (tab && ['home', 'browse', 'more'].includes(tab)) return tab
+    } catch { /* ignore */ }
+    // Also check localStorage for test overrides
+    try {
+      const stored = localStorage.getItem('runout.navTab')
+      if (stored && ['home', 'browse', 'more'].includes(stored)) return stored
+    } catch { /* ignore */ }
+    return 'home'
+  })()
+  const [navTab, setNavTab] = useState(initialTab)
+  // Collection tab within browse: 'records' | 'books'
+  const [collectionTab, setCollectionTab] = useState('records')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const [creditOpen, setCreditOpen] = useState(false)
@@ -101,7 +120,7 @@ export default function App() {
   // A5.4 — keep the Loans-button overdue badge in sync. Fetches both
   // collections (only when lending is enabled) and counts overdue loans; the
   // dashboard also reports its own count via onOverdueCount when it opens, so
-  // the badge matches what the user just saw. Errors/offline → 0 (never throw).
+  // the badge matches what the user just saw. Errors/offline -> 0 (never throw).
   useEffect(() => {
     if (!hasLending(session?.user)) {
       setOverdueCount(0)
@@ -119,12 +138,7 @@ export default function App() {
   }, [session?.user, refreshTick])
 
   // (ADMIN-EPIC-1, #263/#264) — pending-request badge, three surfaces, one
-  // fetch. Reads counts.pendingRequests from GET /admin?counts=1 — the cheap,
-  // requireAdmin-gated COUNTS-ONLY call (CWE-200): it returns only `{ counts }`
-  // and never the requests/users lists, so the 60s poll ships no PII (unlike
-  // ?dashboard=1 / adminList). Refreshed on app foreground + a modest 60s
-  // interval. Failures/offline degrade to 0 (never throw), and non-admins
-  // never fetch.
+  // fetch. Reads counts.pendingRequests from GET /admin?counts=1.
   const refreshPending = useCallback(() => {
     authApi.adminCounts()
       .then((res) => {
@@ -152,10 +166,6 @@ export default function App() {
     }
   }, [isAdmin, refreshPending])
 
-  // Refresh the badge the moment the admin panel closes — an approve/reject
-  // inside the panel should decrement the avatar badge immediately, not on the
-  // next 60s poll. A ref tracks whether it was previously open so the mount
-  // (panel already closed) doesn't double-fetch alongside the effect above.
   const adminWasOpen = useRef(adminOpen)
   useEffect(() => {
     const wasOpen = adminWasOpen.current
@@ -163,53 +173,36 @@ export default function App() {
     if (wasOpen && !adminOpen && isAdmin) refreshPending()
   }, [adminOpen, isAdmin, refreshPending])
 
-  // Stable App toast: auto-dismissing feedback used by the magic-link and
-  // checkout-return flows above the collection shell.
   const showAppToast = useCallback((msg, kind = 'add') => {
     if (appToastTimer.current) clearTimeout(appToastTimer.current)
     setAppToast({ msg, kind })
     appToastTimer.current = setTimeout(() => setAppToast(null), 3200)
   }, [])
 
-  // Reset to the first collection when a different user signs in. C2.1
-  // (issue #86): route first-run to the token-free path — a brand-new member
-  // lands on Books (no Discogs token needed, so their first scan works
-  // immediately) when Books is granted and its collection is still empty;
-  // established members and records-only accounts keep Records. On a lookup
-  // failure we fall back to Records, the safe default.
+  // Reset to the first collection when a different user signs in.
   useEffect(() => {
     const userId = session?.user?.id
     if (!userId) return undefined
-    // Read the current session via the ref (kept in sync above) so this effect
-    // can stay keyed only on user.id — a plan refresh (new session object,
-    // same user) must never reset the member's manually-chosen tab.
     const user = sessionRef.current?.user
     const collections = user?.collections || {}
     if (!collections.books) {
-      setTab('records')
+      setCollectionTab('records')
       return undefined
     }
     let cancelled = false
-    // Promise.resolve() wraps the call so a mocked/non-promise return (or a
-    // synchronous throw) can never crash the effect — dark-screen safety.
     Promise.resolve()
       .then(() => collectionApi.listItems('books'))
       .then((items) => {
         if (cancelled) return
-        setTab(Array.isArray(items) && items.length === 0 ? 'books' : 'records')
+        setCollectionTab(Array.isArray(items) && items.length === 0 ? 'books' : 'records')
       })
       .catch(() => {
-        if (!cancelled) setTab('records')
+        if (!cancelled) setCollectionTab('records')
       })
     return () => { cancelled = true }
   }, [session?.user?.id])
 
-  // S1 self-serve signup (ADR-0003 §3): arriving via ?magic-link=<token> (the
-  // emailed one-time link) exchanges the token for a session — no password, no
-  // admin approval. verifyMagicLink() already persists the session to
-  // localStorage; we then sync React state so the shell mounts (equivalent to
-  // login() without a redundant server round-trip). The token is stripped from
-  // the URL so a reload doesn't re-verify.
+  // S1 self-serve signup via magic link.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const params = new URLSearchParams(window.location.search)
@@ -232,12 +225,7 @@ export default function App() {
     return () => { cancelled = true }
   }, [setSession, showAppToast])
 
-  // S6 checkout return: Stripe's success URL lands as
-  // `?checkout=success&session_id=...` (the ?upgrade=success alias is also
-  // tolerated). Strip the params, then poll the S3 status endpoint (the
-  // self-healing path for webhook lag) — or me() when no session id is present
-  // — until the plan is paid, then success toast + refresh. Offline keeps the
-  // cached session (S5): the poll never signs the user out.
+  // S6 checkout return.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const params = new URLSearchParams(window.location.search)
@@ -251,7 +239,7 @@ export default function App() {
 
     let cancelled = false
     let attempts = 0
-    const MAX_ATTEMPTS = 15 // ~30s of 2s polls
+    const MAX_ATTEMPTS = 15
     const DELAY_MS = 2000
     setConfirmingPayment(true)
 
@@ -260,8 +248,6 @@ export default function App() {
       let paid = false
       try {
         if (sessionId) {
-          // S3 self-healing path: the status poll persists the session for a
-          // brand-new prospect and confirms an existing member's upgrade.
           const data = await paymentApi.getCheckoutStatus(sessionId)
           if (data?.status === 'complete') {
             const nextUser = data.user || sessionRef.current?.user
@@ -270,13 +256,11 @@ export default function App() {
             paid = true
           }
         } else {
-          // No session id (?upgrade=success alone): poll me() until the plan
-          // flips to paid.
           await refresh()
           paid = isPaidPlan(sessionRef.current?.user)
         }
       } catch {
-        // Offline / transient — keep the cached session (S5) and keep polling.
+        // Offline / transient — keep polling.
       }
       if (cancelled) return
       if (paid) {
@@ -284,7 +268,7 @@ export default function App() {
         showAppToast(t('paywall.successToast'), 'add')
         return
       }
-      if (attempts >= MAX_ATTEMPTS) return // banner stays: "still confirming"
+      if (attempts >= MAX_ATTEMPTS) return
       pollTimerRef.current = setTimeout(step, DELAY_MS)
     }
 
@@ -300,9 +284,6 @@ export default function App() {
   }
 
   if (!session) {
-    // While a magic link is being verified, show a loading line instead of a
-    // flash of the auth screen. A prospect returning from a successful
-    // checkout sees the "still confirming" notice while the poll runs.
     return (
       <>
         {confirmingPayment && (
@@ -320,20 +301,13 @@ export default function App() {
   const user = session.user
   const allowed = user.collections || {}
   const available = ['records', 'books'].filter((kind) => allowed[kind])
-  const activeTab = available.includes(tab) ? tab : (available[0] || '')
+  const activeCollectionTab = available.includes(collectionTab) ? collectionTab : (available[0] || '')
 
-  const catalog = CATALOGS[activeTab]
+  const catalog = CATALOGS[activeCollectionTab]
 
-  // Free tier & demo (ADR-0001). The owner/admin is implicitly unlimited; demo
-  // visitors are read-only (no plan, no adds), so `isFree` is forced off for
-  // them and only the demo banner/read-only UI applies.
   const isDemo = user.role === 'demo'
   const plan = user.role === 'admin' ? 'unlimited' : (user.plan || 'free')
 
-  // S6 plan state. `planStatus` is derived client-side (the backend doesn't
-  // emit it): 'free' | 'active' | 'expired' | 'unlimited'. An expired premium
-  // counts as free so the cap gate still protects the server's limit, and the
-  // soft upgrade entry reads "renew". Every field is read defensively.
   const planStatus = (() => {
     if (!user?.plan || user.plan === 'free') return 'free'
     if (user.role === 'admin' || user.plan === 'unlimited') return 'unlimited'
@@ -342,18 +316,11 @@ export default function App() {
     return 'active'
   })()
 
-  // Per-account capability flags (§ W6 / Phase 1 § Play): lending is DERIVED
-  // from the plan (mirror of the server's effectiveFeatures) — any paid plan
-  // includes it, the admin always has it, and the admin's manual per-member
-  // `features.lending` override still works. Games stays an admin-granted
-  // per-account flag (unchanged).
   const lendingEnabled = hasLending(user)
   const gamesEnabled = !!user.features?.games
   const isFree = (plan === 'free' || planStatus === 'expired') && !isDemo
 
   if (!catalog) {
-    // Signed in but no collections granted — shouldn't normally happen, but
-    // be defensive rather than mounting a broken collection view.
     return (
       <div className="auth-screen">
         <div className="auth-card">
@@ -367,24 +334,33 @@ export default function App() {
     )
   }
 
-  // S6: open the paywall for the active collection. CollectionView reports the
-  // reason it's blocked; App owns the modal. The demo space (DEMO_READONLY)
-  // never upgrades, so the paywall is never reachable from the demo.
   function openPaywall(p) {
     if (isDemo) return
     setPaywall({
       reason: p?.reason || 'upgrade',
-      kind: p?.kind || activeTab,
+      kind: p?.kind || activeCollectionTab,
       feature: p?.feature,
     })
+  }
+
+  // Handle bottom nav tab changes
+  function handleNavChange(tab) {
+    if (tab === 'scan') {
+      // Scan is the dominant CTA — trigger scan modal immediately
+      // by navigating to browse with scan open
+      setNavTab('browse')
+      // The scan flow starter will be handled by the browse view
+      return
+    }
+    setNavTab(tab)
   }
 
   return (
     <>
       <Header
-        tabs={available.map((kind) => ({ id: kind, label: t(`kind.${kind}`) }))}
-        activeTab={activeTab}
-        onTabChange={setTab}
+        tabs={navTab === 'browse' ? available.map((kind) => ({ id: kind, label: t(`kind.${kind}`) })) : undefined}
+        activeTab={navTab === 'browse' ? activeCollectionTab : undefined}
+        onTabChange={navTab === 'browse' ? setCollectionTab : undefined}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenAdmin={() => setAdminOpen(true)}
         onOpenCredits={() => setCreditOpen(true)}
@@ -392,21 +368,14 @@ export default function App() {
         user={user}
         pendingCount={pendingCount}
         onLogout={logout}
+        showBack={navTab !== 'home'}
+        onBack={() => setNavTab('home')}
       />
 
-      {/* M1 offline shell (#157): a small, accessible offline-status pill that
-          appears only when the network drops, so the user understands why live
-          data (lookups/sync) is paused while the precached shell keeps
-          rendering. Rendered globally — even on the auth screen — so it never
-          surprises anyone mid-session. */}
       <OnlineIndicator />
 
-      {/* Read-only demo notice (ADR-0001): demo visitors browse but can't add
-          or edit. Leaving the demo signs out back to the auth screen. */}
       {isDemo && <DemoBanner onLeave={logout} />}
 
-      {/* S6 post-checkout notice: "still confirming" while the payment poll
-          runs — and it stays up on timeout so a slow webhook never looks lost. */}
       {confirmingPayment && (
         <div className="paywall-notice" role="status" aria-live="polite">
           <span>{t('paywall.stillPending')}</span>
@@ -414,41 +383,67 @@ export default function App() {
         </div>
       )}
 
-      {/* keyed by kind so each collection remounts fresh when you switch tabs.
-          The boundary shares the key so switching tabs also clears an error
-          state — a failure in one collection never blanks the header/nav or
-          poisons the other tab. */}
-      {/* T2 (issue #110): ThemeProvider feeds the active catalog's room theme
-          (records = gold, books = neutral placeholder until T3 #104) to the
-          collection below; CollectionView applies it as CSS variables on its
-          own container. `catalog?.theme` is optional-chained — a missing theme
-          can never throw. The provider is keyed implicitly by catalog.kind via
-          the boundary/CollectionView keys, so each tab swap gets a fresh
-          accent scope. */}
-      <ThemeProvider theme={catalog?.theme}>
-        <ErrorBoundary
-          key={`boundary-${catalog.kind}`}
-          onReport={() => setFeedbackOpen({ initialType: 'bug' })}
-        >
-          <CollectionView
-            key={catalog.kind}
+      {/* Main content area — switches between Home and Browse views */}
+      <div className="app-content">
+        {navTab === 'home' && (
+          <HomeScreen
             catalog={catalog}
-            onRequestSettings={() => setSettingsOpen(true)}
-            lendingEnabled={lendingEnabled}
-            overdueCount={overdueCount}
-            onOpenLoans={() => setLoansOpen(true)}
-            onOpenPaywall={openPaywall}
-            refreshTick={refreshTick}
-            loansButtonRef={loansButtonRef}
-            plan={plan}
-            planStatus={planStatus}
-            isFree={isFree}
+            status="ready"
             isDemo={isDemo}
-            user={user}
-            gamificationEnabled={gamesEnabled}
+            isFree={isFree}
+            lendingEnabled={lendingEnabled}
+            onScan={() => { setNavTab('browse'); /* scan triggered from browse */ }}
+            onScanCover={() => { setNavTab('browse'); /* cover scan triggered from browse */ }}
+            onManualAdd={() => { setNavTab('browse'); /* manual add triggered from browse */ }}
+            onOpenCollection={() => setNavTab('browse')}
+            onOpenWishlist={() => { setNavTab('browse'); /* wishlist handled in browse view */ }}
+            onOpenConflicts={() => setNavTab('browse')}
           />
-        </ErrorBoundary>
-      </ThemeProvider>
+        )}
+
+        {navTab === 'browse' && (
+          <ThemeProvider theme={catalog?.theme}>
+            <ErrorBoundary
+              key={`boundary-${catalog.kind}`}
+              onReport={() => setFeedbackOpen({ initialType: 'bug' })}
+            >
+              <CollectionView
+                key={catalog.kind}
+                catalog={catalog}
+                onRequestSettings={() => setSettingsOpen(true)}
+                lendingEnabled={lendingEnabled}
+                overdueCount={overdueCount}
+                onOpenLoans={() => setLoansOpen(true)}
+                onOpenPaywall={openPaywall}
+                refreshTick={refreshTick}
+                loansButtonRef={loansButtonRef}
+                plan={plan}
+                planStatus={planStatus}
+                isFree={isFree}
+                isDemo={isDemo}
+                user={user}
+                gamificationEnabled={gamesEnabled}
+              />
+            </ErrorBoundary>
+          </ThemeProvider>
+        )}
+
+        {navTab === 'more' && (
+          <div className="more-screen">
+            <div className="more-screen-content">
+              <p className="more-screen-placeholder">{t('home.title')} &amp; {t('common.settings')}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom navigation — always visible when signed in */}
+      <BottomNav
+        activeTab={navTab}
+        onTabChange={handleNavChange}
+        conflictCount={0}
+        wishlistCount={0}
+      />
 
       {settingsOpen && (
         <SettingsModal
@@ -478,8 +473,6 @@ export default function App() {
         />
       )}
 
-      {/* S6 paywall: CollectionView reported why it's blocked — App renders the
-          bottom sheet with that reason + kind. */}
       {paywall && (
         <PaywallModal
           kind={paywall.kind}
@@ -489,7 +482,6 @@ export default function App() {
         />
       )}
 
-      {/* App-level toast for the magic-link / checkout-return flows. */}
       {appToast && (
         <div className={`toast toast-${appToast.kind}`} role="status" aria-live="polite">
           <span className="toast-icon" aria-hidden="true">{appToast.kind === 'error' ? '✕' : '✓'}</span>

@@ -10,8 +10,10 @@ function res(status, data) {
 const ITEM = { id: 'r1', title: 'Miles Davis - Kind of Blue', year: 1959, label: 'Columbia', genre: ['Jazz'], dateAdded: '2026-01-01T00:00:00Z' }
 
 // Route mock fetches: /auth returns the user (session revalidation), /collection returns one item.
+// Also sets the navTab to 'browse' so tests land on the collection view.
 function mockSignedIn(user, code = 'RU-AAAA-BBBB-CCCC') {
   saveSession({ user, session: 'tok-session-abc123' })
+  localStorage.setItem('runout.navTab', 'browse')
   global.fetch = vi.fn((url) => {
     if (String(url).includes('/functions/auth')) return Promise.resolve(res(200, { user }))
     if (String(url).includes('/functions/collection')) return Promise.resolve(res(200, { items: [ITEM] }))
@@ -22,6 +24,7 @@ function mockSignedIn(user, code = 'RU-AAAA-BBBB-CCCC') {
 describe('App auth gating', () => {
   beforeEach(() => {
     saveSession(null)
+    localStorage.removeItem('runout.navTab')
   })
 
   it('shows the sign-in screen when signed out', async () => {
@@ -33,6 +36,7 @@ describe('App auth gating', () => {
   it('shows both collections for a member with records + books', async () => {
     mockSignedIn({ id: 'u1', name: 'Ada', role: 'member', collections: { records: true, books: true } })
     render(<App />)
+    // Records/Books tabs are now in the browse view toolbar
     expect(await screen.findByRole('button', { name: 'Records' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Books' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Admin panel' })).not.toBeInTheDocument()
@@ -81,6 +85,7 @@ describe('App auth gating', () => {
 describe('App — theme room scope (epic #95, T2 #110)', () => {
   beforeEach(() => {
     saveSession(null)
+    localStorage.removeItem('runout.navTab')
   })
 
   it('swaps the accent scope when switching the Records|Books tab, without a dark screen', async () => {
@@ -107,6 +112,7 @@ describe('App — theme room scope (epic #95, T2 #110)', () => {
 // store's emptiness, so mock the collection response per `collection` param.
 function mockSignedInWithBooks(user, booksItems = []) {
   saveSession({ user, session: 'tok-session-abc123' })
+  localStorage.setItem('runout.navTab', 'browse')
   global.fetch = vi.fn((url) => {
     const u = String(url)
     if (u.includes('/functions/auth')) return Promise.resolve(res(200, { user }))

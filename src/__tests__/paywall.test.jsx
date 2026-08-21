@@ -107,6 +107,8 @@ const KIND_OF_BLUE = {
 beforeEach(() => {
   localStorage.clear()
   setLocale('en')
+  // M2 #320: default to Browse tab for collection-view tests
+  localStorage.setItem('runout.navTab', 'browse')
   window.history.replaceState({}, '', '/')
   currentUser.role = 'member'
   currentUser.plan = 'free'

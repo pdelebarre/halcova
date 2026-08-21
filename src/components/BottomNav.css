@@ -1,0 +1,155 @@
+/* ==========================================================================
+   Bottom Navigation — M2 collector home redesign (#320)
+   
+   Thumb-friendly bottom nav bar with ≤5 destinations.
+   - 44px min touch targets (WCAG 2.5.8)
+   - Safe-area-aware (--safe-bottom)
+   - Dominant center scan button
+   - Mobile-first, desktop adapts
+   ========================================================================== */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  height: calc(64px + var(--safe-bottom));
+  padding: 0 env(safe-area-inset-right) var(--safe-bottom) env(safe-area-inset-left);
+  background: var(--vinyl-groove-2);
+  border-top: 1px solid var(--line);
+  /* Frosted glass to let content breathe behind */
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* --- Nav item base --- */
+.bottom-nav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  /* 44px minimum touch target (WCAG 2.5.8) */
+  min-height: 44px;
+  padding: 6px 4px;
+  border-radius: 0;
+  color: var(--static-grey);
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease;
+}
+
+/* --- Active state --- */
+.bottom-nav-item.active {
+  color: var(--runout-gold);
+}
+
+/* Active bar indicator — slender underline for tabs */
+.bottom-nav-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background: var(--runout-gold);
+  border-radius: 0 0 2px 2px;
+}
+
+/* --- Icon wrapper (for badge positioning) --- */
+.bottom-nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+/* --- Badge (conflict / wishlist count) --- */
+.bottom-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger-bright);
+  color: var(--sleeve-black);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* --- Label --- */
+.bottom-nav-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+/* --- Dominant Scan button (center CTA) --- */
+.bottom-nav-item.dominant {
+  position: relative;
+  /* Lift the scan icon above the bar */
+  margin-top: -14px;
+  flex: 0 0 auto;
+  width: 60px;
+}
+
+.bottom-nav-item.dominant .bottom-nav-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--label-red);
+  color: var(--jacket-kraft);
+  box-shadow: 0 6px 16px rgba(178, 58, 46, 0.4), 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+/* Press state — subtle scale + brighter */
+.bottom-nav-item.dominant:active .bottom-nav-icon-wrap {
+  transform: scale(0.93);
+  background: var(--label-red-bright);
+}
+
+/* Hover (desktop) */
+@media (hover: hover) {
+  .bottom-nav-item:not(.dominant):hover {
+    color: var(--jacket-kraft-dim);
+  }
+  .bottom-nav-item.dominant:hover .bottom-nav-icon-wrap {
+    background: var(--label-red-bright);
+  }
+}
+
+/* --- Desktop: hide bottom nav (header + toolbar handle desktop nav) --- */
+@media (min-width: 1024px) {
+  .bottom-nav {
+    display: none;
+  }
+}

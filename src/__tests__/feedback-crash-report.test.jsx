@@ -37,6 +37,8 @@ beforeEach(() => {
   submitFeedback.mockResolvedValue({ id: '12345678-abcd-4000-8000-000000000000', type: 'bug', status: 'open' })
   // React logs caught boundary errors to console.error — silence it.
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  // M2 #320: default to Browse tab for collection-view tests
+  localStorage.setItem('runout.navTab', 'browse')
 })
 
 describe('ErrorBoundary crash card → "Report a problem" submits type=bug (feat/feedback #82, epic #74)', () => {

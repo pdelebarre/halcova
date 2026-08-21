@@ -14,6 +14,9 @@ export default function Header({
   user,
   pendingCount = 0,
   onLogout,
+  showBack = false,
+  onBack,
+  backLabel,
 }) {
   const scrolled = useScrolled()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -47,22 +50,36 @@ export default function Header({
   return (
     <header className={scrolled ? 'app-header scrolled' : 'app-header'}>
       <div className="app-header-title">
+        {showBack && (
+          <button
+            type="button"
+            className="icon-btn header-back-btn"
+            onClick={onBack}
+            aria-label={backLabel || t('common.back')}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
         <span className="wordmark">Halcova</span>
       </div>
       <div className="header-right">
-        <nav className="tab-bar" aria-label={t('header.collectionType')}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => onTabChange(tab.id)}
-              aria-pressed={activeTab === tab.id}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+        {tabs && tabs.length > 0 && (
+          <nav className="tab-bar" aria-label={t('header.collectionType')}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => onTabChange(tab.id)}
+                aria-pressed={activeTab === tab.id}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        )}
         {user && (
           <div className="avatar-wrap">
             {menuOpen && <div className="avatar-overlay" onClick={closeMenu} aria-hidden="true" />}
@@ -79,8 +96,6 @@ export default function Header({
               {showAdmin && (
                 <button type="button" role="menuitem" onClick={() => run(onOpenAdmin)}>
                   {t('common.adminPanel')}
-                  {/* "Admin panel" menuitem badge (ADMIN-EPIC-1, #263) — same
-                      alert-fatigue rule as the avatar chip: only when > 0. */}
                   {pendingCount > 0 && (
                     <span className="admin-badge menu-badge" aria-label={t('admin.dashboard.pendingBadge', { n: pendingCount })}>
                       {pendingCount}
@@ -109,11 +124,6 @@ export default function Header({
               }
             >
               <span className="user-chip-initial">{String(user.name || '?').charAt(0).toUpperCase()}</span>
-              {/* Avatar chip badge (ADMIN-EPIC-1, #263) — red .admin-badge at
-                  the chip's corner, shown only when count > 0 (alert-fatigue
-                  rule). The count is also folded into the chip's aria-label
-                  above so screen readers announce it even though the button
-                  already carries an explicit label. */}
               {showAdmin && pendingCount > 0 && (
                 <span className="admin-badge avatar-badge" aria-label={t('admin.dashboard.pendingBadge', { n: pendingCount })}>
                   {pendingCount}

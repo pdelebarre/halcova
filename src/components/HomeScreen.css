@@ -1,0 +1,220 @@
+/* ==========================================================================
+   Home Screen — M2 collector home redesign (#320)
+   
+   Thumb-friendly dashboard answering: what I own, what's new,
+   what can I do next.
+   
+   - 44px min touch targets (WCAG 2.5.8)
+   - Safe-area-aware (padding with --safe-bottom accounts for bottom nav)
+   - Mobile-first
+   ========================================================================== */
+
+.home-screen {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 16px 16px calc(var(--safe-bottom) + 80px);
+  /* Account for fixed bottom nav height (64px + safe-bottom) */
+}
+
+/* --- Sync status area (offline-copy indicator, conflict badge) --- */
+.home-sync-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Conflict badge — compact pill-style entry point (#161) */
+.home-conflict-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--danger);
+  background: rgba(194, 75, 63, 0.1);
+  color: var(--danger-bright);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  align-self: flex-start;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.home-conflict-badge:active {
+  background: rgba(194, 75, 63, 0.2);
+}
+
+/* --- Greeting --- */
+.home-greeting {
+  margin-bottom: 24px;
+}
+.home-greeting-title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--jacket-kraft);
+  margin: 0 0 4px;
+}
+.home-greeting-count {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
+  margin: 0;
+}
+
+/* --- Stats row (what I own) --- */
+.home-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.home-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 8px;
+  border-radius: var(--radius-md);
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+}
+.home-stat-value {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--runout-gold);
+  line-height: 1.1;
+}
+.home-stat-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--jacket-kraft-dim);
+}
+.home-stat-action {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.home-stat-action:active {
+  background: var(--vinyl-groove-2);
+  border-color: var(--runout-gold);
+}
+
+/* --- Section --- */
+.home-section {
+  margin-bottom: 28px;
+}
+
+/* --- Empty state (no items yet) --- */
+.home-empty {
+  text-align: center;
+  padding: 24px 16px;
+  margin-bottom: 20px;
+}
+.home-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--vinyl-groove);
+  border: 2px dashed var(--line);
+}
+.home-empty-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--jacket-kraft);
+  margin: 0 0 8px;
+}
+.home-empty-sub {
+  font-size: 14px;
+  color: var(--jacket-kraft-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* --- Action grid (what can I do next) --- */
+.home-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.home-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 88px;
+  padding: 16px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  /* 44px minimum touch target (already satisfied by min-height) */
+}
+.home-action-btn:active {
+  background: var(--vinyl-groove-2);
+  border-color: var(--runout-gold);
+  color: var(--jacket-kraft);
+}
+.home-action-btn svg {
+  color: var(--runout-gold);
+}
+
+/* Scan action gets a subtle red accent to match the bottom-nav dominant CTA */
+.home-action-scan:active svg {
+  color: var(--label-red);
+}
+
+.home-action-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+/* --- View all collection button --- */
+.home-view-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.home-view-all-btn:active {
+  background: var(--vinyl-groove-2);
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+}
+
+/* --- Responsive --- */
+@media (min-width: 768px) {
+  .home-screen { padding-top: 24px; }
+  .home-greeting-title { font-size: 34px; }
+  .home-action-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
