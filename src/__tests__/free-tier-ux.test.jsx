@@ -80,6 +80,8 @@ const KIND_OF_BLUE = {
 beforeEach(() => {
   currentUser.role = 'member'
   currentUser.plan = 'free'
+  // M2 #320: default to Browse tab for collection-view tests
+  localStorage.setItem('runout.navTab', 'browse')
 })
 
 describe('Free-tier UX', () => {

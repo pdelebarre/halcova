@@ -2,18 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import Header from '../components/Header'
 
-const TABS = [
-  { id: 'records', label: 'Records' },
-  { id: 'books', label: 'Books' },
-]
-
 function renderHeader(overrides = {}) {
   const props = {
-    tabs: TABS,
-    activeTab: 'records',
-    onTabChange: vi.fn(),
     onOpenSettings: vi.fn(),
     onOpenAdmin: vi.fn(),
+    onOpenCredits: vi.fn(),
     showAdmin: false,
     user: { id: 'u1', name: 'Ada', role: 'member' },
     onLogout: vi.fn(),
@@ -22,14 +15,19 @@ function renderHeader(overrides = {}) {
   return render(<Header {...props} />)
 }
 
-describe('Header (redesign)', () => {
-  it('shows the wordmark and Records|Books tabs, without a tagline', () => {
+describe('Header (M2 redesign #320)', () => {
+  it('shows the wordmark without a tagline', () => {
     renderHeader()
 
     expect(screen.getByText('Halcova')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Records' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Books' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByText(/your crate, cataloged/)).not.toBeInTheDocument()
+  })
+
+  it('does NOT render Records/Books tabs (moved to browse view)', () => {
+    renderHeader()
+
+    expect(screen.queryByRole('button', { name: 'Records' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Books' })).not.toBeInTheDocument()
   })
 
   it('opens the avatar menu with Settings and Sign out for a member', () => {
@@ -76,11 +74,19 @@ describe('Header (redesign)', () => {
     expect(document.activeElement).toBe(avatar)
   })
 
-  it('switches the active tab', () => {
-    const onTabChange = vi.fn()
-    renderHeader({ onTabChange })
+  it('shows a back button when showBack is true', () => {
+    const onBack = vi.fn()
+    renderHeader({ showBack: true, onBack })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Books' }))
-    expect(onTabChange).toHaveBeenCalledWith('books')
+    const backBtn = screen.getByRole('button', { name: 'Back' })
+    expect(backBtn).toBeInTheDocument()
+    fireEvent.click(backBtn)
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT show a back button by default', () => {
+    renderHeader()
+
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
 })

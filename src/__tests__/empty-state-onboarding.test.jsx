@@ -24,6 +24,11 @@ vi.mock('../api/collection', () => ({
   deleteItem: vi.fn(),
 }))
 
+// M2 #320: default to Browse tab for collection-view tests
+beforeEach(() => {
+  localStorage.setItem('runout.navTab', 'browse')
+})
+
 // Records lookup mocked; getReleaseDetail is read by catalog.js at module load.
 vi.mock('../api/discogs', () => ({
   searchByBarcode: vi.fn(),

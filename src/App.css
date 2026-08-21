@@ -12,6 +12,18 @@
   padding: 0 16px calc(var(--safe-bottom) + 90px);
 }
 
+/* M2 #320: main content area between Header and BottomNav. On mobile the
+   bottom nav is fixed, so content needs extra bottom padding to not be
+   hidden behind it. On desktop (≥1024px) the bottom nav is hidden. */
+.app-content {
+  flex: 1;
+  width: 100%;
+  padding-bottom: calc(var(--safe-bottom) + 64px);
+}
+@media (min-width: 1024px) {
+  .app-content { padding-bottom: var(--safe-bottom); }
+}
+
 /* T2 (issue #110): the per-kind "room" scope. A plain block wrapper whose only
    job is to carry the theme CSS variables (`--theme-accent`, …) + the kind
    marker. It must NOT create a scroll container or a new layout/positioning
@@ -366,4 +378,25 @@
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* --- More screen (bottom nav "More" tab) --- */
+.more-screen {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 24px 16px calc(var(--safe-bottom) + 80px);
+}
+.more-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  text-align: center;
+}
+.more-screen-placeholder {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--jacket-kraft-dim);
 }

@@ -34,6 +34,11 @@ vi.mock('../api/collection', () => ({
   deleteItem: vi.fn(),
 }))
 
+// M2 #320: default to Browse tab for collection-view tests
+beforeEach(() => {
+  localStorage.setItem('runout.navTab', 'browse')
+})
+
 vi.mock('../api/discogs', () => ({
   searchByBarcode: vi.fn(),
   searchByText: vi.fn(),

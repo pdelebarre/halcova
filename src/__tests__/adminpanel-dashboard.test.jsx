@@ -197,12 +197,6 @@ describe('Admin dashboard (ADMIN-EPIC-1, #260)', () => {
 describe('Admin pending badges in Header (ADMIN-EPIC-1, #263)', () => {
   function headerProps(overrides = {}) {
     return {
-      tabs: [
-        { id: 'records', label: 'Records' },
-        { id: 'books', label: 'Books' },
-      ],
-      activeTab: 'records',
-      onTabChange: vi.fn(),
       onOpenSettings: vi.fn(),
       onOpenAdmin: vi.fn(),
       onOpenCredits: vi.fn(),
