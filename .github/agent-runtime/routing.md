@@ -37,6 +37,9 @@ clarification needed.
 | Scanner/camera/barcode/OCR capability | Scanner Builder |
 | IndexedDB/outbox/push-pull/retry implementation | Sync Engineer |
 | Marketing / GTM | Marketing Manager |
+| Post-gate FAIL loop completed | Agent Developer — write `LESSONS_LEARNED.md` entry + open `[RETRO-x.y]` ticket (P1 label: `retro`, link to original issue) |
+| Weekly cadence (every 7 days) | PM — update `VELOCITY` block in `kernel.md` with rolling metrics |
+
 
 The PM may add agents for risk or dependencies but may not omit a mandatory
 specialist triggered by the ticket. Record ambiguous omissions.
