@@ -4,16 +4,15 @@
 > Team checkpoints: `state/teams/`. Milestone detail: `state/M1.md` … `state/M4.md`.
 
 ## Position
-- M0 complete · M1 complete · M2 complete · M3 complete · M4 READY (entry gate pending) · M5+ DORMANT.
+- M0 complete. M1/M2/M3 have merged CORE slices but retain OPEN backlog tickets; final-exit criteria per #355 not all met. M4 NOT started. Backlog reconciliation needed before any milestone is declared externally complete.
 
 ## Milestones
 | Milestone | Focus | Status | Leading teams |
 |---|---|---|---|
-| M0 — Stabilize & Release Current Product | launch baseline | COMPLETE | — |
-| M1 — Security, Reliability & Platform Foundation | epic #337 security + offline #157/#162 + providers #283–#293 + perf #364–#366 | COMPLETE | SECURITY, OFFLINE, PROVIDERS |
-| M2 — Offline-first | mirror #289 · outbox #292 · capability #159 | COMPLETE | OFFLINE, DATA, SECURITY |
-| M3 — Generic Collection Platform | epic #313 (domain #314 · tenancy #165 · registry #315 · adapters #317 · migrate #316) · sync #160/#161 | COMPLETE | DATA, PROVIDERS, SECURITY |
-| M4 — Collector-First Mobile Experience | epic #319 (home #320 · add/scan #321 · detail #322 · search #323 · UX gate #324) | READY (entry gate pending) | COLLECTOR, UX, SECURITY |
+| M1 — Security, Reliability & Platform Foundation | epic #337 (merged core) — CORE merged; OPEN: #217 SSRF suite (P1), #385/#381/#380 (P2 sec), #411 XSS residual, #408 deps, #214 SEC-EPIC-6 | IN PROGRESS (backlog open) | SECURITY |
+| M2 — Offline-first | mirror #289 · outbox #292 · capability #159 merged | IN PROGRESS (backlog open) · OPEN: #158 IndexedDB (P0), #160/#161 sync+OCC (P1), ARCH-EPIC-1 #150 stack | OFFLINE, DATA, SECURITY |
+| M3 — Generic Collection Platform | epic #313 core (domain #314 · tenancy #165 · registry #315 · adapters #317 · migrate #316) merged | IN PROGRESS (backlog open) · OPEN: #318 wishlist/lifecycle (P1), #309 GitHub↔feedback | DATA, PROVIDERS, SECURITY |
+| M4 — Collector-First Mobile Experience | epic #319 | NOT STARTED (hold pending M1–M3 backlog reconciliation) | — |
 | M5+ — Differentiation & growth | social #325 · AI #331 · marketplace #343 · expansion #348 | DORMANT | GROWTH, AI |
 
 ## Team map
