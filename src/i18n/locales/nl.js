@@ -351,6 +351,11 @@ const nl = {
   'offline.clearOfflineDataConfirm': 'De offline kopie van dit apparaat wissen? Uw online collectie blijft ongewijzigd.',
   'offline.clearOfflineDataDone': 'Offline gegevens gewist',
   'offline.clearOfflineDataFailed': 'Offline gegevens konden niet worden gewist. Probeer het opnieuw.',
+  // M2 #158: offline gegevens exporteren.
+  'offline.exportData': 'Offline gegevens exporteren',
+  'offline.exportDataHint': 'Download een JSON-bestand van uw offline gegevens voor back-up of debugging.',
+  'offline.exportDataDone': 'Offline gegevens geëxporteerd',
+  'offline.exportDataFailed': 'Offline gegevens konden niet worden geëxporteerd. Probeer het opnieuw.',
 
   // §17 Gratis abonnement & demo
   'plan.freeCounter': '{count} van {cap} items toegevoegd',

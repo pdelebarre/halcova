@@ -351,6 +351,11 @@ const it = {
   'offline.clearOfflineDataConfirm': 'Cancellare la copia offline da questo dispositivo? La tua collezione online non viene modificata.',
   'offline.clearOfflineDataDone': 'Dati offline cancellati',
   'offline.clearOfflineDataFailed': 'Non è stato possibile cancellare i dati offline. Riprova.',
+  // M2 #158: esportare dati offline.
+  'offline.exportData': 'Esporta dati offline',
+  'offline.exportDataHint': 'Scarica un file JSON dei tuoi dati offline per backup o debug.',
+  'offline.exportDataDone': 'Dati offline esportati',
+  'offline.exportDataFailed': 'Non è stato possibile esportare i dati offline. Riprova.',
 
   // §17 Piano gratuito e demo
   'plan.freeCounter': '{count} di {cap} articoli aggiunti',

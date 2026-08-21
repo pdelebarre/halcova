@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { t, LOCALES, SUPPORTED_LOCALES, useLocale } from '../i18n'
 import { clearMirrorForUser } from '../utils/offlineMirror'
 import { clearOutboxForUser } from '../utils/outbox'
+import { clearLocalDataForUser, exportLocalData } from '../repositories/localDatabase'
 import './SettingsModal.css'
 
 export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
@@ -9,6 +10,10 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [clearDone, setClearDone] = useState(false)
   const [clearFailed, setClearFailed] = useState(false)
+  // M2 #158: export state
+  const [exportDone, setExportDone] = useState(false)
+  const [exportFailed, setExportFailed] = useState(false)
+  const [exporting, setExporting] = useState(false)
   // Ergonomics (#159): manage focus so the keyboard/talkback user always knows
   // where the destructive-clear flow moved.
   const confirmButtonRef = useRef(null)
@@ -55,19 +60,51 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
     // by design here — clearing the offline copy is a privacy management action,
     // not a sign-out.
     //
-    // FAIL-CLOSED (Security): both clears are atomic for the reset outcome. If
-    // EITHER fails (delete/abort/quota/cursor error — the outbox or mirror could
-    // still be readable while a raw queued op survives to auto-flush on
-    // reconnect), we must NOT report "cleared". Surface a safe, generic error
+    // FAIL-CLOSED (Security): all clears are atomic for the reset outcome. If
+    // ANY fails (delete/abort/quota/cursor error — the outbox, mirror, or local
+    // store could still be readable while a raw queued op survives to auto-flush
+    // on reconnect), we must NOT report "cleared". Surface a safe, generic error
     // (ADR-0019 Dec 12: no secrets/raw content) and keep the clear trigger
     // available for a retry.
-    const [mirrorOk, outboxOk] = await Promise.all([
+    const [mirrorOk, outboxOk, localOk] = await Promise.all([
       clearMirrorForUser(userId),
       clearOutboxForUser(userId),
+      clearLocalDataForUser(userId),
     ])
     setConfirmingClear(false)
-    setClearDone(mirrorOk && outboxOk)
-    setClearFailed(!(mirrorOk && outboxOk))
+    setClearDone(mirrorOk && outboxOk && localOk)
+    setClearFailed(!(mirrorOk && outboxOk && localOk))
+  }
+
+  // M2 #158: export local data as a downloadable JSON file.
+  async function handleExportData() {
+    if (!userId) return
+    setExporting(true)
+    setExportDone(false)
+    setExportFailed(false)
+    try {
+      const data = await exportLocalData(userId)
+      if (!data) {
+        setExportFailed(true)
+        return
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `halcova-offline-data-${userId}-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      setExportDone(true)
+    } catch {
+      setExportFailed(true)
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -168,6 +205,39 @@ export default function SettingsModal({ onClose, onOpenFeedback, userId }) {
                 )}
               </div>
             </>
+          )}
+
+          {/* M2 #158: local-data export. Shown for a signed-in user only;
+              downloads a JSON file of the local item store for backup or
+              debugging. The export includes sync metadata but never the
+              session token or access code (ADR-0019 Dec 4). */}
+          {userId && (
+            <div className="settings-card settings-help-books">
+              <p className="settings-offline-data-hint">{t('offline.exportDataHint')}</p>
+              {exportDone ? (
+                <p className="settings-offline-data-done" role="status" tabIndex={-1}>
+                  {t('offline.exportDataDone')}
+                </p>
+              ) : exportFailed ? (
+                <>
+                  <p className="settings-offline-data-done" role="alert" tabIndex={-1}>
+                    {t('offline.exportDataFailed')}
+                  </p>
+                  <button type="button" className="btn btn-ghost" onClick={handleExportData}>
+                    {t('offline.exportData')}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={handleExportData}
+                  disabled={exporting}
+                >
+                  {exporting ? t('common.loading') : t('offline.exportData')}
+                </button>
+              )}
+            </div>
           )}
 
           {/* Feedback entry (feat/feedback #82): a tappable card that opens the

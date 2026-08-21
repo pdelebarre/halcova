@@ -7,6 +7,9 @@ import { OFFLINE_SCOPES } from '../utils/offlineTrust'
 import { countPendingOps, stageAdd } from '../utils/outbox'
 import { flushPendingOps } from '../utils/outboxSync'
 import { newLocalItemUuid } from '../utils/itemUuid'
+// M2 #158: local-first item repository for durable local state with sync
+// metadata, tombstones, and version tracking.
+import { saveItems, saveItem, updateSyncStatus, SYNC_STATUS } from '../repositories/localDatabase'
 
 // M2 Offline Collection Mirror hydration (#289; ADR-0019 Dec 5).
 //
@@ -94,6 +97,11 @@ export function useCollection(collection = 'records') {
       // session user to scope it under.
       if (user?.id) {
         await saveMirror(user.id, data)
+        // M2 #158: also persist to the local-first item repository with sync
+        // metadata so the item store stays current for offline reads and M3
+        // reconciliation. Fail-closed: a storage failure never affects the
+        // live view.
+        await saveItems(user.id, data, { now: Date.now(), syncStatus: SYNC_STATUS.SYNCED })
       }
       await refreshPendingCount()
     } catch (err) {
@@ -156,6 +164,9 @@ export function useCollection(collection = 'records') {
     // Write the pending item into the mirror so it survives reload and renders
     // with the last-known list. Prepend to current state for immediate UX.
     await saveMirror(userId, [pendingItem, ...items])
+    // M2 #158: also persist to the local-first item repository with sync
+    // metadata so the item store tracks the pending state for M3 reconciliation.
+    await saveItem(userId, pendingItem, { now: Date.now(), syncStatus: SYNC_STATUS.PENDING })
     setItems((prev) => [pendingItem, ...prev])
     await refreshPendingCount()
     return pendingItem
@@ -178,6 +189,12 @@ export function useCollection(collection = 'records') {
       const saved = await api.addItem(item, collection)
       setItems((prev) => [saved, ...prev])
       setMutationSeq((s) => s + 1)
+      // M2 #158: persist the server-confirmed item to the local repository
+      // with synced status so the item store stays current.
+      const userId = getUserId()
+      if (userId) {
+        await saveItem(userId, saved, { now: Date.now(), syncStatus: SYNC_STATUS.SYNCED })
+      }
       return saved
     } catch (err) {
       if (!isSafeToMirror(err)) throw err // auth failure: fail closed, no staging
