@@ -351,6 +351,11 @@ const es = {
   'offline.clearOfflineDataConfirm': '¿Borrar la copia sin conexión de este dispositivo? Su colección en línea no se ve afectada.',
   'offline.clearOfflineDataDone': 'Datos sin conexión borrados',
   'offline.clearOfflineDataFailed': 'No se pudieron borrar los datos sin conexión. Inténtalo de nuevo.',
+  // M2 #158: exportar datos sin conexión.
+  'offline.exportData': 'Exportar datos sin conexión',
+  'offline.exportDataHint': 'Descargue un archivo JSON de sus datos sin conexión para copia de seguridad o depuración.',
+  'offline.exportDataDone': 'Datos sin conexión exportados',
+  'offline.exportDataFailed': 'No se pudieron exportar los datos sin conexión. Inténtalo de nuevo.',
 
   // §17 Plan gratuito y demo
   'plan.freeCounter': '{count} de {cap} artículos añadidos',

@@ -351,6 +351,11 @@ const de = {
   'offline.clearOfflineDataConfirm': 'Offline-Kopie von diesem Gerät löschen? Ihre Online-Sammlung bleibt unverändert.',
   'offline.clearOfflineDataDone': 'Offline-Daten gelöscht',
   'offline.clearOfflineDataFailed': 'Offline-Daten konnten nicht gelöscht werden. Bitte versuchen Sie es erneut.',
+  // M2 #158: Offline-Daten exportieren.
+  'offline.exportData': 'Offline-Daten exportieren',
+  'offline.exportDataHint': 'Laden Sie eine JSON-Datei Ihrer Offline-Daten für Backup oder Debugging herunter.',
+  'offline.exportDataDone': 'Offline-Daten exportiert',
+  'offline.exportDataFailed': 'Offline-Daten konnten nicht exportiert werden. Bitte versuchen Sie es erneut.',
 
   // §17 Kostenloser Plan & Demo
   'plan.freeCounter': '{count} von {cap} Artikeln hinzugefügt',

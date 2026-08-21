@@ -351,6 +351,11 @@ const fr = {
   'offline.clearOfflineDataConfirm': 'Effacer la copie hors ligne de cet appareil ? Votre collection en ligne n\'est pas affectée.',
   'offline.clearOfflineDataDone': 'Données hors ligne effacées',
   'offline.clearOfflineDataFailed': 'Impossible d\'effacer les données hors ligne. Veuillez réessayer.',
+  // M2 #158: export des données hors ligne.
+  'offline.exportData': 'Exporter les données hors ligne',
+  'offline.exportDataHint': 'Télécharger un fichier JSON de vos données hors ligne pour sauvegarde ou débogage.',
+  'offline.exportDataDone': 'Données hors ligne exportées',
+  'offline.exportDataFailed': 'Impossible d\'exporter les données hors ligne. Veuillez réessayer.',
 
   // §17 Plan gratuit & démo
   'plan.freeCounter': '{count} / {cap} articles ajoutés',

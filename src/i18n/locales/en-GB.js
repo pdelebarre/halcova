@@ -354,6 +354,11 @@ const enGB = {
   'offline.clearOfflineDataConfirm': 'Clear the offline copy from this device? Your online collection is not affected.',
   'offline.clearOfflineDataDone': 'Offline data cleared',
   'offline.clearOfflineDataFailed': 'Offline data could not be cleared. Please try again.',
+  // M2 #158: local-data export.
+  'offline.exportData': 'Export offline data',
+  'offline.exportDataHint': 'Download a JSON file of your offline collection data for backup or debugging.',
+  'offline.exportDataDone': 'Offline data exported',
+  'offline.exportDataFailed': 'Offline data could not be exported. Please try again.',
 
   // §17 Free plan & demo — same copy as en for the baseline
   'plan.freeCounter': '{count} of {cap} items added',

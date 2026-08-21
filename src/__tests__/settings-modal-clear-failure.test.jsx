@@ -7,16 +7,17 @@
 // and auto-flush on reconnect. The modal must surface a SAFE, generic error (no
 // secrets/raw content) and keep the clear trigger available for a retry.
 //
-// This file mocks only the two user-scoped clear repository functions so the
+// This file mocks the three user-scoped clear repository functions so the
 // failure path is deterministic; the real-repo fail-closed behaviour (clear
-// returns false + the op/records stay durable) is covered in outbox.test.js and
-// offlineMirror.test.js.
+// returns false + the op/records stay durable) is covered in outbox.test.js,
+// offlineMirror.test.js, and localDatabase.test.js.
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { LocaleProvider } from '../i18n'
 import SettingsModal from '../components/SettingsModal'
 import { clearOutboxForUser, clearAllOutbox } from '../utils/outbox'
 import { clearMirrorForUser, clearAllMirror } from '../utils/offlineMirror'
+import { clearLocalDataForUser, clearAllLocalData } from '../repositories/localDatabase'
 
 vi.mock('../utils/outbox', async (importOriginal) => {
   const actual = await importOriginal()
@@ -26,14 +27,20 @@ vi.mock('../utils/offlineMirror', async (importOriginal) => {
   const actual = await importOriginal()
   return { ...actual, clearMirrorForUser: vi.fn() }
 })
+vi.mock('../repositories/localDatabase', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, clearLocalDataForUser: vi.fn() }
+})
 
 beforeEach(async () => {
   localStorage.clear()
   clearOutboxForUser.mockReset()
   clearMirrorForUser.mockReset()
+  clearLocalDataForUser.mockReset()
   // Real clears still reset any shared IndexedDB between tests.
   await clearAllOutbox()
   await clearAllMirror()
+  await clearAllLocalData()
 })
 
 async function confirmClear() {
@@ -53,6 +60,7 @@ describe('SettingsModal — fail-closed clear (#159)', () => {
   it('shows a SAFE error (never "cleared") when the outbox clear fails', async () => {
     clearOutboxForUser.mockResolvedValue(false)
     clearMirrorForUser.mockResolvedValue(true)
+    clearLocalDataForUser.mockResolvedValue(true)
 
     await confirmClear()
 
@@ -63,6 +71,7 @@ describe('SettingsModal — fail-closed clear (#159)', () => {
   it('shows a SAFE error (never "cleared") when the mirror clear fails', async () => {
     clearOutboxForUser.mockResolvedValue(true)
     clearMirrorForUser.mockResolvedValue(false)
+    clearLocalDataForUser.mockResolvedValue(true)
 
     await confirmClear()
 
@@ -70,9 +79,21 @@ describe('SettingsModal — fail-closed clear (#159)', () => {
     expect(screen.queryByText('Offline data cleared')).toBeNull()
   })
 
-  it('reports "cleared" only when BOTH clears succeed', async () => {
+  it('shows a SAFE error (never "cleared") when the local data clear fails', async () => {
     clearOutboxForUser.mockResolvedValue(true)
     clearMirrorForUser.mockResolvedValue(true)
+    clearLocalDataForUser.mockResolvedValue(false)
+
+    await confirmClear()
+
+    expect(await screen.findByText(/could not be cleared/i)).toBeInTheDocument()
+    expect(screen.queryByText('Offline data cleared')).toBeNull()
+  })
+
+  it('reports "cleared" only when ALL three clears succeed', async () => {
+    clearOutboxForUser.mockResolvedValue(true)
+    clearMirrorForUser.mockResolvedValue(true)
+    clearLocalDataForUser.mockResolvedValue(true)
 
     await confirmClear()
 
@@ -83,6 +104,7 @@ describe('SettingsModal — fail-closed clear (#159)', () => {
   it('surfaces a safe, generic failure message (no secrets / no raw content, ADR-0019 Dec 12)', async () => {
     clearOutboxForUser.mockResolvedValue(false)
     clearMirrorForUser.mockResolvedValue(false)
+    clearLocalDataForUser.mockResolvedValue(false)
 
     await confirmClear()
 
@@ -96,6 +118,7 @@ describe('SettingsModal — fail-closed clear (#159)', () => {
   it('keeps a retry trigger available after a failed clear', async () => {
     clearOutboxForUser.mockResolvedValue(false)
     clearMirrorForUser.mockResolvedValue(true)
+    clearLocalDataForUser.mockResolvedValue(true)
 
     await confirmClear()
 

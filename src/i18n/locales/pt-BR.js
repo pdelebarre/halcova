@@ -351,6 +351,11 @@ const ptBR = {
   'offline.clearOfflineDataConfirm': 'Limpar a cópia offline deste dispositivo? Sua coleção online não é afetada.',
   'offline.clearOfflineDataDone': 'Dados offline limpos',
   'offline.clearOfflineDataFailed': 'Não foi possível limpar os dados offline. Tente novamente.',
+  // M2 #158: exportar dados offline.
+  'offline.exportData': 'Exportar dados offline',
+  'offline.exportDataHint': 'Baixe um arquivo JSON dos seus dados offline para backup ou depuração.',
+  'offline.exportDataDone': 'Dados offline exportados',
+  'offline.exportDataFailed': 'Não foi possível exportar os dados offline. Tente novamente.',
 
   // §17 Plano gratuito e demo
   'plan.freeCounter': '{count} de {cap} itens adicionados',

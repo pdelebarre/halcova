@@ -425,6 +425,11 @@ describe('t()', () => {
         'offline.clearOfflineDataConfirm',
         'offline.clearOfflineDataDone',
         'offline.clearOfflineDataFailed',
+        // M2 #158: export keys
+        'offline.exportData',
+        'offline.exportDataHint',
+        'offline.exportDataDone',
+        'offline.exportDataFailed',
       ]
       for (const locale of ['en', 'en-GB', 'fr', 'nl', 'pt-BR', 'de', 'es', 'it']) {
         setLocale(locale)
