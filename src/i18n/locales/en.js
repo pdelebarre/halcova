@@ -875,6 +875,26 @@ const en = {
   'admin.ai.testFail': 'Connection test failed.',
   'admin.ai.activated': 'Provider activated.',
   'admin.ai.activateFail': 'Activation failed — the connection test must pass first.',
+
+  // §17 Conflict resolution (M3 #161, ADR-0019 Dec 8)
+  'conflict.title': 'Sync Conflict',
+  'conflict.counter': 'Conflict {current} of {total}',
+  'conflict.none': 'No unresolved conflicts.',
+  'conflict.resolvedCount': 'Resolved {n} of {total} conflicts.',
+  'conflict.resolved': '✓ Resolved',
+  'conflict.server': 'Server',
+  'conflict.local': 'Local',
+  'conflict.noDifferences': 'No field differences to show.',
+  'conflict.versionInfo': 'Server version {server} · Local version {local}',
+  'conflict.chooseResolution': 'Choose which version to keep:',
+  'conflict.useServer': 'Keep server version',
+  'conflict.useLocal': 'Keep local version',
+  'conflict.merge': 'Merge fields',
+  'conflict.mergeableFields': 'Mergeable fields (pick which version to keep for each):',
+  'conflict.entityType.collection': 'Collection item',
+  'conflict.entityType.lending': 'Lending status',
+  'conflict.entityType.review': 'Review',
+  'conflict.entityType.payment': 'Payment',
 }
 
 export default en

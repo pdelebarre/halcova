@@ -1,7 +1,7 @@
 TEAM: OFFLINE
 CURRENT ISSUE: #160 M3 Idempotent Push/Pull Synchronization
-STATUS: PASS — implementation complete. Created server-side sync function (netlify/functions/sync.js) with batch push (idempotent by clientOpId) and incremental pull with cursor. Created client-side sync engine (src/utils/syncEngine.js) with push/pull/retry/observability. Created useSyncEngine hook with startup/foreground/online triggers. All 2705 tests pass (198 files). Coverage: statements 87.29%, branches 79.98%, functions 86.2%, lines 90.38%. New syncEngine.js: 93.66% stmts, 78.89% branches, 100% functions, 95.45% lines — all above 70%. No .test.* in deployable functions dir. Downstream contracts stable (clientOpId, sync-status columns unchanged).
-ACTIVE PR: m3/offline/160 (not yet pushed)
-LAST GATE: local PASS — all affected suites green (syncEngine.test.js 28 tests, sync.test.js 12 tests); full suite 2705 passed (198 files).
+STATUS: PASS — Tester coverage gate remediated. Added 38 new tests to sync.test.js (covering cursor management error branches, push handler error branches — plan-limit, item-not-found, corrupt payload, update/delete ops, catch-all — pull handler sync-log iteration paths, idempotency replay, hasMore, corrupt entries, deleted entries, item fetch failures). Created useSyncEngine.test.js with 27 tests covering sync lifecycle (startup, online event, visibilitychange, manual trigger, error states, partial/error syncState, unmount safety, flaky connectivity recovery, offline-to-online recovery). sync.js coverage: 99.4% stmts, 87.5% branches, 100% functions, 100% lines. useSyncEngine.js coverage: 100% stmts, 92% branches, 100% functions, 100% lines. Full suite: 2758 passed, 10 skipped, 199 files passed. Global coverage: 88.29% stmts, 80.51% branches, 86.79% functions, 91.42% lines — all above 70%.
+ACTIVE PR: m3/offline/160 (PR #435)
+LAST GATE: PASS — Tester coverage gate (self-remediated, awaiting independent Tester re-verification)
 BLOCKER: none
-NEXT: push branch, create PR, await independent Offline Architect + Security Auditor + Tester re-verification (not self-approved)
+NEXT: Await independent Tester re-verification of coverage gate
