@@ -537,3 +537,370 @@
   color: var(--ink);
   font-size: 13px;
 }
+
+/* Admin AI dashboard (ADMIN-3.8, #310) — tables for per-provider breakdowns
+   and dry-run results. Compact, monospace, scrollable on small screens. */
+.admin-dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.admin-dash-table th,
+.admin-dash-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.admin-dash-table th {
+  color: var(--static-grey);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.admin-dash-table tbody tr:hover {
+  background: var(--vinyl-groove-2);
+}
+.admin-dash-cell-id {
+  font-family: var(--font-mono);
+  color: var(--static-grey);
+  font-size: 10px;
+}
+.admin-dash-cell-summary {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-h4 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--static-grey);
+  margin: 12px 0 6px;
+}
+.admin-dryrun-results {
+  margin-top: 12px;
+}
+
+/* Smart feedback inbox (M4 P1, #307) — queue tabs, opportunity cards,
+   one-click triage, progressive disclosure. */
+
+/* Queue tab bar — horizontal scroll on mobile, wraps on desktop. */
+.smart-queue-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.smart-queue-tabs::-webkit-scrollbar { display: none; }
+
+.smart-queue-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--static-grey);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.smart-queue-tab.active {
+  border-color: var(--runout-gold);
+  color: var(--jacket-kraft);
+  background: rgba(201, 162, 39, 0.12);
+}
+.smart-queue-tab:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: -2px;
+}
+
+.smart-queue-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.smart-queue-count {
+  margin-left: auto;
+}
+
+/* Queue items container. */
+.smart-queue-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Opportunity card — the primary triage surface. */
+.smart-opp-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--vinyl-groove-2);
+  overflow: hidden;
+}
+.smart-opp-card.is-low-confidence {
+  border-color: var(--runout-gold);
+  background: rgba(201, 162, 39, 0.04);
+}
+
+.smart-opp-header {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.smart-opp-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.smart-opp-classification {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--static-grey);
+}
+.smart-opp-classification.is-bug {
+  border-color: var(--label-red);
+  color: var(--label-red-bright);
+}
+.smart-opp-classification.is-enhancement {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+}
+.smart-opp-classification.is-security {
+  border-color: var(--label-red);
+  color: var(--label-red-bright);
+  background: rgba(178, 58, 46, 0.08);
+}
+.smart-opp-classification.is-performance {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+}
+
+.smart-opp-priority {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--static-grey);
+}
+.smart-opp-priority.is-critical {
+  border-color: var(--label-red);
+  color: var(--label-red-bright);
+  background: rgba(178, 58, 46, 0.08);
+}
+.smart-opp-priority.is-high {
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+}
+
+.smart-opp-warning {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--runout-gold);
+  border: 1px solid var(--runout-gold);
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+}
+
+.smart-opp-headline {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--jacket-kraft);
+  font-weight: 600;
+}
+
+/* Primary action area — the accept/review button is visually dominant. */
+.smart-opp-action {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.smart-opp-accept {
+  min-height: 44px;
+  padding: 0 20px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.smart-opp-review {
+  min-height: 44px;
+  padding: 0 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.smart-opp-merge {
+  margin-left: auto;
+}
+
+/* Expanded details section. */
+.smart-opp-details {
+  border-top: 1px solid var(--line);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.smart-opp-meta {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--static-grey);
+}
+.smart-opp-meta > div {
+  display: flex;
+  gap: 8px;
+}
+.smart-opp-meta dt {
+  flex-shrink: 0;
+  min-width: 100px;
+  color: var(--jacket-kraft-dim);
+}
+.smart-opp-meta dd {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+/* Duplicate candidates section. */
+.smart-opp-dups {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.smart-opp-dups-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--static-grey);
+  margin: 0 0 8px;
+}
+.smart-opp-dups-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.smart-opp-dup-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--vinyl-groove);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--static-grey);
+}
+.smart-opp-dup-id {
+  font-weight: 600;
+  color: var(--jacket-kraft);
+}
+.smart-opp-dup-score {
+  color: var(--runout-gold);
+}
+.smart-opp-dup-evidence {
+  color: var(--jacket-kraft-dim);
+  font-style: italic;
+}
+
+/* Progressive disclosure toggle. */
+.smart-opp-toggle {
+  background: transparent;
+  border: none;
+  color: var(--static-grey);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.smart-opp-toggle:hover {
+  color: var(--jacket-kraft);
+}
+.smart-opp-toggle:focus-visible {
+  outline: 2px solid var(--runout-gold);
+  outline-offset: -2px;
+}
+
+/* Original feedback detail. */
+.smart-opp-feedback-detail {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.smart-opp-feedback-detail h4 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--static-grey);
+  margin: 0;
+}
+.smart-opp-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--jacket-kraft);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.smart-opp-tech {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--static-grey);
+}
+.smart-opp-tech > div {
+  display: flex;
+  gap: 8px;
+}
+.smart-opp-tech dt {
+  flex-shrink: 0;
+  min-width: 84px;
+  color: var(--jacket-kraft-dim);
+}
+.smart-opp-tech dd {
+  margin: 0;
+  overflow-wrap: break-word;
+}

@@ -195,3 +195,20 @@ export async function adminAiTest({ profileId }) {
 export async function adminAiActivate({ profileId }) {
   return postJson(ADMIN_URL, { action: 'aiActivate', profileId }, getSessionToken())
 }
+
+// ---- Admin AI dashboard (ADMIN-3.8, #310) ----
+// AI provider health, cost tracking, fallback status and dry-run capability.
+
+// Get the AI dashboard aggregates (7-day and 30-day usage stats, provider
+// profiles, cooldown state).
+export async function adminAiDashboard() {
+  return getJson(`${ADMIN_URL}?aiDashboard=1`, getSessionToken())
+}
+
+// Run a dry-run evaluation of feedback items through the active provider.
+// `limit` is the number of items to evaluate (1-50, default 10).
+// `offset` is the pagination offset (default 0).
+// Never mutates feedback state or creates GitHub issues.
+export async function adminAiDryRun({ limit, offset } = {}) {
+  return postJson(ADMIN_URL, { action: 'aiDryRun', limit, offset }, getSessionToken())
+}

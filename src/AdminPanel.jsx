@@ -153,6 +153,17 @@ export default function AdminPanel({ onClose }) {
   const [aiEditing, setAiEditing] = useState(null) // profile being edited (or null = new)
   const [aiDraft, setAiDraft] = useState({ name: '', providerType: 'openai', baseUrl: '', model: '', apiKey: '', capabilities: '' })
 
+  // Admin AI dashboard (ADMIN-3.8, #310): provider health, cost tracking,
+  // fallback status and dry-run capability.
+  const [aiDashData, setAiDashData] = useState(null)
+  const [aiDashLoading, setAiDashLoading] = useState(true)
+  const [aiDashError, setAiDashError] = useState('')
+  const [aiDashFetchedAt, setAiDashFetchedAt] = useState('')
+  const [dryRunLimit, setDryRunLimit] = useState(10)
+  const [dryRunResults, setDryRunResults] = useState(null)
+  const [dryRunLoading, setDryRunLoading] = useState(false)
+  const [dryRunError, setDryRunError] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -226,6 +237,40 @@ export default function AdminPanel({ onClose }) {
   }, [])
 
   useEffect(() => { loadAi() }, [loadAi])
+
+  // Load the AI dashboard aggregates (ADMIN-3.8, #310). Every failure degrades
+  // to an in-tab error state with retry — never an uncaught throw.
+  const loadAiDashboard = useCallback(async () => {
+    setAiDashLoading(true)
+    setAiDashError('')
+    try {
+      const res = await authApi.adminAiDashboard()
+      setAiDashData(res?.aiDashboard || null)
+      setAiDashFetchedAt(new Date().toISOString())
+    } catch (err) {
+      setAiDashData(null)
+      setAiDashError(err?.message || '')
+    } finally {
+      setAiDashLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadAiDashboard() }, [loadAiDashboard])
+
+  // Run a dry-run evaluation (ADMIN-3.8, #310).
+  const runDryRun = useCallback(async () => {
+    setDryRunLoading(true)
+    setDryRunError('')
+    setDryRunResults(null)
+    try {
+      const res = await authApi.adminAiDryRun({ limit: dryRunLimit })
+      setDryRunResults(res)
+    } catch (err) {
+      setDryRunError(err?.message || '')
+    } finally {
+      setDryRunLoading(false)
+    }
+  }, [dryRunLimit])
 
   // The active profile's secret is never sent back to the client, so opening
   // the edit form for an existing profile leaves the apiKey blank — a blank
@@ -626,6 +671,15 @@ export default function AdminPanel({ onClose }) {
             onClick={() => setTab('ai')}
           >
             {t('admin.tab.ai')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'aiDashboard'}
+            className={`admin-tab${tab === 'aiDashboard' ? ' active' : ''}`}
+            onClick={() => setTab('aiDashboard')}
+          >
+            {t('admin.tab.aiDashboard')}
           </button>
         </div>
 
@@ -1054,6 +1108,216 @@ export default function AdminPanel({ onClose }) {
                     </button>
                   </div>
                 </section>
+              )}
+            </section>
+          ) : tab === 'aiDashboard' ? (
+            <section>
+              {/* Admin AI dashboard (ADMIN-3.8, #310) — provider health, cost
+                  tracking, fallback status and dry-run capability. */}
+              <h3 className="admin-h3">{t('admin.aiDashboard.title')}</h3>
+              <p className="admin-sub">{t('admin.aiDashboard.subtitle')}</p>
+
+              {aiDashLoading ? (
+                <p className="sheet-status">{t('admin.aiDashboard.loading')}</p>
+              ) : aiDashError ? (
+                <p className="sheet-error" role="alert">
+                  {aiDashError}
+                  <button type="button" className="btn btn-ghost btn-sm admin-fb-retry" onClick={loadAiDashboard}>
+                    {t('admin.aiDashboard.retry')}
+                  </button>
+                </p>
+              ) : !aiDashData ? (
+                <p className="sheet-empty">{t('admin.aiDashboard.empty')}</p>
+              ) : (
+                <>
+                  {/* Provider health section */}
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.aiDashboard.section.health')}</h4>
+                    <div className="admin-dash-grid">
+                      {aiDashData.providers?.filter((p) => p.active).length > 0 ? (
+                        aiDashData.providers.filter((p) => p.active).map((p) => (
+                          <div key={p.id} className="admin-stat-card">
+                            <dt className="admin-stat-label">{t('admin.aiDashboard.activeProvider')}</dt>
+                            <dd className="admin-stat-value">{p.name}</dd>
+                            <dd className="admin-stat-caption">{p.providerType} · {p.model}</dd>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="admin-stat-card">
+                          <dt className="admin-stat-label">{t('admin.aiDashboard.activeProvider')}</dt>
+                          <dd className="admin-stat-value">{t('admin.aiDashboard.noActiveProvider')}</dd>
+                        </div>
+                      )}
+                      {aiDashData.providers?.filter((p) => p.fallbackProviderId).length > 0 ? (
+                        <div className="admin-stat-card">
+                          <dt className="admin-stat-label">{t('admin.aiDashboard.fallbackProvider')}</dt>
+                          <dd className="admin-stat-value">{t('admin.aiDashboard.yes')}</dd>
+                        </div>
+                      ) : (
+                        <div className="admin-stat-card">
+                          <dt className="admin-stat-label">{t('admin.aiDashboard.fallbackProvider')}</dt>
+                          <dd className="admin-stat-value">{t('admin.aiDashboard.noFallback')}</dd>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Usage & cost section — 7-day and 30-day aggregates */}
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.aiDashboard.section.cost')}</h4>
+
+                    {[7, 30].map((days) => {
+                      const agg = days === 7 ? aiDashData.aggregates?.days7 : aiDashData.aggregates?.days30
+                      if (!agg) return null
+                      return (
+                        <div key={days}>
+                          <h5 className="admin-h4">{days === 7 ? t('admin.aiDashboard.period.7d') : t('admin.aiDashboard.period.30d')}</h5>
+                          <div className="admin-dash-grid">
+                            <StatCard label={t('admin.aiDashboard.totalCalls')} value={agg.total} />
+                            <StatCard label={t('admin.aiDashboard.ok')} value={agg.ok} />
+                            <StatCard label={t('admin.aiDashboard.fail')} value={agg.fail} />
+                            <StatCard label={t('admin.aiDashboard.avgLatency')} value={t('admin.aiDashboard.ms', { n: agg.avgLatencyMs })} />
+                            <StatCard label={t('admin.aiDashboard.totalTokens')} value={fmtNum(agg.totalTokensIn + agg.totalTokensOut)} />
+                            <StatCard label={t('admin.aiDashboard.totalCost')} value={t('admin.aiDashboard.usd', { n: agg.totalCost.toFixed(4) })} />
+                          </div>
+                          {/* Per-provider breakdown */}
+                          {Object.keys(agg.byProvider || {}).length > 0 && (
+                            <table className="admin-dash-table">
+                              <thead>
+                                <tr>
+                                  <th>{t('admin.aiDashboard.provider')}</th>
+                                  <th>{t('admin.aiDashboard.calls')}</th>
+                                  <th>{t('admin.aiDashboard.ok')}</th>
+                                  <th>{t('admin.aiDashboard.fail')}</th>
+                                  <th>{t('admin.aiDashboard.latency')}</th>
+                                  <th>{t('admin.aiDashboard.cost')}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(agg.byProvider).map(([provider, stats]) => (
+                                  <tr key={provider}>
+                                    <td>{provider}</td>
+                                    <td>{stats.calls}</td>
+                                    <td>{stats.ok}</td>
+                                    <td>{stats.fail}</td>
+                                    <td>{t('admin.aiDashboard.ms', { n: stats.calls > 0 ? Math.round(stats.latencyMs / stats.calls) : 0 })}</td>
+                                    <td>{t('admin.aiDashboard.usd', { n: stats.cost.toFixed(4) })}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </section>
+
+                  {/* Fallback & cooldown section */}
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.aiDashboard.section.fallback')}</h4>
+                    {aiDashData.cooldowns?.length > 0 ? (
+                      <ul className="admin-list">
+                        {aiDashData.cooldowns.map((c) => (
+                          <li key={c.providerId} className="admin-row">
+                            <span className="admin-name">{t('admin.aiDashboard.cooldown')}</span>
+                            <span className="admin-sub">
+                              {t('admin.aiDashboard.cooldownRemaining', { s: Math.round(c.remainingMs / 1000) })}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="sheet-empty">{t('admin.aiDashboard.cooldownNone')}</p>
+                    )}
+                  </section>
+
+                  {/* Dry-run section */}
+                  <section className="admin-dash-section">
+                    <h4 className="admin-h3">{t('admin.aiDashboard.section.dryrun')}</h4>
+                    <p className="admin-sub">{t('admin.aiDashboard.dryrun.description')}</p>
+
+                    <div className="admin-field">
+                      <label htmlFor="dryrun-limit">{t('admin.aiDashboard.dryrun.label')}</label>
+                      <select
+                        id="dryrun-limit"
+                        value={dryRunLimit}
+                        onChange={(e) => setDryRunLimit(Number(e.target.value))}
+                      >
+                        <option value={1}>1</option>
+                        <option value={10}>10</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+
+                    <div className="admin-row-actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={runDryRun}
+                        disabled={dryRunLoading || !aiDashData.providers?.some((p) => p.active)}
+                      >
+                        {dryRunLoading ? t('admin.aiDashboard.dryrun.running') : t('admin.aiDashboard.dryrun.run')}
+                      </button>
+                    </div>
+
+                    {dryRunError && <p className="sheet-error" role="alert">{dryRunError}</p>}
+
+                    {dryRunResults?.error ? (
+                      <p className="sheet-error" role="alert">{dryRunResults.error.message}</p>
+                    ) : dryRunResults?.summary ? (
+                      <div className="admin-dryrun-results">
+                        <h5 className="admin-h4">{t('admin.aiDashboard.dryrun.results')}</h5>
+                        <div className="admin-dash-grid">
+                          <StatCard label={t('admin.aiDashboard.totalCalls')} value={dryRunResults.summary.total} />
+                          <StatCard label={t('admin.aiDashboard.ok')} value={dryRunResults.summary.ok} />
+                          <StatCard label={t('admin.aiDashboard.fail')} value={dryRunResults.summary.fail} />
+                          <StatCard label={t('admin.aiDashboard.avgLatency')} value={t('admin.aiDashboard.ms', { n: dryRunResults.summary.avgLatencyMs })} />
+                          <StatCard label={t('admin.aiDashboard.totalCost')} value={t('admin.aiDashboard.usd', { n: dryRunResults.summary.totalCost.toFixed(4) })} />
+                        </div>
+
+                        {dryRunResults.results?.length > 0 && (
+                          <table className="admin-dash-table">
+                            <thead>
+                              <tr>
+                                <th>{t('admin.aiDashboard.dryrun.feedbackId')}</th>
+                                <th>{t('admin.aiDashboard.dryrun.classification')}</th>
+                                <th>{t('admin.aiDashboard.dryrun.summary')}</th>
+                                <th>{t('admin.aiDashboard.dryrun.confidence')}</th>
+                                <th>{t('admin.aiDashboard.dryrun.latency')}</th>
+                                <th>{t('admin.aiDashboard.dryrun.cost')}</th>
+                                <th>{t('admin.aiDashboard.dryrun.status')}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dryRunResults.results.map((r) => (
+                                <tr key={r.feedbackId}>
+                                  <td className="admin-dash-cell-id">{r.feedbackId?.slice(0, 8)}…</td>
+                                  <td>{r.ok ? r.classification : '—'}</td>
+                                  <td className="admin-dash-cell-summary">{r.ok ? r.summary?.slice(0, 60) : '—'}</td>
+                                  <td>{r.ok ? (r.confidence * 100).toFixed(0) + '%' : '—'}</td>
+                                  <td>{t('admin.aiDashboard.ms', { n: r.latencyMs })}</td>
+                                  <td>{r.costEstimate != null ? t('admin.aiDashboard.usd', { n: r.costEstimate.toFixed(6) }) : '—'}</td>
+                                  <td>
+                                    {r.ok
+                                      ? <span className="admin-badge" style={{ background: 'var(--green, #2e7d32)' }}>{t('admin.aiDashboard.dryrun.success')}</span>
+                                      : <span className="admin-badge" style={{ background: 'var(--red, #c62828)' }}>{t('admin.aiDashboard.dryrun.fail')}</span>
+                                    }
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="sheet-empty">{t('admin.aiDashboard.dryrun.noResults')}</p>
+                    )}
+                  </section>
+
+                  {aiDashFetchedAt && (
+                    <p className="admin-dash-updated">{t('admin.aiDashboard.updated', { time: fmtDateTime(aiDashFetchedAt) })}</p>
+                  )}
+                </>
               )}
             </section>
           ) : (

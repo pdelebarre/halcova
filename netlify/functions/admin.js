@@ -31,7 +31,9 @@ import {
   activateProviderProfile,
   createProviderProfile,
   deleteProviderProfile,
+  getAiDashboard,
   listProviderProfiles,
+  runAiDryRun,
   testProviderProfile,
   updateProviderProfile,
 } from './_shared/ai/ai-admin'
@@ -376,6 +378,21 @@ async function handleAiActivate(body) {
   return json(200, result)
 }
 
+// (ADMIN-3.8, #310) — AI dashboard aggregates (health, cost, fallback status).
+async function handleAiDashboard() {
+  const result = await getAiDashboard()
+  return json(200, result)
+}
+
+// (ADMIN-3.8, #310) — AI dry-run evaluation of feedback items.
+async function handleAiDryRun(body) {
+  const limit = Math.min(Math.max(1, Number(body?.limit) || 10), 50)
+  const offset = Math.max(0, Number(body?.offset) || 0)
+  const result = await runAiDryRun({ limit, offset })
+  if (result.error) return json(400, { error: result.error.message, code: result.error.code })
+  return json(200, result)
+}
+
 // Validate the ids shared across admin actions (SEC-3.1, #194): requestId,
 // userId and reviewId must be short, non-empty strings. Reused by each handler
 // so the shape checks live in one place instead of being re-derived. The
@@ -511,6 +528,13 @@ export default async (req) => {
       if (url.searchParams.get('providers') === '1') {
         body.providers = await listProviderProfiles()
       }
+      // (ADMIN-3.8, #310) — AI dashboard aggregates. Opt-in via
+      // ?aiDashboard=1. Returns 7-day and 30-day usage stats, provider
+      // profiles, and cooldown state.
+      if (url.searchParams.get('aiDashboard') === '1') {
+        const dash = await getAiDashboard()
+        body.aiDashboard = dash
+      }
       return json(200, body)
     }
 
@@ -536,6 +560,8 @@ export default async (req) => {
         case 'aiDelete': return await handleAiDelete(body)
         case 'aiTest': return await handleAiTest(body)
         case 'aiActivate': return await handleAiActivate(body)
+        // (ADMIN-3.8, #310) — AI dry-run evaluation.
+        case 'aiDryRun': return await handleAiDryRun(body)
         default: return json(400, { error: 'Unknown action.' })
       }
     }
