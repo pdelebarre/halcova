@@ -3,10 +3,11 @@
 The sole orchestration surface for operating Halcova from OpenCode. The human
 talks only to the **Master Project Manager** (`halcova-pm`); the PM delegates
 implementation to seven persistent specialist teams and independent review to
-six gate subagents, all through GitHub issues, branches and PRs.
+seven gate subagents, plus a dedicated deployment specialist, all through GitHub
+issues, branches and PRs.
 
 ```
-USER → MASTER PM → implementation teams + independent gates → GitHub issues/PRs → MASTER PM → USER
+USER → MASTER PM → implementation teams + independent gates + deployment specialist → GitHub issues/PRs → MASTER PM → USER
 ```
 
 ## Layout
@@ -25,6 +26,7 @@ USER → MASTER PM → implementation teams + independent gates → GitHub issue
     │   ├── providers-team.md       # SUBAGENT · implementation
     │   ├── ai-team.md              # SUBAGENT · implementation (dormant)
     │   ├── growth-team.md          # SUBAGENT · implementation (dormant)
+    │   ├── netlify-deployment.md   # SUBAGENT · deploy infrastructure specialist (active)
     │   ├── security-auditor.md     # SUBAGENT · gate (read-only)
     │   ├── multi-tenant-security.md # SUBAGENT · gate (read-only)
     │   ├── architecture-reviewer.md # SUBAGENT · gate (read-only)
@@ -61,7 +63,7 @@ OpenCode subagent (task) calls — in parallel when safe — and reports back.
 | PM → team delegation | SUPPORTED | `mode: subagent` team agents invoked via the `task` tool |
 | Parallel workers | SUPPORTED | multiple `task` calls in one turn; parallelize only independent issues |
 | Persistent workers | NOT SUPPORTED | subagents are stateless per call; persistence comes from state files + GitHub |
-| Specialist delegation | SUPPORTED | 7 team subagents + 6 gate subagents; specialists stay dormant until triggered |
+| Specialist delegation | SUPPORTED | 7 team subagents + 6 gate subagents + 1 deploy specialist; specialists stay dormant until triggered |
 | Background execution | NOT SUPPORTED | no long-lived background agents; all work is synchronous within a PM turn |
 | Worker result collection | SUPPORTED | each worker returns the compressed handoff block; PM folds it into state |
 
@@ -87,6 +89,10 @@ limitation to work around.
   image recognition, AI cost controls.
 - **GROWTH** (dormant) — social, discovery, marketplace, collection expansion,
   feedback intelligence, growth features.
+- **NETLIFY DEPLOYMENT** — deploy infrastructure specialist. Activated when a
+  deploy fails or when any PR touches `netlify.toml`, `netlify/functions/`, or
+  deploy dependencies. Knows the 8 common Netlify failure modes, fixes them
+  directly, and reports to the PM.
 
 ## PM authority (immutable)
 
