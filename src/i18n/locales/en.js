@@ -1116,6 +1116,26 @@ const en = {
   'profile.notFound': 'Profile not found',
   'profile.loadError': 'Could not load profile',
   'profile.emptyCollection': 'This collection is not public yet.',
+
+  // §20 Social / Activity Feed (FEAT-8.2, #327)
+  'social.follow': 'Follow',
+  'social.following': 'Following',
+  'social.unfollow': 'Unfollow',
+
+  'feed.title': 'Activity Feed',
+  'feed.emptyTitle': 'No activity yet',
+  'feed.emptyDesc': 'Follow other collectors to see their latest additions and updates here.',
+  'feed.loadError': 'Could not load your feed. Check your connection and try again.',
+  'feed.loadingMore': 'Loading more…',
+  'feed.end': 'You\'re all caught up.',
+  'feed.justNow': 'Just now',
+  'feed.minutesAgo': '{n}m ago',
+  'feed.hoursAgo': '{n}h ago',
+  'feed.daysAgo': '{n}d ago',
+  'feed.addedItem': 'added a {kind} item',
+  'feed.completedCollection': 'completed their {kind} collection',
+  'feed.updatedShowcase': 'updated their {kind} showcase',
+  'feed.updatedProfile': 'updated their profile',
 }
 
 export default en

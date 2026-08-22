@@ -140,6 +140,25 @@ export const POLICY = {
   'report:list': { requires: 'moderator' },   // moderation queue
   'report:read': { requires: 'moderator' },    // single report detail
   'report:moderate': { requires: 'moderator' }, // take action on a report
+
+  // --- social / follows / feed (FEAT-8.2 #327) --------------------------------
+  // Follow/unfollow is owner-scoped (the caller follows on their own behalf).
+  // The feed is owner-scoped (the caller reads their own feed). Reading public
+  // follower/following counts is unauthenticated. Logging activities is
+  // owner-scoped (the caller logs their own actions).
+  'social:follow': { owner: 'self', deny: ['demo'] },
+  'social:unfollow': { owner: 'self', deny: ['demo'] },
+  'social:feed:read': { owner: 'self' },
+  'social:following:read': { owner: 'self' },
+  'social:followers:read': {},               // public counts by target id
+  'social:activity:mine': { owner: 'self' },
+
+  // --- recommendations (FEAT-8.4 #329) ----------------------------------------
+  // Recommendation READ is owner-scoped (self). Settings READ/WRITE is
+  // owner-scoped; demo is read-only on settings write.
+  'recommendation:read': { owner: 'self' },
+  'recommendation:settings:read': { owner: 'self' },
+  'recommendation:settings:write': { owner: 'self', deny: ['demo'] },
 }
 
 // Collapse an existing session-auth Response into the stable 401/403 shape

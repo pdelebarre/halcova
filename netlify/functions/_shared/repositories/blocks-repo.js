@@ -33,11 +33,9 @@ function toBlock(row) {
 }
 
 export function createBlocksRepo(db) {
-  // Create a block. Returns the block. Idempotent: a duplicate block returns
-  // the existing block (ON CONFLICT DO NOTHING + select).
   async function createBlock(blockerId, blockedId, reason = '') {
     if (!blockerId || !blockedId) return null
-    if (blockerId === blockedId) return null // cannot block yourself
+    if (blockerId === blockedId) return null
     const id = randomUUID()
     const { rows } = await db.query(
       `INSERT INTO blocks (id, blocker_id, blocked_id, reason)
@@ -49,7 +47,6 @@ export function createBlocksRepo(db) {
     return toBlock(rows[0])
   }
 
-  // Remove a block. Returns true when a row was deleted.
   async function deleteBlock(blockerId, blockedId) {
     if (!blockerId || !blockedId) return false
     const { rowCount } = await db.query(
@@ -59,7 +56,6 @@ export function createBlocksRepo(db) {
     return rowCount > 0
   }
 
-  // Check if blockerId has blocked blockedId. Returns the block or null.
   async function getBlock(blockerId, blockedId) {
     if (!blockerId || !blockedId) return null
     const { rows } = await db.query(
@@ -69,7 +65,6 @@ export function createBlocksRepo(db) {
     return rows.length ? toBlock(rows[0]) : null
   }
 
-  // List all users blocked by a given user.
   async function listBlocked(blockerId) {
     if (!blockerId) return []
     const { rows } = await db.query(
@@ -79,15 +74,12 @@ export function createBlocksRepo(db) {
     return rows.map(toBlock)
   }
 
-  // Check if user A has blocked user B (for server-side filtering).
-  // Returns true when a block exists.
   async function isBlocked(blockerId, blockedId) {
     if (!blockerId || !blockedId) return false
     const block = await getBlock(blockerId, blockedId)
     return !!block
   }
 
-  // Get all user ids that have blocked a given user (for display filtering).
   async function getBlockerIds(blockedId) {
     if (!blockedId) return []
     const { rows } = await db.query(
@@ -97,7 +89,6 @@ export function createBlocksRepo(db) {
     return rows.map((r) => r.blocker_id)
   }
 
-  // Remove all blocks involving a user (for account deletion).
   async function deleteByUserId(userId) {
     if (!userId) return false
     const { rowCount } = await db.query(
