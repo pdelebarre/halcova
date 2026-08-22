@@ -1,4 +1,4 @@
-# OpenCode Token Optimization Guide
+# OpenCode Token Optimization Guide (DeepSeek Flash)
 
 ## Quick Start
 
@@ -63,6 +63,7 @@ rtk gain  # Shows token savings
 ### 4. Copy Project Config
 ```bash
 cp .opencode/config.yaml ~/.config/opencode/config.yaml
+cp .opencode/dcp.jsonc ~/.config/opencode/dcp.jsonc
 ```
 
 ### 5. Update `.opencodeignore`
@@ -70,6 +71,29 @@ Already configured to exclude:
 - `.github/ai/README.md` (8.7KB savings)
 - `node_modules/`, `dist/`, `build/`
 - Large generated files (`*.min.js`, `*.map`)
+
+## DeepSeek Flash Configuration
+
+### Model Setup
+Your config uses **DeepSeek Flash** for all tasks:
+```yaml
+models:
+  default: deepseek/deepseek-chat
+  explorer: deepseek/deepseek-chat
+  planner: deepseek/deepseek-chat
+  coder: deepseek/deepseek-chat
+  debugger: deepseek/deepseek-chat
+```
+
+### Why DeepSeek Flash?
+- **Cost**: ~10-20x cheaper than Claude Sonnet
+- **Speed**: Very fast responses
+- **Quality**: Good for most coding tasks
+- **Context**: 128K context window
+
+### When to Use Other Models
+- **DeepSeek Flash**: 95% of tasks (implementation, debugging, planning)
+- **Claude Sonnet**: Only for very complex reasoning or when Flash struggles
 
 ## Token Usage Patterns
 
@@ -101,10 +125,10 @@ Already configured to exclude:
 
 ### 2. Use Plan Mode Before Editing
 ```bash
-# Plan first (cheap)
+# Plan first
 /goal --plan "Refactor auth module"
 
-# Then execute (expensive)
+# Then execute
 /goal "Refactor auth module"
 ```
 **Savings**: Catch mistakes at 2K tokens, not 50K deep
@@ -119,21 +143,14 @@ Already configured to exclude:
 ```
 **Savings**: 5,000-20,000 tokens per query
 
-### 4. Use Cheap Models for Exploration
-With subagent config:
-- **Haiku** for: grep, find, file reads, planning (70% of tasks)
-- **Sonnet** for: Complex reasoning, debugging, implementation (30% of tasks)
-
-**Savings**: ~60-70% on exploration tasks
-
-### 5. Monitor DCP Stats
+### 4. Monitor DCP Stats
 ```bash
 /dcp stats
 ```
 
 Shows token savings from pruning and compression.
 
-### 6. Manual Pruning (if needed)
+### 5. Manual Pruning (if needed)
 ```bash
 # Prune last N tool outputs
 /dcp sweep 5
@@ -179,31 +196,40 @@ Shows tokens saved by RTK compression.
 2. **Fresh session**: `/new`
 3. **Reduce scope**: Use specific file references instead of `#codebase`
 
-## Cost Estimates
+## Cost Estimates (DeepSeek Flash)
 
 ### Before Optimization
 - **Average session**: 15,000 tokens
 - **Sessions per day**: 30
 - **Daily cost**: 450,000 tokens
 - **Monthly cost**: 13.5M tokens
+- **Cost at $0.14/1M**: ~$1.89/month
 
 ### After Optimization
 - **Average session**: 6,000 tokens (60% reduction)
 - **Sessions per day**: 30
 - **Daily cost**: 180,000 tokens
 - **Monthly cost**: 5.4M tokens
+- **Cost at $0.14/1M**: ~$0.76/month
 
-**Monthly savings**: ~8M tokens (~60% reduction)
+**Monthly savings**: ~8M tokens (~60% reduction, ~$1.13/month)
+
+### DeepSeek Flash Pricing
+- **Input**: $0.14 per 1M tokens
+- **Output**: $0.28 per 1M tokens
+- **Context**: 128K tokens
+
+**Note**: Even at these low prices, 60% reduction matters for high-volume usage!
 
 ## Configuration Reference
 
 ### Key Settings in `config.yaml`
 ```yaml
-# Model routing
+# DeepSeek Flash for all tasks
 models:
-  explorer: haiku-3.5  # Cheap for exploration
-  planner: haiku-3.5   # Cheap for planning
-  coder: sonnet-3.5    # Expensive for reasoning
+  default: deepseek/deepseek-chat
+  explorer: deepseek/deepseek-chat
+  coder: deepseek/deepseek-chat
 
 # Auto-compact prevents runaway sessions
 autoCompact: true
@@ -231,8 +257,8 @@ caveman: true
 
 ## Files to Reference
 - `.opencodeignore` — Files excluded from context
-- `.opencode/config.yaml` — OpenCode configuration
-- `.opencode/dcp.jsonc` — DCP plugin configuration (create this)
+- `.opencode/config.yaml` — OpenCode configuration (DeepSeek Flash)
+- `.opencode/dcp.jsonc` — DCP plugin configuration
 - `.github/copilot-instructions.md` — Project-wide standards
 - `.github/frontend/.instructions.md` — Frontend patterns
 - `.github/backend/.instructions.md` — Backend patterns
@@ -257,14 +283,15 @@ caveman: true
 3. Check plugin in OpenCode config — `@rtk/opencode-plugin@latest`
 4. Verify with `rtk gain` — Should show savings
 
-### Agent Quality Degradation
-1. Check context budget — `/context` should be < 50%
-2. Manual prune — `/dcp sweep 5`
-3. Use specific file references — Avoid `#codebase`
-4. Start fresh session — `/new`
+### Agent Quality Issues with Flash
+1. **Most tasks**: Flash should handle 95% well
+2. **Complex reasoning**: If Flash struggles, temporarily use Sonnet
+3. **Context bloat**: Check `/context` — reduce if > 50%
+4. **Specific prompts**: Use clearer, more structured prompts
 
 ## Resources
 - [DCP Plugin GitHub](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning)
 - [RTK GitHub](https://github.com/danielgross/rtk)
 - [OpenCode Ecosystem](https://opencode.ai/docs/ecosystem/)
+- [DeepSeek Pricing](https://platform.deepseek.com/pricing)
 - [DCP Commands Guide](https://opencodedocs.com/Opencode-DCP/opencode-dynamic-context-pruning/platforms/commands/)
