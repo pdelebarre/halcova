@@ -1,0 +1,252 @@
+.feed-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.feed-page-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  color: var(--text-primary, #333);
+}
+
+/* Loading skeleton */
+.feed-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.feed-skeleton {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+
+.feed-skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-secondary, #eee);
+  flex-shrink: 0;
+}
+
+.feed-skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feed-skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--surface-secondary, #eee);
+  width: 100%;
+}
+
+.feed-skeleton-line--short {
+  width: 60%;
+}
+
+/* Empty state */
+.feed-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary, #999);
+}
+
+.feed-empty-icon {
+  margin-bottom: 1rem;
+  opacity: 0.4;
+}
+
+.feed-empty-text {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text-primary, #555);
+  margin-bottom: 0.5rem;
+}
+
+.feed-empty-subtext {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #999);
+  line-height: 1.5;
+}
+
+.feed-error-msg {
+  color: var(--text-secondary, #666);
+  margin-bottom: 1rem;
+}
+
+/* Feed list */
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feed-item {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #f0f0f0);
+  border-radius: 10px;
+  padding: 0.875rem;
+  transition: box-shadow 0.15s;
+}
+
+.feed-item:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+/* Activity card */
+.feed-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feed-activity-actor {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.feed-activity-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  flex-shrink: 0;
+  background: var(--surface-secondary, #f0f0f0);
+}
+
+.feed-activity-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #999);
+}
+
+.feed-activity-header {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.feed-activity-username {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary, #333);
+  cursor: pointer;
+}
+
+.feed-activity-username:hover {
+  text-decoration: underline;
+}
+
+.feed-activity-action {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #777);
+}
+
+.feed-activity-body {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  margin-left: 2.875rem;
+}
+
+.feed-activity-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-secondary, #f5f5f5);
+}
+
+.feed-activity-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.feed-activity-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed-activity-artist {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #777);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed-activity-year {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #999);
+}
+
+.feed-activity-changed-fields {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  margin-left: 2.875rem;
+  font-style: italic;
+}
+
+.feed-activity-time {
+  font-size: 0.6875rem;
+  color: var(--text-secondary, #bbb);
+  align-self: flex-end;
+}
+
+/* Infinite scroll */
+.feed-sentinel {
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.feed-loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-secondary, #999);
+  font-size: 0.8125rem;
+}
+
+.feed-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border, #ddd);
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: feed-spin 0.6s linear infinite;
+}
+
+@keyframes feed-spin {
+  to { transform: rotate(360deg); }
+}
+
+.feed-end {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #ccc);
+  padding: 1rem 0;
+}
