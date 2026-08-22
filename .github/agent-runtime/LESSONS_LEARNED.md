@@ -55,6 +55,20 @@ RULE:        Any PR adding a new import from netlify/functions/_shared/ must ver
 GATE:        Release Validator pre-submit checklist (kernel.md §6.1)
 TICKET:      [RETRO-2.1] — auto-opened after deploy-time esbuild failure
 ```
+
+### RETRO-2.2
+```
+DATE:        2026-08-22
+TEAM:        COLLECTOR
+ISSUE:       #320/#321 — Home redesign / Add-Scan flow
+MISTAKE:     HomeScreen and BottomNav action callbacks set navTab='browse' with no mechanism to carry scan/manual/cover intent to the collection view.
+ROOT CAUSE:  No shared intent state between navigation components and the target view. Comments promised "handled by the browse view" but no handler was ever wired.
+RULE:        Any UI action crossing a component boundary must use a shared intent mechanism (state prop, callback, or context) — not just tab switching. Pre-submit verification for UI refactors must trace the complete action flow from tap to modal.
+GATE:        Code review (Front End Architect) for navigation-restructuring PRs
+TICKET:      [RETRO-2.2] — opened after user-reported regression
+```
+
+### RETRO-1.3
 ```
 DATE:        2026-08-21
 TEAM:        SECURITY
