@@ -16,6 +16,7 @@ import {
   findDuplicates,
   getCompletionSuggestions,
   getDuplicateSuggestions,
+  identifyFromImage,
   searchItems,
   getItemDetail,
   getCollectionSummary,
@@ -987,5 +988,102 @@ describe('proposeMutation', () => {
   it('requiresConfirmation is always true', async () => {
     const result = await proposeMutation(provider, { action: 'update', entityType: 'collection_item', changes: {} })
     expect(result.requiresConfirmation).toBe(true)
+  })
+})
+
+describe('identifyFromImage', () => {
+  const validCandidates = {
+    candidates: [
+      { title: 'Abbey Road', confidence: 0.95, source: 'cover' },
+      { title: 'Let It Be', confidence: 0.7, source: 'cover' },
+    ],
+  }
+
+  it('returns candidates for a valid image URL', async () => {
+    const prov = fakeProvider({ content: validCandidates })
+    const result = await identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+    })
+    expect(result.candidates).toHaveLength(2)
+    expect(result.candidates[0].title).toBe('Abbey Road')
+    expect(result.candidates[0].confidence).toBe(0.95)
+  })
+
+  it('passes hints to the capability', async () => {
+    const prov = fakeProvider({ content: validCandidates })
+    const result = await identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+      hints: { collectionType: 'records' },
+    })
+    expect(result.candidates).toHaveLength(2)
+  })
+
+  it('throws on empty imageUrl', async () => {
+    const prov = fakeProvider({ content: validCandidates })
+    await expect(identifyFromImage(prov, {
+      imageUrl: '',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('throws on missing imageUrl', async () => {
+    const prov = fakeProvider({ content: validCandidates })
+    await expect(identifyFromImage(prov, {})).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('throws on non-string imageUrl', async () => {
+    const prov = fakeProvider({ content: validCandidates })
+    await expect(identifyFromImage(prov, {
+      imageUrl: 123,
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('propagates provider errors', async () => {
+    const prov = fakeProvider({
+      completeImpl: async () => { throw new ProviderError(ProviderErrorCode.TIMEOUT, 'timed out', { retryable: true }) },
+    })
+    await expect(identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.TIMEOUT })
+  })
+
+  it('rejects XSS-dangerous content in candidate titles', async () => {
+    const prov = fakeProvider({
+      content: {
+        candidates: [
+          { title: '<script>alert(1)</script>', confidence: 0.9 },
+        ],
+      },
+    })
+    await expect(identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects XSS-dangerous content in candidate source', async () => {
+    const prov = fakeProvider({
+      content: {
+        candidates: [
+          { title: 'Album', confidence: 0.9, source: 'javascript:alert(1)' },
+        ],
+      },
+    })
+    await expect(identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('handles empty candidates gracefully', async () => {
+    const prov = fakeProvider({ content: { candidates: [] } })
+    const result = await identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+    })
+    expect(result.candidates).toEqual([])
+  })
+
+  it('handles provider that does not support the capability', async () => {
+    const prov = fakeProvider({ content: validCandidates, supports: false })
+    await expect(identifyFromImage(prov, {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.UNSUPPORTED })
   })
 })

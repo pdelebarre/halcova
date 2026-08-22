@@ -1,0 +1,196 @@
+/* ImageCaptureModal.css — AI Image Recognition for Collection Capture
+   (FEAT-9.5, #336, epic #331). Mirrors CoverScanModal.css in layout but adds
+   the manual-entry fallback and error-retry grouping. */
+
+.image-capture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+
+.image-capture-video {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-capture-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-capture-chrome {
+  padding: 12px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+}
+
+.image-capture-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.image-capture-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.image-capture-status {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0;
+  min-height: 20px;
+  color: rgba(255,255,255,0.9);
+}
+
+.image-capture-errors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.image-capture-retry {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.image-capture-retry:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.image-capture-actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.image-capture-capture {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+}
+
+.image-capture-capture:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.image-capture-capture:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-capture-capture:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+.image-capture-gallery {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.image-capture-gallery:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-capture-gallery:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.image-capture-manual {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.image-capture-manual:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.image-capture-manual:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.image-capture-file {
+  display: none;
+}
+
+/* Identifying state — dim the chrome slightly */
+.image-capture-overlay.identifying .image-capture-capture,
+.image-capture-overlay.identifying .image-capture-gallery {
+  opacity: 0.5;
+}
+
+/* No-camera state — show the gallery pick as primary */
+.image-capture-overlay.no-camera .image-capture-capture {
+  display: none;
+}
+
+.image-capture-overlay.no-camera .image-capture-gallery {
+  border: 2px solid #fff;
+  padding: 12px 24px;
+  font-size: 16px;
+}
