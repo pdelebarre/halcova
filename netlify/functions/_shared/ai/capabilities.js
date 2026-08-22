@@ -174,12 +174,139 @@ export const GENERATE_ISSUE_EPIC = Object.freeze({
   maxTokens: 1024,
 })
 
+// Metadata completion: fill missing canonical fields from partial input.
+export const COMPLETE_METADATA = Object.freeze({
+  id: 'completeMetadata',
+  description: 'Suggest missing canonical fields (title, artist, label, year, genre, format) from partial input.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['itemId', 'existingFields'],
+    properties: {
+      itemId: { type: 'string', minLength: 36, maxLength: 36 },
+      existingFields: {
+        type: 'object',
+        additionalProperties: false,
+        required: [],
+        properties: {
+          title: { type: 'string', maxLength: 500 },
+          subtitle: { type: 'string', maxLength: 500 },
+          description: { type: 'string', maxLength: 4000 },
+          providerIds: { type: 'object', additionalProperties: { type: 'string', maxLength: 200 } },
+        },
+      },
+      providerHints: {
+        type: 'array',
+        maxItems: 10,
+        items: { type: 'string', maxLength: 100 },
+      },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['suggestedFields', 'confidence', 'source'],
+    properties: {
+      suggestedFields: {
+        type: 'object',
+        additionalProperties: false,
+        required: [],
+        properties: {
+          title: { type: 'string', maxLength: 500 },
+          subtitle: { type: 'string', maxLength: 500 },
+          artist: { type: 'string', maxLength: 500 },
+          label: { type: 'string', maxLength: 500 },
+          year: { type: 'string', maxLength: 10 },
+          genre: { type: 'string', maxLength: 200 },
+          format: { type: 'string', maxLength: 200 },
+          description: { type: 'string', maxLength: 4000 },
+        },
+      },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      source: { type: 'string', minLength: 1, maxLength: 200 },
+    },
+  }),
+  maxTokens: 1024,
+})
+
+// Duplicate detection: find likely duplicate pairs within a collection.
+export const FIND_DUPLICATES = Object.freeze({
+  id: 'findDuplicates',
+  description: 'Find likely duplicate items within a collection by comparing titles and provider ids.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['collectionType', 'candidates'],
+    properties: {
+      collectionType: { type: 'string', minLength: 1, maxLength: 100 },
+      candidates: {
+        type: 'array',
+        minItems: 2,
+        maxItems: 50,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'title'],
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 36 },
+            title: { type: 'string', minLength: 1, maxLength: 500 },
+            subtitle: { type: 'string', maxLength: 500 },
+            providerIds: { type: 'object', additionalProperties: { type: 'string', maxLength: 200 } },
+          },
+        },
+      },
+      threshold: { type: 'number', minimum: 0.5, maximum: 1 },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['pairs'],
+    properties: {
+      pairs: {
+        type: 'array',
+        maxItems: 50,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['itemA', 'itemB', 'score'],
+          properties: {
+            itemA: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'title'],
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 36 },
+                title: { type: 'string', minLength: 1, maxLength: 500 },
+              },
+            },
+            itemB: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'title'],
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 36 },
+                title: { type: 'string', minLength: 1, maxLength: 500 },
+              },
+            },
+            score: { type: 'number', minimum: 0, maximum: 1 },
+            reason: { type: 'string', maxLength: 500 },
+          },
+        },
+      },
+    },
+  }),
+  maxTokens: 1024,
+})
+
 // The full registry, keyed by capability id.
 export const CAPABILITIES = Object.freeze({
   [CLASSIFY.id]: CLASSIFY,
   [DEDUPLICATE.id]: DEDUPLICATE,
   [PRIORITIZE.id]: PRIORITIZE,
   [GENERATE_ISSUE_EPIC.id]: GENERATE_ISSUE_EPIC,
+  [COMPLETE_METADATA.id]: COMPLETE_METADATA,
+  [FIND_DUPLICATES.id]: FIND_DUPLICATES,
 })
 
 export function getCapability(id) {
