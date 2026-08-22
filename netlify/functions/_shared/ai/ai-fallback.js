@@ -35,6 +35,8 @@ const cooldownState = new Map()
 
 // Mark a provider as in cooldown. `providerId` is the profile id, `durationMs`
 // is the cooldown period (defaults to DEFAULT_COOLDOWN_MS).
+import { listProviderProfiles } from './ai-admin'
+
 export function setCooldown(providerId, durationMs = DEFAULT_COOLDOWN_MS) {
   if (!providerId) return
   cooldownState.set(String(providerId), Date.now() + durationMs)
@@ -181,4 +183,10 @@ async function executeFallback({ fallbackProvider, fallbackId, callFn, cooldownM
     }).catch(() => {})
     throw err
   }
+}
+
+/** Returns the currently active (enabled) AI provider profile, or null. */
+export async function getActiveProvider() {
+  const profiles = await listProviderProfiles()
+  return profiles.find((p) => p.active) || null
 }
