@@ -3,6 +3,7 @@ import * as authApi from './api/auth'
 import * as feedbackApi from './api/feedback'
 import { t, getLocale } from './i18n'
 import { deviceLabel } from './utils/appInfo'
+import SmartFeedbackInbox from './components/SmartFeedbackInbox'
 import './AdminPanel.css'
 
 const KIND_LABELS = { records: () => t('kind.records'), books: () => t('kind.books') }
@@ -120,7 +121,7 @@ export default function AdminPanel({ onClose }) {
 
   // Feedback inbox (epic #74, T6 #75). Loaded on mount so the Feedback tab's
   // unread badge (open items) is correct before the owner ever clicks it.
-  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'dashboard' | 'ai'
+  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'smartInbox' | 'dashboard' | 'ai' | 'aiDashboard'
   const [allItems, setAllItems] = useState([]) // full newest-first inbox (badge source)
   const [fbLoading, setFbLoading] = useState(true)
   const [fbError, setFbError] = useState('')
@@ -657,6 +658,15 @@ export default function AdminPanel({ onClose }) {
           <button
             type="button"
             role="tab"
+            aria-selected={tab === 'smartInbox'}
+            className={`admin-tab${tab === 'smartInbox' ? ' active' : ''}`}
+            onClick={() => setTab('smartInbox')}
+          >
+            {t('admin.tab.smartInbox')}
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={tab === 'dashboard'}
             className={`admin-tab${tab === 'dashboard' ? ' active' : ''}`}
             onClick={() => setTab('dashboard')}
@@ -956,6 +966,8 @@ export default function AdminPanel({ onClose }) {
                 </>
               )}
             </section>
+          ) : tab === 'smartInbox' ? (
+            <SmartFeedbackInbox />
           ) : tab === 'ai' ? (
             <section>
               {/* Admin AI settings (ADMIN-3.2, #304) — secure LLM provider-profile

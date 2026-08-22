@@ -106,3 +106,38 @@ export async function deleteFeedback(id) {
   const res = await fetch(fnUrl({ id }), { method: 'DELETE', headers: authHeaders() })
   return handle(res)
 }
+
+// GET — fetch AI triage data for a feedback item (M4 P1, #307). Returns the
+// triage result { classification, productArea, priority, priorityConfidence,
+// summary, duplicateCandidates, isLowConfidence } or null if not yet triaged.
+// Admin session required. Graceful-failure: a non-200 / malformed response
+// returns null instead of throwing — the UI degrades to the basic inbox.
+export async function fetchFeedbackTriage(feedbackId) {
+  if (!getSessionToken()) throw noTokenError()
+  try {
+    const res = await fetch(fnUrl({ id: feedbackId, triage: '1' }), { headers: authHeaders() })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.triage || null
+  } catch {
+    return null
+  }
+}
+
+// POST — trigger AI triage for a feedback item (M4 P1, #307). Returns the
+// triage result or null on failure. Admin session required.
+export async function triggerFeedbackTriage(feedbackId) {
+  if (!getSessionToken()) throw noTokenError()
+  try {
+    const res = await fetch(fnUrl(), {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'triage', feedbackId }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.triage || null
+  } catch {
+    return null
+  }
+}
