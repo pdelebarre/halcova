@@ -13,6 +13,7 @@ import {
   DEDUPLICATE,
   FEEDBACK_TRIAGE,
   FIND_DUPLICATES,
+  IDENTIFY_FROM_IMAGE,
   PRIORITIZE,
   GENERATE_ISSUE_EPIC,
   getCapability,
@@ -509,6 +510,128 @@ it('proceeds when supports() is not a function (no gating)', async () => {
         { id: 'b1', title: 'B' },
       ],
       threshold: 2.0,
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+})
+
+describe('IDENTIFY_FROM_IMAGE capability', () => {
+  it('is registered in the capability registry', () => {
+    expect(CAPABILITIES.identifyFromImage).toBe(IDENTIFY_FROM_IMAGE)
+    expect(getCapability('identifyFromImage')).toBe(IDENTIFY_FROM_IMAGE)
+  })
+
+  it('declares a bounded token ceiling', () => {
+    expect(IDENTIFY_FROM_IMAGE.maxTokens).toBeLessThanOrEqual(2048)
+    expect(IDENTIFY_FROM_IMAGE.maxTokens).toBeGreaterThan(0)
+  })
+
+  it('accepts valid input with imageUrl only', async () => {
+    const provider = fakeProvider({
+      content: {
+        candidates: [
+          { title: 'Abbey Road', confidence: 0.95, source: 'cover' },
+        ],
+      },
+    })
+    const out = await runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })
+    expect(out).toEqual({
+      candidates: [
+        { title: 'Abbey Road', confidence: 0.95, source: 'cover' },
+      ],
+    })
+  })
+
+  it('accepts valid input with hints', async () => {
+    const provider = fakeProvider({
+      content: {
+        candidates: [
+          { title: 'Kind of Blue', confidence: 0.9, providerId: 'mb:123', source: 'cover' },
+        ],
+      },
+    })
+    const out = await runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+      hints: { collectionType: 'records' },
+    })
+    expect(out.candidates[0].title).toBe('Kind of Blue')
+    expect(out.candidates[0].providerId).toBe('mb:123')
+  })
+
+  it('rejects input without imageUrl', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      hints: { collectionType: 'records' },
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects input with empty imageUrl', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: '',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects output with missing candidates', async () => {
+    const provider = fakeProvider({ content: { notCandidates: [] } })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects output with candidate missing title', async () => {
+    const provider = fakeProvider({
+      content: { candidates: [{ confidence: 0.9 }] },
+    })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects output with candidate missing confidence', async () => {
+    const provider = fakeProvider({
+      content: { candidates: [{ title: 'Album' }] },
+    })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects output with too many candidates (over 10)', async () => {
+    const candidates = Array.from({ length: 11 }, (_, i) => ({
+      title: `Album ${i}`,
+      confidence: 0.5,
+    }))
+    const provider = fakeProvider({ content: { candidates } })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects output with confidence out of range', async () => {
+    const provider = fakeProvider({
+      content: { candidates: [{ title: 'Album', confidence: 1.5 }] },
+    })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects output with title too long', async () => {
+    const provider = fakeProvider({
+      content: { candidates: [{ title: 'x'.repeat(501), confidence: 0.9 }] },
+    })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects unknown properties in input', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'identifyFromImage', {
+      imageUrl: 'signed-url-token',
+      unknownField: 'test',
     })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
   })
 })

@@ -536,3 +536,47 @@ export async function proposeMutation(provider, input, options = {}) {
     requiresConfirmation: true,
   }
 }
+
+// ---------------------------------------------------------------------------
+// identifyFromImage — identify an item from a user-submitted image
+// (ADR-0021 §2.5 — Image Recognition Tool).
+//
+// Input: { imageUrl (signed, temporary), hints?: { collectionType? } }
+// Output: { candidates: [{ title, confidence, providerId?, source }] }
+//
+// Security (ADR-0021 §2.5, ADR-0006):
+//   - Image URLs are server-signed, time-bounded (5 min TTL), and scoped to
+//     the authenticated user. The caller (image-identify function) mints the
+//     signed URL before calling this tool.
+//   - The image is never stored or cached by the AI provider.
+//   - The model receives only the image URL and public reference metadata —
+//     never private collection context.
+//   - AI suggests only (no auto-add): candidates require user confirmation.
+//   - XSS-safe: all returned string values are validated before return.
+//   - Provider errors (timeout, rate-limit, oversized) propagate as ProviderError.
+// ---------------------------------------------------------------------------
+export async function identifyFromImage(provider, input, options = {}) {
+  const { imageUrl, hints } = input
+
+  // Validate imageUrl
+  if (typeof imageUrl !== 'string' || imageUrl.trim().length === 0) {
+    throw new ProviderError(
+      ProviderErrorCode.INVALID_OUTPUT,
+      'identifyFromImage: a non-empty imageUrl string is required',
+    )
+  }
+
+  // Build the capability input with data-minimization:
+  // Only the signed image URL and optional public hints are sent to the model.
+  const capabilityInput = { imageUrl }
+  if (hints && typeof hints === 'object' && hints.collectionType) {
+    capabilityInput.hints = { collectionType: String(hints.collectionType).slice(0, 100) }
+  }
+
+  const result = await runCapability(provider, 'identifyFromImage', capabilityInput, options)
+
+  // XSS-safe: validate all string values in candidates
+  assertSafeStrings(result.candidates, '$.candidates')
+
+  return result
+}
