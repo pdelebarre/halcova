@@ -754,7 +754,7 @@ export default function AdminPanel({ onClose }) {
                     key={k}
                     checked={!!draft[k]}
                     onChange={() => setDraft((d) => ({ ...d, [k]: !d[k] }))}
-                    label={KIND_LABELS[k]?.() || k}
+                    label={KIND_ACCESS_LABELS[k]?.() || k}
                   />
                 ))}
               </div>
