@@ -11,6 +11,7 @@ import {
   CLASSIFY,
   COMPLETE_METADATA,
   DEDUPLICATE,
+  FEEDBACK_TRIAGE,
   FIND_DUPLICATES,
   PRIORITIZE,
   GENERATE_ISSUE_EPIC,
@@ -228,6 +229,153 @@ it('proceeds when supports() is not a function (no gating)', async () => {
       itemId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
       existingFields: { title: 'A' },
     })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  // ---------------------------------------------------------------------------
+  // FEEDBACK_TRIAGE capability tests (#306)
+  // ---------------------------------------------------------------------------
+
+  it('exposes FEEDBACK_TRIAGE in the registry', () => {
+    expect(CAPABILITIES.feedbackTriage).toBe(FEEDBACK_TRIAGE)
+    expect(getCapability('feedbackTriage')).toBe(FEEDBACK_TRIAGE)
+  })
+
+  it('declares a bounded token ceiling for FEEDBACK_TRIAGE', () => {
+    expect(FEEDBACK_TRIAGE.maxTokens).toBeLessThanOrEqual(1024)
+  })
+
+  it('runs feedbackTriage end to end with valid input', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'bug', confidence: 0.92 },
+        productArea: 'scanner',
+        priority: 'high',
+        priorityConfidence: 0.85,
+        summary: 'Scanner crashes on iOS',
+        duplicateCandidates: [
+          { feedbackId: 'fb-001', score: 0.88, evidence: 'Similar crash report' },
+        ],
+      },
+    })
+    const out = await runCapability(provider, 'feedbackTriage', {
+      message: 'The scanner crashes every time I scan a barcode on my iPhone.',
+      type: 'bug',
+      category: 'scanner',
+    })
+    expect(out.classification.label).toBe('bug')
+    expect(out.classification.confidence).toBe(0.92)
+    expect(out.productArea).toBe('scanner')
+    expect(out.priority).toBe('high')
+    expect(out.summary).toBe('Scanner crashes on iOS')
+    expect(out.duplicateCandidates).toHaveLength(1)
+    expect(out.duplicateCandidates[0].feedbackId).toBe('fb-001')
+  })
+
+  it('rejects feedbackTriage input missing required message', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'feedbackTriage', { type: 'bug' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+    expect(provider.complete).not.toHaveBeenCalled()
+  })
+
+  it('rejects feedbackTriage input with invalid type enum value', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'feedbackTriage', {
+      message: 'Test',
+      type: 'invalid_type',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+    expect(provider.complete).not.toHaveBeenCalled()
+  })
+
+  it('rejects feedbackTriage input with invalid category enum value', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'feedbackTriage', {
+      message: 'Test',
+      category: 'invalid_category',
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+    expect(provider.complete).not.toHaveBeenCalled()
+  })
+
+  it('rejects feedbackTriage output missing required summary', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'bug', confidence: 0.9 },
+        productArea: 'other',
+        priority: 'medium',
+        // missing summary
+      },
+    })
+    await expect(runCapability(provider, 'feedbackTriage', { message: 'Test' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects feedbackTriage output with invalid classification label', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'invalid_label', confidence: 0.9 },
+        productArea: 'other',
+        priority: 'medium',
+        summary: 'Test',
+      },
+    })
+    await expect(runCapability(provider, 'feedbackTriage', { message: 'Test' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects feedbackTriage output with invalid product area', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'bug', confidence: 0.9 },
+        productArea: 'unknown_area',
+        priority: 'medium',
+        summary: 'Test',
+      },
+    })
+    await expect(runCapability(provider, 'feedbackTriage', { message: 'Test' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects feedbackTriage output with invalid priority', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'bug', confidence: 0.9 },
+        productArea: 'other',
+        priority: 'urgent',
+        summary: 'Test',
+      },
+    })
+    await expect(runCapability(provider, 'feedbackTriage', { message: 'Test' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects feedbackTriage output with duplicate candidates missing required fields', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'bug', confidence: 0.9 },
+        productArea: 'other',
+        priority: 'medium',
+        summary: 'Test',
+        duplicateCandidates: [
+          { feedbackId: 'x' }, // missing score and evidence
+        ],
+      },
+    })
+    await expect(runCapability(provider, 'feedbackTriage', { message: 'Test' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects feedbackTriage output with extra unknown properties', async () => {
+    const provider = fakeProvider({
+      content: {
+        classification: { label: 'bug', confidence: 0.9 },
+        productArea: 'other',
+        priority: 'medium',
+        summary: 'Test',
+        extraField: 'not allowed',
+      },
+    })
+    await expect(runCapability(provider, 'feedbackTriage', { message: 'Test' }))
+      .rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
   })
 
   // ---------------------------------------------------------------------------
