@@ -1,0 +1,42 @@
+# OpenCode Ignore File
+# Prevents large files from being loaded into context
+
+# Dependencies
+node_modules/**
+vendor/**
+
+# Build outputs
+dist/**
+build/**
+out/**
+
+# Generated files
+**/*.min.js
+**/*.bundle.js
+**/*.map
+**/*.lock
+
+# Test coverage
+coverage/**
+.nyc_output/**
+
+# IDE and editor files
+.idea/**
+.vscode/**
+*.swp
+*.swo
+
+# Large documentation (not needed for coding)
+.github/ai/README.md
+docs/**
+*.md (except .github/**)
+
+# Logs and temp files
+logs/**
+*.log
+tmp/**
+
+# Environment files
+.env
+.env.*
+*.env

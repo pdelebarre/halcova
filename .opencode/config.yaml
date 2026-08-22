@@ -1,0 +1,48 @@
+# OpenCode Configuration with Token Optimization
+# Optimized for DeepSeek Flash
+# https://opencode.ai/docs/ecosystem/
+
+# Plugin configuration
+# Add these plugins to your global ~/.config/opencode/opencode.jsonc:
+# {
+#   "plugin": [
+#     "@tarquinen/opencode-dcp@latest",
+#     "@rtk/opencode-plugin@latest"
+#   ]
+# }
+
+# Model configuration - DeepSeek Flash
+# DeepSeek Flash: Fast, cheap, good for most tasks
+# Use only Flash for all tasks (cost-effective)
+models:
+  default: deepseek/deepseek-chat  # DeepSeek Flash for all tasks
+  explorer: deepseek/deepseek-chat  # Fast for grep/find
+  planner: deepseek/deepseek-chat   # Planning and task breakdown
+  coder: deepseek/deepseek-chat     # Implementation
+  debugger: deepseek/deepseek-chat  # Debugging
+
+# Auto-compact to prevent runaway sessions
+autoCompact: true
+
+# Terse agent output (saves output tokens)
+caveman: true
+
+# Tool output compression
+compressToolOutput: true
+
+# Limit file reads per turn
+maxFileReads: 10
+
+# Limit tool calls per turn
+maxToolCalls: 5
+
+# Session management
+session:
+  # Auto-start fresh session after N minutes idle
+  idleTimeout: 10
+  
+  # Suggest /new after N turns
+  suggestNewAfter: 15
+
+# Logging (minimal to save tokens)
+logLevel: warn
