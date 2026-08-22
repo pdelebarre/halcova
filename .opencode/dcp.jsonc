@@ -1,0 +1,61 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+  "enabled": true,
+  "debug": false,
+  
+  // Compression thresholds (adjust for your model's context window)
+  "compress": {
+    // Start aggressive pruning at 50K tokens (out of 100K+ context)
+    "maxContextLimit": 50000,
+    
+    // Below 20K, turn off reminders (context is healthy)
+    "minContextLimit": 20000,
+    
+    // Nudge user to compact every turn when above threshold
+    "nudgeFrequency": 1,
+    
+    // Strong nudges (not just suggestions)
+    "nudgeForce": "strong",
+    
+    // After 5 iterations without pruning, force nudge
+    "iterationNudgeThreshold": 5,
+    
+    // After 10 turns without pruning, auto-suggest
+    "turnNudgeThreshold": 10
+  },
+  
+  // Automatic strategies
+  "strategies": {
+    // Remove duplicate tool calls (same file, same operation)
+    "deduplication": true,
+    
+    // Clean error outputs from 4+ turns ago
+    "purgeErrors": true,
+    
+    // Compress file writes that were superseded by later writes
+    "supersedeWrites": true
+  },
+  
+  // What to never prune
+  "protectedFilePatterns": [
+    "**/*.agent.md",
+    "**/*.instructions.md",
+    "**/SKILL.md",
+    "**/README.md"
+  ],
+  
+  // Turn protection (don't prune recent work)
+  "turnProtection": {
+    "enabled": true,
+    "protectLastN": 3
+  },
+  
+  // Commands
+  "commands": {
+    "enabled": true,
+    "prefix": "/dcp"
+  },
+  
+  // Notification style
+  "pruneNotification": "detailed"
+}
