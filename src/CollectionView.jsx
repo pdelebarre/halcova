@@ -72,7 +72,7 @@ const NEW_ARRIVALS_COUNT = 5
  * driven by a `catalog` describing what we're cataloging (records or books).
  * App.jsx renders one of these per tab.
  */
-export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false }) {
+export default function CollectionView({ catalog, onRequestSettings, lendingEnabled, overdueCount = 0, onOpenLoans, onOpenPaywall, refreshTick, loansButtonRef, planStatus = 'free', isFree = false, isDemo = false, gamificationEnabled = false, pendingAction, onClearPendingAction }) {
   const { items, status, error, source, mirroredAt, add, update, remove, refresh, lend, returnItem, flushOutbox, mutationSeq } = useCollection(catalog.storage)
 
   // M2 #159/#292: mount the foreground reconnect-flush trigger so queued offline
@@ -253,6 +253,17 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
   const [fabOpen, setFabOpen] = useState(false)
   const fabRef = useRef(null)
   const fabMenuRef = useRef(null)
+
+  // Process pending action from App (scan/cover/manual invoked from BottomNav or HomeScreen)
+  useEffect(() => {
+    if (!pendingAction) return
+    if (pendingAction === 'scan') setModal('scan')
+    else if (pendingAction === 'cover') setModal('cover')
+    else if (pendingAction === 'manual') setModal('manual')
+    else if (pendingAction === 'wishlist') { /* scroll to wishlist — handled by filter */ }
+    else if (pendingAction === 'conflicts') { /* open conflict modal — handled inline */ }
+    onClearPendingAction?.()
+  }, [pendingAction, onClearPendingAction])
 
   useEffect(() => {
     if (!fabOpen) return undefined

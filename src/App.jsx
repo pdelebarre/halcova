@@ -79,6 +79,8 @@ export default function App() {
     return 'home'
   })()
   const [navTab, setNavTab] = useState(initialTab)
+  // Pending action to carry to the browse view: 'scan' | 'cover' | 'manual' | 'wishlist' | 'conflicts' | null
+  const [pendingAction, setPendingAction] = useState(null)
   // Collection tab within browse: 'records' | 'books'
   const [collectionTab, setCollectionTab] = useState('records')
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -346,10 +348,8 @@ export default function App() {
   // Handle bottom nav tab changes
   function handleNavChange(tab) {
     if (tab === 'scan') {
-      // Scan is the dominant CTA — trigger scan modal immediately
-      // by navigating to browse with scan open
       setNavTab('browse')
-      // The scan flow starter will be handled by the browse view
+      setPendingAction('scan')
       return
     }
     setNavTab(tab)
@@ -392,12 +392,12 @@ export default function App() {
             isDemo={isDemo}
             isFree={isFree}
             lendingEnabled={lendingEnabled}
-            onScan={() => { setNavTab('browse'); /* scan triggered from browse */ }}
-            onScanCover={() => { setNavTab('browse'); /* cover scan triggered from browse */ }}
-            onManualAdd={() => { setNavTab('browse'); /* manual add triggered from browse */ }}
-            onOpenCollection={() => setNavTab('browse')}
-            onOpenWishlist={() => { setNavTab('browse'); /* wishlist handled in browse view */ }}
-            onOpenConflicts={() => setNavTab('browse')}
+            onScan={() => { setNavTab('browse'); setPendingAction('scan') }}
+            onScanCover={() => { setNavTab('browse'); setPendingAction('cover') }}
+            onManualAdd={() => { setNavTab('browse'); setPendingAction('manual') }}
+            onOpenCollection={(type) => { setNavTab('browse'); setCollectionTab(type || 'records') }}
+            onOpenWishlist={() => { setNavTab('browse'); setPendingAction('wishlist') }}
+            onOpenConflicts={() => { setNavTab('browse'); setPendingAction('conflicts') }}
           />
         )}
 
@@ -423,6 +423,8 @@ export default function App() {
                 isDemo={isDemo}
                 user={user}
                 gamificationEnabled={gamesEnabled}
+                pendingAction={navTab === 'browse' ? pendingAction : null}
+                onClearPendingAction={() => setPendingAction(null)}
               />
             </ErrorBoundary>
           </ThemeProvider>

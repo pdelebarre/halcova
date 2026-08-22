@@ -218,3 +218,41 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* Genre browsing chips — thumb-friendly 44px min height */
+.home-genre-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.home-genre-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+.home-genre-chip:active {
+  background: var(--vinyl-groove-2);
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+}
+.home-genre-name {
+  flex: 1;
+}
+.home-genre-count {
+  font-size: 11px;
+  opacity: 0.6;
+  font-weight: 400;
+}

@@ -68,6 +68,23 @@ export default function HomeScreen({
   const hasItems = ownedItems.length > 0
   const { Card } = catalog?.components || {}
 
+  // Genres present in the collection, grouped by count
+  const genres = useMemo(() => {
+    const genreMap = new Map()
+    for (const item of ownedItems) {
+      const genreList = item.genre
+      if (!genreList) continue
+      if (Array.isArray(genreList)) {
+        for (const g of genreList) genreMap.set(g, (genreMap.get(g) || 0) + 1)
+      } else if (typeof genreList === 'string') {
+        genreMap.set(genreList, (genreMap.get(genreList) || 0) + 1)
+      }
+    }
+    return [...genreMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+  }, [ownedItems])
+
   // SECURITY: never render raw metadata strings — card component handles
   // isDangerousContent guarding. We pass items through the existing pipeline.
 
@@ -136,7 +153,30 @@ export default function HomeScreen({
         </section>
       )}
 
-      {/* What's new — most recent additions shelf */}
+      {/* Browse by genre — when items exist */}
+        {hasItems && genres.length > 0 && (
+          <section className="home-section" aria-labelledby="home-genres-heading">
+            <SectionHeader
+              id="home-genres-heading"
+              title={t('home.browseByGenre')}
+            />
+            <div className="home-genre-list">
+              {genres.map(([genre, count]) => (
+                <button
+                  key={genre}
+                  type="button"
+                  className="home-genre-chip"
+                  onClick={() => onOpenCollection(catalog.kind, { genre })}
+                >
+                  <span className="home-genre-name">{genre}</span>
+                  <span className="home-genre-count">{count}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* What's new — most recent additions shelf */}
       {recentAdditions.length > 0 && Card && (
         <section className="home-section" aria-labelledby="home-recent-heading">
           <SectionHeader

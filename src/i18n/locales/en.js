@@ -1034,6 +1034,8 @@ const en = {
   'home.emptyCollection': 'Your collection is empty',
   'home.startScanning': 'Start scanning',
   'home.continueBrowsing': 'Continue browsing',
+  'home.browseByGenre': 'Browse by genre',
+  'home.collectionTypes': 'Collection types',
 }
 
 export default en
