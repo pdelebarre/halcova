@@ -219,7 +219,7 @@ export async function getProfileSecret(id) {
   }
 }
 
-function buildProvider(profile, secret) {
+export function buildProvider(profile, secret) {
   if (profile.providerType === 'openai') {
     return new OpenAIProvider({
       baseUrl: profile.baseUrl,
