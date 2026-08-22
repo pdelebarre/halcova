@@ -49,7 +49,7 @@ import * as discogs from '../api/discogs'
 // M2 #320: default to Browse tab for collection-view tests
 beforeEach(() => {
   localStorage.setItem('runout.navTab', 'browse')
-})'
+})
 
 const EXISTING = { id: 'r0', title: 'Some Other - Album', year: 2001, formatType: 'LP', barcode: '1234567890123' }
 const KIND_OF_BLUE = {
