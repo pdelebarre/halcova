@@ -1,7 +1,7 @@
 TEAM: AI
-CURRENT ISSUE: #310 — [ADMIN-3.8] AI provider test/dry-run + cost, health & fallback dashboard (M4 P1)
-STATUS: IMPLEMENTED — implementation complete on branch m4/ai/310, all 390 AI tests pass (16 files)
-ACTIVE PR: none yet — branch m4/ai/310 (committed, not pushed)
-LAST GATE: self-verify — 27 new tests across 3 new test files (ai-cost-tracker, ai-fallback, ai-dryrun). New modules: ai-cost-tracker.js (cost estimation + Blobs/Postgres storage), ai-fallback.js (cooldown + retry + fallback), ai-dryrun.js (read-only feedback evaluation). Modified: ai-admin.js (getAiDashboard, runAiDryRun), admin.js (handleAiDashboard, handleAiDryRun, ?aiDashboard=1), auth.js (adminAiDashboard, adminAiDryRun), AdminPanel.jsx (AI dashboard tab with health/cost/fallback/dry-run UI), AdminPanel.css (dashboard table styles), en.js (new i18n strings). No .test.* in netlify/functions/ root.
-BLOCKER: none — all dependencies (#304, #306, #337) merged
-NEXT: PM route for independent review by Security Auditor + Whole Stack Architect (AI provider/model/tool security boundary per ADR-0006); then route #310 PR for merge
+CURRENT ISSUE: #308 — [ADMIN-3.6] GitHub issue/epic generation + controlled labels (M4 P1)
+STATUS: IMPLEMENTED — issue-gen.js + issue-gen.test.js complete on branch m4/ai/308. All 404 AI tests pass (13 files, +47 new). No .test.* in netlify/functions/ root.
+ACTIVE PR: none yet — branch m4/ai/308 (committed, not pushed)
+LAST GATE: self-verify — 47/47 issue-gen tests pass. Controlled 14-label allow-list enforced. XSS-safe via isSafeCanonicalString. Data-minimization: triage metadata never sent to model. Idempotent via deterministic draftId. Draft-return pattern (requiresConfirmation: true). Error propagation verified.
+BLOCKER: none — #303 GENERATE_ISSUE_EPIC capability exists; #306 feedback triage input schema compatible
+NEXT: PM route for independent review by Security Auditor + Whole Stack Architect (ADR-0006 AI provider/tool security boundary); then route #308 PR for merge
