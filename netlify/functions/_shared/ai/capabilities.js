@@ -299,6 +299,136 @@ export const FIND_DUPLICATES = Object.freeze({
   maxTokens: 1024,
 })
 
+// Assistant query: interpret a natural-language collection query and return a
+// structured response with optional tool calls. This is the central capability
+// for the conversational assistant (#333, ADR-0021 §2.1).
+//
+// The LLM receives the user's query, optional collection context, and available
+// tool definitions. Its output tells the AI runtime what tools to call and how
+// to phrase the final response.
+//
+// Data-minimization (ADR-0021 §3.1):
+//   - Only the query text and allowlisted context fields are sent to the model.
+//   - Private owned attributes (notes, grading, lending, wishlist) are never included.
+//   - availableData is pre-minimized by the caller.
+//
+// "AI suggests; application decides" (ADR-0021 §4):
+//   - Tool calls that produce mutations (proposeMutation) are returned as drafts.
+//   - The LLM may suggest mutations but never executes them directly.
+//   - requiresConfirmation: true means the caller must confirm before executing.
+//
+// XSS-safe (ADR-0021 §7):
+//   - The output response text is validated by the caller via assertSafeStrings.
+//   - toolCall arguments are schema-validated before dispatch.
+export const ASSISTANT_QUERY = Object.freeze({
+  id: 'assistantQuery',
+  description: 'Answer a natural-language question about the user\'s collection by choosing which tools to call and generating a conversational response.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['query'],
+    properties: {
+      query: { type: 'string', minLength: 1, maxLength: 2000 },
+      collectionType: { type: 'string', maxLength: 100 },
+      conversationHistory: {
+        type: 'array',
+        maxItems: 20,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['role', 'content'],
+          properties: {
+            role: { type: 'string', enum: ['user', 'assistant'] },
+            content: { type: 'string', maxLength: 4000 },
+          },
+        },
+      },
+      availableTools: {
+        type: 'array',
+        maxItems: 10,
+        items: { type: 'string', maxLength: 50 },
+      },
+      availableData: {
+        type: 'object',
+        additionalProperties: false,
+        required: [],
+        properties: {
+          // Pre-fetched data that the assistant can reference without tool calls.
+          // Data-minimization: only public/minimized fields are included.
+          searchResults: {
+            type: 'array',
+            maxItems: 20,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: [],
+              properties: {
+                id: { type: 'string', maxLength: 36 },
+                title: { type: 'string', maxLength: 500 },
+                subtitle: { type: 'string', maxLength: 500 },
+                collectionType: { type: 'string', maxLength: 100 },
+                status: { type: 'string', maxLength: 50 },
+              },
+            },
+          },
+          collectionSummary: {
+            type: 'object',
+            additionalProperties: false,
+            required: [],
+            properties: {
+              totalItems: { type: 'integer', minimum: 0 },
+              identifiedCount: { type: 'integer', minimum: 0 },
+              draftCount: { type: 'integer', minimum: 0 },
+            },
+          },
+        },
+      },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['response'],
+    properties: {
+      response: { type: 'string', minLength: 1, maxLength: 4000 },
+      facts: {
+        type: 'array',
+        maxItems: 20,
+        items: { type: 'string', maxLength: 500 },
+      },
+      estimates: {
+        type: 'array',
+        maxItems: 10,
+        items: { type: 'string', maxLength: 500 },
+      },
+      recommendations: {
+        type: 'array',
+        maxItems: 10,
+        items: { type: 'string', maxLength: 500 },
+      },
+      requiresConfirmation: { type: 'boolean' },
+      toolCalls: {
+        type: 'array',
+        maxItems: 5,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['tool', 'args'],
+          properties: {
+            tool: {
+              type: 'string',
+              enum: ['searchItems', 'getItemDetail', 'getCollectionSummary', 'proposeMutation', 'getCompletionSuggestions', 'getDuplicateSuggestions'],
+            },
+            args: { type: 'object' },
+          },
+        },
+      },
+      draftId: { type: 'string', maxLength: 36 },
+    },
+  }),
+  maxTokens: 1024,
+})
+
 // The full registry, keyed by capability id.
 export const CAPABILITIES = Object.freeze({
   [CLASSIFY.id]: CLASSIFY,
@@ -307,6 +437,7 @@ export const CAPABILITIES = Object.freeze({
   [GENERATE_ISSUE_EPIC.id]: GENERATE_ISSUE_EPIC,
   [COMPLETE_METADATA.id]: COMPLETE_METADATA,
   [FIND_DUPLICATES.id]: FIND_DUPLICATES,
+  [ASSISTANT_QUERY.id]: ASSISTANT_QUERY,
 })
 
 export function getCapability(id) {
