@@ -21,6 +21,12 @@
 //                   the author (own); status only surfaces via `mine`.
 //   - 'feedback' -> the AUTHOR-facing DTO never includes adminNote (admin-only,
 //                   C7); the ADMIN view (`admin: true`) includes it.
+//   - 'profile'  -> a PUBLIC view gets only the public fields (username, avatar,
+//                   bio, links); the OWNER view gets everything including
+//                   visibility settings and shareId.
+//   - 'profileItem' -> a PUBLIC collection item gets only C1 public catalog
+//                   metadata (title, image, category); private fields (price,
+//                   location, serial, notes, receipts) are stripped.
 //
 // Enforcement invariant (SEC-7.2, #339): authorization lives in policy.js
 // rules; WHAT fields appear in a DTO live in these allowlists + handler-
@@ -29,7 +35,7 @@
 // public surface.
 
 import { publicUser } from './auth'
-import { ITEM_NON_OWNER_RETAINED, ITEM_PUBLIC_FIELDS, PRIVATE_ASSET_FIELDS } from './visibility'
+import { ITEM_NON_OWNER_RETAINED, ITEM_PUBLIC_FIELDS, PRIVATE_ASSET_FIELDS, PROFILE_PUBLIC_FIELDS, PROFILE_ITEM_PUBLIC_FIELDS } from './visibility'
 
 // The allowlisted top-level fields on a NON-OWNER item DTO: C1 public catalog
 // metadata + the retained ownership-adjacent keys. Everything else (C3–C7:
@@ -119,6 +125,28 @@ export function filterFor(principal, resource, object, { own = false, admin = fa
     const rest = { ...object }
     delete rest.adminNote
     return rest
+  }
+  if (resource === 'profile') {
+    // OWNER view (own:true) gets everything including visibility settings and
+    // shareId. PUBLIC view gets only the public fields (username, avatar, bio,
+    // links). Admin sees the owner view.
+    if (own || admin) return object
+    const out = {}
+    for (const key of Object.keys(object)) {
+      if (PROFILE_PUBLIC_FIELDS.has(key)) out[key] = object[key]
+    }
+    return out
+  }
+  if (resource === 'profileItem') {
+    // PUBLIC collection item: only C1 public catalog metadata (title, image,
+    // category). Private fields (price, location, serial, notes, receipts) are
+    // stripped. This is stricter than the non-owner item filter which retains
+    // dateAdded/wishlist/lending — those are also stripped for public profiles.
+    const out = {}
+    for (const key of Object.keys(object)) {
+      if (PROFILE_ITEM_PUBLIC_FIELDS.has(key)) out[key] = object[key]
+    }
+    return out
   }
   return object
 }

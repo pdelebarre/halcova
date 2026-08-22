@@ -1,0 +1,139 @@
+.profile-settings {
+  padding: 1rem;
+}
+
+.profile-settings-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.profile-settings-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary, #666);
+}
+
+.profile-settings-error {
+  background: var(--error-bg, #fef2f2);
+  color: var(--error, #dc2626);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.profile-settings-success {
+  background: var(--success-bg, #f0fdf4);
+  color: var(--success, #16a34a);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.profile-settings-field {
+  margin-bottom: 1rem;
+}
+
+.profile-settings-field label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary, #333);
+}
+
+.profile-settings-field input,
+.profile-settings-field textarea,
+.profile-settings-field select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary, #333);
+}
+
+.profile-settings-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.profile-settings-links {
+  margin-bottom: 1rem;
+}
+
+.profile-settings-links > label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary, #333);
+}
+
+.profile-settings-link-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.profile-settings-link-row input {
+  flex: 1;
+  padding: 0.375rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+
+.profile-settings-link-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #666);
+  padding: 0.25rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.profile-settings-link-remove:hover {
+  color: var(--error, #dc2626);
+}
+
+.profile-settings-share {
+  margin-bottom: 1rem;
+}
+
+.profile-settings-share label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary, #333);
+}
+
+.profile-settings-share-url {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.profile-settings-share-url input {
+  flex: 1;
+  padding: 0.375rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  background: var(--input-bg, #f9f9f9);
+}
+
+.profile-settings-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #ddd);
+}

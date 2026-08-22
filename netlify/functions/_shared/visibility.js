@@ -144,6 +144,25 @@ export const USER_SECRET_FIELDS = Object.freeze([
   'code', 'code_hash', 'stripeCustomerId', 'stripeSubscriptionId', 'stripeCheckoutSessionId',
 ])
 
+// --- profile (FEAT-8.1 #326) ------------------------------------------------
+// Public profile fields that may reach public surfaces. Everything else
+// (userId, shareId, visibility settings, createdAt, updatedAt) is private.
+export const PROFILE_PUBLIC_FIELDS = Object.freeze(new Set([
+  'username', 'avatar', 'bio', 'links',
+]))
+
+// Public collection item fields visible on a public profile page. Only C1
+// public catalog metadata — no price (C3), location (C4), serial (C5),
+// receipts (C6), notes (C7), lending (C8), or private asset refs.
+export const PROFILE_ITEM_PUBLIC_FIELDS = Object.freeze(new Set([
+  'id', 'title', 'year', 'label', 'genre', 'style', 'country', 'formatType',
+  'coverImage', 'barcode', 'discogsId', 'googleBooksId',
+  'artists', 'masterId', 'tracklist', 'released',
+  'authorsList', 'subtitle', 'series', 'mainCategory', 'snippet', 'pageCount',
+  'description', 'catno', 'formatRaw', 'isbn',
+  'mbid', 'openLibraryId',
+]))
+
 // Helper: true when a principal role sees the OWNED (full) surface of a
 // resource — the owner/admin bypass. Members see their own owned surface too
 // (own:true is resolved by the caller via filterFor), which is why the bypass
