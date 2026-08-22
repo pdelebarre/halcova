@@ -4,8 +4,7 @@
 > Team checkpoints: `state/teams/`. Milestone detail: `state/M1.md` … `state/M4.md`.
 
 ## Position
-- M0 complete. M1 complete (40 closed). M2 complete (19 closed). M3 complete (9 closed). M4 core AI P1 delivered.
-- M5–M6 in Icebox.
+- M0–M4 complete (M1: 40, M2: 19, M3: 9, M4: 36). M5–M6 in icebox.
 
 ## Milestones
 | Milestone | Focus | Status | Leading teams |
