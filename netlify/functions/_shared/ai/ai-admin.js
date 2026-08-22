@@ -25,6 +25,9 @@ import { encryptSecret, decryptSecret, maskSecret } from './ai-secrets'
 import { validateAiEndpoint, endpointAllowlistFromEnv } from './ai-endpoint'
 import { OpenAIProvider } from './openai'
 import { logAudit } from '../audit'
+import { getUsageAggregates, recordUsageEvent } from './ai-cost-tracker'
+import { dryRunFeedback } from './ai-dryrun'
+import { getCooldownState } from './ai-fallback'
 
 const AI_CONFIG_STORE = 'runout-ai-config'
 
@@ -282,4 +285,52 @@ export async function activateProviderProfile(id, { test = testProviderProfile }
   const activated = await repo.transaction((txn) => txn.activateProfile(id))
   logAudit('ai.profile.activate', { profileId: id })
   return { profile: toPublic(activated) }
+}
+
+// ---------------------------------------------------------------------------
+// AI Dashboard aggregates (ADMIN-3.8, #310)
+// ---------------------------------------------------------------------------
+
+// Get usage aggregates for the AI dashboard. Returns 7-day and 30-day stats
+// plus per-provider breakdowns and cooldown state.
+export async function getAiDashboard() {
+  const [agg7d, agg30d, profiles, cooldowns] = await Promise.all([
+    getUsageAggregates({ days: 7 }),
+    getUsageAggregates({ days: 30 }),
+    listProviderProfiles(),
+    Promise.resolve(getCooldownState()),
+  ])
+
+  return {
+    aggregates: {
+      days7: agg7d,
+      days30: agg30d,
+    },
+    providers: profiles,
+    cooldowns,
+  }
+}
+
+// Run a dry-run evaluation of feedback items through the active provider.
+// Returns { results, summary } or { error }.
+export async function runAiDryRun({ limit = 10, offset = 0 } = {}) {
+  const result = await dryRunFeedback({ limit, offset, providerFactory: buildProvider })
+
+  // Record usage events for the dry-run (metadata only — no prompts/responses).
+  if (!result.error && result.results) {
+    for (const r of result.results) {
+      if (r.ok) {
+        recordUsageEvent({
+          provider: result.summary?.provider || 'unknown',
+          model: result.summary?.model || 'unknown',
+          tokensIn: r.tokensIn,
+          tokensOut: r.tokensOut,
+          latencyMs: r.latencyMs,
+          ok: true,
+        }).catch(() => {})
+      }
+    }
+  }
+
+  return result
 }
