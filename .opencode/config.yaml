@@ -1,0 +1,89 @@
+# OpenCode Configuration with Token Optimization
+# https://github.com/opencode-ai/opencode
+
+# Model configuration with cost-aware routing
+models:
+  # Use cheap models for exploration tasks (70% of agentic tokens)
+  explorer: anthropic/haiku-3.5  # Fast, cheap for grep/find
+  planner: anthropic/haiku-3.5   # Planning and task breakdown
+  
+  # Use expensive models only for complex reasoning
+  coder: anthropic/sonnet-3.5    # Complex implementation
+  debugger: anthropic/sonnet-3.5 # Deep debugging
+
+# Dynamic Context Pruning (DCP) - 50-70% token savings
+dcp:
+  enabled: true
+  strategy: aggressive
+  max_tokens: 6000  # Keep context under 6K tokens
+  
+  # What to always keep
+  keep:
+    - active_file
+    - recent_errors
+    - current_task
+  
+  # What to drop first
+  drop:
+    - old_history
+    - debug_logs
+    - completed_tasks
+  
+  # Compact after N turns
+  compact_after_turns: 5
+
+# Auto-compact to prevent runaway sessions
+autoCompact: true
+
+# Terse agent output (saves output tokens)
+caveman: true
+
+# Tool output compression
+compressToolOutput: true
+
+# Limit file reads per turn
+maxFileReads: 10
+
+# Limit tool calls per turn
+maxToolCalls: 5
+
+# Session management
+session:
+  # Auto-start fresh session after N minutes idle
+  idleTimeout: 10
+  
+  # Suggest /new after N turns
+  suggestNewAfter: 15
+
+# Logging (minimal to save tokens)
+logLevel: warn
+
+# Plugins
+plugins:
+  - dcp-plugin
+  - rtk-plugin  # Rust Token Killer for CLI output
+
+# DCP Plugin config
+dcp-plugin:
+  # Aggressive pruning
+  threshold: 0.6  # Prune when 60% of context used
+  
+  # Keep these patterns
+  preserve:
+    - "*.agent.md"
+    - "*.instructions.md"
+    - "SKILL.md"
+
+# RTK Plugin config (compresses CLI output)
+rtk-plugin:
+  enabled: true
+  compressionRatio: 0.8  # 80% compression
+  
+  # Commands to compress
+  commands:
+    - git diff
+    - git log
+    - npm install
+    - npm run build
+    - find
+    - grep
