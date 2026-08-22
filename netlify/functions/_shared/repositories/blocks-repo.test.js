@@ -1,8 +1,10 @@
+// @vitest-environment node
+//
 // blocks-repo.test.js — unit tests for the Postgres blocks repository
 // (FEAT-8.5, #330). Uses pg-mem for an in-memory Postgres emulator.
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import newDb from 'pg-mem'
+import { DataType, newDb } from 'pg-mem'
 import { createBlocksRepo } from './blocks-repo'
 
 const MIGRATION_SQL = `
@@ -19,9 +21,14 @@ CREATE INDEX blocks_blocked_idx ON blocks (blocked_id);
 `
 
 function createTestDb() {
-  const db = newDb().adapters.pg()
-  db.query(MIGRATION_SQL)
-  return db
+  const mem = newDb()
+  mem.public.none(MIGRATION_SQL)
+  const { Pool } = mem.adapters.createPg()
+  const pool = new Pool()
+  return {
+    query: (text, params) => pool.query(text, params),
+    connect: () => pool.connect(),
+  }
 }
 
 describe('blocks-repo', () => {

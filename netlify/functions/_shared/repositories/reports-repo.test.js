@@ -1,8 +1,10 @@
+// @vitest-environment node
+//
 // reports-repo.test.js — unit tests for the Postgres reports repository
 // (FEAT-8.5, #330). Uses pg-mem for an in-memory Postgres emulator.
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import newDb from 'pg-mem'
+import { DataType, newDb } from 'pg-mem'
 import { createReportsRepo } from './reports-repo'
 
 const MIGRATION_SQL = `
@@ -29,9 +31,21 @@ CREATE INDEX reports_reporter_idx ON reports (reporter_id);
 `
 
 function createTestDb() {
-  const db = newDb().adapters.pg()
-  db.query(MIGRATION_SQL)
-  return db
+  const mem = newDb()
+  // Register char_length for the CHECK constraint
+  mem.public.registerFunction({
+    name: 'char_length',
+    args: [DataType.text],
+    returns: DataType.integer,
+    implementation: (s) => String(s ?? '').length,
+  })
+  mem.public.none(MIGRATION_SQL)
+  const { Pool } = mem.adapters.createPg()
+  const pool = new Pool()
+  return {
+    query: (text, params) => pool.query(text, params),
+    connect: () => pool.connect(),
+  }
 }
 
 describe('reports-repo', () => {
