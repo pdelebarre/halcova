@@ -5,11 +5,10 @@ import './BottomNav.css'
 /**
  * Bottom navigation bar — M2 collector home redesign (#320).
  *
- * Thumb-friendly, ≤5 destinations with clear active state.
+ * Thumb-friendly, ≤4 destinations with clear active state.
  * - Home: collection overview (stats, recent additions, next actions)
  * - Browse: Records/Books collection grid
  * - Scan: dominant Add action (center, prominent)
- * - More: wishlist, settings, profile access
  *
  * DESIGN RULES:
  * - 44px minimum touch targets (WCAG 2.5.8 / 2.5.5)

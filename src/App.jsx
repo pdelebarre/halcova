@@ -63,18 +63,18 @@ function stripUrlParam(key) { stripUrlParams([key]) }
 
 export default function App() {
   const { session, ready, login, logout, requestAccess, refresh, setSession } = useAuth()
-  // Bottom navigation tab: 'home' | 'browse' | 'scan' | 'more'
+  // Bottom navigation tab: 'home' | 'browse' | 'scan'
   // Default is 'home'. Tests and URL params can override via ?tab=browse.
   const initialTab = (() => {
     try {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab')
-      if (tab && ['home', 'browse', 'more'].includes(tab)) return tab
+      if (tab && ['home', 'browse'].includes(tab)) return tab
     } catch { /* ignore */ }
     // Also check localStorage for test overrides
     try {
       const stored = localStorage.getItem('runout.navTab')
-      if (stored && ['home', 'browse', 'more'].includes(stored)) return stored
+      if (stored && ['home', 'browse'].includes(stored)) return stored
     } catch { /* ignore */ }
     return 'home'
   })()
@@ -428,14 +428,6 @@ export default function App() {
               />
             </ErrorBoundary>
           </ThemeProvider>
-        )}
-
-        {navTab === 'more' && (
-          <div className="more-screen">
-            <div className="more-screen-content">
-              <p className="more-screen-placeholder">{t('home.title')} &amp; {t('common.settings')}</p>
-            </div>
-          </div>
         )}
       </div>
 
