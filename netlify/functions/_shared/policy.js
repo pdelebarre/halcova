@@ -115,7 +115,7 @@ export const POLICY = {
   'payment:portal': { owner: 'self' },
   'billing:webhook': { webhook: true },
 
-  // --- profiles (FEAT-8.1 #326) ----------------------------------------------
+// --- profiles (FEAT-8.1 #326) ----------------------------------------------
   // Profile READ via share id is PUBLIC (no auth required). Profile READ via
   // user id is owner-scoped. Profile WRITE is owner-scoped (self).
   'profile:read:public': {},           // public profile by share id
@@ -127,6 +127,19 @@ export const POLICY = {
   // Public collection items are read-only, filtered through visibility.js.
   'profile:collection:read:public': {},    // public collection by share id
   'profile:collection:read:own': { owner: 'self' },  // own collection visibility
+
+  // --- blocks / mute (FEAT-8.5 #330) -----------------------------------------
+  // Block management is owner-scoped (self). Demo is read-only.
+  'block:list': { owner: 'self' },
+  'block:create': { owner: 'self', deny: ['demo'] },
+  'block:delete': { owner: 'self', deny: ['demo'] },
+
+  // --- reports (FEAT-8.5 #330) -----------------------------------------------
+  // Members can report content; moderators review. Demo is read-only.
+  'report:create': { deny: ['demo'] },
+  'report:list': { requires: 'moderator' },   // moderation queue
+  'report:read': { requires: 'moderator' },    // single report detail
+  'report:moderate': { requires: 'moderator' }, // take action on a report
 }
 
 // Collapse an existing session-auth Response into the stable 401/403 shape
@@ -153,17 +166,25 @@ export function normalizeReject(response) {
 export async function enforce(req, action, {
   ownsTarget,             // async (user) => boolean, required when rule.owner==='target'
   requiresAdmin = false,  // force requires:'admin' (for admin:* fallthrough)
+  requiresModerator = false, // force requires:'moderator'
   denyCode,
   denyMessage,
 } = {}) {
   const rule = POLICY[action] || {}
   const admin = rule.requires === 'admin' || requiresAdmin || action.startsWith('admin:')
+  const moderator = rule.requires === 'moderator' || requiresModerator
 
-  // Resolve the session (or require admin) FIRST — the principal is always
-  // derived from the authenticated session, never the request.
+  // Resolve the session (or require admin/moderator) FIRST — the principal is
+  // always derived from the authenticated session, never the request.
   let resolved
   if (admin) {
     resolved = await requireAdmin(req)
+  } else if (moderator) {
+    // Moderator gate: resolve session and check for moderator or admin role.
+    resolved = await resolveSession(req)
+    if (!resolved.error && resolved.user.role !== 'moderator' && resolved.user.role !== 'admin') {
+      resolved = { error: json(403, { error: 'Moderator access required.' }) }
+    }
   } else {
     resolved = await resolveSession(req)
   }
