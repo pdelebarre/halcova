@@ -1,8 +1,10 @@
+// @vitest-environment node
+//
 // profiles-repo.test.js — unit tests for the Postgres profile repository
 // (FEAT-8.1, #326). Uses pg-mem for an in-memory Postgres emulator.
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import newDb from 'pg-mem'
+import { describe, it, expect, beforeAll } from 'vitest'
+import { DataType, newDb } from 'pg-mem'
 import { createProfilesRepo } from './profiles-repo'
 
 // Load the migration SQL
@@ -29,9 +31,14 @@ CREATE INDEX profiles_user_id_idx ON profiles (user_id);
 `
 
 function createTestDb() {
-  const db = newDb().adapters.pg()
-  db.query(MIGRATION_SQL)
-  return db
+  const mem = newDb()
+  mem.public.none(MIGRATION_SQL)
+  const { Pool } = mem.adapters.createPg()
+  const pool = new Pool()
+  return {
+    query: (text, params) => pool.query(text, params),
+    connect: () => pool.connect(),
+  }
 }
 
 describe('profiles-repo', () => {
