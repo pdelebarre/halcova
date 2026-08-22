@@ -56,8 +56,13 @@ vi.mock('@netlify/blobs', () => ({
 }))
 
 // Mock postgres as not configured so the import runs in generic (Blobs-only) mode
+const { isPostgresConfiguredMock } = vi.hoisted(() => {
+  const mock = vi.fn(() => false)
+  return { isPostgresConfiguredMock: mock }
+})
+
 vi.mock('./postgres', () => ({
-  isPostgresConfigured: () => false,
+  isPostgresConfigured: isPostgresConfiguredMock,
   createPool: () => null,
 }))
 
@@ -118,6 +123,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  isPostgresConfiguredMock.mockReturnValue(false)
 })
 
 describe('import — auth and collection gating', () => {
@@ -179,6 +185,23 @@ describe('import — preview mode', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.code).toBe('MISSING_CONTENT')
+  })
+
+  it('preview detects duplicate titles from existing items', async () => {
+    // Seed an existing item with a known title
+    const store = getStore('collection-test-user-350-records')
+    const existingId = 'existing-item-001'
+    await store.setJSON(`item:${existingId}`, { id: existingId, title: 'Existing Album' })
+    await store.setJSON('index', [existingId])
+
+    // Preview a CSV with a matching title
+    const req = await buildRequest({ body: csvBody([{ title: 'Existing Album', year: '2020' }]) })
+    const res = await handler(req)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.phase).toBe('preview')
+    expect(body.duplicateCount).toBe(1)
+    expect(body.duplicates[0].title).toBe('Existing Album')
   })
 })
 
@@ -299,6 +322,39 @@ describe('import — security adversarial negatives', () => {
     const body = await res.json()
     // Empty string is falsy — caught as MISSING_CONTENT before parseImport runs
     expect(['MISSING_CONTENT', IMPORT_ERROR.EMPTY_FILE]).toContain(body.code)
+  })
+})
+
+describe('import — error handling', () => {
+  it('returns 500 on unexpected handler error', async () => {
+    // Trigger an unhandled exception by passing an invalid URL
+    const req = {
+      url: 'not-a-valid-url',
+      method: 'POST',
+      headers: { get: () => null },
+      json: async () => ({}),
+      text: async () => '{}',
+    }
+    const res = await handler(req)
+    expect(res.status).toBe(500)
+  })
+})
+
+describe('import — Postgres type-registry mode', () => {
+  beforeEach(() => {
+    // Temporarily enable Postgres for these tests
+    isPostgresConfiguredMock.mockReturnValue(true)
+  })
+
+  it('preview with type registry falls back to generic when type not found', async () => {
+    // When Postgres is "configured" but the type registry has no data,
+    // getTypeDef returns null and preview falls back to generic mode.
+    const req = await buildRequest({ body: csvBody([{ title: 'Test', year: '2020' }]) })
+    const res = await handler(req)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.phase).toBe('preview')
+    expect(body.isGeneric).toBe(true)
   })
 })
 
