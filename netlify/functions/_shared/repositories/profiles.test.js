@@ -4,11 +4,11 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import newDb from 'pg-mem'
-import profilesHandler from '../profiles'
-import { createProfilesRepo } from './_shared/repositories/profiles-repo'
+import profilesHandler from '../../profiles'
+import { createProfilesRepo } from './profiles-repo'
 
 // Mock the Postgres db module
-vi.mock('./_shared/postgres', () => {
+vi.mock('../postgres', () => {
   const db = newDb().adapters.pg()
   db.query(`
     CREATE TABLE profiles (
@@ -35,12 +35,12 @@ vi.mock('./_shared/postgres', () => {
 })
 
 // Mock session-auth
-vi.mock('./_shared/session-auth', () => ({
+vi.mock('../session-auth', () => ({
   resolveSession: vi.fn(),
   requireAdmin: vi.fn(),
 }))
 
-import { resolveSession } from './_shared/session-auth'
+import { resolveSession } from '../session-auth'
 
 function mockRequest(method, path, { body, headers = {} } = {}) {
   const url = `https://runout.example.com/.netlify/functions/profiles${path}`
@@ -64,7 +64,7 @@ function mockRequest(method, path, { body, headers = {} } = {}) {
 describe('profiles handler', () => {
   beforeAll(async () => {
     // Seed a public profile for testing
-    const repo = createProfilesRepo({ query: (await vi.mock('./_shared/postgres')).db.query })
+    const repo = createProfilesRepo({ query: (await vi.mock('../postgres')).db.query })
     // Actually let's use the db directly
   })
 
