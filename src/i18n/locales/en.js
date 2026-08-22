@@ -24,8 +24,16 @@ const en = {
   // §2 Kinds & tags
   'kind.records': 'Records',
   'kind.books': 'Books',
+  'kind.games': 'Games',
+  'kind.guitars': 'Guitars & Instruments',
+  'kind.cards': 'Trading Cards',
+  'kind.coins': 'Coins',
   'kind.recordsAccess': 'Records access',
   'kind.booksAccess': 'Books access',
+  'kind.gamesAccess': 'Games access',
+  'kind.guitarsAccess': 'Guitars & Instruments access',
+  'kind.cardsAccess': 'Trading Cards access',
+  'kind.coinsAccess': 'Coins access',
 
   // §3 Auth screen
   'auth.tagline': 'your crate & shelf, cataloged',
@@ -92,6 +100,21 @@ const en = {
   'coverScan.timedOut': 'Reading the cover took too long — try again or pick a different photo.',
   'coverScan.error': 'Something went wrong with the camera or photo.',
   'coverScan.close': 'Cancel cover scan',
+
+  // §6b Image capture (AI image recognition, FEAT-9.5, #336)
+  'imageCapture.title': 'Identify from photo',
+  'imageCapture.help': 'Frame the item so the cover or label is clearly visible.',
+  'imageCapture.capture': 'Capture',
+  'imageCapture.choosePhoto': 'Choose a photo',
+  'imageCapture.identifying': 'Identifying…',
+  'imageCapture.identifyFailed': "Couldn't identify the item — try a clearer photo or enter the details manually.",
+  'imageCapture.error': 'Something went wrong with the camera or photo.',
+  'imageCapture.close': 'Cancel identification',
+  'imageCapture.enterManually': 'Enter details manually instead',
+  'imageCapture.candidatesTitle': 'Did you mean…',
+  'imageCapture.confirm': 'Yes, that\'s it',
+  'imageCapture.reject': 'None of these',
+  'imageCapture.noCandidates': "Couldn't identify the item from the photo.",
 
   // RES-1.5 T5 (#290): lookup error-contract copy. Other locales inherit EN
   // (no raw-key rendering — the completeness test asserts every key resolves
@@ -979,6 +1002,42 @@ const en = {
   'admin.smartInbox.priority.high': 'High',
   'admin.smartInbox.priority.medium': 'Medium',
   'admin.smartInbox.priority.low': 'Low',
+
+  // Collection insights dashboard (FEAT-9.4, #335) — AI-powered collection
+  // insights with completion suggestions, recommendations, and gap analysis.
+  // Deterministic stats (genre, decade, format) are always available without AI.
+  'admin.tab.insights': 'Insights',
+  'admin.insights.title': 'Collection insights',
+  'admin.insights.subtitle': 'AI-powered analysis of your collection — suggestions, recommendations, and gaps.',
+  'admin.insights.loading': 'Loading insights…',
+  'admin.insights.error': 'Could not load collection insights.',
+  'admin.insights.retry': 'Retry',
+  'admin.insights.empty': 'Add some items to your collection to see insights.',
+  'admin.insights.noAi': 'Activate an AI provider to generate insights.',
+  'admin.insights.updated': 'Last updated {time}',
+  'admin.insights.cached': 'Cached — last generated {time}',
+  'admin.insights.generate': 'Generate insights',
+  'admin.insights.generating': 'Generating…',
+  'admin.insights.section.stats': 'Collection stats',
+  'admin.insights.stats.total': 'Total items',
+  'admin.insights.stats.genre': 'Genre distribution',
+  'admin.insights.stats.decade': 'Decade spread',
+  'admin.insights.stats.format': 'Format breakdown',
+  'admin.insights.stats.noGenres': 'No genre data yet.',
+  'admin.insights.stats.noDecades': 'No decade data yet.',
+  'admin.insights.stats.noFormats': 'No format data yet.',
+  'admin.insights.section.completions': 'Completion suggestions',
+  'admin.insights.completions.empty': 'No completion suggestions yet — generate insights to see recommendations.',
+  'admin.insights.completions.evidence': 'Evidence: {evidence}',
+  'admin.insights.completions.estimated': 'Estimated',
+  'admin.insights.section.recommendations': 'You might like',
+  'admin.insights.recommendations.empty': 'No recommendations yet — generate insights to see suggestions.',
+  'admin.insights.recommendations.evidence': 'Based on: {evidence}',
+  'admin.insights.section.gaps': 'Collection gaps',
+  'admin.insights.gaps.empty': 'No gaps identified yet — generate insights to see analysis.',
+  'admin.insights.gaps.evidence': 'Evidence: {evidence}',
+  'admin.insights.disclaimer': 'AI-generated suggestions — review before acting. AI suggests; you decide.',
+  'admin.insights.collectionType': 'Collection type',
 
   // §17 Conflict resolution (M3 #161, ADR-0019 Dec 8)
   'conflict.title': 'Sync Conflict',

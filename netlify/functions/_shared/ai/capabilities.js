@@ -519,6 +519,170 @@ export const FEEDBACK_TRIAGE = Object.freeze({
   maxTokens: 512,
 })
 
+// Collection insights: generate completion suggestions, "you might like"
+// recommendations, and collection gap analysis from canonical metadata.
+// Data-minimization: only public canonical fields (title, artist, genre,
+// year, format) are sent to the model — never private owned attributes
+// (notes, grading, lending, wishlist).
+// "AI suggests; app decides": the output is advisory only — no auto-execution.
+// XSS-safe: all output text is schema-validated and bounded.
+export const COLLECTION_INSIGHTS = Object.freeze({
+  id: 'collectionInsights',
+  description: 'Generate collection insights: completion suggestions, recommendations, and gap analysis from canonical metadata.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['collectionType', 'items'],
+    properties: {
+      collectionType: { type: 'string', minLength: 1, maxLength: 100 },
+      items: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 100,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'title'],
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 36 },
+            title: { type: 'string', minLength: 1, maxLength: 500 },
+            subtitle: { type: 'string', maxLength: 500 },
+            artist: { type: 'string', maxLength: 500 },
+            genre: { type: 'string', maxLength: 200 },
+            year: { type: 'string', maxLength: 10 },
+            format: { type: 'string', maxLength: 200 },
+            label: { type: 'string', maxLength: 500 },
+          },
+        },
+      },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['insights'],
+    properties: {
+      insights: {
+        type: 'object',
+        additionalProperties: false,
+        required: [],
+        properties: {
+          completionSuggestions: {
+            type: 'array',
+            maxItems: 10,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['title', 'reason'],
+              properties: {
+                title: { type: 'string', minLength: 1, maxLength: 500 },
+                subtitle: { type: 'string', maxLength: 500 },
+                artist: { type: 'string', maxLength: 500 },
+                reason: { type: 'string', minLength: 1, maxLength: 500 },
+                evidence: { type: 'string', maxLength: 500 },
+                estimated: { type: 'boolean' },
+              },
+            },
+          },
+          recommendations: {
+            type: 'array',
+            maxItems: 10,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['title', 'reason'],
+              properties: {
+                title: { type: 'string', minLength: 1, maxLength: 500 },
+                subtitle: { type: 'string', maxLength: 500 },
+                artist: { type: 'string', maxLength: 500 },
+                reason: { type: 'string', minLength: 1, maxLength: 500 },
+                evidence: { type: 'string', maxLength: 500 },
+                estimated: { type: 'boolean' },
+              },
+            },
+          },
+          gaps: {
+            type: 'array',
+            maxItems: 10,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['description', 'reason'],
+              properties: {
+                description: { type: 'string', minLength: 1, maxLength: 500 },
+                reason: { type: 'string', minLength: 1, maxLength: 500 },
+                evidence: { type: 'string', maxLength: 500 },
+                estimated: { type: 'boolean' },
+              },
+            },
+          },
+        },
+      },
+    },
+  }),
+  maxTokens: 2048,
+})
+
+// Image recognition: identify an item from a user-submitted image
+// (ADR-0021 §2.5 — Image Recognition Tool).
+//
+// Input: { imageUrl (signed, temporary), hints?: { collectionType? } }
+// Output: { candidates: [{ title, confidence, providerId?, source }] }
+//
+// Security constraints (ADR-0021 §2.5):
+//   - Image URLs are server-signed, time-bounded (5 min TTL), and scoped to
+//     the authenticated user.
+//   - The image is never stored or cached by the AI provider.
+//   - The model receives only the image data and public reference metadata —
+//     never private collection context.
+//   - AI suggests only (no auto-add): candidates require user confirmation.
+//
+// XSS-safe: all returned string values (title, source) are schema-validated
+// and bounded. providerId is optional and allowlisted.
+export const IDENTIFY_FROM_IMAGE = Object.freeze({
+  id: 'identifyFromImage',
+  description: 'Identify an item from a user-submitted image (cover, label, barcode). Returns candidate matches with confidence scores.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['imageUrl'],
+    properties: {
+      imageUrl: { type: 'string', minLength: 1, maxLength: 2000 },
+      hints: {
+        type: 'object',
+        additionalProperties: false,
+        required: [],
+        properties: {
+          collectionType: { type: 'string', maxLength: 100 },
+        },
+      },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['candidates'],
+    properties: {
+      candidates: {
+        type: 'array',
+        maxItems: 10,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['title', 'confidence'],
+          properties: {
+            title: { type: 'string', minLength: 1, maxLength: 500 },
+            confidence: { type: 'number', minimum: 0, maximum: 1 },
+            providerId: { type: 'string', maxLength: 200 },
+            source: { type: 'string', maxLength: 200 },
+          },
+        },
+      },
+    },
+  }),
+  maxTokens: 1024,
+})
+
 // The full registry, keyed by capability id.
 export const CAPABILITIES = Object.freeze({
   [CLASSIFY.id]: CLASSIFY,
@@ -529,6 +693,8 @@ export const CAPABILITIES = Object.freeze({
   [FIND_DUPLICATES.id]: FIND_DUPLICATES,
   [ASSISTANT_QUERY.id]: ASSISTANT_QUERY,
   [FEEDBACK_TRIAGE.id]: FEEDBACK_TRIAGE,
+  [COLLECTION_INSIGHTS.id]: COLLECTION_INSIGHTS,
+  [IDENTIFY_FROM_IMAGE.id]: IDENTIFY_FROM_IMAGE,
 })
 
 export function getCapability(id) {
