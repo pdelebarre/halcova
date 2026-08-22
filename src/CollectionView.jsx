@@ -1275,7 +1275,7 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
               query={debouncedQuery}
             />
           ) : (sortBy === 'genre' || (!debouncedQuery && sortBy === 'added')) ? (
-            <GenreShelf items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
+            <GenreShelf items={visibleItems} GridComponent={catalog.components.Grid || Grid} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
           ) : (
             <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
           )

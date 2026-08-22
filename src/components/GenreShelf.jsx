@@ -1,15 +1,15 @@
 import { useMemo } from 'react'
 import { t } from '../i18n'
 import SectionHeader from './SectionHeader'
-import Grid from './Grid'
 import './GenreShelf.css'
 
 /**
  * GenreShelf — groups items by genre, like record shop sections.
  * Each genre gets a sticky header + grid of cards.
  * Items with multiple genres appear in every matching section.
+ * Receives GridComponent from the caller (catalog-specific AlbumGrid/BookGrid).
  */
-export default function GenreShelf({ items, onOpen, lendingEnabled, copy, query }) {
+export default function GenreShelf({ items, GridComponent, onOpen, lendingEnabled, copy, query }) {
   // Group items by genre
   const sections = useMemo(() => {
     const map = new Map()
@@ -82,7 +82,7 @@ export default function GenreShelf({ items, onOpen, lendingEnabled, copy, query 
             count={sectionItems.length}
             className="genre-section-header"
           />
-          <Grid items={sectionItems} onOpen={onOpen} lendingEnabled={lendingEnabled} copy={copy} query={query} />
+          <GridComponent items={sectionItems} onOpen={onOpen} lendingEnabled={lendingEnabled} copy={copy} query={query} />
         </section>
       ))}
     </div>
