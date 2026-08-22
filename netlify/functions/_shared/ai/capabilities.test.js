@@ -9,7 +9,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   CAPABILITIES,
   CLASSIFY,
+  COMPLETE_METADATA,
   DEDUPLICATE,
+  FIND_DUPLICATES,
   PRIORITIZE,
   GENERATE_ISSUE_EPIC,
   getCapability,
@@ -143,5 +145,222 @@ it('proceeds when supports() is not a function (no gating)', async () => {
     })
     expect(out.title).toBe('Scanner bug')
     expect(out.acceptanceCriteria).toEqual(['Repro'])
+  })
+
+  // ---------------------------------------------------------------------------
+  // COMPLETE_METADATA capability tests
+  // ---------------------------------------------------------------------------
+
+  it('exposes COMPLETE_METADATA in the registry', () => {
+    expect(CAPABILITIES.completeMetadata).toBe(COMPLETE_METADATA)
+    expect(getCapability('completeMetadata')).toBe(COMPLETE_METADATA)
+  })
+
+  it('declares a bounded token ceiling for COMPLETE_METADATA', () => {
+    expect(COMPLETE_METADATA.maxTokens).toBeLessThanOrEqual(1024)
+  })
+
+  it('runs completeMetadata end to end with valid input', async () => {
+    const provider = fakeProvider({
+      content: {
+        suggestedFields: { title: 'Abbey Road', artist: 'The Beatles', year: '1969' },
+        confidence: 0.95,
+        source: 'openai',
+      },
+    })
+    const out = await runCapability(provider, 'completeMetadata', {
+      itemId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      existingFields: { title: 'Abbey' },
+    })
+    expect(out.suggestedFields.title).toBe('Abbey Road')
+    expect(out.confidence).toBe(0.95)
+    expect(out.source).toBe('openai')
+  })
+
+  it('rejects completeMetadata input missing required itemId', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'completeMetadata', {
+      existingFields: { title: 'Abbey' },
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+    expect(provider.complete).not.toHaveBeenCalled()
+  })
+
+  it('rejects completeMetadata input with invalid itemId type', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'completeMetadata', {
+      itemId: 123,
+      existingFields: { title: 'Abbey' },
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects completeMetadata output missing required fields', async () => {
+    const provider = fakeProvider({ content: { suggestedFields: { title: 'A' } } })
+    await expect(runCapability(provider, 'completeMetadata', {
+      itemId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      existingFields: { title: 'A' },
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects completeMetadata output with confidence out of range', async () => {
+    const provider = fakeProvider({
+      content: {
+        suggestedFields: { title: 'A' },
+        confidence: 1.5,
+        source: 'test',
+      },
+    })
+    await expect(runCapability(provider, 'completeMetadata', {
+      itemId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      existingFields: { title: 'A' },
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects completeMetadata output with unknown properties', async () => {
+    const provider = fakeProvider({
+      content: {
+        suggestedFields: { title: 'A' },
+        confidence: 0.9,
+        source: 'test',
+        extraField: 'not allowed',
+      },
+    })
+    await expect(runCapability(provider, 'completeMetadata', {
+      itemId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      existingFields: { title: 'A' },
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  // ---------------------------------------------------------------------------
+  // FIND_DUPLICATES capability tests
+  // ---------------------------------------------------------------------------
+
+  it('exposes FIND_DUPLICATES in the registry', () => {
+    expect(CAPABILITIES.findDuplicates).toBe(FIND_DUPLICATES)
+    expect(getCapability('findDuplicates')).toBe(FIND_DUPLICATES)
+  })
+
+  it('declares a bounded token ceiling for FIND_DUPLICATES', () => {
+    expect(FIND_DUPLICATES.maxTokens).toBeLessThanOrEqual(1024)
+  })
+
+  it('runs findDuplicates end to end with valid input', async () => {
+    const provider = fakeProvider({
+      content: {
+        pairs: [
+          {
+            itemA: { id: 'a1', title: 'Abbey Road' },
+            itemB: { id: 'b1', title: 'Abbey Road (Remastered)' },
+            score: 0.92,
+            reason: 'Same title, different edition',
+          },
+        ],
+      },
+    })
+    const out = await runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [
+        { id: 'a1', title: 'Abbey Road' },
+        { id: 'b1', title: 'Abbey Road (Remastered)' },
+      ],
+    })
+    expect(out.pairs).toHaveLength(1)
+    expect(out.pairs[0].score).toBe(0.92)
+    expect(out.pairs[0].itemA.id).toBe('a1')
+  })
+
+  it('rejects findDuplicates input with fewer than 2 candidates', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [{ id: 'a1', title: 'Only One' }],
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+    expect(provider.complete).not.toHaveBeenCalled()
+  })
+
+  it('rejects findDuplicates input with more than 50 candidates', async () => {
+    const provider = fakeProvider({ content: {} })
+    const manyCandidates = Array.from({ length: 51 }, (_, i) => ({ id: `id${i}`, title: `Item ${i}` }))
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: manyCandidates,
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects findDuplicates output with missing required fields', async () => {
+    const provider = fakeProvider({ content: { pairs: [{ itemA: { id: 'a1', title: 'A' } }] } })
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [
+        { id: 'a1', title: 'A' },
+        { id: 'b1', title: 'B' },
+      ],
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects findDuplicates output with score out of range', async () => {
+    const provider = fakeProvider({
+      content: {
+        pairs: [
+          {
+            itemA: { id: 'a1', title: 'A' },
+            itemB: { id: 'b1', title: 'B' },
+            score: 1.5,
+          },
+        ],
+      },
+    })
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [
+        { id: 'a1', title: 'A' },
+        { id: 'b1', title: 'B' },
+      ],
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects findDuplicates output with unknown properties', async () => {
+    const provider = fakeProvider({
+      content: {
+        pairs: [
+          {
+            itemA: { id: 'a1', title: 'A' },
+            itemB: { id: 'b1', title: 'B' },
+            score: 0.8,
+            extra: 'not allowed',
+          },
+        ],
+      },
+    })
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [
+        { id: 'a1', title: 'A' },
+        { id: 'b1', title: 'B' },
+      ],
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects findDuplicates input with threshold below 0.5', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [
+        { id: 'a1', title: 'A' },
+        { id: 'b1', title: 'B' },
+      ],
+      threshold: 0.1,
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
+  })
+
+  it('rejects findDuplicates input with threshold above 1.0', async () => {
+    const provider = fakeProvider({ content: {} })
+    await expect(runCapability(provider, 'findDuplicates', {
+      collectionType: 'records',
+      candidates: [
+        { id: 'a1', title: 'A' },
+        { id: 'b1', title: 'B' },
+      ],
+      threshold: 2.0,
+    })).rejects.toMatchObject({ code: ProviderErrorCode.INVALID_OUTPUT })
   })
 })
