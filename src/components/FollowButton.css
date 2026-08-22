@@ -1,0 +1,61 @@
+.follow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border: 1px solid var(--accent, #3b82f6);
+  border-radius: 20px;
+  background: var(--surface, #fff);
+  color: var(--accent, #3b82f6);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.follow-btn:hover:not(:disabled) {
+  background: var(--accent-hover-bg, #eff6ff);
+}
+
+.follow-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.follow-btn--sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.follow-btn--md {
+  padding: 0.375rem 1rem;
+}
+
+.follow-btn--active {
+  background: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+.follow-btn--active:hover:not(:disabled) {
+  background: var(--accent-hover, #2563eb);
+  border-color: var(--accent-hover, #2563eb);
+}
+
+.follow-btn--loading {
+  border-color: var(--border, #ddd);
+  background: var(--surface-secondary, #f5f5f5);
+}
+
+.follow-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border, #ddd);
+  border-top-color: var(--accent, #3b82f6);
+  border-radius: 50%;
+  animation: follow-spin 0.6s linear infinite;
+}
+
+@keyframes follow-spin {
+  to { transform: rotate(360deg); }
+}
