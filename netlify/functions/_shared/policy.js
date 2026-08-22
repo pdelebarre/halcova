@@ -114,6 +114,19 @@ export const POLICY = {
   'payment:status': { capability: true },
   'payment:portal': { owner: 'self' },
   'billing:webhook': { webhook: true },
+
+  // --- profiles (FEAT-8.1 #326) ----------------------------------------------
+  // Profile READ via share id is PUBLIC (no auth required). Profile READ via
+  // user id is owner-scoped. Profile WRITE is owner-scoped (self).
+  'profile:read:public': {},           // public profile by share id
+  'profile:read:own': { owner: 'self' },  // own profile by user id
+  'profile:write': { owner: 'self', deny: ['demo'] },
+  'profile:delete': { owner: 'self', deny: ['demo'] },
+
+  // --- public collection items (FEAT-8.1 #326) --------------------------------
+  // Public collection items are read-only, filtered through visibility.js.
+  'profile:collection:read:public': {},    // public collection by share id
+  'profile:collection:read:own': { owner: 'self' },  // own collection visibility
 }
 
 // Collapse an existing session-auth Response into the stable 401/403 shape

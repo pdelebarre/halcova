@@ -1095,6 +1095,27 @@ const en = {
   'home.continueBrowsing': 'Continue browsing',
   'home.browseByGenre': 'Browse by genre',
   'home.collectionTypes': 'Collection types',
+
+  // §14 Profile (FEAT-8.1, #326)
+  'profile.settings': 'Profile settings',
+  'profile.username': 'Username',
+  'profile.usernamePlaceholder': 'Your display name',
+  'profile.bio': 'Bio',
+  'profile.bioPlaceholder': 'Tell others about yourself',
+  'profile.profileVisibility': 'Profile visibility',
+  'profile.collectionVisibility': 'Collection visibility',
+  'profile.visibilityPrivate': 'Private (only you)',
+  'profile.visibilityMembers': 'Members (signed-in users)',
+  'profile.visibilityPublic': 'Public (anyone with the link)',
+  'profile.links': 'Links',
+  'profile.linkLabelPlaceholder': 'Label',
+  'profile.linkUrlPlaceholder': 'https://…',
+  'profile.addLink': 'Add link',
+  'profile.shareUrl': 'Share URL',
+  'profile.defaultName': 'A Collector',
+  'profile.notFound': 'Profile not found',
+  'profile.loadError': 'Could not load profile',
+  'profile.emptyCollection': 'This collection is not public yet.',
 }
 
 export default en
