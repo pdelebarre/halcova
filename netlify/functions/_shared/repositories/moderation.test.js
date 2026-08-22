@@ -2,55 +2,22 @@
 // (FEAT-8.5, #330). Tests block/mute, reports, rate limiting, and security.
 
 import { describe, it, expect, vi } from 'vitest'
-import newDb from 'pg-mem'
-import moderationHandler from '../moderation'
+import moderationHandler from '../../moderation'
 
-// Mock the Postgres db module
-vi.mock('./_shared/postgres', () => {
-  const db = newDb().adapters.pg()
-  db.query(`
-    CREATE TABLE blocks (
-      id          uuid PRIMARY KEY,
-      blocker_id  text NOT NULL,
-      blocked_id  text NOT NULL,
-      reason      text NOT NULL DEFAULT '',
-      created_at  timestamptz NOT NULL DEFAULT now(),
-      UNIQUE (blocker_id, blocked_id)
-    );
-    CREATE INDEX blocks_blocker_idx ON blocks (blocker_id);
-    CREATE INDEX blocks_blocked_idx ON blocks (blocked_id);
-
-    CREATE TABLE reports (
-      id              uuid PRIMARY KEY,
-      reporter_id     text NOT NULL,
-      target_type     text NOT NULL,
-      target_id       text NOT NULL,
-      reason          text NOT NULL CHECK (char_length(reason) BETWEEN 1 AND 2000),
-      status          text NOT NULL DEFAULT 'open',
-      action_taken    text NOT NULL DEFAULT '',
-      moderator_id    text NOT NULL DEFAULT '',
-      moderator_note  text NOT NULL DEFAULT '',
-      created_at      timestamptz NOT NULL DEFAULT now(),
-      updated_at      timestamptz NOT NULL DEFAULT now(),
-      CONSTRAINT reports_status_check
-        CHECK (status IN ('open', 'under_review', 'resolved', 'dismissed')),
-      CONSTRAINT reports_action_check
-        CHECK (action_taken IN ('', 'content_hidden', 'user_warned', 'user_blocked', 'none'))
-    );
-    CREATE INDEX reports_status_idx ON reports (status, created_at DESC);
-    CREATE INDEX reports_target_idx ON reports (target_type, target_id);
-    CREATE INDEX reports_reporter_idx ON reports (reporter_id);
-  `)
-  return { isPostgresConfigured: () => true, db }
-})
+// Mock the Postgres db module. Tests exercise only routing/auth that returns
+// before createBlocksRepo/createReportsRepo is called, so a stub suffices.
+vi.mock('../postgres', () => ({
+  isPostgresConfigured: () => true,
+  db: { query: vi.fn() },
+}))
 
 // Mock session-auth
-vi.mock('./_shared/session-auth', () => ({
+vi.mock('../session-auth', () => ({
   resolveSession: vi.fn(),
   requireAdmin: vi.fn(),
 }))
 
-import { resolveSession } from './_shared/session-auth'
+import { resolveSession } from '../session-auth'
 
 function mockRequest(method, path, { body, headers = {} } = {}) {
   const url = `https://runout.example.com/.netlify/functions/moderation${path}`
