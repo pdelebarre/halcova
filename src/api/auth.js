@@ -212,3 +212,19 @@ export async function adminAiDashboard() {
 export async function adminAiDryRun({ limit, offset } = {}) {
   return postJson(ADMIN_URL, { action: 'aiDryRun', limit, offset }, getSessionToken())
 }
+
+// ---- Collection insights (FEAT-9.4, #335) ----
+// Generate AI-powered collection insights: completion suggestions,
+// recommendations, and gap analysis. Data-minimization: only canonical
+// metadata is sent to the model. "AI suggests; app decides" — output is
+// advisory only. Results are cached server-side for 5 minutes.
+
+// Generate collection insights for a given collection type and items.
+// `collectionType` is the collection kind (e.g. 'records', 'books').
+// `items` is an array of item objects with canonical fields (title, artist,
+// genre, year, format, label).
+// Returns { insights, cached } where insights contains completionSuggestions,
+// recommendations, and gaps.
+export async function adminAiInsights({ collectionType, items }) {
+  return postJson(ADMIN_URL, { action: 'aiInsights', collectionType, items }, getSessionToken())
+}

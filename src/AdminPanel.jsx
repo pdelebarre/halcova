@@ -4,11 +4,26 @@ import * as feedbackApi from './api/feedback'
 import { t, getLocale } from './i18n'
 import { deviceLabel } from './utils/appInfo'
 import SmartFeedbackInbox from './components/SmartFeedbackInbox'
+import InsightsDashboard from './components/InsightsDashboard'
 import './AdminPanel.css'
 
-const KIND_LABELS = { records: () => t('kind.records'), books: () => t('kind.books') }
-const KIND_ACCESS_LABELS = { records: () => t('kind.recordsAccess'), books: () => t('kind.booksAccess') }
-const KINDS = ['records', 'books']
+const KIND_LABELS = {
+  records: () => t('kind.records'),
+  books: () => t('kind.books'),
+  games: () => t('kind.games'),
+  guitars: () => t('kind.guitars'),
+  cards: () => t('kind.cards'),
+  coins: () => t('kind.coins'),
+}
+const KIND_ACCESS_LABELS = {
+  records: () => t('kind.recordsAccess'),
+  books: () => t('kind.booksAccess'),
+  games: () => t('kind.gamesAccess'),
+  guitars: () => t('kind.guitarsAccess'),
+  cards: () => t('kind.cardsAccess'),
+  coins: () => t('kind.coinsAccess'),
+}
+const KINDS = ['records', 'books', 'games', 'guitars', 'cards', 'coins']
 
 // Feedback inbox (epic #74, T6 #75) — mirror the allow-lists in
 // netlify/functions/feedback.js so a junk value from the server renders a
@@ -121,7 +136,7 @@ export default function AdminPanel({ onClose }) {
 
   // Feedback inbox (epic #74, T6 #75). Loaded on mount so the Feedback tab's
   // unread badge (open items) is correct before the owner ever clicks it.
-  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'smartInbox' | 'dashboard' | 'ai' | 'aiDashboard'
+  const [tab, setTab] = useState('members') // 'members' | 'feedback' | 'smartInbox' | 'dashboard' | 'ai' | 'aiDashboard' | 'insights'
   const [allItems, setAllItems] = useState([]) // full newest-first inbox (badge source)
   const [fbLoading, setFbLoading] = useState(true)
   const [fbError, setFbError] = useState('')
@@ -690,6 +705,15 @@ export default function AdminPanel({ onClose }) {
             onClick={() => setTab('aiDashboard')}
           >
             {t('admin.tab.aiDashboard')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'insights'}
+            className={`admin-tab${tab === 'insights' ? ' active' : ''}`}
+            onClick={() => setTab('insights')}
+          >
+            {t('admin.tab.insights')}
           </button>
         </div>
 
@@ -1332,6 +1356,12 @@ export default function AdminPanel({ onClose }) {
                 </>
               )}
             </section>
+          ) : tab === 'insights' ? (
+            <InsightsDashboard
+              items={[]}
+              collectionType="records"
+              onClose={() => setTab('members')}
+            />
           ) : (
             <section>
               {/* Feedback inbox — owner-only triage (epic #74, T6 #75) */}

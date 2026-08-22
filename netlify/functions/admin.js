@@ -37,6 +37,7 @@ import {
   testProviderProfile,
   updateProviderProfile,
 } from './_shared/ai/ai-admin'
+import { generateCollectionInsights } from './_shared/ai/ai-insights'
 import {
   deleteUserCollections,
   getRequest,
@@ -393,6 +394,29 @@ async function handleAiDryRun(body) {
   return json(200, result)
 }
 
+// (FEAT-9.4, #335) — Collection insights generation.
+// Accepts { collectionType, items } where items is an array of canonical
+// item metadata. Returns AI-generated completion suggestions, recommendations,
+// and gap analysis. Data-minimization: only canonical fields are sent to the
+// model. "AI suggests; app decides" — output is advisory only.
+async function handleAiInsights(body) {
+  const collectionType = body?.collectionType
+  const items = body?.items
+  if (!collectionType || typeof collectionType !== 'string') {
+    return json(400, { error: 'collectionType is required.', code: 'INVALID_INPUT' })
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    return json(400, { error: 'items array is required and must not be empty.', code: 'INVALID_INPUT' })
+  }
+  // Cap items to 100 to bound AI cost
+  const cappedItems = items.slice(0, 100)
+  const result = await generateCollectionInsights(collectionType, cappedItems)
+  if (result.error) {
+    return json(400, { error: result.error.message, code: result.error.code })
+  }
+  return json(200, { insights: result.insights, cached: result.cached })
+}
+
 // Validate the ids shared across admin actions (SEC-3.1, #194): requestId,
 // userId and reviewId must be short, non-empty strings. Reused by each handler
 // so the shape checks live in one place instead of being re-derived. The
@@ -562,6 +586,8 @@ export default async (req) => {
         case 'aiActivate': return await handleAiActivate(body)
         // (ADMIN-3.8, #310) — AI dry-run evaluation.
         case 'aiDryRun': return await handleAiDryRun(body)
+        // (FEAT-9.4, #335) — Collection insights generation.
+        case 'aiInsights': return await handleAiInsights(body)
         default: return json(400, { error: 'Unknown action.' })
       }
     }
