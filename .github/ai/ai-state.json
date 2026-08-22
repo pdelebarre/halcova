@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0",
+  "last_updated": "2026-08-22",
+  "architectural_decisions": [
+    {
+      "id": "ARCH-001",
+      "title": "MFE + BFF Architecture Pattern",
+      "date": "2025-08-15",
+      "status": "active",
+      "decision": "React Vite micro-frontends with Spring Boot Backend for Frontend",
+      "alternatives_considered": ["Monolithic React app", "Next.js with API routes", "Pure microservices"],
+      "rationale": "Separation of concerns between frontend teams, independent deployment, BFF provides unified API facade for MFEs",
+      "implications": ["Frontend teams can work independently on MFEs", "BFF handles cross-cutting concerns (auth, rate limiting, aggregation)", "Increased deployment complexity"],
+      "review_date": "2026-08-15"
+    },
+    {
+      "id": "ARCH-002",
+      "title": "Offline-First Data Sync",
+      "date": "2025-09-01",
+      "status": "active",
+      "decision": "Local PouchDB with custom sync protocol to PostgreSQL backend",
+      "alternatives_considered": ["Redux Persist with rehydration", "Service Worker cache only", "GraphQL with offline mutations"],
+      "rationale": "Field operations require reliable offline capability with conflict resolution",
+      "implications": ["PouchDB in browser for local persistence", "Custom sync protocol for conflict detection", "PostgreSQL for server-side canonical data"],
+      "review_date": "2026-09-01"
+    },
+    {
+      "id": "ARCH-003",
+      "title": "Netlify for Frontend Hosting",
+      "date": "2025-08-20",
+      "status": "active",
+      "decision": "Netlify for MFE hosting with Netlify Functions for serverless backend",
+      "alternatives_considered": ["Vercel", "AWS S3 + CloudFront", "Self-hosted Nginx"],
+      "rationale": "Simple deployment, built-in CI/CD, serverless functions for lightweight backend",
+      "implications": ["10-second function timeout limit", "Edge functions for low-latency", "Netlify Collections for CMS-like content"],
+      "constraints": ["Functions timeout at 10s — use async processing for long tasks", "Connection pooling: max 20 connections per function instance"],
+      "review_date": "2026-08-20"
+    },
+    {
+      "id": "ARCH-004",
+      "title": "Multi-Tenant Data Isolation",
+      "date": "2025-10-01",
+      "status": "active",
+      "decision": "Row-level security (RLS) in PostgreSQL with tenant_id column",
+      "alternatives_considered": ["Separate databases per tenant", "Separate schemas per tenant", "Application-level filtering only"],
+      "rationale": "Cost-effective, maintains single codebase, RLS provides defense in depth",
+      "implications": ["All tables must have tenant_id column", "RLS policies on all tenant-scoped tables", "Application must set tenant context on connection"],
+      "review_date": "2026-10-01"
+    }
+  ],
+  "technical_learnings": [
+    {
+      "id": "LEARN-001",
+      "category": "Netlify",
+      "learning": "Netlify Functions timeout at 10 seconds — use async processing for long tasks",
+      "context": "Barcode scanning and image processing exceed timeout",
+      "solution": "Offload to background job with webhook callback",
+      "date": "2025-11-15"
+    },
+    {
+      "id": "LEARN-002",
+      "category": "PostgreSQL",
+      "learning": "Connection pooling: max 20 connections per Netlify Function instance",
+      "context": "Connection exhaustion under load",
+      "solution": "Use PgBouncer or connection pooler, limit concurrent connections",
+      "date": "2025-12-01"
+    },
+    {
+      "id": "LEARN-003",
+      "category": "PouchDB",
+      "learning": "PouchDB replication conflicts on high-write scenarios",
+      "context": "Multiple devices syncing same document",
+      "solution": "Implement last-write-wins with vector clocks for conflict resolution",
+      "date": "2026-01-10"
+    },
+    {
+      "id": "LEARN-004",
+      "category": "React Vite",
+      "learning": "MFE shared dependencies must be externalized to avoid duplication",
+      "context": "Bundle size explosion with multiple MFEs",
+      "solution": "Use module federation with shared dependencies configured",
+      "date": "2026-02-20"
+    }
+  ],
+  "patterns_and_conventions": [
+    {
+      "id": "PATTERN-001",
+      "name": "BFF Aggregation Pattern",
+      "description": "BFF aggregates multiple backend services into unified frontend API",
+      "example": "Catalog BFF aggregates product, pricing, and inventory services",
+      "files": ["src/backend/bff/catalog-controller.ts", "src/backend/bff/catalog-service.ts"]
+    },
+    {
+      "id": "PATTERN-002",
+      "name": "Offline Queue Pattern",
+      "description": "Queue mutations locally when offline, sync when online",
+      "example": "Scan results queued in PouchDB, synced to PostgreSQL on reconnect",
+      "files": ["src/frontend/offline/queue-manager.ts", "src/frontend/offline/sync-protocol.ts"]
+    },
+    {
+      "id": "PATTERN-003",
+      "name": "Tenant Context Pattern",
+      "description": "Tenant ID propagated through all layers via context/middleware",
+      "example": "JWT contains tenant_id, middleware sets PostgreSQL session variable",
+      "files": ["src/backend/middleware/tenant-context.ts", "src/backend/db/tenant-aware-query.ts"]
+    }
+  ],
+  "active_constraints": [
+    "Netlify Functions: 10s timeout, 1024MB memory",
+    "PostgreSQL: 20 connections per function instance max",
+    "PouchDB: 50MB local storage limit per origin",
+    "MFE bundle: < 200KB gzipped per MFE"
+  ]
+}
