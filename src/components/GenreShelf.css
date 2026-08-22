@@ -1,0 +1,61 @@
+/* GenreShelf — record-shop genre sections */
+
+.genre-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Jump-to-genre rail */
+.genre-jump-rail {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.genre-jump-rail::-webkit-scrollbar {
+  display: none;
+}
+.genre-jump-chip {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--vinyl-groove);
+  color: var(--jacket-kraft);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.genre-jump-chip:active {
+  background: var(--vinyl-groove-2);
+  border-color: var(--runout-gold);
+  color: var(--runout-gold);
+}
+
+/* Genre section — sticky header + grid */
+.genre-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+}
+.genre-section + .genre-section {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 16px;
+}
+.genre-section-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--vinyl-groove);
+  padding: 8px 0;
+}

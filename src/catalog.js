@@ -50,6 +50,7 @@ export const recordsCatalog = {
     { value: 'artist', label: 'Artist A–Z' },
     { value: 'year', label: 'Year' },
     { value: 'format', label: 'Format' },
+    { value: 'genre', label: 'By genre' },
   ],
   // The Aisles (§ Phase 2): browse axes for the aisle picker. Each axis knows
   // how to extract its bin value(s) from an item; bins are counted client-side.
@@ -528,11 +529,11 @@ export const booksCatalog = {
   genreLabel: 'Category',
   artistLabel: 'author',
   artistPlaceholder: 'All authors',
-  sortOptions: [
+sortOptions: [
     { value: 'added', label: 'Recently added' },
-    { value: 'artist', label: 'Author A–Z' },
-    { value: 'title', label: 'Title A–Z' },
+    { value: 'author', label: 'Author A–Z' },
     { value: 'year', label: 'Year' },
+    { value: 'genre', label: 'By genre' },
   ],
   // The Aisles (§ Phase 2): browse axes for the aisle picker. Books have no
   // series field in the item shape, so the axes cover the data we actually have.

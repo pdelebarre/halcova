@@ -12,6 +12,7 @@ import WishlistSheet from './components/WishlistSheet'
 import PlayPanel from './components/PlayPanel'
 import SyncStatus from './components/SyncStatus'
 import ConflictResolutionModal from './components/ConflictResolutionModal'
+import GenreShelf from './components/GenreShelf'
 import { useCollection } from './hooks/useCollection'
 import { useLookup } from './hooks/useLookup'
 import { useOutboxSync } from './hooks/useOutboxSync'
@@ -1273,6 +1274,8 @@ export default function CollectionView({ catalog, onRequestSettings, lendingEnab
               onOpen={openItem}
               query={debouncedQuery}
             />
+          ) : (sortBy === 'genre' || (!debouncedQuery && sortBy === 'added')) ? (
+            <GenreShelf items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
           ) : (
             <Grid items={visibleItems} onOpen={openItem} lendingEnabled={lendingEnabled} copy={copy} query={debouncedQuery} />
           )
