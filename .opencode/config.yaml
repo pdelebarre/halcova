@@ -1,4 +1,5 @@
 # OpenCode Configuration with Token Optimization
+# Optimized for DeepSeek Flash
 # https://opencode.ai/docs/ecosystem/
 
 # Plugin configuration
@@ -10,15 +11,15 @@
 #   ]
 # }
 
-# Model configuration with cost-aware routing
+# Model configuration - DeepSeek Flash
+# DeepSeek Flash: Fast, cheap, good for most tasks
+# Use only Flash for all tasks (cost-effective)
 models:
-  # Use cheap models for exploration tasks (70% of agentic tokens)
-  explorer: anthropic/haiku-3.5  # Fast, cheap for grep/find
-  planner: anthropic/haiku-3.5   # Planning and task breakdown
-  
-  # Use expensive models only for complex reasoning
-  coder: anthropic/sonnet-3.5    # Complex implementation
-  debugger: anthropic/sonnet-3.5 # Deep debugging
+  default: deepseek/deepseek-chat  # DeepSeek Flash for all tasks
+  explorer: deepseek/deepseek-chat  # Fast for grep/find
+  planner: deepseek/deepseek-chat   # Planning and task breakdown
+  coder: deepseek/deepseek-chat     # Implementation
+  debugger: deepseek/deepseek-chat  # Debugging
 
 # Auto-compact to prevent runaway sessions
 autoCompact: true
