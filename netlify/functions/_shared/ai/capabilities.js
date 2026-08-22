@@ -229,76 +229,6 @@ export const COMPLETE_METADATA = Object.freeze({
   maxTokens: 1024,
 })
 
-// Duplicate detection: find likely duplicate pairs within a collection.
-export const FIND_DUPLICATES = Object.freeze({
-  id: 'findDuplicates',
-  description: 'Find likely duplicate items within a collection by comparing titles and provider ids.',
-  inputSchema: Object.freeze({
-    type: 'object',
-    additionalProperties: false,
-    required: ['collectionType', 'candidates'],
-    properties: {
-      collectionType: { type: 'string', minLength: 1, maxLength: 100 },
-      candidates: {
-        type: 'array',
-        minItems: 2,
-        maxItems: 50,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['id', 'title'],
-          properties: {
-            id: { type: 'string', minLength: 1, maxLength: 36 },
-            title: { type: 'string', minLength: 1, maxLength: 500 },
-            subtitle: { type: 'string', maxLength: 500 },
-            providerIds: { type: 'object', additionalProperties: { type: 'string', maxLength: 200 } },
-          },
-        },
-      },
-      threshold: { type: 'number', minimum: 0.5, maximum: 1 },
-    },
-  }),
-  outputSchema: Object.freeze({
-    type: 'object',
-    additionalProperties: false,
-    required: ['pairs'],
-    properties: {
-      pairs: {
-        type: 'array',
-        maxItems: 50,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['itemA', 'itemB', 'score'],
-          properties: {
-            itemA: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['id', 'title'],
-              properties: {
-                id: { type: 'string', minLength: 1, maxLength: 36 },
-                title: { type: 'string', minLength: 1, maxLength: 500 },
-              },
-            },
-            itemB: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['id', 'title'],
-              properties: {
-                id: { type: 'string', minLength: 1, maxLength: 36 },
-                title: { type: 'string', minLength: 1, maxLength: 500 },
-              },
-            },
-            score: { type: 'number', minimum: 0, maximum: 1 },
-            reason: { type: 'string', maxLength: 500 },
-          },
-        },
-      },
-    },
-  }),
-  maxTokens: 1024,
-})
-
 // Assistant query: interpret a natural-language collection query and return a
 // structured response with optional tool calls. This is the central capability
 // for the conversational assistant (#333, ADR-0021 §2.1).
@@ -429,6 +359,166 @@ export const ASSISTANT_QUERY = Object.freeze({
   maxTokens: 1024,
 })
 
+// Duplicate detection: find likely duplicate pairs within a collection.
+export const FIND_DUPLICATES = Object.freeze({
+  id: 'findDuplicates',
+  description: 'Find likely duplicate items within a collection by comparing titles and provider ids.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['collectionType', 'candidates'],
+    properties: {
+      collectionType: { type: 'string', minLength: 1, maxLength: 100 },
+      candidates: {
+        type: 'array',
+        minItems: 2,
+        maxItems: 50,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'title'],
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 36 },
+            title: { type: 'string', minLength: 1, maxLength: 500 },
+            subtitle: { type: 'string', maxLength: 500 },
+            providerIds: { type: 'object', additionalProperties: { type: 'string', maxLength: 200 } },
+          },
+        },
+      },
+      threshold: { type: 'number', minimum: 0.5, maximum: 1 },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['pairs'],
+    properties: {
+      pairs: {
+        type: 'array',
+        maxItems: 50,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['itemA', 'itemB', 'score'],
+          properties: {
+            itemA: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'title'],
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 36 },
+                title: { type: 'string', minLength: 1, maxLength: 500 },
+              },
+            },
+            itemB: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'title'],
+              properties: {
+                id: { type: 'string', minLength: 1, maxLength: 36 },
+                title: { type: 'string', minLength: 1, maxLength: 500 },
+              },
+            },
+            score: { type: 'number', minimum: 0, maximum: 1 },
+            reason: { type: 'string', maxLength: 500 },
+          },
+        },
+      },
+    },
+  }),
+  maxTokens: 1024,
+})
+
+// Feedback triage: classify + assign priority + recommend duplicates for incoming
+// feedback (ADMIN-3.4, #306, epic #302).
+//
+// Input includes the feedback message and optional context (type, category, url)
+// plus existing feedback entries for duplicate comparison.
+// Output is a structured triage result with controlled classification labels,
+// product area, priority, and ranked duplicate candidates.
+//
+// Security:
+//   - LLM output is untrusted and schema-validated via runCapability.
+//   - Controlled-value rejection: classification/productArea/priority are
+//     allow-listed; unknown values are rejected fail-closed.
+//   - Data-minimization: only the feedback text and metadata are sent to the
+//     model — never author identity, session tokens, or private fields.
+//   - Prompt-injection content: feedback text is treated as untrusted data;
+//     output schema validation rejects attempts to return unauthorized values.
+//   - No GitHub mutation occurs in this tool (#306 scope boundary).
+export const FEEDBACK_TRIAGE = Object.freeze({
+  id: 'feedbackTriage',
+  description: 'Classify incoming feedback, assign product area and priority, and recommend duplicate candidates.',
+  inputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['message'],
+    properties: {
+      message: { type: 'string', minLength: 1, maxLength: 4000 },
+      type: { type: 'string', enum: ['suggestion', 'bug'] },
+      category: { type: 'string', enum: ['records', 'books', 'scanner', 'auth', 'billing', 'games', 'lending', 'other'] },
+      url: { type: 'string', maxLength: 2000 },
+      appVersion: { type: 'string', maxLength: 100 },
+      existingFeedback: {
+        type: 'array',
+        maxItems: 20,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'message'],
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 100 },
+            message: { type: 'string', minLength: 1, maxLength: 4000 },
+            type: { type: 'string', maxLength: 50 },
+            category: { type: 'string', maxLength: 50 },
+          },
+        },
+      },
+    },
+  }),
+  outputSchema: Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    required: ['classification', 'productArea', 'priority', 'summary'],
+    properties: {
+      classification: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['label', 'confidence'],
+        properties: {
+          label: { type: 'string', enum: ['bug', 'enhancement', 'documentation', 'security', 'performance'] },
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+        },
+      },
+      productArea: {
+        type: 'string',
+        enum: ['scanner', 'auth', 'billing', 'collection', 'search', 'catalog', 'sync', 'ui', 'api', 'other'],
+      },
+      priority: {
+        type: 'string',
+        enum: ['critical', 'high', 'medium', 'low'],
+      },
+      priorityConfidence: { type: 'number', minimum: 0, maximum: 1 },
+      summary: { type: 'string', minLength: 1, maxLength: 200 },
+      duplicateCandidates: {
+        type: 'array',
+        maxItems: 20,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['feedbackId', 'score', 'evidence'],
+          properties: {
+            feedbackId: { type: 'string', minLength: 1, maxLength: 100 },
+            score: { type: 'number', minimum: 0, maximum: 1 },
+            evidence: { type: 'string', minLength: 1, maxLength: 500 },
+          },
+        },
+      },
+    },
+  }),
+  maxTokens: 512,
+})
+
 // The full registry, keyed by capability id.
 export const CAPABILITIES = Object.freeze({
   [CLASSIFY.id]: CLASSIFY,
@@ -438,6 +528,7 @@ export const CAPABILITIES = Object.freeze({
   [COMPLETE_METADATA.id]: COMPLETE_METADATA,
   [FIND_DUPLICATES.id]: FIND_DUPLICATES,
   [ASSISTANT_QUERY.id]: ASSISTANT_QUERY,
+  [FEEDBACK_TRIAGE.id]: FEEDBACK_TRIAGE,
 })
 
 export function getCapability(id) {
