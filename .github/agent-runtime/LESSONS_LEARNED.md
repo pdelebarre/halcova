@@ -44,7 +44,17 @@ GATE:        Security Auditor gate (kernel.md §3); evidence-cache rules (handof
 TICKET:      [RETRO-1.2] — open via routing trigger after gate-fail
 ```
 
-### RETRO-1.3
+### RETRO-2.1
+```
+DATE:        2026-08-22
+TEAM:        AI
+ISSUE:       #310 — [ADMIN-3.8] AI provider test/dry-run + cost, health & fallback dashboard
+MISTAKE:     Shared module import resolved at test time (via mocking) but failed at deploy time (via esbuild) because the exported symbol didn't exist.
+ROOT CAUSE:  Unit tests mock the import target, so the real export is never verified. Only esbuild (Netlify's bundler) traces the full module graph — and it fails when an import has no matching export.
+RULE:        Any PR adding a new import from netlify/functions/_shared/ must verify the exported symbol exists (grep for "export function" matching the import name, or run a bundler dry-run). Unit tests alone are insufficient — mocking hides missing exports.
+GATE:        Release Validator pre-submit checklist (kernel.md §6.1)
+TICKET:      [RETRO-2.1] — auto-opened after deploy-time esbuild failure
+```
 ```
 DATE:        2026-08-21
 TEAM:        SECURITY

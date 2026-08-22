@@ -121,6 +121,7 @@ These checks must pass before any PR is raised. Failures are hard blocks.
 | P5 | No self-approval of security or tenant-isolation gates | PM / Security |
 | P6 | Migration rollback script present for any schema change | Data Architect |
 | P7 | `LESSONS_LEARNED.md` consulted for patterns matching this ticket's domain | All implementers |
+| P8 | New import from `netlify/functions/_shared/` verified against target's exports — unit-test mocking can hide missing exports | Front End Dev / Netlify Backend |
 
 > Rules are sourced from `LESSONS_LEARNED.md`. When a RETRO ticket is closed,
 > the resolved rule is promoted here by the Agent Developer.
